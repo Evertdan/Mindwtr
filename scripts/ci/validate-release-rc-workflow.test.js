@@ -289,7 +289,7 @@ test("stable and RC releases sign and verify the checksum manifest", () => {
   }
 });
 
-test("release jobs preserve AUR proposals without receiving publish credentials", () => {
+test("update-aur and update-aur-beta publish directly with a pre-push ownership audit", () => {
   const stableText = readFileSync(".github/workflows/release.yml", "utf8");
   const rcText = readFileSync(".github/workflows/release-rc.yml", "utf8");
   const betaText = readFileSync(
@@ -300,32 +300,64 @@ test("release jobs preserve AUR proposals without receiving publish credentials"
   const rc = parse(rcText);
   const beta = parse(betaText);
 
-  expect(stableText).not.toContain("AUR_SSH_PRIVATE_KEY");
-  expect(rcText).not.toContain("AUR_SSH_PRIVATE_KEY");
-  expect(betaText).not.toContain("AUR_SSH_PRIVATE_KEY");
+  // Direct publishers need the SSH credential; nothing here force-pushes AUR.
+  expect(stableText).toContain("AUR_SSH_PRIVATE_KEY");
+  expect(betaText).toContain("AUR_SSH_PRIVATE_KEY");
 
-  for (const jobName of ["update-aur", "update-aur-source"]) {
-    const steps = stable.jobs[jobName].steps;
+  // Host key must be pinned to the known AUR fingerprint, not TOFU-trusted.
+  const pinnedFingerprint = "SHA256:RFzBCUItH9LZS0cKB5UE6ceAYhBD5C8GeOBip8Z11+4";
+  expect(stableText).toContain(pinnedFingerprint);
+  expect(betaText).toContain(pinnedFingerprint);
+  const noForcePush = /git push[^\n]*(--force|-f\b)/;
+  expect(stableText).not.toMatch(noForcePush);
+  expect(rcText).not.toMatch(noForcePush);
+  expect(betaText).not.toMatch(noForcePush);
+
+  for (const jobName of ["update-aur", "update-aur-beta"]) {
+    const steps =
+      jobName === "update-aur-beta"
+        ? beta.jobs["update-aur-beta"].steps
+        : stable.jobs[jobName].steps;
+    const auditIndex = steps.findIndex(
+      (step) => step.name === "Verify AUR package ownership before push",
+    );
+    const validateIndex = steps.findIndex(
+      (step) => step.name === "Validate AUR package contents",
+    );
+    const pushIndex = steps.findIndex((step) =>
+      step.name.startsWith("Commit and push"),
+    );
+    expect(auditIndex).toBeGreaterThan(-1);
+    expect(validateIndex).toBeGreaterThan(-1);
+    expect(pushIndex).toBeGreaterThan(auditIndex);
+    expect(pushIndex).toBeGreaterThan(validateIndex);
     expect(
       steps.some((step) => step.name === "Prepare immutable AUR proposal"),
-    ).toBe(true);
-    expect(
-      steps.some(
-        (step) =>
-          step.name === "Preserve exact AUR proposal for reviewed publication",
-      ),
-    ).toBe(true);
+    ).toBe(false);
   }
-  expect(rc.jobs["aur-beta"].name).toContain("Prepare AUR Beta Proposal");
-  expect(beta.on.workflow_dispatch.inputs.tag.required).toBe(true);
+
+  // mindwtr (the source package) is unchanged: still a reviewed proposal.
+  const sourceSteps = stable.jobs["update-aur-source"].steps;
   expect(
-    beta.jobs["update-aur-beta"].steps.some(
+    sourceSteps.some((step) => step.name === "Prepare immutable AUR proposal"),
+  ).toBe(true);
+  expect(
+    sourceSteps.some(
       (step) =>
         step.name === "Preserve exact AUR proposal for reviewed publication",
     ),
   ).toBe(true);
-  expect(betaText).toContain("SHA256SUMS");
-  expect(betaText).not.toContain("updpkgsums");
+
+  expect(stable.jobs["update-aur-bin-beta"].name).toContain(
+    "Update AUR Beta",
+  );
+  expect(stable.jobs["update-aur-bin-beta"].secrets).toBe("inherit");
+  expect(rc.jobs["aur-beta"].name).toContain("Update AUR Beta");
+  expect(rc.jobs["aur-beta"].secrets).toBe("inherit");
+
+  // Beta is dispatchable standalone, not gated behind the reviewed environment.
+  expect(beta.on.workflow_dispatch.inputs.tag.required).toBe(true);
+  expect(beta.jobs["update-aur-beta"].environment).toBeUndefined();
 });
 
 test("AUR publication is a manual environment-gated recovery workflow", () => {

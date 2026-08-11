@@ -42,17 +42,19 @@ sha256sum --check SHA256SUMS
 
 ## Publishing policy
 
-A Mindwtr release never pushes directly to AUR. Release jobs instead:
+`mindwtr-bin` and `mindwtr-bin-beta` publish directly from release jobs:
 
-1. Clone the current AUR repository over read-only HTTPS.
-2. Generate the proposed `PKGBUILD` and `.SRCINFO`.
-3. Reject unexpected files, owners, sources, commands, or skipped checksums.
-4. Build in a clean Arch container.
-5. Save the exact files, base commit, all-package ownership/history snapshot, review diff, and diff checksum as a 90-day workflow artifact.
+1. Generate the package's `PKGBUILD` and `.SRCINFO` from the release tag.
+2. Reject unexpected files, owners, sources, commands, or skipped checksums (`scripts/ci/validate-aur-package.mjs`).
+3. Build in a clean Arch container.
+4. Re-verify the package's maintainer, co-maintainers, and upstream URL against the trusted policy immediately before pushing (`scripts/ci/audit-aur-state.mjs`); ownership drift aborts the push.
+5. Push a single, non-force commit over a dedicated SSH credential.
 
-Publication is a separate manual `Publish reviewed AUR proposal` workflow protected by the `aur-publish` GitHub Environment. Before its one non-force push attempt, it re-fetches all three packages and requires the reviewed ownership and histories to be unchanged. A recognized AUR maintenance response marks only that channel as delayed; an unexpected rejection fails the publication job.
+A recognized AUR maintenance response (pushes disabled) marks the channel delayed rather than failing the job; an unexpected rejection fails it.
 
-When AUR is unavailable, do not retry repeatedly. Preserve the proposal artifact and dispatch publication only after Arch announces that pushes are restored.
+`mindwtr` (the source package) still goes through the reviewed-proposal path: its release job validates and builds the package the same way, then saves the exact files, base commit, all-package ownership/history snapshot, review diff, and diff checksum as a 90-day workflow artifact instead of pushing.
+
+The manual `Publish reviewed AUR proposal` workflow (`publish-aur.yml`), protected by the `aur-publish` GitHub Environment, publishes that saved proposal and remains available as an incident-mode fallback for `mindwtr-bin` and `mindwtr-bin-beta` too, for out-of-band publication when direct pushes are unavailable or extra review is warranted.
 
 ## Maintainer security
 

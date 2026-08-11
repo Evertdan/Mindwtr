@@ -4,13 +4,20 @@ on:
   workflow_call:
     inputs:
       tag:
-        description: "RC or stable tag to prepare for mindwtr-bin-beta (e.g., v1.0.5-rc.1 or v1.0.5)"
+        description: 'RC or stable tag to publish to mindwtr-bin-beta (e.g., v1.0.5-rc.1 or v1.0.5)'
         required: true
         type: string
+    secrets:
+      AUR_SSH_PRIVATE_KEY:
+        required: true
+      AUR_USERNAME:
+        required: false
+      AUR_EMAIL:
+        required: false
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing RC or stable tag to prepare for mindwtr-bin-beta"
+        description: 'RC or stable tag to publish to mindwtr-bin-beta (e.g., v1.0.5-rc.1 or v1.0.5)'
         required: true
         type: string
 
@@ -27,7 +34,7 @@ concurrency:
 jobs:
   update-aur-beta:
     runs-on: ubuntu-latest
-    name: Prepare mindwtr-bin-beta proposal
+    name: Update mindwtr-bin-beta
     timeout-minutes: 45
     steps:
       - name: Checkout repo
@@ -54,12 +61,59 @@ jobs:
             exit 1
           fi
 
-      - name: Clone AUR beta repo read-only
+      - name: Configure SSH for AUR
+        shell: bash
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AUR_SSH_PRIVATE_KEY:-}" ]; then
+            echo "Missing AUR_SSH_PRIVATE_KEY secret." >&2
+            exit 1
+          fi
+
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "${AUR_SSH_PRIVATE_KEY}" > ~/.ssh/aur
+          chmod 600 ~/.ssh/aur
+          cat > ~/.ssh/config <<'EOF'
+          Host aur.archlinux.org
+            HostName aur.archlinux.org
+            User aur
+            IdentityFile ~/.ssh/aur
+            IdentitiesOnly yes
+            HostKeyAlgorithms ssh-ed25519
+            StrictHostKeyChecking yes
+          EOF
+
+          : > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          ssh-keyscan -t ed25519 aur.archlinux.org > "$RUNNER_TEMP/aur-known-hosts" 2>/dev/null
+          ACTUAL_FINGERPRINT="$(ssh-keygen -lf "$RUNNER_TEMP/aur-known-hosts" -E sha256 | awk '{print $2}')"
+          EXPECTED_FINGERPRINT='SHA256:RFzBCUItH9LZS0cKB5UE6ceAYhBD5C8GeOBip8Z11+4'
+          if [ "$ACTUAL_FINGERPRINT" != "$EXPECTED_FINGERPRINT" ]; then
+            echo "AUR SSH host fingerprint mismatch: expected ${EXPECTED_FINGERPRINT}, got ${ACTUAL_FINGERPRINT:-missing}." >&2
+            exit 1
+          fi
+          cp "$RUNNER_TEMP/aur-known-hosts" ~/.ssh/known_hosts
+
+      - name: Clone or initialize AUR beta repo
         shell: bash
         run: |
           set -euo pipefail
           rm -rf aur-mindwtr-bin-beta
-          git clone https://aur.archlinux.org/mindwtr-bin-beta.git aur-mindwtr-bin-beta
+          AUR_URL="ssh://aur@aur.archlinux.org/mindwtr-bin-beta.git"
+          for attempt in 1 2 3; do
+            if git clone "$AUR_URL" aur-mindwtr-bin-beta; then
+              exit 0
+            fi
+            echo "AUR beta clone attempt ${attempt} failed; retrying..." >&2
+            rm -rf aur-mindwtr-bin-beta
+            sleep 3
+          done
+
+          echo "Could not clone mindwtr-bin-beta; initializing a new AUR package checkout."
+          git init -b master aur-mindwtr-bin-beta
+          git -C aur-mindwtr-bin-beta remote add origin "$AUR_URL"
 
       - name: Generate beta PKGBUILD
         shell: bash
@@ -86,7 +140,7 @@ jobs:
           Path('aur-mindwtr-bin-beta/PKGBUILD').write_text(text, encoding='utf-8')
           PY
 
-      - name: Resolve release asset checksum
+      - name: Wait for release assets
         shell: bash
         env:
           TAG: ${{ steps.version.outputs.tag }}
@@ -94,23 +148,17 @@ jobs:
         run: |
           set -euo pipefail
           URL_DEB="https://github.com/${{ github.repository }}/releases/download/${TAG}/mindwtr_${VERSION}_amd64.deb"
-          URL_SUMS="https://github.com/${{ github.repository }}/releases/download/${TAG}/SHA256SUMS"
-          ASSET_NAME="mindwtr_${VERSION}_amd64.deb"
           echo "Waiting for release assets to become available..."
           for attempt in $(seq 1 10); do
-            if curl -fsI "$URL_DEB" >/dev/null && curl -fsSL "$URL_SUMS" -o SHA256SUMS; then
-              CHECKSUM="$(awk -v asset="$ASSET_NAME" '$2 == asset || $2 == "./" asset { print $1 }' SHA256SUMS)"
-              if [[ "$CHECKSUM" =~ ^[0-9a-fA-F]{64}$ ]] && [ "$(printf '%s\n' "$CHECKSUM" | wc -l)" -eq 1 ]; then
-                sed -i "s/__SHA256__/${CHECKSUM}/" aur-mindwtr-bin-beta/PKGBUILD
-                echo "Resolved the exact release-manifest checksum for ${ASSET_NAME}."
-                exit 0
-              fi
+            if curl -fsI "$URL_DEB" >/dev/null; then
+              echo "Release assets are available."
+              exit 0
             fi
             if [ "$attempt" -eq 10 ]; then
-              echo "Release asset or exact checksum not available after waiting: $ASSET_NAME" >&2
+              echo "Release asset not available after waiting: $URL_DEB" >&2
               exit 1
             fi
-            echo "Release asset or checksum not available yet (attempt ${attempt}/10); retrying..." >&2
+            echo "Release asset not available yet (attempt ${attempt}/10); retrying..." >&2
             sleep 15
           done
 
@@ -132,26 +180,49 @@ jobs:
               getent group "$HOST_GID" >/dev/null 2>&1 || groupadd -g "$HOST_GID" builder
               id -u builder >/dev/null 2>&1 || useradd -m -u "$HOST_UID" -g "$HOST_GID" builder
               chown -R builder:builder /aur
+              su builder -c "updpkgsums"
               su builder -c "makepkg --verifysource --noconfirm"
               su builder -c "makepkg --cleanbuild --clean --nodeps --noconfirm"
               su builder -c "makepkg --printsrcinfo > /aur/.SRCINFO"
             '
 
-      - name: Prepare immutable AUR proposal
+      - name: Validate AUR package contents
         shell: bash
         run: |
           set -euo pipefail
-          bash scripts/ci/prepare-aur-proposal.sh \
-            aur-mindwtr-bin-beta \
-            mindwtr-bin-beta \
-            "${{ steps.version.outputs.tag }}" \
-            aur-proposal
+          node scripts/ci/validate-aur-package.mjs \
+            --package-dir aur-mindwtr-bin-beta \
+            --package mindwtr-bin-beta
 
-      - name: Preserve exact AUR proposal for reviewed publication
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: aur-proposal-mindwtr-bin-beta-${{ steps.version.outputs.tag }}
-          path: aur-proposal/
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 90
+      - name: Verify AUR package ownership before push
+        shell: bash
+        run: node scripts/ci/audit-aur-state.mjs
+
+      - name: Commit and push beta package
+        shell: bash
+        working-directory: aur-mindwtr-bin-beta
+        env:
+          AUR_USERNAME: ${{ secrets.AUR_USERNAME }}
+          AUR_EMAIL: ${{ secrets.AUR_EMAIL }}
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain -- PKGBUILD .SRCINFO)" ]; then
+            echo "No AUR beta package changes to publish."
+            exit 0
+          fi
+
+          git config --local user.name "${AUR_USERNAME:-mindwtr-bot}"
+          git config --local user.email "${AUR_EMAIL:-actions@github.com}"
+          git add PKGBUILD .SRCINFO
+          git commit -m "Update to ${{ steps.version.outputs.tag }}"
+
+          PUSH_LOG="$RUNNER_TEMP/aur-beta-push.log"
+          if git push origin master 2>&1 | tee "$PUSH_LOG"; then
+            exit 0
+          fi
+          if grep -Eqi 'AUR is down due to maintenance|disabled (all )?AUR pushes|pushes (are|have been) disabled' "$PUSH_LOG"; then
+            echo "::warning::AUR beta publication delayed by Arch maintenance/security controls. Re-dispatch once pushes are restored."
+            exit 0
+          fi
+          echo "Failed to push mindwtr-bin-beta to AUR." >&2
+          exit 1

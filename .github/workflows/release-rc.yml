@@ -500,10 +500,11 @@ jobs:
   aur-beta:
     if: ${{ always() && needs.validate.result == 'success' && (needs.prerelease.result == 'success' || (needs.validate.outputs.existing_release == 'true' && github.event_name == 'workflow_dispatch')) && (github.event_name != 'workflow_dispatch' || inputs.run_aur_beta) }}
     needs: [validate, prerelease]
-    name: Prepare AUR Beta Proposal (mindwtr-bin-beta)
+    name: Update AUR Beta (mindwtr-bin-beta)
     uses: ./.github/workflows/update-aur-beta.yml
     with:
       tag: ${{ needs.validate.outputs.tag }}
+    secrets: inherit
 
   linux-repos-beta:
     if: ${{ always() && needs.validate.result == 'success' && (needs.prerelease.result == 'success' || (needs.validate.outputs.existing_release == 'true' && github.event_name == 'workflow_dispatch')) && (github.event_name != 'workflow_dispatch' || inputs.run_linux_repos_beta) }}
