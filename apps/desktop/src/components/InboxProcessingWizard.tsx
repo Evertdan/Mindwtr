@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { ArrowRight, BookOpen, Check, CheckCircle, ChevronLeft, ClipboardList, Clock, Trash2, User, X } from 'lucide-react';
-import { DEFAULT_PROJECT_COLOR, filterProjectsBySelectedArea, formatTimeEstimateLabel, safeFormatDate, safeParseDate, tFallback, type Area, type Project, type Task, type TaskDraft, type TaskDraftSetter, type TaskPriority, type TimeEstimate } from '@mindwtr/core';
+import { ArrowRight, BookOpen, Check, CheckCircle, ChevronLeft, ClipboardList, Clock, Loader2, Sparkles, Trash2, User, X } from 'lucide-react';
+import { DEFAULT_PROJECT_COLOR, filterProjectsBySelectedArea, formatTimeEstimateLabel, safeFormatDate, safeParseDate, tFallback, type AppData, type Area, type Project, type Task, type TaskDraft, type TaskDraftSetter, type TaskPriority, type TimeEstimate } from '@mindwtr/core';
 
 import { cn } from '../lib/utils';
 import { useNativeDateInputLocale } from '../hooks/use-native-date-input-locale';
@@ -15,6 +15,8 @@ import {
     type InboxProcessingOptionLists,
     type InboxProcessingVisibility,
 } from './views/inbox/inbox-processing-utils';
+import { TaskEditorAiPanels } from './Task/TaskEditorAiPanels';
+import { useTaskItemAi } from './Task/useTaskItemAi';
 import { TokenAutocompleteInput } from './Task/TokenAutocompleteInput';
 import { AutocompleteTextInput } from './ui/AutocompleteTextInput';
 import { AreaSelector } from './ui/AreaSelector';
@@ -89,6 +91,8 @@ export type InboxProcessingWizardProps = {
     showProjectInRefine: boolean;
     scheduleFields: InboxProcessingScheduleFieldsControls;
     visibleScheduleFieldKeys: InboxProcessingScheduleFieldKey[];
+    /** Only for the AI-enabled switch behind the clarify step's assistant. */
+    settings?: AppData['settings'];
 };
 
 const PRIORITY_OPTIONS: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
@@ -158,6 +162,7 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
     showProjectInRefine,
     scheduleFields,
     visibleScheduleFieldKeys,
+    settings,
 }: InboxProcessingWizardProps) {
     const { nativeDateInputLocale, dateFormatSetting } = useNativeDateInputLocale();
     const {
@@ -202,6 +207,28 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
     const setSelectedTimeEstimate = (value: TimeEstimate | undefined) => setField('timeEstimate', value ?? '');
     const setSelectedProjectId = (value: string | null) => setField('projectId', value ?? '');
     const setSelectedAreaId = (value: string | null) => setField('areaId', value ?? '');
+
+    // The same clarify action the task editor offers, on the task being
+    // processed (#1022). Copilot stays off: the wizard makes no background AI
+    // calls, only the one the user asks for.
+    const ai = useTaskItemAi({
+        taskId: processingTask?.id ?? '',
+        settings,
+        t,
+        editTitle: draft.title,
+        editDescription: draft.description,
+        editContexts: draft.contexts,
+        editTags: draft.tags,
+        editStartTime: draft.startTime,
+        editDueDate: draft.dueDate,
+        editReviewAt: draft.reviewAt,
+        contextOptions: allContexts,
+        tagOptions: allTags,
+        projectContext: null,
+        timeEstimatesEnabled: showTimeEstimateField,
+        setField,
+        copilotEnabled: false,
+    });
 
     // After a long step is submitted the view is left scrolled to the bottom;
     // bring the panel top (title of the next task) back into view on advance.
@@ -394,6 +421,30 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
                                     controlClassName="rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none"
                                     menuClassName="text-sm"
                                 />
+                            </div>
+                        )}
+                        {ai.aiEnabled && (
+                            <div className="flex flex-col gap-2 text-xs">
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={ai.handleAIClarify}
+                                        disabled={ai.isAIWorking}
+                                        aria-busy={ai.isAIWorking}
+                                        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        {ai.isAIWorking
+                                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                            : <Sparkles className="h-3.5 w-3.5" />}
+                                        {t('taskEdit.aiClarify')}
+                                    </button>
+                                    {ai.isAIWorking && (
+                                        <span role="status" aria-live="polite" className="text-muted-foreground">
+                                            {tFallback(t, 'ai.working', 'Working...')}
+                                        </span>
+                                    )}
+                                </div>
+                                <TaskEditorAiPanels ai={ai} timeEstimatesEnabled={showTimeEstimateField} t={t} />
                             </div>
                         )}
                     </div>

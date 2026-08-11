@@ -873,6 +873,7 @@ export function useInboxProcessingController({
         showProjectInRefine: projectFirst && showProjectStep,
         scheduleFields,
         visibleScheduleFieldKeys,
+        settings,
     };
 
     return {

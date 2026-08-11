@@ -1068,4 +1068,22 @@ describe('InboxProcessor', () => {
         const [, updates] = updateTask.mock.calls[updateTask.mock.calls.length - 1] as [string, Task];
         expect(updates.description).toBeUndefined();
     });
+
+    it('offers AI clarify in the guided refine step when AI is on (#1022)', () => {
+        const { getByRole } = renderInboxProcessor({
+            settings: { ai: { enabled: true, provider: 'openai' } },
+        });
+
+        fireEvent.click(getByRole('button', { name: /process\.btn/i }));
+
+        expect(getByRole('button', { name: 'taskEdit.aiClarify' })).toBeInTheDocument();
+    });
+
+    it('leaves the refine step free of AI actions when AI is off', () => {
+        const { getByRole, queryByRole } = renderInboxProcessor();
+
+        fireEvent.click(getByRole('button', { name: /process\.btn/i }));
+
+        expect(queryByRole('button', { name: 'taskEdit.aiClarify' })).not.toBeInTheDocument();
+    });
 });
