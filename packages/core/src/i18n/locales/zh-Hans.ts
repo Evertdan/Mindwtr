@@ -1151,6 +1151,7 @@ export const zhHans: Record<string, string> = {
         'ai.breakdownTitle': '推荐步骤',
         'copilot.suggested': '建议',
         'copilot.applyHint': '点击应用',
+        'copilot.applyAll': '全部应用',
         'copilot.applied': '已应用',
         'settings.dailyDigest': '每日简报',
         'settings.dailyDigestDesc': '启用早间简报和晚间回顾提醒。',

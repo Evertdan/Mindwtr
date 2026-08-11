@@ -9,7 +9,8 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { act, create } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createAIProvider } from '@mindwtr/core';
 
 import CaptureScreen, { sanitizeCaptureReturnToParam } from '@/app/capture-modal';
 
@@ -696,5 +697,76 @@ describe('CaptureScreen', () => {
     });
     expect(openTaskScreen).toHaveBeenCalledWith('task-new', 'project-1', 'task');
     expect(routerMocks.replace).not.toHaveBeenCalledWith('/inbox');
+  });
+
+  describe('copilot suggestion chips (#1022)', () => {
+    const findChip = (tree: ReturnType<typeof create>, label: string) => tree.root.findAll(
+      (node) => node.props.accessibilityRole === 'button' && node.props.accessibilityLabel === label
+    )[0];
+
+    const mountWithSuggestion = async () => {
+      vi.mocked(createAIProvider).mockReturnValue({
+        predictMetadata: vi.fn().mockResolvedValue({ context: '@phone', timeEstimate: '15min', tags: ['#health'] }),
+      } as never);
+
+      let tree!: ReturnType<typeof create>;
+      await act(async () => {
+        tree = create(<CaptureScreen />);
+      });
+      // The debounced copilot request plus the promise it awaits.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(900);
+      });
+      return tree;
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      storeState.settings = { ai: { enabled: true, provider: 'openai' }, features: {} } as never;
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      storeState.settings = { ai: { enabled: false }, features: {} } as never;
+    });
+
+    it('applies only the tapped part to the captured task', async () => {
+      const tree = await mountWithSuggestion();
+
+      await act(async () => {
+        findChip(tree, '@phone').props.onPress();
+      });
+
+      await act(async () => {
+        await findTouchableByText(tree, 'Save').props.onPress();
+      });
+
+      expect(storeState.addTask).toHaveBeenCalledWith('Shared text', {
+        status: 'inbox',
+        contexts: ['@phone'],
+      });
+    });
+
+    it('applies the remaining parts through apply all', async () => {
+      const tree = await mountWithSuggestion();
+
+      await act(async () => {
+        findChip(tree, '@phone').props.onPress();
+      });
+      await act(async () => {
+        findChip(tree, 'copilot.applyAll').props.onPress();
+      });
+
+      await act(async () => {
+        await findTouchableByText(tree, 'Save').props.onPress();
+      });
+
+      expect(storeState.addTask).toHaveBeenCalledWith('Shared text', {
+        status: 'inbox',
+        contexts: ['@phone'],
+        tags: ['#health'],
+        timeEstimate: '15min',
+      });
+    });
   });
 });

@@ -15,13 +15,15 @@ const createAi = (overrides: Partial<EditorAi> = {}): EditorAi => ({
     aiError: null,
     aiBreakdownSteps: null,
     copilotSuggestion: null,
-    copilotApplied: false,
     copilotContext: undefined,
     copilotEstimate: undefined,
+    copilotTags: [],
+    pendingCopilotParts: [],
     resetCopilotDraft: vi.fn(),
     resetAiState: vi.fn(),
     clearAiBreakdown: vi.fn(),
     clearAiClarify: vi.fn(),
+    applyCopilotPart: vi.fn(),
     applyCopilotSuggestion: vi.fn(),
     addBreakdownStepsToChecklist: vi.fn(),
     selectClarifyOption: vi.fn(),
@@ -75,6 +77,7 @@ const translations: Record<string, string> = {
     'ai.applySuggestion': 'Apply suggestion',
     'copilot.suggested': 'Suggested:',
     'copilot.applyHint': 'Click to apply',
+    'copilot.applyAll': 'Apply all',
     'copilot.applied': 'Applied:',
     'common.delete': 'Delete',
     'common.save': 'Save',
@@ -333,7 +336,8 @@ describe('TaskItemEditor AI panels', () => {
         expect(applyClarifySuggestion).toHaveBeenCalledTimes(1);
     });
 
-    it('applies a copilot suggestion from the suggested chip', () => {
+    it('applies one suggested part per chip, and the rest through apply all', () => {
+        const applyCopilotPart = vi.fn();
         const applyCopilotSuggestion = vi.fn();
         const { getByRole } = render(
             <TaskItemEditor
@@ -341,35 +345,61 @@ describe('TaskItemEditor AI panels', () => {
                 timeEstimatesEnabled
                 ai={createAi({
                     copilotSuggestion: { context: '@phone', timeEstimate: '15min', tags: ['#health'] },
+                    pendingCopilotParts: [
+                        { kind: 'context', value: '@phone' },
+                        { kind: 'timeEstimate', value: '15min' },
+                        { kind: 'tag', value: '#health' },
+                    ],
+                    applyCopilotPart,
                     applyCopilotSuggestion,
                 })}
             />
         );
 
-        const chip = getByRole('button', { name: /Suggested:/ });
-        expect(chip).toHaveTextContent('@phone');
-        expect(chip).toHaveTextContent('15min');
-        expect(chip).toHaveTextContent('#health');
+        fireEvent.click(getByRole('button', { name: '#health' }));
+        expect(applyCopilotPart).toHaveBeenCalledTimes(1);
+        expect(applyCopilotPart).toHaveBeenCalledWith({ kind: 'tag', value: '#health' });
+        expect(applyCopilotSuggestion).not.toHaveBeenCalled();
 
-        fireEvent.click(chip);
+        fireEvent.click(getByRole('button', { name: 'Apply all' }));
         expect(applyCopilotSuggestion).toHaveBeenCalledTimes(1);
     });
 
-    it('replaces the suggestion chip with the applied summary once applied', () => {
+    it('keeps the unapplied parts suggestible beside the applied summary', () => {
+        const { getByRole, getByText, queryByRole } = render(
+            <TaskItemEditor
+                {...baseProps}
+                timeEstimatesEnabled
+                ai={createAi({
+                    copilotSuggestion: { context: '@phone', timeEstimate: '15min' },
+                    copilotContext: '@phone',
+                    pendingCopilotParts: [{ kind: 'timeEstimate', value: '15min' }],
+                })}
+            />
+        );
+
+        expect(getByRole('button', { name: '15min' })).toBeInTheDocument();
+        expect(queryByRole('button', { name: '@phone' })).not.toBeInTheDocument();
+        // A lone remaining part needs no "apply all".
+        expect(queryByRole('button', { name: 'Apply all' })).not.toBeInTheDocument();
+        expect(getByText(/Applied:/)).toHaveTextContent('@phone');
+    });
+
+    it('drops the suggestion row once every part is applied', () => {
         const { getByText, queryByRole } = render(
             <TaskItemEditor
                 {...baseProps}
                 timeEstimatesEnabled
                 ai={createAi({
                     copilotSuggestion: { context: '@phone' },
-                    copilotApplied: true,
                     copilotContext: '@phone',
                     copilotEstimate: '15min',
+                    pendingCopilotParts: [],
                 })}
             />
         );
 
-        expect(queryByRole('button', { name: /Suggested:/ })).not.toBeInTheDocument();
+        expect(queryByRole('button', { name: '@phone' })).not.toBeInTheDocument();
         const applied = getByText(/Applied:/);
         expect(applied).toHaveTextContent('@phone');
         expect(applied).toHaveTextContent('15min');

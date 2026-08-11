@@ -92,6 +92,9 @@ const baseProps = {
     aiWorking: {},
     aiWorkingText: {},
     copilotPill: {},
+    copilotChipRow: {},
+    copilotChip: {},
+    copilotApplyAll: {},
     copilotText: {},
     copilotHint: {},
     emptySectionHint: {},
@@ -105,8 +108,8 @@ const baseProps = {
   isAIWorking: false,
   handleAIClarify: vi.fn(),
   handleAIBreakdown: vi.fn(),
-  copilotSuggestion: null,
-  copilotApplied: false,
+  pendingCopilotParts: [],
+  applyCopilotPart: vi.fn(),
   applyCopilotSuggestion: vi.fn(),
   copilotContext: undefined,
   copilotEstimate: undefined,
@@ -739,5 +742,68 @@ describe('TaskEditFormTab keyboard handling', () => {
 
     expect(detailsHeader?.props.accessibilityState).toMatchObject({ expanded: true });
     expect(renderField).toHaveBeenCalledWith('description');
+  });
+});
+
+describe('TaskEditFormTab copilot chips', () => {
+  const findButton = (tree: ReturnType<typeof create>, label: string) => tree.root.findAll(
+    (node) => node.props.accessibilityRole === 'button' && node.props.accessibilityLabel === label
+  )[0];
+
+  const pendingParts = [
+    { kind: 'context' as const, value: '@phone' },
+    { kind: 'timeEstimate' as const, value: '15min' },
+    { kind: 'tag' as const, value: '#health' },
+  ];
+
+  it('applies one suggested part per chip, and the rest through apply all (#1022)', () => {
+    const applyCopilotPart = vi.fn();
+    const applyCopilotSuggestion = vi.fn();
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(
+        <TaskEditFormTab
+          {...baseProps}
+          aiEnabled
+          pendingCopilotParts={pendingParts}
+          applyCopilotPart={applyCopilotPart}
+          applyCopilotSuggestion={applyCopilotSuggestion}
+        />
+      );
+    });
+
+    act(() => {
+      findButton(tree, '#health').props.onPress();
+    });
+    expect(applyCopilotPart).toHaveBeenCalledTimes(1);
+    expect(applyCopilotPart).toHaveBeenCalledWith({ kind: 'tag', value: '#health' });
+    expect(applyCopilotSuggestion).not.toHaveBeenCalled();
+
+    act(() => {
+      findButton(tree, 'copilot.applyAll').props.onPress();
+    });
+    expect(applyCopilotSuggestion).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the unapplied part suggestible beside the applied summary', () => {
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(
+        <TaskEditFormTab
+          {...baseProps}
+          aiEnabled
+          pendingCopilotParts={[{ kind: 'timeEstimate', value: '15min' }]}
+          copilotContext="@phone"
+        />
+      );
+    });
+
+    expect(findButton(tree, '15min')).toBeTruthy();
+    expect(findButton(tree, '@phone')).toBeUndefined();
+    // A lone remaining part needs no "apply all".
+    expect(findButton(tree, 'copilot.applyAll')).toBeUndefined();
+    expect(JSON.stringify(tree.toJSON())).toContain('copilot.applied');
   });
 });

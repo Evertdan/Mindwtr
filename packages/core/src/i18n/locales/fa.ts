@@ -1190,6 +1190,7 @@ export const faOverrides: Record<string, string> = {
         'ai.breakdownTitle': 'قدم‌های پیشنهادی',
         'copilot.suggested': 'پیشنهادشده',
         'copilot.applyHint': 'برای اعمال ضربه بزنید',
+        'copilot.applyAll': 'اعمال همه',
         'copilot.applied': 'اعمال شد',
         'settings.dailyDigest': 'خلاصه روزانه',
         'settings.dailyDigestDesc': 'یک خلاصه صبحگاهی و یادآوری مرور عصرگاهی دریافت کنید.',

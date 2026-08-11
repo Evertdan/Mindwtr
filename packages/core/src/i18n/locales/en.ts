@@ -1214,6 +1214,7 @@ export const en: Record<string, string> = {
         'ai.breakdownTitle': 'Suggested steps',
         'copilot.suggested': 'Suggested',
         'copilot.applyHint': 'Tap to apply',
+        'copilot.applyAll': 'Apply all',
         'copilot.applied': 'Applied',
         'settings.dailyDigest': 'Daily digest',
         'settings.dailyDigestDesc': 'Get a morning briefing and evening review prompt.',

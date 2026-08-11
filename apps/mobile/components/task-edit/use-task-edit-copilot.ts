@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppData, TimeEstimate } from '@mindwtr/core';
 import { createAIProvider } from '@mindwtr/core';
 import type { AIProviderId } from '@mindwtr/core';
@@ -11,6 +11,9 @@ type CopilotSuggestion = {
     timeEstimate?: TimeEstimate;
     tags?: string[];
 };
+
+/** One separately applicable piece of a copilot suggestion. */
+export type CopilotPart = { kind: 'context' | 'timeEstimate' | 'tag'; value: string };
 
 type UseTaskEditCopilotArgs = {
     settings: AppData['settings'];
@@ -42,7 +45,6 @@ export function useTaskEditCopilot({
     const [aiKey, setAiKey] = useState('');
     const keyRequired = isAIKeyRequired(settings);
     const [copilotSuggestion, setCopilotSuggestion] = useState<CopilotSuggestion | null>(null);
-    const [copilotApplied, setCopilotApplied] = useState(false);
     const [copilotContext, setCopilotContext] = useState<string | undefined>(undefined);
     const [copilotEstimate, setCopilotEstimate] = useState<TimeEstimate | undefined>(undefined);
     const [copilotTags, setCopilotTags] = useState<string[]>([]);
@@ -130,7 +132,6 @@ export function useTaskEditCopilot({
     useEffect(() => {
         if (!visible) {
             setCopilotSuggestion(null);
-            setCopilotApplied(false);
             setCopilotContext(undefined);
             setCopilotEstimate(undefined);
             setCopilotTags([]);
@@ -142,7 +143,6 @@ export function useTaskEditCopilot({
     }, [visible]);
 
     const resetCopilotDraft = useCallback(() => {
-        setCopilotApplied(false);
         setCopilotContext(undefined);
         setCopilotEstimate(undefined);
         setCopilotTags([]);
@@ -150,40 +150,65 @@ export function useTaskEditCopilot({
 
     const resetCopilotState = useCallback(() => {
         setCopilotSuggestion(null);
-        setCopilotApplied(false);
         setCopilotContext(undefined);
         setCopilotEstimate(undefined);
         setCopilotTags([]);
     }, []);
 
-    const applyCopilotSuggestion = useCallback(() => {
-        if (!copilotSuggestion) return;
+    // The suggestion splits into parts the user applies one at a time (#1022);
+    // a part leaves the pending list once it is in the applied markers below.
+    const pendingCopilotParts = useMemo<CopilotPart[]>(() => {
+        if (!copilotSuggestion) return [];
+        const parts: CopilotPart[] = [];
+        if (copilotSuggestion.context && copilotSuggestion.context !== copilotContext) {
+            parts.push({ kind: 'context', value: copilotSuggestion.context });
+        }
+        if (timeEstimatesEnabled && copilotSuggestion.timeEstimate && !copilotEstimate) {
+            parts.push({ kind: 'timeEstimate', value: copilotSuggestion.timeEstimate });
+        }
+        for (const tag of copilotSuggestion.tags ?? []) {
+            if (!copilotTags.includes(tag)) parts.push({ kind: 'tag', value: tag });
+        }
+        return parts;
+    }, [copilotContext, copilotEstimate, copilotSuggestion, copilotTags, timeEstimatesEnabled]);
+
+    // Batched on purpose: applying several tags one call at a time would each
+    // re-read the same stale draft string and drop all but the last.
+    const applyCopilotParts = useCallback((parts: CopilotPart[]) => {
+        if (parts.length === 0) return;
         const splitTokens = (value: string | undefined) => (
             (value ?? '').split(',').map((token) => token.trim()).filter(Boolean)
         );
-        if (copilotSuggestion.context) {
-            const current = splitTokens(draft?.contexts);
-            const next = Array.from(new Set([...current, copilotSuggestion.context]));
+        const context = parts.find((part) => part.kind === 'context')?.value;
+        const estimate = parts.find((part) => part.kind === 'timeEstimate')?.value;
+        const tags = parts.filter((part) => part.kind === 'tag').map((part) => part.value);
+        if (context) {
+            const next = Array.from(new Set([...splitTokens(draft?.contexts), context]));
             setDraftField('contexts', next.join(', '));
-            setCopilotContext(copilotSuggestion.context);
+            setCopilotContext(context);
         }
-        if (copilotSuggestion.tags?.length) {
-            const currentTags = splitTokens(draft?.tags);
-            const nextTags = Array.from(new Set([...currentTags, ...copilotSuggestion.tags]));
+        if (tags.length) {
+            const nextTags = Array.from(new Set([...splitTokens(draft?.tags), ...tags]));
             setDraftField('tags', nextTags.join(', '));
-            setCopilotTags(copilotSuggestion.tags);
+            setCopilotTags((prev) => Array.from(new Set([...prev, ...tags])));
         }
-        if (copilotSuggestion.timeEstimate && timeEstimatesEnabled) {
-            setDraftField('timeEstimate', copilotSuggestion.timeEstimate);
-            setCopilotEstimate(copilotSuggestion.timeEstimate);
+        if (estimate && timeEstimatesEnabled) {
+            setDraftField('timeEstimate', estimate as TimeEstimate);
+            setCopilotEstimate(estimate as TimeEstimate);
         }
-        setCopilotApplied(true);
-    }, [copilotSuggestion, draft?.contexts, draft?.tags, setDraftField, timeEstimatesEnabled]);
+    }, [draft?.contexts, draft?.tags, setDraftField, timeEstimatesEnabled]);
+
+    const applyCopilotPart = useCallback((part: CopilotPart) => {
+        applyCopilotParts([part]);
+    }, [applyCopilotParts]);
+
+    const applyCopilotSuggestion = useCallback(() => {
+        applyCopilotParts(pendingCopilotParts);
+    }, [applyCopilotParts, pendingCopilotParts]);
 
     return {
         aiKey,
-        copilotSuggestion,
-        copilotApplied,
+        pendingCopilotParts,
         copilotContext,
         copilotEstimate,
         copilotTags,
@@ -193,6 +218,7 @@ export function useTaskEditCopilot({
         setShowAllTags,
         resetCopilotDraft,
         resetCopilotState,
+        applyCopilotPart,
         applyCopilotSuggestion,
     };
 }

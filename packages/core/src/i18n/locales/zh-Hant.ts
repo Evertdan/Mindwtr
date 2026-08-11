@@ -1151,6 +1151,7 @@ export const zhHant: Record<string, string> = {
         'ai.breakdownTitle': '推薦步驟',
         'copilot.suggested': '建議',
         'copilot.applyHint': '點擊應用',
+        'copilot.applyAll': '全部應用',
         'copilot.applied': '已應用',
         'settings.dailyDigest': '每日簡報',
         'settings.dailyDigestDesc': '啓用早間簡報和晚間回顧提醒。',

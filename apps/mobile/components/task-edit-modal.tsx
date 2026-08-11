@@ -40,7 +40,7 @@ import {
     getRecurrenceStrategyValue,
 } from './task-edit/recurrence-utils';
 import { getAssignedToSuggestions } from './task-metadata-suggestions';
-import { useTaskEditCopilot } from './task-edit/use-task-edit-copilot';
+import { useTaskEditCopilot, type CopilotPart } from './task-edit/use-task-edit-copilot';
 import {
     parseTokenList,
     replaceTrailingToken,
@@ -58,6 +58,7 @@ import { useTaskTokenSuggestions } from './task-edit/use-task-token-suggestions'
 
 
 const EMPTY_COPILOT_TAGS: string[] = [];
+const EMPTY_COPILOT_PARTS: CopilotPart[] = [];
 
 interface TaskEditModalProps {
     visible: boolean;
@@ -238,13 +239,13 @@ function TaskEditModalInner({
     });
 
     const {
-        copilotSuggestion,
-        copilotApplied,
+        pendingCopilotParts,
         copilotContext,
         copilotEstimate,
         copilotTags,
         resetCopilotDraft,
         resetCopilotState,
+        applyCopilotPart,
         applyCopilotSuggestion,
     } = useTaskEditCopilot({
         settings,
@@ -679,9 +680,12 @@ function TaskEditModalInner({
         openAttachmentRef.current(attachment)
     ), []);
     const noopAIAction = useCallback(() => {}, []);
+    const noopApplyCopilotPart = useCallback((_part: CopilotPart) => {}, []);
     const formHandleAIClarify = aiEnabled ? handleAIClarify : noopAIAction;
     const formHandleAIBreakdown = aiEnabled ? handleAIBreakdown : noopAIAction;
     const formApplyCopilotSuggestion = aiEnabled ? applyCopilotSuggestion : noopAIAction;
+    const formApplyCopilotPart = aiEnabled ? applyCopilotPart : noopApplyCopilotPart;
+    const formPendingCopilotParts = aiEnabled ? pendingCopilotParts : EMPTY_COPILOT_PARTS;
     const formCopilotTags = aiEnabled ? copilotTags : EMPTY_COPILOT_TAGS;
     const fieldRendererProps = useMemo(() => ({
         addFileAttachment,
@@ -942,8 +946,8 @@ function TaskEditModalInner({
                                 isAIWorking={isAIWorking}
                                 handleAIClarify={formHandleAIClarify}
                                 handleAIBreakdown={formHandleAIBreakdown}
-                                copilotSuggestion={copilotSuggestion}
-                                copilotApplied={copilotApplied}
+                                pendingCopilotParts={formPendingCopilotParts}
+                                applyCopilotPart={formApplyCopilotPart}
                                 applyCopilotSuggestion={formApplyCopilotSuggestion}
                                 copilotContext={copilotContext}
                                 copilotEstimate={copilotEstimate}

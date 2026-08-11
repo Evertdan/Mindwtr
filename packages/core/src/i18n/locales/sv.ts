@@ -1190,6 +1190,7 @@ export const svOverrides: Record<string, string> = {
         'ai.breakdownTitle': 'Föreslagna steg',
         'copilot.suggested': 'Föreslaget',
         'copilot.applyHint': 'Tryck för att tillämpa',
+        'copilot.applyAll': 'Tillämpa alla',
         'copilot.applied': 'Tillämpat',
         'settings.dailyDigest': 'Daglig sammanfattning',
         'settings.dailyDigestDesc': 'Få en morgonbriefing och en påminnelse om kvällens genomgång.',

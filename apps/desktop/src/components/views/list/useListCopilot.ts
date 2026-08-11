@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppData } from '@mindwtr/core';
 import { createAIProvider, type AIProviderId } from '@mindwtr/core';
 import { buildCopilotConfig, isAIKeyRequired, loadAIKey } from '../../../lib/ai-config';
+import type { CopilotPart } from '../../Task/useTaskItemAi';
 
 type CopilotSuggestion = { context?: string; tags?: string[] };
 
@@ -18,7 +19,6 @@ export function useListCopilot({ settings, newTaskTitle, allContexts, allTags }:
     const keyRequired = isAIKeyRequired(settings);
     const [aiKey, setAiKey] = useState('');
     const [copilotSuggestion, setCopilotSuggestion] = useState<CopilotSuggestion | null>(null);
-    const [copilotApplied, setCopilotApplied] = useState(false);
     const [copilotContext, setCopilotContext] = useState<string | null>(null);
     const [copilotTags, setCopilotTags] = useState<string[]>([]);
     const copilotAbortRef = useRef<AbortController | null>(null);
@@ -78,26 +78,47 @@ export function useListCopilot({ settings, newTaskTitle, allContexts, allTags }:
         };
     }, [aiEnabled, aiKey, allContexts, allTags, keyRequired, newTaskTitle, settings]);
 
-    const applyCopilotSuggestion = useCallback((suggestion: CopilotSuggestion | null) => {
-        if (!suggestion) return;
-        setCopilotApplied(true);
-        setCopilotContext(suggestion.context ?? null);
-        setCopilotTags(suggestion.tags ?? []);
+    // Per-part apply (#1022). This row has no time estimate to suggest, so the
+    // parts are the context and one per tag.
+    const pendingCopilotParts = useMemo<CopilotPart[]>(() => {
+        if (!copilotSuggestion) return [];
+        const parts: CopilotPart[] = [];
+        if (copilotSuggestion.context && copilotSuggestion.context !== copilotContext) {
+            parts.push({ kind: 'context', value: copilotSuggestion.context });
+        }
+        for (const tag of copilotSuggestion.tags ?? []) {
+            if (!copilotTags.includes(tag)) parts.push({ kind: 'tag', value: tag });
+        }
+        return parts;
+    }, [copilotContext, copilotSuggestion, copilotTags]);
+
+    const applyCopilotParts = useCallback((parts: CopilotPart[]) => {
+        const context = parts.find((part) => part.kind === 'context')?.value;
+        const tags = parts.filter((part) => part.kind === 'tag').map((part) => part.value);
+        if (context) setCopilotContext(context);
+        if (tags.length) setCopilotTags((prev) => Array.from(new Set([...prev, ...tags])));
     }, []);
+
+    const applyCopilotPart = useCallback((part: CopilotPart) => {
+        applyCopilotParts([part]);
+    }, [applyCopilotParts]);
+
+    const applyCopilotSuggestion = useCallback(() => {
+        applyCopilotParts(pendingCopilotParts);
+    }, [applyCopilotParts, pendingCopilotParts]);
 
     const resetCopilot = useCallback(() => {
         setCopilotSuggestion(null);
-        setCopilotApplied(false);
         setCopilotContext(null);
         setCopilotTags([]);
     }, []);
 
     return {
         aiEnabled,
-        copilotSuggestion,
-        copilotApplied,
         copilotContext,
         copilotTags,
+        pendingCopilotParts,
+        applyCopilotPart,
         applyCopilotSuggestion,
         resetCopilot,
     };

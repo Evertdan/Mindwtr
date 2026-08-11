@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     type AppData,
     type AIProviderId,
@@ -17,6 +17,9 @@ type TaskItemAiContext = {
     projectTasks: string[];
 } | null;
 
+/** One separately applicable piece of a copilot suggestion. */
+export type CopilotPart = { kind: 'context' | 'timeEstimate' | 'tag'; value: string };
+
 type UseTaskItemAiArgs = {
     taskId: string;
     settings: AppData['settings'] | undefined;
@@ -33,6 +36,8 @@ type UseTaskItemAiArgs = {
     projectContext: TaskItemAiContext;
     timeEstimatesEnabled: boolean;
     setField: TaskDraftSetter;
+    /** Off for surfaces that only want the on-demand actions (no background metadata calls). */
+    copilotEnabled?: boolean;
 };
 
 export function useTaskItemAi({
@@ -51,6 +56,7 @@ export function useTaskItemAi({
     projectContext,
     timeEstimatesEnabled,
     setField,
+    copilotEnabled = true,
 }: UseTaskItemAiArgs) {
     const aiEnabled = settings?.ai?.enabled === true;
     const aiProvider = (settings?.ai?.provider ?? 'openai') as AIProviderId;
@@ -62,15 +68,18 @@ export function useTaskItemAi({
     const [aiError, setAiError] = useState<string | null>(null);
     const [aiBreakdownSteps, setAiBreakdownSteps] = useState<string[] | null>(null);
     const [copilotSuggestion, setCopilotSuggestion] = useState<{ context?: string; timeEstimate?: TimeEstimate; tags?: string[] } | null>(null);
-    const [copilotApplied, setCopilotApplied] = useState(false);
     const [copilotContext, setCopilotContext] = useState<string | undefined>(undefined);
     const [copilotEstimate, setCopilotEstimate] = useState<TimeEstimate | undefined>(undefined);
+    const [copilotTags, setCopilotTags] = useState<string[]>([]);
     const [isAIWorking, setIsAIWorking] = useState(false);
     const copilotInputRef = useRef<string>('');
     const copilotAbortRef = useRef<AbortController | null>(null);
     const copilotMountedRef = useRef(true);
 
     useEffect(() => {
+        // No key read for the surfaces that never call a provider: every task
+        // row mounts this hook, and most of them have AI switched off.
+        if (!aiEnabled) return;
         let active = true;
         loadAIKey(aiProvider)
             .then((key) => {
@@ -82,10 +91,10 @@ export function useTaskItemAi({
         return () => {
             active = false;
         };
-    }, [aiProvider]);
+    }, [aiEnabled, aiProvider]);
 
     useEffect(() => {
-        if (!aiEnabled || (keyRequired && !aiKey)) {
+        if (!aiEnabled || !copilotEnabled || (keyRequired && !aiKey)) {
             setCopilotSuggestion(null);
             return;
         }
@@ -151,7 +160,7 @@ export function useTaskItemAi({
                 copilotAbortRef.current = null;
             }
         };
-    }, [aiEnabled, aiKey, aiProvider, contextOptions, copilotModel, editContexts, editDescription, editTitle, keyRequired, settings, tagOptions, timeEstimatesEnabled]);
+    }, [aiEnabled, aiKey, aiProvider, contextOptions, copilotEnabled, copilotModel, editContexts, editDescription, editTitle, keyRequired, settings, tagOptions, timeEstimatesEnabled]);
 
     useEffect(() => {
         copilotMountedRef.current = true;
@@ -192,9 +201,9 @@ export function useTaskItemAi({
     }, [aiEnabled, aiKey, keyRequired, settings, t]);
 
     const resetCopilotDraft = useCallback(() => {
-        setCopilotApplied(false);
         setCopilotContext(undefined);
         setCopilotEstimate(undefined);
+        setCopilotTags([]);
     }, []);
 
     const resetAiState = useCallback(() => {
@@ -202,9 +211,9 @@ export function useTaskItemAi({
         setAiError(null);
         setAiBreakdownSteps(null);
         setCopilotSuggestion(null);
-        setCopilotApplied(false);
         setCopilotContext(undefined);
         setCopilotEstimate(undefined);
+        setCopilotTags([]);
     }, []);
 
     const clearAiBreakdown = useCallback(() => {
@@ -215,25 +224,53 @@ export function useTaskItemAi({
         setAiClarifyResponse(null);
     }, []);
 
-    const applyCopilotSuggestion = useCallback(() => {
-        if (!copilotSuggestion) return;
-        if (copilotSuggestion.context) {
+    // The suggestion splits into parts the user applies one at a time (#1022);
+    // a part leaves the pending list once it is in the applied markers below.
+    const pendingCopilotParts = useMemo<CopilotPart[]>(() => {
+        if (!copilotSuggestion) return [];
+        const parts: CopilotPart[] = [];
+        if (copilotSuggestion.context && copilotSuggestion.context !== copilotContext) {
+            parts.push({ kind: 'context', value: copilotSuggestion.context });
+        }
+        if (timeEstimatesEnabled && copilotSuggestion.timeEstimate && !copilotEstimate) {
+            parts.push({ kind: 'timeEstimate', value: copilotSuggestion.timeEstimate });
+        }
+        for (const tag of copilotSuggestion.tags ?? []) {
+            if (!copilotTags.includes(tag)) parts.push({ kind: 'tag', value: tag });
+        }
+        return parts;
+    }, [copilotContext, copilotEstimate, copilotSuggestion, copilotTags, timeEstimatesEnabled]);
+
+    // Batched on purpose: applying several tags one call at a time would each
+    // re-read the same stale draft string and drop all but the last.
+    const applyCopilotParts = useCallback((parts: CopilotPart[]) => {
+        if (parts.length === 0) return;
+        const context = parts.find((part) => part.kind === 'context')?.value;
+        const estimate = parts.find((part) => part.kind === 'timeEstimate')?.value;
+        const tags = parts.filter((part) => part.kind === 'tag').map((part) => part.value);
+        if (context) {
             const currentContexts = editContexts.split(',').map((c) => c.trim()).filter(Boolean);
-            const nextContexts = Array.from(new Set([...currentContexts, copilotSuggestion.context]));
-            setField('contexts', nextContexts.join(', '));
-            setCopilotContext(copilotSuggestion.context);
+            setField('contexts', Array.from(new Set([...currentContexts, context])).join(', '));
+            setCopilotContext(context);
         }
-        if (copilotSuggestion.tags?.length) {
+        if (tags.length) {
             const currentTags = editTags.split(',').map((t) => t.trim()).filter(Boolean);
-            const nextTags = Array.from(new Set([...currentTags, ...copilotSuggestion.tags]));
-            setField('tags', nextTags.join(', '));
+            setField('tags', Array.from(new Set([...currentTags, ...tags])).join(', '));
+            setCopilotTags((prev) => Array.from(new Set([...prev, ...tags])));
         }
-        if (copilotSuggestion.timeEstimate && timeEstimatesEnabled) {
-            setField('timeEstimate', copilotSuggestion.timeEstimate);
-            setCopilotEstimate(copilotSuggestion.timeEstimate);
+        if (estimate && timeEstimatesEnabled) {
+            setField('timeEstimate', estimate as TimeEstimate);
+            setCopilotEstimate(estimate as TimeEstimate);
         }
-        setCopilotApplied(true);
-    }, [copilotSuggestion, editContexts, editTags, setField, timeEstimatesEnabled]);
+    }, [editContexts, editTags, setField, timeEstimatesEnabled]);
+
+    const applyCopilotPart = useCallback((part: CopilotPart) => {
+        applyCopilotParts([part]);
+    }, [applyCopilotParts]);
+
+    const applyCopilotSuggestion = useCallback(() => {
+        applyCopilotParts(pendingCopilotParts);
+    }, [applyCopilotParts, pendingCopilotParts]);
 
     const applyAISuggestion = useCallback((suggested: { title?: string; context?: string; timeEstimate?: TimeEstimate }) => {
         if (suggested.title) setField('title', suggested.title);
@@ -335,13 +372,15 @@ export function useTaskItemAi({
         aiError,
         aiBreakdownSteps,
         copilotSuggestion,
-        copilotApplied,
         copilotContext,
         copilotEstimate,
+        copilotTags,
+        pendingCopilotParts,
         resetCopilotDraft,
         resetAiState,
         clearAiBreakdown,
         clearAiClarify,
+        applyCopilotPart,
         applyCopilotSuggestion,
         addBreakdownStepsToChecklist,
         selectClarifyOption,

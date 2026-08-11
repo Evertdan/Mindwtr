@@ -286,10 +286,10 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
 
     const {
         aiEnabled,
-        copilotSuggestion,
-        copilotApplied,
         copilotContext,
         copilotTags,
+        pendingCopilotParts,
+        applyCopilotPart,
         applyCopilotSuggestion,
         resetCopilot,
     } = useListCopilot({
@@ -1163,19 +1163,32 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
                                 onOpenAudio={() => openQuickAdd(statusFilter, 'audio')}
                                 onResetCopilot={resetCopilot}
                             />
-                            {aiEnabled && copilotSuggestion && !copilotApplied && (
-                                <button
-                                    type="button"
-                                    onClick={() => applyCopilotSuggestion(copilotSuggestion)}
-                                    className="mt-2 rounded border border-border bg-muted/30 px-2 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/60"
-                                >
-                                    ✨ {t('copilot.suggested')}{' '}
-                                    {copilotSuggestion.context ? `${copilotSuggestion.context} ` : ''}
-                                    {copilotSuggestion.tags?.length ? copilotSuggestion.tags.join(' ') : ''}
-                                    <span className="ml-2 text-muted-foreground/70">{t('copilot.applyHint')}</span>
-                                </button>
+                            {aiEnabled && pendingCopilotParts.length > 0 && (
+                                <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded border border-border bg-muted/30 px-2 py-1 text-xs text-muted-foreground">
+                                    <span>✨ {t('copilot.suggested')}</span>
+                                    {pendingCopilotParts.map((part) => (
+                                        <button
+                                            key={`${part.kind}:${part.value}`}
+                                            type="button"
+                                            onClick={() => applyCopilotPart(part)}
+                                            className="rounded bg-muted/50 px-1.5 py-0.5 text-foreground transition-colors hover:bg-muted"
+                                        >
+                                            {part.value}
+                                        </button>
+                                    ))}
+                                    {pendingCopilotParts.length > 1 && (
+                                        <button
+                                            type="button"
+                                            onClick={applyCopilotSuggestion}
+                                            className="rounded px-1.5 py-0.5 text-primary transition-colors hover:bg-primary/10"
+                                        >
+                                            {t('copilot.applyAll')}
+                                        </button>
+                                    )}
+                                    <span className="text-muted-foreground/70">{t('copilot.applyHint')}</span>
+                                </div>
                             )}
-                            {aiEnabled && copilotApplied && (
+                            {aiEnabled && (copilotContext || copilotTags.length > 0) && (
                                 <div className="mt-2 rounded border border-border bg-muted/30 px-2 py-1 text-xs text-muted-foreground">
                                     ✅ {t('copilot.applied')}{' '}
                                     {copilotContext ? `${copilotContext} ` : ''}

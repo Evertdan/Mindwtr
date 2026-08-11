@@ -45,6 +45,7 @@ import { addHardwareBackPressListener } from '@/lib/hardware-back';
 import { showInvalidDateCommandToast } from '@/lib/quick-add-toast';
 import { ThemedAlertHost } from '@/components/themed-alert';
 import { QuickAddPreview } from '@/components/QuickAddPreview';
+import type { CopilotPart } from '@/components/task-edit/use-task-edit-copilot';
 import { openTaskScreen } from '@/lib/task-meta-navigation';
 
 type CaptureSearchParams = {
@@ -232,7 +233,6 @@ export default function CaptureScreen() {
   const [pendingBulkLines, setPendingBulkLines] = useState<string[] | null>(null);
   const [descriptionValue, setDescriptionValue] = useState(initialDescription);
   const [copilotSuggestion, setCopilotSuggestion] = useState<{ context?: string; timeEstimate?: TimeEstimate; tags?: string[] } | null>(null);
-  const [copilotApplied, setCopilotApplied] = useState(false);
   const [aiKey, setAiKey] = useState('');
   const [copilotContext, setCopilotContext] = useState<string | undefined>(undefined);
   const [copilotEstimate, setCopilotEstimate] = useState<TimeEstimate | undefined>(undefined);
@@ -369,10 +369,37 @@ export default function CaptureScreen() {
 
   const handleInputChange = (text: string) => {
     setValue(text);
-    setCopilotApplied(false);
     setCopilotContext(undefined);
     setCopilotEstimate(undefined);
     setCopilotTags([]);
+  };
+
+  // Same per-part apply as the task editor (#1022); here the parts are stashed
+  // for task creation instead of written into a draft.
+  const pendingCopilotParts = React.useMemo<CopilotPart[]>(() => {
+    if (!copilotSuggestion) return [];
+    const parts: CopilotPart[] = [];
+    if (copilotSuggestion.context && copilotSuggestion.context !== copilotContext) {
+      parts.push({ kind: 'context', value: copilotSuggestion.context });
+    }
+    if (timeEstimatesEnabled && copilotSuggestion.timeEstimate && !copilotEstimate) {
+      parts.push({ kind: 'timeEstimate', value: copilotSuggestion.timeEstimate });
+    }
+    for (const tag of copilotSuggestion.tags ?? []) {
+      if (!copilotTags.includes(tag)) parts.push({ kind: 'tag', value: tag });
+    }
+    return parts;
+  }, [copilotContext, copilotEstimate, copilotSuggestion, copilotTags, timeEstimatesEnabled]);
+
+  const hasAppliedCopilot = Boolean(copilotContext) || Boolean(copilotEstimate) || copilotTags.length > 0;
+
+  const applyCopilotParts = (parts: CopilotPart[]) => {
+    const context = parts.find((part) => part.kind === 'context')?.value;
+    const estimate = parts.find((part) => part.kind === 'timeEstimate')?.value;
+    const tags = parts.filter((part) => part.kind === 'tag').map((part) => part.value);
+    if (context) setCopilotContext(context);
+    if (estimate && timeEstimatesEnabled) setCopilotEstimate(estimate as TimeEstimate);
+    if (tags.length) setCopilotTags((prev) => Array.from(new Set([...prev, ...tags])));
   };
 
   const placeholderColor = tc.secondaryText;
@@ -632,31 +659,39 @@ export default function CaptureScreen() {
               />
             </View>
           )}
-          {copilotSuggestion && !copilotApplied && (
-            <TouchableOpacity
-              style={[styles.copilotPill, { borderColor: tc.border, backgroundColor: tc.inputBg }]}
-              onPress={() => {
-                setCopilotContext(copilotSuggestion.context);
-                if (timeEstimatesEnabled) setCopilotEstimate(copilotSuggestion.timeEstimate);
-                setCopilotTags(copilotSuggestion.tags ?? []);
-                setCopilotApplied(true);
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', columnGap: 4 }}>
+          {pendingCopilotParts.length > 0 && (
+            <View style={[styles.copilotPill, { borderColor: tc.border, backgroundColor: tc.inputBg }]}>
+              <View style={styles.copilotChipRow}>
                 <Text style={[styles.copilotText, { color: tc.text }]}>✨</Text>
-                <Text style={[styles.copilotText, { color: tc.text, flexShrink: 1 }]}>
-                  {t('copilot.suggested')}{' '}
-                  {copilotSuggestion.context ? `${copilotSuggestion.context} ` : ''}
-                  {timeEstimatesEnabled && copilotSuggestion.timeEstimate ? `${copilotSuggestion.timeEstimate}` : ''}
-                  {copilotSuggestion.tags?.length ? copilotSuggestion.tags.join(' ') : ''}
-                </Text>
+                <Text style={[styles.copilotText, { color: tc.text }]}>{t('copilot.suggested')}</Text>
+                {pendingCopilotParts.map((part) => (
+                  <TouchableOpacity
+                    key={`${part.kind}:${part.value}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={part.value}
+                    style={[styles.copilotChip, { borderColor: tc.border, backgroundColor: tc.cardBg }]}
+                    onPress={() => applyCopilotParts([part])}
+                  >
+                    <Text style={[styles.copilotText, { color: tc.text }]}>{part.value}</Text>
+                  </TouchableOpacity>
+                ))}
+                {pendingCopilotParts.length > 1 && (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={t('copilot.applyAll')}
+                    style={styles.copilotApplyAll}
+                    onPress={() => applyCopilotParts(pendingCopilotParts)}
+                  >
+                    <Text style={[styles.copilotText, { color: tc.tint }]}>{t('copilot.applyAll')}</Text>
+                  </TouchableOpacity>
+                )}
               </View>
               <Text style={[styles.copilotHint, { color: tc.secondaryText }]}>
                 {t('copilot.applyHint')}
               </Text>
-            </TouchableOpacity>
+            </View>
           )}
-          {copilotApplied && (
+          {hasAppliedCopilot && (
             <View style={[styles.copilotPill, { borderColor: tc.border, backgroundColor: tc.inputBg }]}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', columnGap: 4 }}>
                 <Text style={[styles.copilotText, { color: tc.text }]}>✅</Text>
@@ -837,6 +872,23 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     alignSelf: 'flex-start',
     gap: 2,
+  },
+  copilotChipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    columnGap: 6,
+    rowGap: 6,
+  },
+  copilotChip: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  copilotApplyAll: {
+    paddingHorizontal: 4,
+    paddingVertical: 4,
   },
   copilotText: {
     fontSize: 12,

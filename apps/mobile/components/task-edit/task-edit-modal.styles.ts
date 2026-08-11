@@ -356,6 +356,23 @@ export const styles = StyleSheet.create({
         paddingVertical: 8,
         marginBottom: 12,
     },
+    copilotChipRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        columnGap: 6,
+        rowGap: 6,
+    },
+    copilotChip: {
+        borderWidth: 1,
+        borderRadius: 10,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+    },
+    copilotApplyAll: {
+        paddingHorizontal: 4,
+        paddingVertical: 4,
+    },
     copilotText: {
         fontSize: 12,
         fontWeight: '600',

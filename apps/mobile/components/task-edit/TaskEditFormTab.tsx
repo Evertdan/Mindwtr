@@ -21,8 +21,7 @@ import { parseRRuleString, tFallback, type Attachment, type Task, type TaskEdito
 import type { TaskDraft } from '@mindwtr/core/task-draft';
 import type { ThemeColors } from '@/hooks/use-theme-colors';
 import { CollapsibleSection } from './CollapsibleSection';
-
-type CopilotSuggestion = { context?: string; timeEstimate?: TimeEstimate; tags?: string[] };
+import type { CopilotPart } from './use-task-edit-copilot';
 
 type TaskEditFormTabProps = {
     t: (key: string) => string;
@@ -36,8 +35,8 @@ type TaskEditFormTabProps = {
     isAIWorking: boolean;
     handleAIClarify: () => void;
     handleAIBreakdown: () => void;
-    copilotSuggestion: CopilotSuggestion | null;
-    copilotApplied: boolean;
+    pendingCopilotParts: CopilotPart[];
+    applyCopilotPart: (part: CopilotPart) => void;
     applyCopilotSuggestion: () => void;
     copilotContext: string | undefined;
     copilotEstimate: TimeEstimate | undefined;
@@ -82,8 +81,8 @@ function TaskEditFormTabComponent({
     isAIWorking,
     handleAIClarify,
     handleAIBreakdown,
-    copilotSuggestion,
-    copilotApplied,
+    pendingCopilotParts,
+    applyCopilotPart,
     applyCopilotSuggestion,
     copilotContext,
     copilotEstimate,
@@ -125,6 +124,7 @@ function TaskEditFormTabComponent({
     );
     const aiWorkingLabel = t('ai.working');
     const aiWorkingText = aiWorkingLabel === 'ai.working' ? 'Working...' : aiWorkingLabel;
+    const hasAppliedCopilot = Boolean(copilotContext) || Boolean(copilotEstimate) || copilotTags.length > 0;
     const taskEditorLayoutHelpLabel = tFallback(t, 'taskEdit.editorLayoutHelpLabel', 'Editor layout help');
     const taskEditorLayoutHelpText = tFallback(
         t,
@@ -425,31 +425,46 @@ function TaskEditFormTabComponent({
                             )}
                         </View>
                     )}
-                    {aiEnabled && copilotSuggestion && !copilotApplied && (
-                        <TouchableOpacity
-                            style={[styles.copilotPill, { borderColor: tc.border, backgroundColor: tc.filterBg }]}
-                            onPress={applyCopilotSuggestion}
-                        >
-                            <View style={{ flexDirection: 'row', alignItems: 'flex-start', columnGap: 4 }}>
+                    {aiEnabled && pendingCopilotParts.length > 0 && (
+                        <View style={[styles.copilotPill, { borderColor: tc.border, backgroundColor: tc.filterBg }]}>
+                            <View style={styles.copilotChipRow}>
                                 <Ionicons
                                     name="sparkles-outline"
                                     size={16}
                                     color={tc.text}
                                     accessible={false}
                                 />
-                                <Text style={[styles.copilotText, { color: tc.text, flexShrink: 1 }]}>
-                                    {t('copilot.suggested')}{' '}
-                                    {copilotSuggestion.context ? `${copilotSuggestion.context} ` : ''}
-                                    {timeEstimatesEnabled && copilotSuggestion.timeEstimate ? `${copilotSuggestion.timeEstimate}` : ''}
-                                    {copilotSuggestion.tags?.length ? copilotSuggestion.tags.join(' ') : ''}
+                                <Text style={[styles.copilotText, { color: tc.text }]}>
+                                    {t('copilot.suggested')}
                                 </Text>
+                                {pendingCopilotParts.map((part) => (
+                                    <TouchableOpacity
+                                        key={`${part.kind}:${part.value}`}
+                                        accessibilityRole="button"
+                                        accessibilityLabel={part.value}
+                                        style={[styles.copilotChip, { borderColor: tc.border, backgroundColor: tc.cardBg }]}
+                                        onPress={() => applyCopilotPart(part)}
+                                    >
+                                        <Text style={[styles.copilotText, { color: tc.text }]}>{part.value}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                                {pendingCopilotParts.length > 1 && (
+                                    <TouchableOpacity
+                                        accessibilityRole="button"
+                                        accessibilityLabel={t('copilot.applyAll')}
+                                        style={styles.copilotApplyAll}
+                                        onPress={applyCopilotSuggestion}
+                                    >
+                                        <Text style={[styles.copilotText, { color: tc.tint }]}>{t('copilot.applyAll')}</Text>
+                                    </TouchableOpacity>
+                                )}
                             </View>
                             <Text style={[styles.copilotHint, { color: tc.secondaryText }]}>
                                 {t('copilot.applyHint')}
                             </Text>
-                        </TouchableOpacity>
+                        </View>
                     )}
-                    {aiEnabled && copilotApplied && (
+                    {aiEnabled && hasAppliedCopilot && (
                         <View style={[styles.copilotPill, { borderColor: tc.border, backgroundColor: tc.filterBg }]}>
                             <View style={{ flexDirection: 'row', alignItems: 'flex-start', columnGap: 4 }}>
                                 <Ionicons

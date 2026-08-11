@@ -98,10 +98,11 @@ export function TaskEditorAiPanels({ ai, timeEstimatesEnabled, t }: TaskEditorAi
         aiError,
         aiBreakdownSteps,
         aiClarifyResponse,
-        copilotSuggestion,
-        copilotApplied,
         copilotContext,
         copilotEstimate,
+        copilotTags,
+        pendingCopilotParts,
+        applyCopilotPart,
         applyCopilotSuggestion,
         addBreakdownStepsToChecklist,
         clearAiBreakdown,
@@ -110,24 +111,36 @@ export function TaskEditorAiPanels({ ai, timeEstimatesEnabled, t }: TaskEditorAi
         clearAiClarify,
     } = ai;
     if (!aiEnabled) return null;
-    const copilotTags = copilotSuggestion?.tags ?? [];
+    const hasAppliedCopilot = Boolean(copilotContext) || Boolean(copilotEstimate) || copilotTags.length > 0;
 
     return (
         <>
-            {copilotSuggestion && !copilotApplied && (
-                <button
-                    type="button"
-                    onClick={applyCopilotSuggestion}
-                    className="text-xs px-2 py-1 rounded bg-muted/30 border border-border text-muted-foreground hover:bg-muted/60 transition-colors text-left"
-                >
-                    ✨ {t('copilot.suggested')}{' '}
-                    {copilotSuggestion.context ? `${copilotSuggestion.context} ` : ''}
-                    {timeEstimatesEnabled && copilotSuggestion.timeEstimate ? `${copilotSuggestion.timeEstimate}` : ''}
-                    {copilotSuggestion.tags?.length ? copilotSuggestion.tags.join(' ') : ''}
-                    <span className="ml-2 text-muted-foreground/70">{t('copilot.applyHint')}</span>
-                </button>
+            {pendingCopilotParts.length > 0 && (
+                <div className="text-xs px-2 py-1 rounded bg-muted/30 border border-border text-muted-foreground flex flex-wrap items-center gap-1.5">
+                    <span>✨ {t('copilot.suggested')}</span>
+                    {pendingCopilotParts.map((part) => (
+                        <button
+                            key={`${part.kind}:${part.value}`}
+                            type="button"
+                            onClick={() => applyCopilotPart(part)}
+                            className="px-1.5 py-0.5 rounded bg-muted/50 text-foreground hover:bg-muted transition-colors"
+                        >
+                            {part.value}
+                        </button>
+                    ))}
+                    {pendingCopilotParts.length > 1 && (
+                        <button
+                            type="button"
+                            onClick={applyCopilotSuggestion}
+                            className="px-1.5 py-0.5 rounded text-primary hover:bg-primary/10 transition-colors"
+                        >
+                            {t('copilot.applyAll')}
+                        </button>
+                    )}
+                    <span className="text-muted-foreground/70">{t('copilot.applyHint')}</span>
+                </div>
             )}
-            {copilotApplied && (
+            {hasAppliedCopilot && (
                 <div className="text-xs px-2 py-1 rounded bg-muted/30 border border-border text-muted-foreground">
                     ✅ {t('copilot.applied')}{' '}
                     {copilotContext ? `${copilotContext} ` : ''}
