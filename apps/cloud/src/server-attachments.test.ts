@@ -343,7 +343,14 @@ describe('garbageCollectOrphanAttachments', () => {
         });
     });
 
-    test('reports a file deletion durability failure without counting it as deleted', () => {
+    // S7: GC batches removals per directory into one trailing durablySyncDirectory
+    // call instead of a per-entry parent fsync, so a batched publish failure is
+    // attributed to the directory, not to whichever file happened to be removed
+    // last — and a successful unlink still counts as deleted even though the
+    // directory's publish for it failed (the bytes really are gone; only the
+    // crash-durability guarantee for that is what failed, and it's retried on
+    // the next GC pass — see the retry test below).
+    test('reports a batched directory publish failure without discarding files it already unlinked', () => {
         withSandbox((dataDir) => {
             const key = 'gc-file-durability-failure';
             const attachmentsRoot = join(dataDir, key, 'attachments');
@@ -370,15 +377,15 @@ describe('garbageCollectOrphanAttachments', () => {
                 removal.fileSystem,
             );
 
-            expect(result.deleted).toBe(0);
+            expect(result.deleted).toBe(1);
             expect(result.errors).toHaveLength(1);
-            expect(result.errors[0]).toContain('stale.bin: injected fsync-parent failure');
+            expect(result.errors[0]).toBe('mixed: injected fsync-parent failure');
             expect(existsSync(stalePath)).toBe(false);
             expect(existsSync(retainedPath)).toBe(true);
         });
     });
 
-    test('re-publishes a retained directory after a prior unlink parent fsync failure', () => {
+    test('re-publishes a directory after a prior batched publish failure, without repeating the earlier deletion', () => {
         withSandbox((dataDir) => {
             const key = 'gc-file-durability-retry';
             const attachmentsRoot = join(dataDir, key, 'attachments');
@@ -403,7 +410,7 @@ describe('garbageCollectOrphanAttachments', () => {
             });
 
             const first = garbageCollectOrphanAttachments(dataDir, key, data, removal.fileSystem);
-            expect(first.deleted).toBe(0);
+            expect(first.deleted).toBe(1);
             expect(first.errors).toHaveLength(1);
             expect(existsSync(stalePath)).toBe(false);
             expect(existsSync(retainedPath)).toBe(true);
@@ -417,7 +424,7 @@ describe('garbageCollectOrphanAttachments', () => {
         });
     });
 
-    test('reports a pruned-directory durability failure', () => {
+    test("reports the attachments root's batched publish failure after pruning an emptied subdirectory", () => {
         withSandbox((dataDir) => {
             const key = 'gc-directory-durability-failure';
             const attachmentsRoot = join(dataDir, key, 'attachments');
@@ -439,8 +446,33 @@ describe('garbageCollectOrphanAttachments', () => {
 
             expect(result.deleted).toBe(1);
             expect(result.errors).toHaveLength(1);
-            expect(result.errors[0]).toContain('stale-only: injected fsync-parent failure');
+            expect(result.errors[0]).toBe('.: injected fsync-parent failure');
             expect(existsSync(staleOnlyDir)).toBe(false);
+        });
+    });
+
+    // S7: the core fix — removing several stale files from one directory must
+    // publish that directory exactly once (the trailing batch sync), not once
+    // per removed file (the old N+1 behavior).
+    test('fsyncs a directory exactly once per pass no matter how many stale files it removes', () => {
+        withSandbox((dataDir) => {
+            const key = 'gc-batch-fsync-key';
+            const attachmentsRoot = join(dataDir, key, 'attachments');
+            const batchDir = join(attachmentsRoot, 'batch');
+            mkdirSync(batchDir, { recursive: true });
+            const stalePaths = ['a.bin', 'b.bin', 'c.bin'].map((name) => join(batchDir, name));
+            for (const stalePath of stalePaths) {
+                writeFileSync(stalePath, 'stale');
+                expireFile(stalePath);
+            }
+            const removal = createRemovalFileSystem(() => false);
+
+            const result = garbageCollectOrphanAttachments(dataDir, key, emptyAppData(), removal.fileSystem);
+
+            expect(result.deleted).toBe(3);
+            expect(result.errors).toEqual([]);
+            const batchDirFsyncs = removal.events.filter((event) => event === `fsync-parent:${batchDir}`);
+            expect(batchDirFsyncs).toHaveLength(1);
         });
     });
 });

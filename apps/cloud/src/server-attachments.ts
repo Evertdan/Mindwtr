@@ -156,7 +156,11 @@ export function garbageCollectOrphanAttachments(
                 visit(entryPath);
                 try {
                     if (entryPath !== rootRealPath) {
-                        durablyRemoveDirectory(entryPath, removalFileSystem);
+                        // syncParent: false — this directory's own removal from dirPath's
+                        // listing is published by the batched durablySyncDirectory(dirPath)
+                        // below, alongside every file this pass removed from dirPath. A
+                        // per-entry fsync here would republish the same parent N+1 times.
+                        durablyRemoveDirectory(entryPath, removalFileSystem, { syncParent: false });
                     }
                 } catch (error) {
                     const code = typeof error === 'object' && error !== null && 'code' in error
@@ -181,7 +185,10 @@ export function garbageCollectOrphanAttachments(
                 continue;
             }
             try {
-                if (durablyRemoveFile(entryPath, removalFileSystem)) {
+                // syncParent: false — same batching as the directory-prune case above:
+                // this file's removal is published by the trailing durablySyncDirectory
+                // call for dirPath, not by its own per-entry fsync.
+                if (durablyRemoveFile(entryPath, removalFileSystem, { syncParent: false })) {
                     deleted += 1;
                 }
             } catch (error) {

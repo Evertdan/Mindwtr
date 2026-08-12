@@ -229,17 +229,30 @@ export function durablySyncDirectory(
     syncDirectoryEntryParent(directoryPath, fileSystem);
 }
 
+export type DurableRemovalOptions = {
+    /**
+     * Set false only when the caller removes several entries from the same
+     * directory and durably syncs that directory itself once at the end (see
+     * garbageCollectOrphanAttachments' batched GC pass) — otherwise every
+     * per-entry removal keeps paying its own parent fsync, which is required
+     * for a standalone removal like the single-file DELETE route to durably
+     * acknowledge before responding. Defaults to true.
+     */
+    syncParent?: boolean;
+};
+
 function durablyRemoveEntry(
     targetPath: string,
     remove: (path: string) => void,
     fileSystem: DurableRemovalFileSystem,
+    syncParent: boolean,
 ): boolean {
     const parentPath = dirname(targetPath);
     if (!fileSystem.existsSync(targetPath)) {
         // A preceding attempt may have made the removal visible but failed while
         // publishing the parent-directory change. Re-sync an existing parent so
         // an idempotent retry cannot acknowledge visibility as durability.
-        if (fileSystem.existsSync(parentPath)) {
+        if (syncParent && fileSystem.existsSync(parentPath)) {
             syncDirectoryEntryParent(parentPath, fileSystem);
         }
         return false;
@@ -249,27 +262,29 @@ function durablyRemoveEntry(
         remove(targetPath);
     } catch (error) {
         if (!isFsErrorWithCode(error, 'ENOENT')) throw error;
-        if (fileSystem.existsSync(parentPath)) {
+        if (syncParent && fileSystem.existsSync(parentPath)) {
             syncDirectoryEntryParent(parentPath, fileSystem);
         }
         return false;
     }
-    syncDirectoryEntryParent(parentPath, fileSystem);
+    if (syncParent) syncDirectoryEntryParent(parentPath, fileSystem);
     return true;
 }
 
 export function durablyRemoveFile(
     targetPath: string,
     fileSystem: DurableRemovalFileSystem = nodeDurableRemovalFileSystem,
+    options: DurableRemovalOptions = {},
 ): boolean {
-    return durablyRemoveEntry(targetPath, (path) => fileSystem.unlinkSync(path), fileSystem);
+    return durablyRemoveEntry(targetPath, (path) => fileSystem.unlinkSync(path), fileSystem, options.syncParent ?? true);
 }
 
 export function durablyRemoveDirectory(
     targetPath: string,
     fileSystem: DurableRemovalFileSystem = nodeDurableRemovalFileSystem,
+    options: DurableRemovalOptions = {},
 ): boolean {
-    return durablyRemoveEntry(targetPath, (path) => fileSystem.rmdirSync(path), fileSystem);
+    return durablyRemoveEntry(targetPath, (path) => fileSystem.rmdirSync(path), fileSystem, options.syncParent ?? true);
 }
 
 export function ensureDirectoryWithinRoot(
