@@ -154,11 +154,13 @@ export const AUTH_FAILURE_RATE_MAX = Number.isFinite(authFailureRateMaxValue) &&
     ? Math.floor(authFailureRateMaxValue)
     : 30;
 export const ATTACHMENT_PATH_ALLOWLIST = /^[a-zA-Z0-9._/-]+$/;
-// Real cloudKeys are content-addressed and short: buildCloudKey (packages/core/src/
-// attachment-paths.ts) emits `attachments/<uuid>[.ext]` (2 segments, ~52 chars) and the
-// CloudKit backend emits `cloudkit:<uuid>` (1 segment, ~45 chars). These bounds give an
-// 8x/10x margin over that shape while still rejecting the thousands-of-segments paths
-// that make ensureDirectoryWithinRoot's per-segment walk O(depth^2) on an authenticated PUT.
+// Real cloudKeys reaching this server are content-addressed and short: buildCloudKey
+// (packages/core/src/attachment-paths.ts) emits `attachments/<uuid>[.ext]` — 2 segments,
+// ~52 chars. (The CloudKit backend's `cloudkit:<uuid>` keys never reach this endpoint at
+// all — ATTACHMENT_PATH_ALLOWLIST above has no `:`, so those requests go straight to
+// Apple's CloudKit and are rejected here if ever attempted.) These bounds give an 8x/10x
+// margin over that 2-segment/~52-char shape while still rejecting the thousands-of-segments
+// paths that make ensureDirectoryWithinRoot's per-segment walk O(depth^2) on an authenticated PUT.
 export const ATTACHMENT_PATH_MAX_SEGMENTS = 16;
 export const ATTACHMENT_PATH_MAX_LENGTH = 512;
 export const CLOUD_DATA_LOCK_WAIT_TIMEOUT_MS = 60_000;
