@@ -116,10 +116,15 @@ export function useTaskItemAi({
         if (signature === copilotInputRef.current) {
             return;
         }
-        copilotInputRef.current = signature;
         let cancelled = false;
         let localAbort: AbortController | null = null;
         const handle = setTimeout(async () => {
+            // Record the signature only once the request actually dispatches:
+            // a re-render can clear this timer before it fires (effect
+            // cleanup below), and marking the ref at schedule time would make
+            // that rerun's dedup check see a signature that was never really
+            // sent, permanently skipping the reschedule.
+            copilotInputRef.current = signature;
             try {
                 const currentContexts = editContexts.split(',').map((c) => c.trim()).filter(Boolean);
                 const provider = createAIProvider(await buildCopilotConfig(settings ?? {}, aiKey));

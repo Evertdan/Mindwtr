@@ -184,15 +184,7 @@ describe('TaskItem copilot wiring', () => {
         expect(lastCall?.copilotEnabled).toBe(false);
     });
 
-    // The debounced predictMetadata call itself isn't asserted here: entering
-    // edit mode re-renders TaskItem (loadTokenOptions flips on) before the
-    // 800ms debounce fires, and useTaskItemAi's debounce effect has a
-    // pre-existing, unrelated quirk where a same-signature re-render after
-    // its timer is cleared skips rescheduling — reproducible on unmodified
-    // code too. That's outside this finding's scope (useTaskItemAi.ts
-    // internals), so this only asserts the wiring TaskItem.tsx owns: the
-    // argument it passes to the hook.
-    it('enables copilot for a row mounted already in edit mode', async () => {
+    it('enables copilot for a row mounted already in edit mode, and the debounced call still fires', async () => {
         useUiStore.setState({ editingTaskId: rowTask.id });
 
         render(
@@ -201,7 +193,11 @@ describe('TaskItem copilot wiring', () => {
             </LanguageProvider>
         );
 
+        // Entering edit mode on mount re-renders TaskItem (loadTokenOptions
+        // flips on) before the 800ms debounce fires; predictMetadata must
+        // still land once things settle (N1).
         await settleSuggestion();
+        expect(predictMetadata).toHaveBeenCalledTimes(1);
 
         const calls = vi.mocked(useTaskItemAi).mock.calls;
         const lastCall = calls[calls.length - 1]?.[0];
