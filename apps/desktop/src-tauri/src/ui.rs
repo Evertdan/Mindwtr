@@ -492,8 +492,18 @@ pub(crate) fn nudge_wayland_csd_after_show(window: &tauri::WebviewWindow) {
 #[cfg(not(target_os = "linux"))]
 pub(crate) fn nudge_wayland_csd_after_show(_window: &tauri::WebviewWindow) {}
 
+/// The single funnel for putting the main window back on screen: the tray menu
+/// and tray click, a second instance (including the Flatpak listener), the
+/// first reveal after launch, and the quick-add fallback all land here.
+///
+/// The macOS activation policy is restored to Regular before the window
+/// appears — never after — so the window is never on screen while the app is
+/// still an accessory (no Dock icon, no Cmd+Tab, and the menu bar left with
+/// the previously frontmost app). `set_focus` below then activates the app,
+/// which is what actually hands the menu bar over.
 pub(crate) fn show_main(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
+        let _ = crate::platform::apply_macos_activation_policy(app, false);
         let _ = window.set_skip_taskbar(false);
         let _ = window.unminimize();
         let _ = window.show();

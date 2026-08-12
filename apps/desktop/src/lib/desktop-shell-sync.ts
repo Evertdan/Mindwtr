@@ -58,12 +58,21 @@ export function useDesktopShellSync({ showTray, trayTooltip, closeBehavior }: De
         return runShellCommand('set_tray_tooltip', { tooltip: trayTooltip }, 'tray', 'setTooltip');
     }, [showTray, trayTooltip]);
 
+    // Settings alone can only ever put the app *back* in the Dock, Cmd+Tab and
+    // the menu bar. Enabling close-to-tray used to make it an accessory app for
+    // the rest of the session, window on screen or not; becoming an accessory
+    // belongs to the hide path (hide-to-tray.ts) and is undone by the show path
+    // (Rust `show_main`), the only two places that know where the window is.
+    // Restoring Regular here still matters: a window already hidden in the tray
+    // when close-to-tray or the tray icon is turned off (a settings sync from
+    // another device can do this) would otherwise be left with no Dock icon and
+    // no tray to come back through.
     useEffect(() => {
         if (!isTauriRuntime()) return;
-        const hideFromDock = closeBehavior === 'tray' && showTray !== false;
+        if (closeBehavior === 'tray' && showTray !== false) return;
         return runShellCommand(
             'set_macos_activation_policy',
-            { accessory: hideFromDock },
+            { accessory: false },
             'window',
             'setActivationPolicy',
         );

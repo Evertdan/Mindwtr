@@ -888,9 +888,16 @@ mod tests {
     }
 }
 
-#[tauri::command]
-pub(crate) fn set_macos_activation_policy(
-    app: tauri::AppHandle,
+/// Accessory removes the Dock icon, the Cmd+Tab entry and the app's menu bar,
+/// so it is only ever correct while the main window is actually hidden in the
+/// tray. Every caller therefore sits on a hide or a show path, never on a
+/// settings change. No-op off macOS, so call sites stay platform-agnostic.
+///
+/// Applying a policy does not activate the app: a caller switching back to
+/// Regular for a window it is about to show must still focus that window, or
+/// the menu bar keeps belonging to the previously frontmost app.
+pub(crate) fn apply_macos_activation_policy(
+    app: &tauri::AppHandle,
     accessory: bool,
 ) -> Result<(), String> {
     #[cfg(target_os = "macos")]
@@ -905,7 +912,15 @@ pub(crate) fn set_macos_activation_policy(
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (&app, accessory);
+        let _ = (app, accessory);
     }
     Ok(())
+}
+
+#[tauri::command]
+pub(crate) fn set_macos_activation_policy(
+    app: tauri::AppHandle,
+    accessory: bool,
+) -> Result<(), String> {
+    apply_macos_activation_policy(&app, accessory)
 }

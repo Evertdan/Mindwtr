@@ -30,6 +30,7 @@ afterEach(() => {
 });
 
 const options: DesktopShellSyncOptions = { showTray: true, trayTooltip: 'Mindwtr', closeBehavior: 'tray' };
+const quitOptions: DesktopShellSyncOptions = { ...options, closeBehavior: 'quit' };
 
 describe('useDesktopShellSync', () => {
     it('invokes nothing off Tauri', () => {
@@ -37,14 +38,27 @@ describe('useDesktopShellSync', () => {
         expect(invoked).toEqual([]);
     });
 
-    it('sets the tray icon before its tooltip, then the dock policy', () => {
+    it('sets the tray icon before its tooltip', () => {
         enableTauri();
         renderHook(() => useDesktopShellSync(options));
         expect(invoked).toEqual([
             ['set_tray_visible', { visible: true }],
             ['set_tray_tooltip', { tooltip: 'Mindwtr' }],
-            ['set_macos_activation_policy', { accessory: true }],
         ]);
+    });
+
+    // The window is on screen whenever this hook runs, so enabling close-to-tray
+    // must never cost the Dock icon, the Cmd+Tab entry or the menu bar. Only the
+    // hide path may make the app an accessory.
+    it('never makes the app an accessory from settings alone', () => {
+        enableTauri();
+        const { rerender } = renderHook((props: typeof options) => useDesktopShellSync(props), {
+            initialProps: quitOptions,
+        });
+        rerender(options);
+        rerender({ ...options, showTray: undefined });
+
+        expect(invoked).not.toContainEqual(['set_macos_activation_policy', { accessory: true }]);
     });
 
     it('leaves the tray alone until settings hydrate', () => {
@@ -52,12 +66,13 @@ describe('useDesktopShellSync', () => {
         renderHook(() => useDesktopShellSync({ ...options, showTray: undefined }));
         expect(invoked.map(([command]) => command)).toEqual([
             // No visibility command without a setting, but an unhydrated tray is
-            // still shown, so its tooltip and the dock policy still apply.
+            // still shown, so its tooltip still applies.
             'set_tray_tooltip',
-            'set_macos_activation_policy',
         ]);
     });
 
+    // A window hidden in the tray when the tray is switched off has nothing left
+    // to bring it back, so the app must return to the Dock and Cmd+Tab.
     it('skips the tooltip when the tray is hidden and keeps the dock icon', () => {
         enableTauri();
         renderHook(() => useDesktopShellSync({ ...options, showTray: false }));
@@ -69,7 +84,7 @@ describe('useDesktopShellSync', () => {
 
     it('keeps the dock icon when closing quits', () => {
         enableTauri();
-        renderHook(() => useDesktopShellSync({ ...options, closeBehavior: 'quit' }));
+        renderHook(() => useDesktopShellSync(quitOptions));
         expect(invoked).toContainEqual(['set_macos_activation_policy', { accessory: false }]);
     });
 
@@ -103,7 +118,7 @@ describe('useDesktopShellSync', () => {
             throw new Error('no tray');
         };
 
-        renderHook(() => useDesktopShellSync(options));
+        renderHook(() => useDesktopShellSync(quitOptions));
         await vi.waitFor(() => expect(logErrorMock).toHaveBeenCalledTimes(3));
 
         expect(logErrorMock.mock.calls.map((call) => (call as unknown as [unknown, object])[1])).toEqual([
@@ -120,7 +135,7 @@ describe('useDesktopShellSync', () => {
             rejects.push(rejectPromise);
         });
 
-        const { unmount } = renderHook(() => useDesktopShellSync(options));
+        const { unmount } = renderHook(() => useDesktopShellSync(quitOptions));
         expect(rejects).toHaveLength(3);
         unmount();
         for (const reject of rejects) reject(new Error('too late'));

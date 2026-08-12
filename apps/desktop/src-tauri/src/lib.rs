@@ -1218,13 +1218,22 @@ pub fn run() {
                         // the user must be able to see it and act on it. Hiding here
                         // used to turn a stuck save into a silent zombie process that
                         // still held the only copy of unsaved edits.
-                        if let Some(w) = handle.get_webview_window("main") {
-                            if !w.is_visible().unwrap_or(true) {
-                                let _ = w.show();
-                                crate::ui::nudge_wayland_csd_after_show(&w);
+                        // Hopped onto the main thread (as
+                        // reveal_main_window_after_timeout already does) so
+                        // show_main's activation-policy switch is applied
+                        // inline, before the window it reveals appears.
+                        let reveal = handle.clone();
+                        let _ = handle.run_on_main_thread(move || {
+                            if let Some(w) = reveal.get_webview_window("main") {
+                                if !w.is_visible().unwrap_or(true) {
+                                    // Through show_main so this forced reveal
+                                    // also brings back the Dock icon and menu
+                                    // bar a tray-hidden window gave up.
+                                    show_main(&reveal);
+                                }
+                                let _ = w.set_focus();
                             }
-                            let _ = w.set_focus();
-                        }
+                        });
                     });
                 }
             }
@@ -1263,6 +1272,14 @@ pub fn run() {
                 // construction fails further down despite the icon being
                 // available, that branch forces the window back.
                 app.state::<MainWindowReveal>().suppress();
+            }
+            if start_hidden {
+                // Launched straight into the tray, so there is no window to
+                // own a Dock icon or the menu bar yet. show_main restores
+                // Regular on whichever path brings the window up. A quick-add
+                // launch is deliberately not included: that one does put a
+                // window on screen.
+                let _ = crate::platform::apply_macos_activation_policy(&app.handle(), true);
             }
 
             // The main window is declared create:false so portable mode can pin
@@ -1456,10 +1473,7 @@ pub fn run() {
                     // the failure mode #913 was about). Bypasses the reveal
                     // gate deliberately: it was suppressed for a tray start
                     // that no longer has a tray.
-                    if let Some(window) = handle.get_webview_window("main") {
-                        let _ = window.show();
-                        crate::ui::nudge_wayland_csd_after_show(&window);
-                    }
+                    show_main(&handle);
                 }
             }
 

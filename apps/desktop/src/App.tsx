@@ -103,6 +103,7 @@ import {
 import { resolveCloseBehavior } from './lib/window-behavior';
 import { handleDesktopCloseRequest } from './lib/close-request-handler';
 import { beginCloseFlush, resetCloseFlushGate } from './lib/close-flush-gate';
+import { hideMainWindowToTray } from './lib/hide-to-tray';
 import { useConfirmDialog } from './hooks/useConfirmDialog';
 import { subscribeNavigateEvent } from './lib/navigation-events';
 import { shouldOpenDesktopFirstRunOnboarding, subscribeDesktopOnboardingEvent } from './lib/desktop-onboarding-events';
@@ -694,14 +695,7 @@ function App() {
         // "keep running", and handleDesktopCloseRequest's direct 'tray' branch,
         // which cannot reset the gate itself) funnels through here.
         resetCloseFlushGate();
-        const { getCurrentWindow } = await import('@tauri-apps/api/window');
-        const window = getCurrentWindow();
-        try {
-            await window.setSkipTaskbar(true);
-        } catch (error) {
-            void logError(error, { scope: 'window', step: 'setSkipTaskbar' });
-        }
-        await window.hide();
+        await hideMainWindowToTray();
     }, []);
 
     const quitApp = useCallback(async () => {
