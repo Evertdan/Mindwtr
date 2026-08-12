@@ -224,7 +224,12 @@ export function handleOrphanAttachmentGcRequest(dataDir: string, key: string, fi
         return errorResponse('Stored data failed validation', 500);
     }
     const result = garbageCollectOrphanAttachments(dataDir, key, data);
-    return jsonResponse({ ok: result.errors.length === 0, ...result });
+    const ok = result.errors.length === 0;
+    // S8: a GC pass that failed to remove or durably publish some entries is not a
+    // 200 — 500 is the existing convention this file already uses for durability/
+    // filesystem failures (see e.g. the validation-failure branch above), and unlike
+    // 207 it makes response.ok false for every caller without bespoke handling.
+    return jsonResponse({ ok, ...result }, { status: ok ? 200 : 500 });
 }
 
 const normalizeAttachmentContentType = (value: string | null): string => value?.split(';', 1)[0]?.trim().toLowerCase() || '';

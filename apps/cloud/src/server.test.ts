@@ -3404,7 +3404,8 @@ describe('cloud server api', () => {
                 method: 'POST',
                 headers: authHeaders,
             });
-            expect(gcResponse.status).toBe(200);
+            // S8: a GC pass with errors must not answer 200.
+            expect(gcResponse.status).toBe(500);
             const gcBody = await gcResponse.json();
             expect(gcBody.ok).toBe(false);
             expect(gcBody.deleted).toBe(0);
