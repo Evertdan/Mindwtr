@@ -1,5 +1,5 @@
 import { createWithEqualityFn } from 'zustand/traditional';
-import type { FilterCriteria, TaskSortBy } from '@mindwtr/core';
+import { useTaskStore, type FilterCriteria, type TaskSortBy } from '@mindwtr/core';
 import { DONE_AXES, FOCUS_AXES, REFERENCE_AXES, sanitizeAxis, type DoneGroupBy, type NextGroupBy, type ReferenceGroupBy } from '../components/views/list/next-grouping';
 import { DONE_SORT_OPTIONS } from '../lib/task-list-sort';
 
@@ -107,6 +107,22 @@ function readStoredProjectLayouts(): Record<string, ProjectLayout> {
     } catch {
         return {};
     }
+}
+
+// Drops entries for projects the store no longer knows about (deleted and
+// purged, not just soft-deleted — _allProjects keeps trashed ones restorable).
+// Skipped when _allProjects is empty: that means "not loaded yet" at cold
+// boot, not "no projects exist", and pruning against it would wipe every
+// saved layout on every launch.
+function pruneProjectLayouts(layouts: Record<string, ProjectLayout>): Record<string, ProjectLayout> {
+    const allProjects = useTaskStore.getState()._allProjects;
+    if (allProjects.length === 0) return layouts;
+    const validIds = new Set(allProjects.map((project) => project.id));
+    const pruned: Record<string, ProjectLayout> = {};
+    for (const [projectId, layout] of Object.entries(layouts)) {
+        if (validIds.has(projectId)) pruned[projectId] = layout;
+    }
+    return pruned;
 }
 
 function saveStoredProjectLayouts(layouts: Record<string, ProjectLayout>) {
@@ -253,7 +269,7 @@ export const useUiStore = createWithEqualityFn<UiState>()((set) => ({
     projectLayouts: readStoredProjectLayouts(),
     setProjectLayout: (projectId, layout) =>
         set((state) => {
-            const projectLayouts = { ...state.projectLayouts, [projectId]: layout };
+            const projectLayouts = pruneProjectLayouts({ ...state.projectLayouts, [projectId]: layout });
             saveStoredProjectLayouts(projectLayouts);
             return { projectLayouts };
         }),

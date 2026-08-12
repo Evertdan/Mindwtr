@@ -155,4 +155,33 @@ describe('useUiStore project layouts (#1019)', () => {
             'project-2': 'columns',
         });
     });
+
+    it('prunes an unknown project id once the store has real project data (#U8)', async () => {
+        window.localStorage.setItem('mindwtr:project-layouts:v1', JSON.stringify({
+            'known-project': 'list',
+            'deleted-project': 'columns',
+        }));
+        const { PROJECT_LAYOUTS_STORAGE_KEY, useUiStore } = await import('./ui-store');
+        const { useTaskStore } = await import('@mindwtr/core');
+        useTaskStore.setState({ _allProjects: [{ id: 'known-project' }] as never });
+
+        useUiStore.getState().setProjectLayout('known-project', 'columns');
+
+        expect(useUiStore.getState().projectLayouts).toEqual({ 'known-project': 'columns' });
+        expect(JSON.parse(window.localStorage.getItem(PROJECT_LAYOUTS_STORAGE_KEY) || '{}')).toEqual({
+            'known-project': 'columns',
+        });
+    });
+
+    it('does not prune anything before the store has loaded real project data', async () => {
+        window.localStorage.setItem('mindwtr:project-layouts:v1', JSON.stringify({ 'orphan-project': 'columns' }));
+        const { PROJECT_LAYOUTS_STORAGE_KEY, useUiStore } = await import('./ui-store');
+
+        useUiStore.getState().setProjectLayout('another-project', 'list');
+
+        expect(JSON.parse(window.localStorage.getItem(PROJECT_LAYOUTS_STORAGE_KEY) || '{}')).toEqual({
+            'orphan-project': 'columns',
+            'another-project': 'list',
+        });
+    });
 });
