@@ -3686,6 +3686,45 @@ describe('TaskStore', () => {
         expect(useTaskStore.getState().persistenceFailure).toBeNull();
     });
 
+    it('does not let a stale incremental retry snapshot outrank a newer pending snapshot at flush', async () => {
+        const task = createStoreTask('stale-retry-race');
+        useTaskStore.setState({
+            tasks: [task],
+            _allTasks: [task],
+            _tasksById: buildEntityMap([task]),
+        });
+
+        let rejectSaveTask: ((reason?: unknown) => void) | null = null;
+        mockStorage.saveTask = vi.fn(() => new Promise<void>((_, reject) => {
+            rejectSaveTask = reject;
+        }));
+        setStorageAdapter(mockStorage);
+
+        // Dispatch the incremental save. Its retry snapshot is captured now, before
+        // the newer task below is created.
+        void useTaskStore.getState().updateTask(task.id, { title: 'First edit' });
+
+        // A newer full snapshot (with the extra task) is enqueued via debouncedSave
+        // while the incremental save above is still in flight.
+        await useTaskStore.getState().addTask('Newer task');
+
+        // The incremental save now fails. Its retry snapshot predates the newer
+        // pending snapshot and must not be allowed to win at flush time.
+        rejectSaveTask?.(new Error('incremental write failed'));
+        await waitForExpectation(() => {
+            expect(useTaskStore.getState().persistenceFailure).toMatchObject({
+                message: expect.stringContaining('incremental write failed'),
+            });
+        });
+
+        await flushPendingSave();
+
+        expect(mockStorage.saveData).toHaveBeenCalledTimes(1);
+        const savedData = (mockStorage.saveData as unknown as { mock: { calls: any[][] } }).mock.calls[0][0] as AppData;
+        expect(savedData.tasks.map((t) => t.title)).toContain('Newer task');
+        expect(savedData.tasks).toHaveLength(2);
+    });
+
     it('keeps a failed incremental snapshot pending so fetch cannot replace it with stale storage', async () => {
         const task = createStoreTask('incremental-fetch-race');
         useTaskStore.setState({

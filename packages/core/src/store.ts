@@ -387,10 +387,17 @@ const enqueuePendingSave = (
 };
 
 const trackImmediateSave = (save: Promise<void>, retrySnapshot?: AppData): Promise<void> => {
+    const dispatchVersion = pendingVersion;
     let trackedSave: Promise<void>;
     trackedSave = save
         .catch((error) => {
-            if (retrySnapshot) enqueuePendingSave(retrySnapshot, undefined, false);
+            // Only enqueue the retry snapshot if no newer snapshot has been queued
+            // since dispatch — a newer one already contains this mutation, since
+            // store state is cumulative. Enqueuing the stale one would let it
+            // outrank the newer entry at flush (last-entry coalescing).
+            if (retrySnapshot && pendingVersion === dispatchVersion) {
+                enqueuePendingSave(retrySnapshot, undefined, false);
+            }
             recordPersistenceFailure(toSaveErrorMessage(error));
             throw error;
         })
