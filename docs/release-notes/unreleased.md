@@ -15,6 +15,8 @@ Changes collected after `v1.1.6` and before the next version tag.
 - Task editor: the Person field now appears automatically while a task is edited as Waiting For, so an existing task can be assigned to someone without first customizing the editor layout. Desktop and mobile. (#1021)
 - AI Copilot: suggestions now apply one piece at a time — tap the suggested context, time estimate, or any tag on its own, or apply all of them at once. Works in the task editor, the desktop list's add-task row, and mobile quick capture. (#1022)
 - Process Inbox: the guided clarify step now offers the AI clarify action when the AI assistant is switched on. Desktop. (#1022)
+- Desktop: refreshing the sync backup no longer logs a write error on rclone and WinFSP mounts — the backup copy no longer sets the destination's size, which those mounts refuse without a write cache. The backup itself was already updating correctly. (#1001)
+- Desktop: File Sync no longer logs a write error against its lock file on rclone and WinFSP mounts — taking the folder lock needs no write access, so an existing lock file is now opened read-only. Sync was already correctly locked there; only the mount's log was affected. (#1001)
 
 - Calendar: a task with a start date but no time now shows "All day" in the desktop month grid and the mobile schedule list, instead of a phantom midnight time (shown as "12:00" on 12-hour clocks).
 - Desktop: attachment links pointing at a folder (for example `D:\Media\Movies\`) now open in the file manager instead of failing with "Path is outside Mindwtr-managed locations". Links to files anywhere already worked; folders now match.

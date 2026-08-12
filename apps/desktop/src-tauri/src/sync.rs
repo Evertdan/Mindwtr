@@ -3975,6 +3975,91 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
+    fn write_refusing_lock_file_still_grants_the_sync_lock() {
+        // A cache-off rclone VFS mount refuses to write-open an existing file
+        // (#1001) — it logged an error on every sync while the lock still
+        // worked. A read-only mode bit is the local stand-in for that refusal:
+        // the lock must be taken through a handle that never asks for write
+        // access, on the same stable inode.
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().expect("temp dir");
+        let lock_path = dir.path().join(".mindwtr.lock");
+        fs::write(&lock_path, b"").expect("seed lock file");
+        fs::set_permissions(&lock_path, fs::Permissions::from_mode(0o444))
+            .expect("make the lock file refuse write opens");
+        assert!(
+            OpenOptions::new().write(true).open(&lock_path).is_err(),
+            "test setup must actually refuse write opens (not running as root)"
+        );
+
+        let owner = acquire_sync_lock(dir.path()).expect("write-refusing lock file can be locked");
+
+        assert_eq!(
+            acquire_sync_lock(dir.path()).expect_err("the lock must still exclude a second writer"),
+            "Sync lock held by another process"
+        );
+        release_sync_lock(&owner);
+        assert!(lock_path.exists(), "stable lock inode must not be unlinked");
+    }
+
+    #[test]
+    fn sync_writes_never_copy_through_a_presizing_copy() {
+        // `fs::copy` presizes the destination (`CopyFileExW` on Windows), which
+        // a cache-off rclone VFS refuses with a per-sync `Truncate: Can't change
+        // size` error (#1001). Nothing on the sync write path may reintroduce
+        // it; the refusal is invisible on a local filesystem, so guard the
+        // source instead.
+        let source = include_str!("sync.rs");
+        // Built at runtime: spelling the declaration out as a literal would make
+        // this test's own source the first match and guard nothing.
+        let declaration = format!("fn {}(", "write_sync_file_to_dir");
+        assert_eq!(
+            source.matches(&declaration).count(),
+            1,
+            "write_sync_file_to_dir must be declared exactly once for this check to mean anything"
+        );
+        let body = source
+            .split_once(declaration.as_str())
+            .expect("write_sync_file_to_dir")
+            .1
+            .split_once("\n#[tauri::command")
+            .expect("end of write_sync_file_to_dir")
+            .0;
+        for (forbidden, reason) in [
+            (
+                "fs::copy(",
+                "must copy sequentially, not through fs::copy, which presizes the destination",
+            ),
+            (
+                "sync_regular_file_for_durability",
+                "must flush the handle it wrote, not reopen an existing file for write",
+            ),
+        ] {
+            assert!(
+                !body.contains(forbidden),
+                "the sync write path {reason} (found {forbidden:?})"
+            );
+        }
+    }
+
+    #[test]
+    fn copy_file_sequentially_replaces_the_destination_contents() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let source = dir.path().join("source.json");
+        let destination = dir.path().join("destination.json");
+        fs::write(&source, b"fresh-contents").expect("write source");
+        fs::write(&destination, b"stale-contents-that-is-longer").expect("write destination");
+
+        copy_file_sequentially(&source, &destination).expect("copy");
+
+        assert_eq!(
+            fs::read(&destination).expect("read destination"),
+            b"fresh-contents"
+        );
+    }
+
+    #[test]
     fn concurrent_sync_lock_contenders_have_one_owner() {
         let dir = tempfile::tempdir().expect("temp dir");
         let path = Arc::new(dir.path().to_path_buf());
@@ -7495,22 +7580,59 @@ fn is_sync_lock_contention(error: &std::io::Error) -> bool {
     false
 }
 
+fn sync_lock_error_message(error: &std::io::Error) -> String {
+    if is_sync_lock_contention(error) {
+        "Sync lock held by another process".to_string()
+    } else {
+        format!(
+            "Failed to acquire an exclusive sync lock; this filesystem may not support safe concurrent writes: {error}"
+        )
+    }
+}
+
+/// Taking the lock needs no write access — `flock` accepts a read-only
+/// descriptor and `LockFileEx` accepts a `GENERIC_READ` handle — so ask for it
+/// only when the file has to be created. Write-opening an *existing* file is
+/// what a cache-off rclone VFS mount refuses: it hands back a write handle,
+/// then refuses at close, logging an error on every sync (#1001). Creating a
+/// missing file is the one write those mounts always allow.
+fn open_sync_lock_file(lock_path: &Path, writable: bool) -> std::io::Result<File> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    if writable {
+        options.write(true).create(true);
+    }
+    options.open(lock_path)
+}
+
 fn acquire_sync_lock(sync_dir: &Path) -> Result<SyncFileLock, String> {
     let lock_path = sync_dir.join(".mindwtr.lock");
-    let file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(&lock_path)
+    let file = open_sync_lock_file(&lock_path, false)
+        // Any refusal of the read-only open — a lock file that does not exist
+        // yet, a mount that answers oddly — falls back to the writable open used
+        // before #1001, so the set of filesystems that can take the lock at all
+        // only grows.
+        .or_else(|_| open_sync_lock_file(&lock_path, true))
+        .map_err(|error| format!("Failed to open sync lock: {error}"))?;
+    let read_only_error = match file.try_lock_exclusive() {
+        Ok(()) => return Ok(SyncFileLock { file }),
+        Err(error) if is_sync_lock_contention(&error) => {
+            return Err(sync_lock_error_message(&error))
+        }
+        Err(error) => error,
+    };
+
+    // No documented `flock`/`LockFileEx` implementation refuses a read-only
+    // handle, but sync must not break outright on a filesystem that disagrees:
+    // retry on the writable handle this used before #1001.
+    log::warn!(
+        "Sync lock rejected on a read-only handle ({read_only_error}); retrying with a writable handle"
+    );
+    let file = open_sync_lock_file(&lock_path, true)
         .map_err(|error| format!("Failed to open sync lock: {error}"))?;
     match file.try_lock_exclusive() {
         Ok(()) => Ok(SyncFileLock { file }),
-        Err(error) if is_sync_lock_contention(&error) => {
-            Err("Sync lock held by another process".to_string())
-        }
-        Err(error) => Err(format!(
-            "Failed to acquire an exclusive sync lock; this filesystem may not support safe concurrent writes: {error}"
-        )),
+        Err(error) => Err(sync_lock_error_message(&error)),
     }
 }
 
@@ -7574,6 +7696,20 @@ fn sync_parent_directory_for_durability(path: &Path) -> std::io::Result<()> {
         let _ = path;
         Ok(())
     }
+}
+
+/// `fs::copy` presizes the destination before writing it — `CopyFileExW` on
+/// Windows, an explicit size change elsewhere — and a cache-off rclone VFS
+/// refuses any size change ("WriteFileHandle: Truncate: Can't change size",
+/// #1001), logging an error per sync even though the bytes still land. Writing
+/// the destination sequentially through one freshly created handle is the write
+/// shape those mounts always allow, and flushing that same handle avoids
+/// reopening the file for write afterwards, which they also refuse.
+fn copy_file_sequentially(source: &Path, destination: &Path) -> std::io::Result<()> {
+    let contents = fs::read(source)?;
+    let mut file = File::create(destination)?;
+    file.write_all(&contents)?;
+    file.sync_all()
 }
 
 fn finish_copied_sync_file_durably<SyncFile, Remove, SyncParent>(
@@ -7978,35 +8114,32 @@ fn write_sync_file_to_dir(
         }
 
         if sync_file.exists() && read_sync_candidate(&sync_file, 1).is_ok() {
-            // fs::copy opens the destination with O_TRUNC, which rclone/WinFSP mounts
-            // refuse without a VFS write cache — so the .bak silently stopped updating
-            // there (#1001). Copy to a fresh temp name (a new file, always allowed) and
-            // rename over the old backup, the same shape the data file itself uses.
+            // Overwriting the backup in place needs O_TRUNC, which rclone/WinFSP
+            // mounts refuse without a VFS write cache — so the .bak silently
+            // stopped updating there (#1001). Write a fresh temp name (a new
+            // file, always allowed) and rename over the old backup, the same
+            // shape the data file itself uses.
             let backup_tmp = sync_dir.join(format!("{}.bak.tmp", DATA_FILE_NAME));
             let _ = fs::remove_file(&backup_tmp);
-            if fs::copy(&sync_file, &backup_tmp).is_ok() {
-                let replace_result =
-                    if let Err(error) = sync_regular_file_for_durability(&backup_tmp) {
-                        Err(format!("Failed to flush sync backup temp file: {error}"))
-                    } else {
-                        let replacement = if cfg!(windows) && backup_file.exists() {
-                            replace_sync_backup_preserving_previous(
-                                &backup_tmp,
-                                &backup_file,
-                                &backup_previous_file,
-                                |path| fs::remove_file(path),
-                                |from, to| fs::rename(from, to),
-                            )
-                        } else {
-                            fs::rename(&backup_tmp, &backup_file).map_err(|error| error.to_string())
-                        };
-                        let directory_flush = sync_parent_directory_for_durability(&backup_file)
-                            .map_err(|error| {
-                                format!("Failed to flush sync backup directory metadata: {error}")
-                            });
-                        replacement.and(directory_flush)
-                    };
-                if let Err(err) = replace_result {
+            if let Err(error) = copy_file_sequentially(&sync_file, &backup_tmp) {
+                log::warn!("Sync backup copy failed: {error}");
+            } else {
+                let replacement = if cfg!(windows) && backup_file.exists() {
+                    replace_sync_backup_preserving_previous(
+                        &backup_tmp,
+                        &backup_file,
+                        &backup_previous_file,
+                        |path| fs::remove_file(path),
+                        |from, to| fs::rename(from, to),
+                    )
+                } else {
+                    fs::rename(&backup_tmp, &backup_file).map_err(|error| error.to_string())
+                };
+                let directory_flush =
+                    sync_parent_directory_for_durability(&backup_file).map_err(|error| {
+                        format!("Failed to flush sync backup directory metadata: {error}")
+                    });
+                if let Err(err) = replacement.and(directory_flush) {
                     log::warn!("Sync backup replacement failed: {err}");
                     let _ = fs::remove_file(&backup_tmp);
                 }
@@ -8051,12 +8184,15 @@ fn write_sync_file_to_dir(
                     "Atomic rename failed ({}), falling back to direct write",
                     rename_err
                 );
-                match fs::copy(&tmp_file, &sync_file) {
+                match copy_file_sequentially(&tmp_file, &sync_file) {
                     Ok(_) => {
                         finish_copied_sync_file_durably(
                             &tmp_file,
                             &sync_file,
-                            sync_regular_file_for_durability,
+                            // Already flushed on the handle that wrote it.
+                            // Reopening it for write is the shape a cache-off
+                            // VFS mount refuses (#1001).
+                            |_| Ok(()),
                             |path| fs::remove_file(path),
                             sync_parent_directory_for_durability,
                         )?;
