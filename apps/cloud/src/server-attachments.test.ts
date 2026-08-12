@@ -516,6 +516,38 @@ describe('garbageCollectOrphanAttachments', () => {
             expect(batchDirFsyncs).toHaveLength(1);
         });
     });
+
+    // S7-CORRECTION: with syncParent:false, a removal failure can no longer mean "the
+    // directory's own fsync already failed" — it only ever means "this one entry
+    // couldn't be removed". The trailing durablySyncDirectory must still run for every
+    // OTHER entry this pass successfully removed from the same directory, or their
+    // removal is never durably published (regresses on power loss, and every later
+    // pass repeats identically since nothing converges).
+    test('still fsyncs the directory once when one removal fails and a sibling in the same directory succeeds', () => {
+        withSandbox((dataDir) => {
+            const key = 'gc-partial-failure-key';
+            const attachmentsRoot = join(dataDir, key, 'attachments');
+            const mixedDir = join(attachmentsRoot, 'mixed');
+            const failingPath = join(mixedDir, 'fails.bin');
+            const succeedingPath = join(mixedDir, 'succeeds.bin');
+            mkdirSync(mixedDir, { recursive: true });
+            writeFileSync(failingPath, 'stale');
+            writeFileSync(succeedingPath, 'stale');
+            expireFile(failingPath);
+            expireFile(succeedingPath);
+            const removal = createRemovalFileSystem((stage, path) => stage === 'unlink' && path === failingPath);
+
+            const result = garbageCollectOrphanAttachments(dataDir, key, emptyAppData(), removal.fileSystem);
+
+            expect(result.deleted).toBe(1);
+            expect(result.errors).toHaveLength(1);
+            expect(result.errors[0]).toBe('mixed/fails.bin: EIO');
+            expect(existsSync(failingPath)).toBe(true);
+            expect(existsSync(succeedingPath)).toBe(false);
+            const mixedDirFsyncs = removal.events.filter((event) => event === `fsync-parent:${mixedDir}`);
+            expect(mixedDirFsyncs).toHaveLength(1);
+        });
+    });
 });
 
 describe('handleAttachmentPathRequest DELETE', () => {

@@ -3,7 +3,7 @@
 // stored AppData still references. Pulled out of server.ts so these rules — previously
 // reachable only by spinning up a live server — have a direct test surface.
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync } from 'fs';
-import { dirname, join, relative } from 'path';
+import { join, relative } from 'path';
 import {
     validateAttachmentForUpload,
     type Attachment,
@@ -138,7 +138,6 @@ export function garbageCollectOrphanAttachments(
     const rootRealPath = realpathSync(rootDir);
     const referenced = collectReferencedAttachmentCloudKeys(data);
     const errors: string[] = [];
-    const failedDirectorySyncs = new Set<string>();
     let deleted = 0;
     let kept = 0;
     let scanned = 0;
@@ -169,7 +168,6 @@ export function garbageCollectOrphanAttachments(
                 } catch (error) {
                     const code = getFsErrorCode(error);
                     if (code !== 'ENOTEMPTY' && code !== 'EEXIST') {
-                        failedDirectorySyncs.add(dirname(entryPath));
                         errors.push(`${relative(rootRealPath, entryPath)}: ${code}`);
                     }
                 }
@@ -194,11 +192,16 @@ export function garbageCollectOrphanAttachments(
                     deleted += 1;
                 }
             } catch (error) {
-                failedDirectorySyncs.add(dirname(entryPath));
                 errors.push(`${relativePath}: ${getFsErrorCode(error)}`);
             }
         }
-        if (failedDirectorySyncs.has(dirPath)) return;
+        // S7-CORRECTION: always attempt the trailing sync, even when an entry in this
+        // directory failed to remove. With syncParent:false (batched removals above),
+        // a removal failure can no longer mean "the parent fsync already failed" — it
+        // now only ever means "this one entry couldn't be unlinked/rmdir'd" — so
+        // skipping the batch sync here used to leave every OTHER successfully removed
+        // entry in the same directory permanently unpublished. This try/catch is the
+        // only place a directory-publish failure is now recorded.
         try {
             // Publish the directory even when a prior run already made an unlink
             // visible before its parent fsync failed. Otherwise GC loses the absent
