@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text } from 'react-native';
+import { Text, View } from 'react-native';
 import renderer, { act } from 'react-test-renderer';
 import { describe, expect, it } from 'vitest';
 import { buildQuickAddPreviewEntries, parseQuickAdd, type QuickAddPreviewEntry } from '@mindwtr/core';
@@ -41,6 +41,20 @@ describe('QuickAddPreview', () => {
     expect(texts(tree)).toEqual(expect.arrayContaining(['@errands', '#family']));
     expect(tree.root.findByProps({ testID: 'quick-add-preview' }).props.accessibilityLiveRegion)
       .toBe('polite');
+  });
+
+  it('hides the title chip from the Android live region so per-keystroke text does not get announced', () => {
+    const entries: QuickAddPreviewEntry[] = [
+      { id: 'title', kind: 'title', label: 'Title', value: 'Call mom', tone: 'default' },
+      { id: '@errands', kind: 'context', value: '@errands', tone: 'default' },
+    ];
+    const chips = render(entries).root.findAllByType(View)
+      .filter((node) => node.props.importantForAccessibility !== undefined);
+
+    expect(chips).toHaveLength(1);
+    expect(chips[0].findAllByType(Text).map((node) => node.props.children)).toContain('Call mom');
+    expect(chips[0].props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(chips[0].props.accessibilityElementsHidden).toBe(true);
   });
 
   it('collapses a long strip into a trailing count', () => {

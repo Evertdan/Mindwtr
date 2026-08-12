@@ -35,6 +35,7 @@ export function QuickAddPreview({ entries, tc }: QuickAddPreviewProps) {
     >
       {visible.map((entry) => {
         const warning = entry.tone === 'warning';
+        const isTitle = entry.kind === 'title';
         return (
           <View
             key={entry.id}
@@ -45,6 +46,11 @@ export function QuickAddPreview({ entries, tc }: QuickAddPreviewProps) {
                 borderColor: warning ? tc.danger : tc.border,
               },
             ]}
+            // The title chip echoes the draft as typed (quick-add-preview.ts), so
+            // it changes on every keystroke; excluded from the live region so
+            // TalkBack doesn't announce it on top of keystroke echo. Other chips
+            // still announce normally. Stays in the same visual position either way.
+            {...(isTitle ? { importantForAccessibility: 'no-hide-descendants' as const, accessibilityElementsHidden: true } : null)}
           >
             {entry.label ? (
               <CompactText

@@ -34,6 +34,12 @@ export function QuickAddPreview({ entries, className }: QuickAddPreviewProps) {
             {visible.map((entry) => (
                 <span
                     key={entry.id}
+                    // The title chip echoes the draft as typed (quick-add-preview.ts),
+                    // so it changes on every keystroke; excluded from the live region
+                    // so screen readers don't announce it on top of keystroke echo.
+                    // Other chips (a token appearing/disappearing/changing) still
+                    // announce normally. Stays in the same visual position either way.
+                    aria-hidden={entry.kind === 'title' ? true : undefined}
                     className={cn(
                         'inline-flex max-w-full items-baseline gap-1 rounded-full border px-2 py-0.5',
                         entry.tone === 'warning'

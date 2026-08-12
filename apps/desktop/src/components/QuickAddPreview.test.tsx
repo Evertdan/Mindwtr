@@ -44,4 +44,13 @@ describe('QuickAddPreview', () => {
         ]} />);
         expect(screen.getByText('/due:nope').parentElement?.className).toContain('destructive');
     });
+
+    it('hides the title chip from the live region so per-keystroke text does not get announced', () => {
+        render(<QuickAddPreview entries={[
+            entry('title', { kind: 'title', label: 'Title', value: 'Call mom' }),
+            entry('@errands'),
+        ]} />);
+        expect(screen.getByText('Call mom').closest('[aria-hidden]')).toHaveAttribute('aria-hidden', 'true');
+        expect(screen.getByText('@errands').closest('[aria-hidden]')).toBeNull();
+    });
 });
