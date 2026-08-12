@@ -379,7 +379,8 @@ describe('garbageCollectOrphanAttachments', () => {
 
             expect(result.deleted).toBe(1);
             expect(result.errors).toHaveLength(1);
-            expect(result.errors[0]).toBe('mixed: injected fsync-parent failure');
+            // S9: the error code ('EIO', from the injected failure), not a raw message.
+            expect(result.errors[0]).toBe('mixed: EIO');
             expect(existsSync(stalePath)).toBe(false);
             expect(existsSync(retainedPath)).toBe(true);
         });
@@ -446,8 +447,48 @@ describe('garbageCollectOrphanAttachments', () => {
 
             expect(result.deleted).toBe(1);
             expect(result.errors).toHaveLength(1);
-            expect(result.errors[0]).toBe('.: injected fsync-parent failure');
+            // S9: the error code, not a raw message.
+            expect(result.errors[0]).toBe('.: EIO');
             expect(existsSync(staleOnlyDir)).toBe(false);
+        });
+    });
+
+    // S9: real Node fs errors embed the absolute path (and, inside the namespace
+    // directory, the token-derived key) in .message — e.g. "EACCES: permission denied,
+    // unlink '/data/<key>/attachments/leaky/stale.bin'". Prove GC reports only the
+    // error code plus the already-namespace-relative path, never that message. (ENOENT
+    // is excluded here because durablyRemoveEntry treats it as an idempotent no-op,
+    // not a reportable failure — see server-storage.ts's durablyRemoveEntry.)
+    test('reports removal failures by error code, never by the raw fs error message that could carry an absolute path', () => {
+        withSandbox((dataDir) => {
+            const key = 'gc-path-leak-key';
+            const attachmentsRoot = join(dataDir, key, 'attachments');
+            const leakyDir = join(attachmentsRoot, 'leaky');
+            const stalePath = join(leakyDir, 'stale.bin');
+            mkdirSync(leakyDir, { recursive: true });
+            writeFileSync(stalePath, 'stale');
+            expireFile(stalePath);
+            const removalFileSystem: DurableRemovalFileSystem = {
+                existsSync,
+                unlinkSync: () => {
+                    throw Object.assign(
+                        new Error(`EACCES: permission denied, unlink '${stalePath}'`),
+                        { code: 'EACCES' },
+                    );
+                },
+                rmdirSync,
+                openSync: (path) => openSync(path, 'r'),
+                fsyncSync,
+                closeSync,
+            };
+
+            const result = garbageCollectOrphanAttachments(dataDir, key, emptyAppData(), removalFileSystem);
+
+            expect(result.errors).toHaveLength(1);
+            expect(result.errors[0]).toBe('leaky/stale.bin: EACCES');
+            expect(result.errors[0]).not.toContain(dataDir);
+            expect(result.errors[0]).not.toContain(stalePath);
+            expect(result.errors[0]).not.toContain('permission denied');
         });
     });
 

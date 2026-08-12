@@ -192,6 +192,19 @@ function isFsErrorWithCode(error: unknown, code: string): boolean {
         && (error as { code?: unknown }).code === code;
 }
 
+// S9: node fs errors embed the absolute path in .message (e.g. "ENOENT: no such
+// file or directory, lstat '/data/<namespace-key>/attachments/...'"). Callers that
+// surface removal/GC failures to a response body must use the short .code instead
+// (e.g. 'ENOENT', 'EIO') — never .message, and never the error object itself.
+export function getFsErrorCode(error: unknown): string {
+    return typeof error === 'object'
+        && error !== null
+        && 'code' in error
+        && typeof (error as { code?: unknown }).code === 'string'
+        ? (error as { code: string }).code
+        : 'unknown';
+}
+
 /**
  * Walks each path segment from `rootRealPath` down to `targetDir`, rejecting any
  * symlink escape along the way. With `create: true` (the default; used by attachment

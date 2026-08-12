@@ -17,6 +17,7 @@ import {
     durablyRemoveDirectory,
     durablyRemoveFile,
     durablySyncDirectory,
+    getFsErrorCode,
     isBodyReadError,
     isPathWithinRoot,
     normalizeAttachmentRelativePath,
@@ -149,7 +150,10 @@ export function garbageCollectOrphanAttachments(
             try {
                 stat = lstatSync(entryPath);
             } catch (error) {
-                errors.push(`${relative(rootRealPath, entryPath)}: ${(error as Error).message}`);
+                // S9: never surface (error as Error).message — node fs errors embed the
+                // absolute server path (and, here, the namespace key). Report the short
+                // error code alongside the already-namespace-relative path instead.
+                errors.push(`${relative(rootRealPath, entryPath)}: ${getFsErrorCode(error)}`);
                 continue;
             }
             if (stat.isDirectory()) {
@@ -163,12 +167,10 @@ export function garbageCollectOrphanAttachments(
                         durablyRemoveDirectory(entryPath, removalFileSystem, { syncParent: false });
                     }
                 } catch (error) {
-                    const code = typeof error === 'object' && error !== null && 'code' in error
-                        ? String((error as { code?: unknown }).code ?? '')
-                        : '';
+                    const code = getFsErrorCode(error);
                     if (code !== 'ENOTEMPTY' && code !== 'EEXIST') {
                         failedDirectorySyncs.add(dirname(entryPath));
-                        errors.push(`${relative(rootRealPath, entryPath)}: ${(error as Error).message}`);
+                        errors.push(`${relative(rootRealPath, entryPath)}: ${code}`);
                     }
                 }
                 continue;
@@ -193,7 +195,7 @@ export function garbageCollectOrphanAttachments(
                 }
             } catch (error) {
                 failedDirectorySyncs.add(dirname(entryPath));
-                errors.push(`${relativePath}: ${(error as Error).message}`);
+                errors.push(`${relativePath}: ${getFsErrorCode(error)}`);
             }
         }
         if (failedDirectorySyncs.has(dirPath)) return;
@@ -204,7 +206,7 @@ export function garbageCollectOrphanAttachments(
             durablySyncDirectory(dirPath, removalFileSystem);
         } catch (error) {
             const relativeDir = relative(rootRealPath, dirPath).replace(/\\/g, '/') || '.';
-            errors.push(`${relativeDir}: ${(error as Error).message}`);
+            errors.push(`${relativeDir}: ${getFsErrorCode(error)}`);
         }
     };
 
