@@ -12,6 +12,7 @@ import {
     markLocalSqliteWrite,
     markLocalWrite,
     start,
+    stop,
 } from './local-data-watcher';
 
 function getTauriMocks() {
@@ -411,6 +412,10 @@ describe('local-data-watcher', () => {
             watchFile,
             schedule: scheduleMock,
             cancelSchedule: cancelScheduleMock,
+            // start() now ends with one immediate merge check (#S11); give it
+            // a real read so it resolves as a clean no-op instead of hitting
+            // the unconfigured default Tauri invoke.
+            readDataJson: async () => emptyData(),
             logInfo: () => undefined,
             logWarn: () => undefined,
         });
@@ -578,6 +583,10 @@ describe('local-data-watcher', () => {
             watchFile,
             schedule: scheduleMock,
             cancelSchedule,
+            // start() now ends with one immediate merge check (#S11); give it
+            // a real read so it resolves as a clean no-op instead of hitting
+            // the unconfigured default Tauri invoke.
+            readDataJson: async () => emptyData(),
             logInfo: () => undefined,
             logWarn: () => undefined,
         });
@@ -1164,6 +1173,47 @@ describe('local-data-watcher', () => {
 
         nowMs = 2200;
         await flushScheduledTimers();
+
+        expect(saveCalls).toHaveLength(1);
+        expect(saveCalls[0]?.tasks.some((task) => task.id === 'ext-1')).toBe(true);
+    });
+
+    it('observes an external change still pending at stop() once start() runs again (#S11)', async () => {
+        let capturedCallback: ((event: { path?: string; paths?: string[] }) => void) | undefined;
+        __localDataWatcherTestUtils.setDependenciesForTests({
+            watchFile: async (_path, callback) => {
+                capturedCallback = callback;
+                return () => undefined;
+            },
+        });
+
+        // Disk matches local (both empty) when the watcher starts, so its own
+        // trailing immediate check (#S11) is a no-op here.
+        await start('/tmp/mindwtr/data.json');
+
+        // A write lands while the watcher is up: debounced, not yet merged.
+        externalData = {
+            ...emptyData(),
+            tasks: [
+                {
+                    id: 'ext-1',
+                    title: 'From CLI',
+                    status: 'inbox',
+                    createdAt: '2026-01-01T00:00:00.000Z',
+                    updatedAt: '2026-01-01T00:00:00.000Z',
+                },
+            ],
+        } as AppData;
+        capturedCallback?.({ path: '/tmp/mindwtr/data.json' });
+        expect(saveCalls).toHaveLength(0);
+
+        // stop() today drops pendingExternalChange and cancels the debounce
+        // timer (StrictMode/HMR/teardown can hit this window) — the change
+        // is now unobserved unless data.json changes again.
+        stop();
+
+        // start() must observe it without needing a fresh filesystem event.
+        await start('/tmp/mindwtr/data.json');
 
         expect(saveCalls).toHaveLength(1);
         expect(saveCalls[0]?.tasks.some((task) => task.id === 'ext-1')).toBe(true);

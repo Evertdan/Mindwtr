@@ -1129,6 +1129,13 @@ export const createLocalDataWatcherController = (
         }
 
         await Promise.all(registrations);
+
+        // A write can land in the 750ms debounce right before a stop/start
+        // (StrictMode/HMR/teardown) — stop() clears pendingExternalChange and
+        // cancels that timer, so without this the change is only observed if
+        // data.json changes again. One immediate, self-write-window-ignoring
+        // check here picks it up regardless.
+        await handleExternalChange({ immediate: true, ignoreSelfWindow: true });
     }
 
     function stop(): void {
@@ -1174,6 +1181,11 @@ export const createLocalDataWatcherController = (
         pendingSqliteChangePaths = [];
         pendingExternalChange = false;
         pendingSelfWrites = [];
+        // Aligned with resetForTests: a stale ignore window or hash from before
+        // this stop() must not suppress or short-circuit the next start()'s
+        // observations.
+        ignoreUntil = 0;
+        lastKnownHash = '';
         sqliteIgnoreUntil = 0;
         sqliteSelfWriteUntil = 0;
         lastSqliteSelfWriteAt = 0;
