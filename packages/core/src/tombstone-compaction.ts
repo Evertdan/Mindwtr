@@ -11,10 +11,11 @@ const SQLITE_NEUTRAL_FALSE_FIELDS = new Set([
     'isCollapsed',
 ]);
 
-// normalizeTaskForLoad backfills pushCount: 0 on every load while compacted
-// tombstones omit the field; without this neutral-zero carve-out every purged
-// tombstone re-flags as uncompacted and takes a rev bump on every merge, which
-// changes the sync fingerprint and re-triggers the next cycle forever (#766).
+// normalizeTaskForLoad no longer backfills pushCount: 0 on purged tombstones
+// (task-status.ts, fixed by 0642ab52e / #766), but rows persisted before that
+// fix still carry a stored 0. Without this neutral-zero carve-out, those
+// legacy rows re-flag as uncompacted and take a rev bump on every merge,
+// which changes the sync fingerprint and re-triggers the next cycle forever.
 const NEUTRAL_ZERO_FIELDS = new Set(['pushCount']);
 
 const hasValuesOutsideCompactedTombstone = (
