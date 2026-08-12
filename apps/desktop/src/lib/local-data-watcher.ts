@@ -74,9 +74,7 @@ const persistMergedDataThroughStore = async (
         _allProjects: allProjects,
         _allSections: allSections,
         _allAreas: allAreas,
-        people: allPeople.filter((person) => !person.deletedAt),
         _allPeople: allPeople,
-        _peopleById: new Map(allPeople.map((person) => [person.id, person] as const)),
         settings: canonical.settings ?? state.settings,
         lastDataChangeAt: Math.max(now(), state.lastDataChangeAt + 1),
     }));
