@@ -94,16 +94,20 @@ export const appendPendingRemoteAttachmentDeletes = (
 
 export function collectReferencedAttachmentCloudKeys(data: AppData): Set<string> {
     const referenced = new Set<string>();
-    const collect = (attachments: Attachment[] | undefined, ownerDeleted?: string) => {
-        if (ownerDeleted) return;
+    // Owner predicate mirrors collectRetainedAttachmentCloudKeysForProjectPurge and
+    // core's findLiveAttachmentResourceReferences: purgedAt, not deletedAt. A
+    // soft-deleted owner is still restorable from Trash for 90 days, so its
+    // attachment bytes stay referenced until the owner is actually purged.
+    const collect = (attachments: Attachment[] | undefined, ownerPurged?: string) => {
+        if (ownerPurged) return;
         for (const attachment of attachments ?? []) {
             if (attachment.kind !== 'file' || attachment.deletedAt || !attachment.cloudKey) continue;
             const normalized = normalizeAttachmentRelativePath(attachment.cloudKey);
             if (normalized) referenced.add(normalized);
         }
     };
-    data.tasks.forEach((task) => collect(task.attachments, task.deletedAt));
-    data.projects.forEach((project) => collect(project.attachments, project.deletedAt));
+    data.tasks.forEach((task) => collect(task.attachments, task.purgedAt));
+    data.projects.forEach((project) => collect(project.attachments, project.purgedAt));
     return referenced;
 }
 

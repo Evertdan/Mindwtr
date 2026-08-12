@@ -122,7 +122,7 @@ describe('getAttachmentCloudKey', () => {
 });
 
 describe('collectReferencedAttachmentCloudKeys', () => {
-    test('only counts non-deleted file attachments on non-deleted owners', () => {
+    test('only counts non-deleted file attachments on non-purged owners', () => {
         const data = emptyAppData();
         data.tasks = [
             makeTask({
@@ -131,10 +131,10 @@ describe('collectReferencedAttachmentCloudKeys', () => {
                 attachments: [makeFileAttachment({ id: 'ta1', cloudKey: 'live-task/keep.bin' })],
             }),
             makeTask({
-                id: 'deleted-task',
-                title: 'Deleted',
-                deletedAt: iso,
-                attachments: [makeFileAttachment({ id: 'ta2', cloudKey: 'deleted-task/excluded.bin' })],
+                id: 'purged-task',
+                title: 'Purged',
+                purgedAt: iso,
+                attachments: [makeFileAttachment({ id: 'ta2', cloudKey: 'purged-task/excluded.bin' })],
             }),
         ];
         data.projects = [
@@ -151,6 +151,32 @@ describe('collectReferencedAttachmentCloudKeys', () => {
 
         const referenced = collectReferencedAttachmentCloudKeys(data);
         expect(referenced).toEqual(new Set(['live-task/keep.bin', 'live-project/keep.bin']));
+    });
+
+    // S1: a soft-deleted (Trash, restorable) owner is NOT purgedAt. Its attachment
+    // bytes must stay referenced so the orphan GC never unlinks them out from under
+    // a restore — only purgedAt (the 90-day cascade) makes them eligible.
+    test('retains attachments belonging to a soft-deleted-but-not-purged owner', () => {
+        const data = emptyAppData();
+        data.tasks = [
+            makeTask({
+                id: 'trashed-task',
+                title: 'Trashed',
+                deletedAt: iso,
+                attachments: [makeFileAttachment({ id: 'ta1', cloudKey: 'trashed-task/keep.bin' })],
+            }),
+        ];
+        data.projects = [
+            makeProject({
+                id: 'trashed-project',
+                title: 'Trashed',
+                deletedAt: iso,
+                attachments: [makeFileAttachment({ id: 'pa1', cloudKey: 'trashed-project/keep.bin' })],
+            }),
+        ];
+
+        const referenced = collectReferencedAttachmentCloudKeys(data);
+        expect(referenced).toEqual(new Set(['trashed-task/keep.bin', 'trashed-project/keep.bin']));
     });
 });
 
