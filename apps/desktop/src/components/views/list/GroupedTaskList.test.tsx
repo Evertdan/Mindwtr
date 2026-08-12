@@ -124,6 +124,44 @@ describe('GroupedTaskList', () => {
             .toBeInTheDocument();
     });
 
+    // #825 regression guard. The old VirtualTaskRow owned a hand-rolled
+    // ResizeObserver and had its own test; unifying on @tanstack/react-virtual
+    // deleted both, and dynamic re-measure now depends entirely on this wiring:
+    // the library observes exactly the elements handed to `measureElement`, and
+    // reads which row it measured from `data-index`. Drop either and an inline
+    // editor expanding a row paints over the row below, silently.
+    it('registers every virtual row for re-measurement with the index the library reads (#825)', () => {
+        const measured: Element[] = [];
+        const virtualRows = buildGroupedVirtualRows(groups, new Set(), getSectionDomId);
+        const virtualizer = {
+            ...fakeVirtualizer(virtualRows.length),
+            measureElement: (element: Element | null) => { if (element) measured.push(element); },
+        } as unknown as Virtualizer<HTMLDivElement, Element>;
+
+        const view = render(
+            <GroupedTaskList
+                groups={groups}
+                tasks={groups.flatMap((group) => group.tasks)}
+                virtualRows={virtualRows}
+                virtualizer={virtualizer}
+                collapsedGroupIds={new Set()}
+                onToggleGroup={() => {}}
+                getSectionDomId={getSectionDomId}
+                renderTask={(item) => <div key={item.id} data-task-id={item.id}>{item.title}</div>}
+            />,
+        );
+
+        // Every row — section headers included — reaches the measurer, and each
+        // carries the data-index the library resolves the measurement by. jsdom
+        // lays nothing out, so the pixel re-measure itself is not exercised here;
+        // that is @tanstack's own ResizeObserver. This pins our half of it.
+        expect(measured).toHaveLength(virtualRows.length);
+        expect(measured.map((element) => element.getAttribute('data-index')))
+            .toEqual(virtualRows.map((_row, index) => String(index)));
+
+        view.unmount();
+    });
+
     it('renders a flat list without cards when there is no grouping', () => {
         const { container, queryAllByRole } = render(
             <GroupedTaskList
