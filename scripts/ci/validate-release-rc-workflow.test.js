@@ -266,6 +266,59 @@ test("Windows release signs and publishes exactly the current NSIS installer", (
   );
 });
 
+// T5: the two SignPath submissions are scheduled to change (migration to two
+// single-file submissions). Pin both artifact-configuration slugs and the full
+// outcome chain so an edit to either can't silently start signing/uploading the
+// wrong artifact, or run a downstream step whose staging step never succeeded.
+// There are two chains, not one: the app-exe chain gates on stage-unsigned-exe;
+// the installer chain gates on stage-unsigned-installer, which itself only
+// stages once stage-unsigned-exe succeeded — that link is what actually
+// prevents the installer from signing/uploading when the app binary wasn't.
+test("Windows release SignPath submissions are gated end to end and target the pinned slugs", () => {
+  const windows = parse(
+    readFileSync(".github/workflows/release-windows.yml", "utf8"),
+  );
+  const steps = windows.jobs.standalone.steps;
+  const find = (name) => {
+    const step = steps.find((candidate) => candidate.name === name);
+    expect(step).toBeDefined();
+    return step;
+  };
+
+  const stageExeOutcome = "steps.stage-unsigned-exe.outcome == 'success'";
+  const stageInstallerOutcome =
+    "steps.stage-unsigned-installer.outcome == 'success'";
+
+  const uploadExeStep = find("Upload unsigned app binary");
+  const submitExeStep = find(
+    "Submit SignPath signing request for the app binary",
+  );
+  const applyExeStep = find("Apply signed app binary");
+  for (const step of [uploadExeStep, submitExeStep, applyExeStep]) {
+    expect(step.if).toContain(stageExeOutcome);
+  }
+  expect(submitExeStep.with["artifact-configuration-slug"]).toBe("initial");
+
+  const stageInstallerStep = find("Stage unsigned installer for signing");
+  expect(stageInstallerStep.if).toContain(stageExeOutcome);
+
+  const uploadInstallerStep = find("Upload unsigned installer");
+  const submitInstallerStep = find(
+    "Submit SignPath signing request for the installer",
+  );
+  const applyInstallerStep = find("Apply and verify signed installer");
+  for (const step of [
+    uploadInstallerStep,
+    submitInstallerStep,
+    applyInstallerStep,
+  ]) {
+    expect(step.if).toContain(stageInstallerOutcome);
+  }
+  expect(submitInstallerStep.with["artifact-configuration-slug"]).toBe(
+    "windows-installer",
+  );
+});
+
 test("stable and RC releases sign and verify the checksum manifest", () => {
   const stable = parse(readFileSync(".github/workflows/release.yml", "utf8"));
   const rc = parse(readFileSync(".github/workflows/release-rc.yml", "utf8"));
