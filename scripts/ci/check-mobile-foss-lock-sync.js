@@ -9,34 +9,14 @@ const repoRoot = path.resolve(__dirname, '..', '..');
 const mobilePackagePath = path.join(repoRoot, 'apps/mobile/package.json');
 const mobileLockPath = path.join(repoRoot, 'apps/mobile/package-lock.json');
 const corePackagePath = path.join(repoRoot, 'packages/core/package.json');
+// Reuse the real F-Droid manifest transform instead of hand-duplicating it here,
+// so this guard can never silently drift from what the actual FOSS build applies.
+const { applyPackageManifestChanges } = require(
+  path.join(repoRoot, 'apps/mobile/scripts/fdroid_strip_deps.js')
+);
 
 const pkg = JSON.parse(fs.readFileSync(mobilePackagePath, 'utf8'));
-
-if (pkg.dependencies && pkg.dependencies['expo-dev-client']) {
-  delete pkg.dependencies['expo-dev-client'];
-}
-if (pkg.devDependencies && pkg.devDependencies['expo-dev-client']) {
-  delete pkg.devDependencies['expo-dev-client'];
-}
-
-if (!pkg.expo || typeof pkg.expo !== 'object' || Array.isArray(pkg.expo)) {
-  pkg.expo = {};
-}
-if (!pkg.expo.autolinking || typeof pkg.expo.autolinking !== 'object' || Array.isArray(pkg.expo.autolinking)) {
-  pkg.expo.autolinking = {};
-}
-const existingExclude = Array.isArray(pkg.expo.autolinking.exclude)
-  ? pkg.expo.autolinking.exclude.filter((value) => typeof value === 'string')
-  : [];
-for (const excludedModule of ['play-store-updates', 'expo-store-review']) {
-  if (!existingExclude.includes(excludedModule)) {
-    existingExclude.push(excludedModule);
-  }
-}
-pkg.expo.autolinking.exclude = existingExclude;
-if (pkg.dependencies && pkg.dependencies['@mindwtr/core'] === 'workspace:*') {
-  pkg.dependencies['@mindwtr/core'] = 'file:../../packages/core';
-}
+applyPackageManifestChanges(pkg, false);
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mindwtr-mobile-foss-package-'));
 const tmpMobileDir = path.join(tmpDir, 'apps/mobile');

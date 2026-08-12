@@ -133,6 +133,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  applyPackageManifestChanges,
   __testables: {
     applyAppJsonManifestChanges,
     applyPackageManifestChanges,
