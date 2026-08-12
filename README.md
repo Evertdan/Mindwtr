@@ -195,7 +195,7 @@ Desktop builds can start the local REST API from **Settings -> Advanced** on `12
 - 📲 **Android Widget** - Home screen focus/next widget
 - ⌨️ **Keyboard Shortcuts** - Standard (Gmail-style), Vim, and Emacs presets
 - 🎨 **Themes** - Light, Dark, OLED, Nord, Catppuccin Macchiato, Dracula, Sepia, E-ink, and Material 3
-- 🌍 **i18n** - English, Vietnamese, Chinese (Simplified), Chinese (Traditional), Spanish, Hindi, Arabic, German, Russian, Japanese, French, Portuguese, Polish, Korean, Czech, Italian, Turkish, Dutch, Persian, Swedish
+- 🌍 **i18n** - English, Vietnamese, Chinese (Simplified), Chinese (Traditional), Spanish, Hindi, Arabic, German, Russian, Japanese, French, Portuguese (Brazil), Polish, Korean, Czech, Italian, Turkish, Dutch, Persian, Swedish
 - 🐳 **Docker** - Run the PWA + self-hosted sync server with Docker
 
 </details>
