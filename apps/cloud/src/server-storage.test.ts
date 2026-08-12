@@ -427,7 +427,10 @@ describe('ensureDurableDirectory', () => {
         ]);
     });
 
-    test('re-establishes target entry durability when retrying after parent fsync failure', () => {
+    // S4: only first creation pays the durability barrier. A retry that finds the
+    // target already visible (mkdir succeeded, the earlier parent fsync did not)
+    // must not re-sync — see the fast-path comment on ensureDurableDirectory.
+    test('does not re-sync an already-visible directory entry on retry after a prior parent fsync failure', () => {
         const harness = createDurableDirectoryFileSystem(['/cloud'], 'fsync-parent', 1);
 
         expect(() => ensureDurableDirectory(
@@ -445,10 +448,21 @@ describe('ensureDurableDirectory', () => {
             'mkdir:/cloud/data',
             'open-parent:/cloud',
             'close-parent:/cloud',
-            'open-parent:/cloud',
-            'fsync-parent:/cloud',
-            'close-parent:/cloud',
         ]);
+    });
+
+    // S4: every lock acquisition and every GET/HEAD /v1/data reaches this same
+    // already-durable-directory case. It must be free of filesystem durability
+    // calls entirely, not just cheaper than creation.
+    test('does not touch the parent at all when the target directory already exists', () => {
+        const harness = createDurableDirectoryFileSystem(['/cloud', '/cloud/data']);
+
+        expect(ensureDurableDirectory(
+            '/cloud/data',
+            harness.fileSystem,
+        )).toBe('/cloud/data');
+
+        expect(harness.events).toEqual([]);
     });
 
     for (const failureStage of [

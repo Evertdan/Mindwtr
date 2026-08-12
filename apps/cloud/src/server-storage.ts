@@ -335,10 +335,13 @@ export function ensureDurableDirectory(
 
             const relativeTarget = relative(existingAncestor, absoluteTarget);
             if (!relativeTarget || relativeTarget === '.') {
-                // A previous attempt can leave the target visible after mkdir while
-                // failing to fsync its parent entry. Re-sync the entry on retries;
-                // existence alone is not proof that the directory is durable.
-                syncDirectoryEntryParent(dirname(absoluteTarget), fileSystem);
+                // The target already existed when this call began, so nothing was
+                // created — there is no new directory entry to publish. This is the
+                // hot path (every lock acquisition, every GET/HEAD /v1/data), so it
+                // must not pay a durability barrier; only first creation (below) does.
+                // A crash between a prior call's mkdir and its parent fsync either
+                // left the entry durable (nothing to fix) or drops it on a real
+                // crash/reboot, which self-heals via ENOENT below on the next call.
                 return existingRealPath;
             }
             const canonicalTarget = resolve(existingRealPath, relativeTarget);
