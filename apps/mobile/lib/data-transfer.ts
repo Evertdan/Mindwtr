@@ -53,6 +53,10 @@ const StorageAccessFramework = FileSystem.StorageAccessFramework;
 const SNAPSHOT_DIR_NAME = 'snapshots';
 const SNAPSHOT_FILE_PATTERN = /^data\.(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})(?:\.(\d{3})(?:\.(\d+))?)?\.snapshot\.json$/u;
 const MAX_LOCAL_SNAPSHOTS = 5;
+// Deliberately does not match SNAPSHOT_FILE_PATTERN, so a half-written snapshot
+// is invisible to the restore roster and to pruning.
+const SNAPSHOT_PENDING_FILE_NAME = 'data.pending.snapshot.tmp';
+const MAX_SNAPSHOT_NAME_COLLISIONS = 100;
 
 export type TransferDocument = {
     fileName: string;
@@ -223,11 +227,27 @@ const saveCurrentDataSnapshot = async (data: AppData): Promise<string> => {
     let file = new File(`${directory.uri}/${fileName}`);
     while (file.exists) {
         collisionIndex += 1;
+        if (collisionIndex > MAX_SNAPSHOT_NAME_COLLISIONS) {
+            throw new Error('Snapshot storage already holds too many snapshots from this instant.');
+        }
         fileName = buildSnapshotFileName(snapshotAt, collisionIndex);
         file = new File(`${directory.uri}/${fileName}`);
     }
-    file.create({ intermediates: true, overwrite: false });
-    file.write(serializeBackupData(data));
+    const pending = new File(`${directory.uri}/${SNAPSHOT_PENDING_FILE_NAME}`);
+    try {
+        pending.create({ intermediates: true, overwrite: true });
+        pending.write(serializeBackupData(data));
+        pending.move(file);
+    } catch (error) {
+        try {
+            if (pending.exists) {
+                pending.delete();
+            }
+        } catch {
+            // Ignore best-effort cleanup failures.
+        }
+        throw error;
+    }
     pruneSnapshots(directory);
     void logInfo('Recovery snapshot complete', {
         scope: 'transfer',

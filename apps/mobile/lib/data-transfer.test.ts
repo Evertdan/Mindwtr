@@ -36,6 +36,7 @@ const logMocks = vi.hoisted(() => ({
 const fileSystemMocks = vi.hoisted(() => ({
   fileContents: new Map<string, string>(),
   fileWrites: [] as string[],
+  writeError: null as Error | null,
   getInfoAsync: vi.fn(),
   readAsStringAsync: vi.fn(),
 }));
@@ -98,7 +99,14 @@ vi.mock('expo-file-system', () => ({
     get exists() { return fileSystemMocks.fileContents.has(this.uri); }
     create() { fileSystemMocks.fileContents.set(this.uri, ''); }
     delete() { fileSystemMocks.fileContents.delete(this.uri); }
+    move(destination: { uri: string }) {
+      const contents = fileSystemMocks.fileContents.get(this.uri) ?? '';
+      fileSystemMocks.fileContents.delete(this.uri);
+      fileSystemMocks.fileContents.set(destination.uri, contents);
+      this.uri = destination.uri;
+    }
     write(text: string) {
+      if (fileSystemMocks.writeError) throw fileSystemMocks.writeError;
       fileSystemMocks.fileWrites.push(text);
       fileSystemMocks.fileContents.set(this.uri, text);
     }
@@ -148,6 +156,7 @@ describe('mobile data transfer', () => {
     vi.clearAllMocks();
     fileSystemMocks.fileContents.clear();
     fileSystemMocks.fileWrites = [];
+    fileSystemMocks.writeError = null;
     fileSystemMocks.readAsStringAsync.mockResolvedValue('');
     fileSystemMocks.getInfoAsync.mockResolvedValue({ exists: true, size: 1 });
     storeStateRef.current = {
@@ -247,6 +256,35 @@ describe('mobile data transfer', () => {
     await expect(createMobileRecoverySnapshot()).rejects.toThrow('Local data changed');
 
     expect(fileSystemMocks.fileWrites).toHaveLength(0);
+  });
+
+  it('leaves no snapshot file behind and prunes nothing when the snapshot write fails', async () => {
+    // One more than MAX_LOCAL_SNAPSHOTS, so a stray empty file would evict a real one.
+    const existing = Array.from({ length: 6 }, (_unused, index) =>
+      `file://document/snapshots/data.2026-08-0${index + 1}T00-00-00.000.snapshot.json`);
+    existing.forEach((uri) => fileSystemMocks.fileContents.set(uri, '{}'));
+    fileSystemMocks.writeError = new Error('No space left on device');
+
+    await expect(createMobileRecoverySnapshot()).rejects.toThrow('No space left on device');
+
+    expect([...fileSystemMocks.fileContents.keys()].sort()).toEqual([...existing].sort());
+  });
+
+  it('fails explicitly instead of looping forever when one instant is fully collided', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-09T12:34:05.123Z'));
+    try {
+      const base = 'file://document/snapshots/data.2026-08-09T12-34-05.123';
+      fileSystemMocks.fileContents.set(`${base}.snapshot.json`, '{}');
+      for (let index = 1; index <= 100; index += 1) {
+        fileSystemMocks.fileContents.set(`${base}.${index}.snapshot.json`, '{}');
+      }
+
+      await expect(createMobileRecoverySnapshot()).rejects.toThrow('too many snapshots from this instant');
+      expect(fileSystemMocks.fileWrites).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('rejects an oversized picked import before reading it into memory', async () => {
