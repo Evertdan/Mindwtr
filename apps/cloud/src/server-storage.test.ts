@@ -6,10 +6,12 @@ import {
     durablyRemoveFile,
     ensureDurableDirectory,
     ensureDirectoryWithinRoot,
+    normalizeAttachmentRelativePath,
     type DurableDirectoryFileSystem,
     type DurableFileSystem,
     type DurableRemovalFileSystem,
 } from './server-storage';
+import { ATTACHMENT_PATH_MAX_LENGTH, ATTACHMENT_PATH_MAX_SEGMENTS } from './server-config';
 
 type DirectoryFailureStage =
     | 'mkdir'
@@ -527,5 +529,39 @@ describe('ensureDirectoryWithinRoot', () => {
             'fsync-parent:/cloud/namespace/attachments/projects',
             'close-parent:/cloud/namespace/attachments/projects',
         ]);
+    });
+});
+
+describe('normalizeAttachmentRelativePath path bounds (S5)', () => {
+    test('accepts a real-shaped cloudKey (attachments/<uuid>.ext)', () => {
+        expect(normalizeAttachmentRelativePath('attachments/3fa85f64-5717-4562-b3fc-2c963f66afa6.pdf'))
+            .toBe('attachments/3fa85f64-5717-4562-b3fc-2c963f66afa6.pdf');
+    });
+
+    test(`accepts exactly ${ATTACHMENT_PATH_MAX_SEGMENTS} segments`, () => {
+        const path = Array.from({ length: ATTACHMENT_PATH_MAX_SEGMENTS }, (_, i) => `seg${i}`).join('/');
+        expect(normalizeAttachmentRelativePath(path)).toBe(path);
+    });
+
+    test(`rejects ${ATTACHMENT_PATH_MAX_SEGMENTS + 1} segments`, () => {
+        const path = Array.from({ length: ATTACHMENT_PATH_MAX_SEGMENTS + 1 }, (_, i) => `seg${i}`).join('/');
+        expect(normalizeAttachmentRelativePath(path)).toBeNull();
+    });
+
+    test(`rejects thousands of segments (the O(depth^2) DoS shape)`, () => {
+        const path = Array.from({ length: 5000 }, (_, i) => `s${i}`).join('/');
+        expect(normalizeAttachmentRelativePath(path)).toBeNull();
+    });
+
+    test(`accepts exactly ${ATTACHMENT_PATH_MAX_LENGTH} characters`, () => {
+        const path = `a${'b'.repeat(ATTACHMENT_PATH_MAX_LENGTH - 1)}`;
+        expect(path.length).toBe(ATTACHMENT_PATH_MAX_LENGTH);
+        expect(normalizeAttachmentRelativePath(path)).toBe(path);
+    });
+
+    test(`rejects ${ATTACHMENT_PATH_MAX_LENGTH + 1} characters`, () => {
+        const path = `a${'b'.repeat(ATTACHMENT_PATH_MAX_LENGTH)}`;
+        expect(path.length).toBe(ATTACHMENT_PATH_MAX_LENGTH + 1);
+        expect(normalizeAttachmentRelativePath(path)).toBeNull();
     });
 });

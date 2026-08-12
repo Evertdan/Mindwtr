@@ -150,6 +150,13 @@ export const AUTH_FAILURE_RATE_MAX = Number.isFinite(authFailureRateMaxValue) &&
     ? Math.floor(authFailureRateMaxValue)
     : 30;
 export const ATTACHMENT_PATH_ALLOWLIST = /^[a-zA-Z0-9._/-]+$/;
+// Real cloudKeys are content-addressed and short: buildCloudKey (packages/core/src/
+// attachment-paths.ts) emits `attachments/<uuid>[.ext]` (2 segments, ~52 chars) and the
+// CloudKit backend emits `cloudkit:<uuid>` (1 segment, ~45 chars). These bounds give an
+// 8x/10x margin over that shape while still rejecting the thousands-of-segments paths
+// that make ensureDirectoryWithinRoot's per-segment walk O(depth^2) on an authenticated PUT.
+export const ATTACHMENT_PATH_MAX_SEGMENTS = 16;
+export const ATTACHMENT_PATH_MAX_LENGTH = 512;
 export const CLOUD_DATA_LOCK_WAIT_TIMEOUT_MS = 60_000;
 // Generated from TASK_SYNC_FIELD_SCHEMA's cloudWrite flag (task-sync-schema.ts): a field
 // with cloudWrite 'create-patch' is writable both at task creation and via patch; 'patch'

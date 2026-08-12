@@ -17,6 +17,8 @@ import { basename, dirname, join, relative, resolve, sep } from 'path';
 import { sleep, type AppData } from '@mindwtr/core';
 import {
     ATTACHMENT_PATH_ALLOWLIST,
+    ATTACHMENT_PATH_MAX_LENGTH,
+    ATTACHMENT_PATH_MAX_SEGMENTS,
     CLOUD_DATA_LOCK_WAIT_TIMEOUT_MS,
     logError,
 } from './server-config';
@@ -364,13 +366,13 @@ export function ensureDurableDirectory(
 export function normalizeAttachmentRelativePath(rawPath: string): string | null {
     const decoded = decodeAttachmentPath(rawPath);
     if (!decoded) return null;
-    if (!decoded || !ATTACHMENT_PATH_ALLOWLIST.test(decoded)) {
+    if (!decoded || decoded.length > ATTACHMENT_PATH_MAX_LENGTH || !ATTACHMENT_PATH_ALLOWLIST.test(decoded)) {
         return null;
     }
     const normalized = decoded.replace(/^\/+|\/+$/g, '');
     if (!normalized) return null;
     const segments = normalized.split('/').filter(Boolean);
-    if (segments.length === 0) return null;
+    if (segments.length === 0 || segments.length > ATTACHMENT_PATH_MAX_SEGMENTS) return null;
     if (segments.some((segment) => segment === '.' || segment === '..')) {
         return null;
     }
