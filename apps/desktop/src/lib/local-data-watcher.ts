@@ -337,7 +337,7 @@ export const createLocalDataWatcherController = (
     /** Filter out iCloud placeholder events (.icloud files, lock files). */
     const isRelevantSyncEvent = (paths: string[]): boolean => {
         return paths.some((p) => {
-            const name = p.split('/').pop() ?? '';
+            const name = getPathBasename(p);
             // Ignore iCloud placeholder stubs (.filename.icloud)
             if (name.endsWith('.icloud')) return false;
             // Ignore our own advisory lock file
