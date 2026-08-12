@@ -85,10 +85,6 @@ export interface UpdateInfo {
   source: UpdateSource;
   installSource: InstallSource;
   sourceFallback: boolean;
-  /** True when the GitHub REST API was rate-limited and the releases.atom
-   * feed was used instead: only latestVersion/hasUpdate/releaseUrl are real,
-   * releaseNotes/assets/downloadUrl are empty. */
-  atomFallback: boolean;
 }
 
 type UpdateAsset = { name: string; url: string };
@@ -729,9 +725,6 @@ export async function checkForUpdates(
         source: "microsoft-store",
         installSource,
         sourceFallback: false,
-        // The Microsoft Store is always the returned source here; a degraded
-        // GitHub notes lookup doesn't make this UpdateInfo itself degraded.
-        atomFallback: false,
       };
     }
 
@@ -815,9 +808,6 @@ export async function checkForUpdates(
       source,
       installSource,
       sourceFallback: Boolean(sourceResult && source === "github-release"),
-      atomFallback: Boolean(
-        githubDegraded && !githubRelease && source === "github-release",
-      ),
     };
   } catch (error) {
     reportError("Failed to check for updates", error, {

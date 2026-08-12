@@ -393,7 +393,6 @@ describe("update-service channel selection", () => {
     expect(result.hasUpdate).toBe(true);
     expect(result.latestVersion).toBe("1.9.0");
     expect(result.source).toBe("github-release");
-    expect(result.atomFallback).toBe(true);
     expect(result.releaseNotes).toBe("");
     expect(result.assets).toEqual([]);
     expect(result.downloadUrl).toBeNull();
@@ -420,7 +419,9 @@ describe("update-service channel selection", () => {
     });
 
     expect(result.hasUpdate).toBe(false);
-    expect(result.atomFallback).toBe(true);
+    expect(result.releaseNotes).toBe("");
+    expect(result.assets).toEqual([]);
+    expect(result.downloadUrl).toBeNull();
   });
 
   it("does not consult the atom feed when the GitHub API succeeds", async () => {
@@ -443,7 +444,7 @@ describe("update-service channel selection", () => {
     });
 
     expect(result.hasUpdate).toBe(true);
-    expect(result.atomFallback).toBe(false);
+    expect(result.releaseNotes).toBe("latest notes");
     expect(
       fetchMock.mock.calls.some((call) =>
         String(call[0]).includes("releases.atom"),
