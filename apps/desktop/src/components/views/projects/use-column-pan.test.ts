@@ -57,4 +57,15 @@ describe('useMiddleMousePan', () => {
 
         expect(element.scrollLeft).toBe(0);
     });
+
+    it('stops listening on window after unmount mid-drag', () => {
+        const element = { scrollLeft: 0 } as HTMLElement;
+        const { result, unmount } = renderHook(() => useMiddleMousePan({ current: element }));
+
+        result.current(pointerDown(1, 100));
+        unmount();
+        movePointer(140);
+
+        expect(element.scrollLeft).toBe(0);
+    });
 });

@@ -1,4 +1,4 @@
-import { useCallback, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 
 /**
  * Middle-mouse press-and-drag pans a horizontally scrolling strip, the way a
@@ -9,6 +9,11 @@ import { useCallback, type PointerEvent as ReactPointerEvent, type RefObject } f
  * that leaves the strip still pans and still ends.
  */
 export function useMiddleMousePan(ref: RefObject<HTMLElement | null>) {
+    // Unmounting mid-drag (e.g. switching projects) must stop the drag too,
+    // or these window listeners outlive the component.
+    const stopRef = useRef<(() => void) | null>(null);
+    useEffect(() => () => stopRef.current?.(), []);
+
     return useCallback((event: ReactPointerEvent) => {
         if (event.button !== 1) return;
         const element = ref.current;
@@ -25,7 +30,9 @@ export function useMiddleMousePan(ref: RefObject<HTMLElement | null>) {
             window.removeEventListener('pointermove', onMove);
             window.removeEventListener('pointerup', stop);
             window.removeEventListener('pointercancel', stop);
+            stopRef.current = null;
         };
+        stopRef.current = stop;
         window.addEventListener('pointermove', onMove);
         window.addEventListener('pointerup', stop);
         window.addEventListener('pointercancel', stop);
