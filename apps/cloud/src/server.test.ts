@@ -3292,6 +3292,10 @@ describe('cloud server api', () => {
             const serializedLogs = captured.join('');
             expect(serializedLogs).toContain('"failureClass":"filesystem"');
             expect(serializedLogs).toContain('"failureCode":"attachment_io_failed"');
+            // S10: the durability failure log carries the bare errno (renaming a
+            // published file onto an existing directory fails with EISDIR) so an
+            // operator can diagnose without the log ever holding a path or message.
+            expect(serializedLogs).toContain('"failureErrno":"EISDIR"');
             expect(serializedLogs).not.toContain(key);
             expect(serializedLogs).not.toContain(dataDir);
             expect(serializedLogs).not.toContain(privateRelativePath);

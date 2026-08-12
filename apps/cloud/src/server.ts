@@ -1434,6 +1434,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                             logError('request failed', {
                                 failureClass: 'filesystem',
                                 failureCode: 'permission_denied',
+                                failureErrno: errorCode,
                                 requestId,
                             });
                             return createInternalServerErrorResponse(
@@ -1447,6 +1448,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                                 ? 'filesystem'
                                 : 'runtime',
                             failureCode: isAttachmentFailure ? 'attachment_io_failed' : 'request_failed',
+                            failureErrno: typeof errorCode === 'string' ? errorCode : undefined,
                             requestId,
                         });
                         return createInternalServerErrorResponse('Internal server error', requestId);

@@ -32,6 +32,10 @@ export type CloudFailureContext = {
         | 'server_start_failed'
         | 'stored_data_invalid'
         | 'stored_data_invalid_json';
+    // S10: ONLY ever assign a bare fs/sqlite error code here (e.g. 'ENOENT', 'EACCES',
+    // 'SQLITE_BUSY') — never error.message or a path. Privacy ratchet 9e1cd93b7 covers
+    // this field too: logError does not sanitize it, the caller must.
+    failureErrno?: string;
     requestId?: string;
 };
 
