@@ -188,7 +188,7 @@ Mindwtr 默认简单，需要时也足够强大：
 - 📱 **移动端** - React Native/Expo（iOS 通过 App Store/TestFlight、Android），内置手势与应用快捷方式提示
 - 📲 **Android 小部件** - 桌面焦点/下一步小组件
 - ⌨️ **键盘快捷键** - 标准（Gmail 风格）、Vim 与 Emacs 预设
-- 🎨 **主题** - 明亮、暗色、OLED、Nord、Sepia、电子墨水与 Material 3
+- 🎨 **主题** - 明亮、暗色、OLED、Nord、Catppuccin Macchiato、Dracula、Sepia、电子墨水与 Material 3
 - 🌍 **国际化** - 英文、越南语、简体中文、繁體中文、西班牙语、印地语、阿拉伯语、德语、俄语、日语、法语、葡萄牙语、波兰语、韩语、捷克语、意大利语、土耳其语、荷兰语、波斯语、瑞典语
 - 🐳 **Docker** - 使用 Docker 运行 PWA + 自托管同步服务
 
