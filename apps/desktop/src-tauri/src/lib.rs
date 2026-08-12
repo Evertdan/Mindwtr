@@ -16,7 +16,7 @@ use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{self, Read, Write};
 #[cfg(target_os = "macos")]
-use std::os::raw::{c_char, c_int};
+use std::os::raw::c_char;
 #[cfg(target_os = "linux")]
 use std::os::unix::net::{UnixListener, UnixStream};
 #[cfg(target_os = "windows")]
@@ -524,8 +524,8 @@ unsafe extern "C" {
     fn mindwtr_macos_create_security_bookmark(path_cstr: *const c_char) -> *mut c_char;
     fn mindwtr_macos_resolve_security_bookmark(base64_cstr: *const c_char) -> *mut c_char;
     fn mindwtr_macos_free_bookmark_string(ptr: *mut c_char);
-    fn mindwtr_macos_frontmost_application_pid() -> c_int;
-    fn mindwtr_macos_activate_application(pid: c_int);
+    fn mindwtr_macos_make_quick_add_panel(ns_window: *mut std::ffi::c_void) -> bool;
+    fn mindwtr_macos_present_quick_add_panel(ns_window: *mut std::ffi::c_void) -> bool;
 
     fn mindwtr_cloudkit_account_status() -> *mut c_char;
     fn mindwtr_cloudkit_ensure_zone() -> *mut c_char;
@@ -581,9 +581,10 @@ struct QuickAddPending(Mutex<Option<String>>);
 struct CloseRequestHandled(AtomicBool);
 struct GlobalQuickAddShortcutState(Mutex<Option<String>>);
 
+/// Windows only: macOS restores nothing because the quick-add panel never takes
+/// activation away in the first place (#794).
 #[derive(Clone, Copy, Debug, Default)]
 struct QuickAddFocusSnapshot {
-    macos_pid: Option<i32>,
     windows_hwnd: Option<isize>,
 }
 

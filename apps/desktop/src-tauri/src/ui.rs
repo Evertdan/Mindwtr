@@ -13,16 +13,19 @@ const GNOME_INTERFACE_SCHEMA: &str = "org.gnome.desktop.interface";
 const GNOME_COLOR_SCHEME_KEY: &str = "color-scheme";
 const GNOME_GTK_THEME_KEY: &str = "gtk-theme";
 
+/// macOS is deliberately absent: the quick-add window is a non-activating
+/// panel, so Mindwtr never becomes the active app and the app the user was in
+/// stays frontmost the whole time. Re-activating it on close would at best be a
+/// no-op and at worst steal focus from an app the user switched to while the
+/// panel was open (#794).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum QuickAddFocusPolicy {
-    RestoreMacosApplication,
     RestoreWindowsForegroundWindow,
     None,
 }
 
 fn quick_add_focus_policy_for_os(os: &str) -> QuickAddFocusPolicy {
     match os {
-        "macos" => QuickAddFocusPolicy::RestoreMacosApplication,
         "windows" => QuickAddFocusPolicy::RestoreWindowsForegroundWindow,
         _ => QuickAddFocusPolicy::None,
     }
@@ -30,17 +33,6 @@ fn quick_add_focus_policy_for_os(os: &str) -> QuickAddFocusPolicy {
 
 fn current_quick_add_focus_policy() -> QuickAddFocusPolicy {
     quick_add_focus_policy_for_os(std::env::consts::OS)
-}
-
-#[cfg(target_os = "macos")]
-fn capture_macos_previous_application_pid() -> Option<i32> {
-    let pid = unsafe { mindwtr_macos_frontmost_application_pid() };
-    (pid > 0).then_some(pid as i32)
-}
-
-#[cfg(not(target_os = "macos"))]
-fn capture_macos_previous_application_pid() -> Option<i32> {
-    None
 }
 
 #[cfg(target_os = "windows")]
@@ -64,12 +56,7 @@ fn capture_windows_previous_foreground_hwnd(_window: &tauri::WebviewWindow) -> O
 
 fn capture_quick_add_focus_snapshot(window: &tauri::WebviewWindow) -> QuickAddFocusSnapshot {
     match current_quick_add_focus_policy() {
-        QuickAddFocusPolicy::RestoreMacosApplication => QuickAddFocusSnapshot {
-            macos_pid: capture_macos_previous_application_pid(),
-            windows_hwnd: None,
-        },
         QuickAddFocusPolicy::RestoreWindowsForegroundWindow => QuickAddFocusSnapshot {
-            macos_pid: None,
             windows_hwnd: capture_windows_previous_foreground_hwnd(window),
         },
         QuickAddFocusPolicy::None => QuickAddFocusSnapshot::default(),
@@ -94,16 +81,6 @@ fn take_quick_add_focus_snapshot(app: &tauri::AppHandle) -> QuickAddFocusSnapsho
     snapshot
 }
 
-#[cfg(target_os = "macos")]
-fn restore_macos_application(pid: i32) {
-    if pid > 0 {
-        unsafe { mindwtr_macos_activate_application(pid as _) };
-    }
-}
-
-#[cfg(not(target_os = "macos"))]
-fn restore_macos_application(_pid: i32) {}
-
 #[cfg(target_os = "windows")]
 fn restore_windows_foreground_window(hwnd: isize) {
     if hwnd != 0 {
@@ -118,11 +95,6 @@ fn restore_windows_foreground_window(_hwnd: isize) {}
 
 fn restore_quick_add_focus(snapshot: QuickAddFocusSnapshot) {
     match current_quick_add_focus_policy() {
-        QuickAddFocusPolicy::RestoreMacosApplication => {
-            if let Some(pid) = snapshot.macos_pid {
-                restore_macos_application(pid);
-            }
-        }
         QuickAddFocusPolicy::RestoreWindowsForegroundWindow => {
             if let Some(hwnd) = snapshot.windows_hwnd {
                 restore_windows_foreground_window(hwnd);
@@ -527,6 +499,50 @@ pub(crate) fn show_main_and_emit(app: &tauri::AppHandle) {
     }
 }
 
+/// Turns the freshly built quick-add window into a non-activating panel so it
+/// can take the keyboard without activating Mindwtr (#794). Done once at
+/// creation, not per show, so the very first hotkey press already behaves.
+#[cfg(target_os = "macos")]
+fn convert_quick_add_window_to_panel(window: &tauri::WebviewWindow) {
+    let converted = window
+        .ns_window()
+        .ok()
+        .is_some_and(|ns_window| unsafe { mindwtr_macos_make_quick_add_panel(ns_window) });
+    if !converted {
+        log::warn!(
+            "Quick add window could not become a non-activating panel; \
+             falling back to the activating focus path."
+        );
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn convert_quick_add_window_to_panel(_window: &tauri::WebviewWindow) {}
+
+/// Orders the panel front and gives it the keyboard without activating the app.
+/// False means the window is not a panel (every non-macOS platform, or a failed
+/// conversion), and the caller must fall back to `set_focus`.
+#[cfg(target_os = "macos")]
+fn present_quick_add_panel(window: &tauri::WebviewWindow) -> bool {
+    window
+        .ns_window()
+        .ok()
+        .is_some_and(|ns_window| unsafe { mindwtr_macos_present_quick_add_panel(ns_window) })
+}
+
+#[cfg(not(target_os = "macos"))]
+fn present_quick_add_panel(_window: &tauri::WebviewWindow) -> bool {
+    false
+}
+
+/// `set_focus` activates the app on macOS, which is exactly what drags the main
+/// window forward (#794) — so the panel path must not call it. Anywhere else,
+/// and whenever the panel conversion failed, the call stays: without it the
+/// window is on screen but cannot be typed into.
+fn quick_add_show_needs_focus_call(os: &str, panel_presented: bool) -> bool {
+    !(os == "macos" && panel_presented)
+}
+
 pub(crate) fn create_quick_add_window(app: &tauri::AppHandle) -> Result<(), String> {
     if app.get_webview_window(QUICK_ADD_WINDOW_LABEL).is_some() {
         return Ok(());
@@ -553,7 +569,7 @@ pub(crate) fn create_quick_add_window(app: &tauri::AppHandle) -> Result<(), Stri
         .focused(false)
         .visible(false)
         .build()
-        .map(|_| ())
+        .map(|window| convert_quick_add_window_to_panel(&window))
         .map_err(|error| format!("Failed to create quick add window: {error}"))
 }
 
@@ -630,7 +646,10 @@ pub(crate) fn show_quick_add_window(app: &tauri::AppHandle) {
         let _ = window.unminimize();
         center_quick_add_window(app, &window);
         let _ = window.show();
-        let _ = window.set_focus();
+        let panel_presented = present_quick_add_panel(&window);
+        if quick_add_show_needs_focus_call(std::env::consts::OS, panel_presented) {
+            let _ = window.set_focus();
+        }
         let payload = QuickAddEventPayload {
             target: QUICK_ADD_TARGET_WINDOW.to_string(),
         };
@@ -723,9 +742,11 @@ mod tests {
 
     #[test]
     fn quick_add_focus_policy_is_platform_specific() {
+        // The macOS panel never takes activation away, so nothing is restored
+        // on close — restoring would be the thing that steals focus (#794).
         assert_eq!(
             quick_add_focus_policy_for_os("macos"),
-            QuickAddFocusPolicy::RestoreMacosApplication
+            QuickAddFocusPolicy::None
         );
         assert_eq!(
             quick_add_focus_policy_for_os("windows"),
@@ -739,5 +760,21 @@ mod tests {
             quick_add_focus_policy_for_os("freebsd"),
             QuickAddFocusPolicy::None
         );
+    }
+
+    #[test]
+    fn macos_panel_show_skips_the_activating_focus_call() {
+        assert!(!quick_add_show_needs_focus_call("macos", true));
+        // Conversion failed: better a focused main window than a popup that
+        // swallows every keystroke.
+        assert!(quick_add_show_needs_focus_call("macos", false));
+    }
+
+    #[test]
+    fn other_platforms_always_keep_the_focus_call() {
+        for os in ["windows", "linux", "freebsd"] {
+            assert!(quick_add_show_needs_focus_call(os, false));
+            assert!(quick_add_show_needs_focus_call(os, true));
+        }
     }
 }
