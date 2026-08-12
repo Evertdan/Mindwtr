@@ -59,11 +59,49 @@ describe('buildQuickAddPreviewEntries', () => {
         expect(entries.some((entry) => entry.kind === 'due')).toBe(true);
     });
 
-    it('hides a detected date the surface will suppress', () => {
+    it('shows a picked due date instead of the trailing natural one', () => {
         const input = 'call mom tomorrow';
         const parsed = parseQuickAdd(input, [], now);
-        const entries = buildQuickAddPreviewEntries(parsed, { t, rawInput: input, suppressDetectedDate: true });
-        expect(entries.some((entry) => entry.kind === 'due')).toBe(false);
+        expect(parsed.detectedDate?.date).toBeTruthy();
+        const dueOf = (options: Parameters<typeof buildQuickAddPreviewEntries>[1]) =>
+            buildQuickAddPreviewEntries(parsed, options).find((entry) => entry.kind === 'due')?.value;
+
+        expect(dueOf({ t, rawInput: input })).toContain('2026');
+        expect(dueOf({ t, rawInput: input, overrides: { dueDate: '2027-03-04' } })).toContain('2027');
+    });
+
+    it('shows a picked due date instead of an explicit /due command', () => {
+        const input = 'call mom /due:2026-09-01';
+        const parsed = parseQuickAdd(input, [], now);
+        const entries = buildQuickAddPreviewEntries(parsed, {
+            t,
+            rawInput: input,
+            overrides: { dueDate: '2027-03-04' },
+        });
+        expect(entries.find((entry) => entry.kind === 'due')?.value).toContain('2027');
+    });
+
+    it('shows a picked start time instead of the parsed one', () => {
+        const input = 'call mom /start:2026-09-01';
+        const parsed = parseQuickAdd(input, [], now);
+        const entries = buildQuickAddPreviewEntries(parsed, {
+            t,
+            rawInput: input,
+            overrides: { startTime: '2027-03-04T10:00:00.000Z' },
+        });
+        expect(entries.find((entry) => entry.kind === 'start')?.value).toContain('2027');
+    });
+
+    it('shows a picked project instead of one the text would create', () => {
+        const input = 'call mom +Brand New';
+        const parsed = parseQuickAdd(input, [], now);
+        const entries = buildQuickAddPreviewEntries(parsed, {
+            t,
+            projects: [project()],
+            rawInput: input,
+            overrides: { projectId: 'p1' },
+        });
+        expect(entries.find((entry) => entry.kind === 'project')?.value).toBe('Home Reno');
     });
 
     it('keeps chip ids stable while the draft grows', () => {

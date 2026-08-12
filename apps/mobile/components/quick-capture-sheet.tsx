@@ -489,17 +489,33 @@ export function QuickCaptureSheet({
     setShowPriorityPicker(false);
   }, [prioritiesEnabled]);
 
-  // A due date picked in the sheet outranks a trailing natural-language date,
-  // so the preview must not promise one either (see buildCaptureTaskProps).
-  const suppressDetectedDate = Boolean(dueDate);
+  // The one expression both the preview and transformProps read, so the strip
+  // cannot promise a due date the save would replace.
+  const pickedDueDate = useMemo(() => {
+    if (!dueDate) return undefined;
+    const dateOnly = safeFormatDate(dueDate, 'yyyy-MM-dd');
+    if (!dateOnly) return undefined;
+    return dueDateHasTime ? dueDate.toISOString() : dateOnly;
+  }, [dueDate, dueDateHasTime]);
+
+  // Everything the sheet's own pickers force onto the saved task.
+  const previewOverrides = useMemo(() => ({
+    projectId: projectId || undefined,
+    dueDate: pickedDueDate,
+    startTime: startTime ? startTime.toISOString() : undefined,
+  }), [pickedDueDate, projectId, startTime]);
+
+  // A due date picked in the sheet outranks a trailing natural-language date
+  // (see buildCaptureTaskProps).
+  const suppressDetectedDate = Boolean(pickedDueDate);
   const previewEntries = useMemo(() => {
     const trimmed = value.trim();
     if (!trimmed) return [];
     return buildQuickAddPreviewEntries(
       parseQuickAdd(trimmed, projects, new Date(), areas, quickAddParseOptions),
-      { t, projects, areas, rawInput: trimmed, suppressDetectedDate },
+      { t, projects, areas, rawInput: trimmed, overrides: previewOverrides },
     );
-  }, [areas, projects, quickAddParseOptions, suppressDetectedDate, t, value]);
+  }, [areas, previewOverrides, projects, quickAddParseOptions, t, value]);
 
   const buildCaptureRequestForInput = useCallback((
     inputValue: string,
@@ -531,16 +547,13 @@ export function QuickCaptureSheet({
           taskProps.contexts = Array.from(new Set([...(taskProps.contexts ?? []), ...contextTags]));
         }
         if (prioritiesEnabled && priority) taskProps.priority = priority;
-        if (dueDate) {
-          const dateOnly = safeFormatDate(dueDate, 'yyyy-MM-dd');
-          if (dateOnly) taskProps.dueDate = dueDateHasTime ? dueDate.toISOString() : dateOnly;
-        }
+        if (pickedDueDate) taskProps.dueDate = pickedDueDate;
         if (startTime) taskProps.startTime = startTime.toISOString();
         return taskProps;
       },
     };
     return { input, options };
-  }, [areas, canFocusNewTask, contextTags, dueDate, dueDateHasTime, focusNewTask, initialProps, prioritiesEnabled, priority, projectId, projects, quickAddParseOptions, selectedAreaId, startTime, suppressDetectedDate]);
+  }, [areas, canFocusNewTask, contextTags, focusNewTask, initialProps, pickedDueDate, prioritiesEnabled, priority, projectId, projects, quickAddParseOptions, selectedAreaId, startTime, suppressDetectedDate]);
 
   const buildTaskPropsForInput = useCallback(async (inputValue: string, fallbackTitle: string, extraProps?: Partial<Task>) => {
     const request = buildCaptureRequestForInput(inputValue, fallbackTitle, extraProps);

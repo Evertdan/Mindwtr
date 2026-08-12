@@ -1148,6 +1148,44 @@ describe('QuickCaptureSheet save handling', () => {
     }));
   });
 
+  it('previews the picked due date instead of the one the text parsed to', async () => {
+    parseQuickAdd.mockReturnValue({
+      title: 'Ship the build',
+      props: { dueDate: '2026-05-04' },
+      invalidDateCommands: [],
+    });
+
+    let tree!: ReturnType<typeof create>;
+    await act(async () => {
+      tree = create(
+        <QuickCaptureSheet
+          visible
+          openRequestId={1}
+          initialValue="Ship the build /due:monday"
+          onClose={vi.fn()}
+        />
+      );
+      await Promise.resolve();
+    });
+
+    const dueChip = () => {
+      const body = tree.root.findAll((node) => String(node.type) === 'QuickCaptureSheetBody')[0];
+      const entries = (body?.props?.preview?.props?.entries ?? []) as { kind: string; value: string }[];
+      return entries.find((entry) => entry.kind === 'due')?.value;
+    };
+
+    expect(dueChip()).toContain('2026');
+
+    const pickers = tree.root.findAll((node) => String(node.type) === 'QuickCaptureSheetPickers')[0];
+    if (!pickers) throw new Error('QuickCaptureSheetPickers not found');
+    await act(async () => {
+      pickers.props.onDueDateChange({ type: 'set' }, new Date(2027, 2, 5, 9, 0, 0, 0));
+      await Promise.resolve();
+    });
+
+    expect(dueChip()).toContain('2027');
+  });
+
   it('saves picker due times only after the user explicitly selects one', async () => {
     addTask.mockResolvedValue({ success: true, id: 'task-1' });
 

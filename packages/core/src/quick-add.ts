@@ -18,6 +18,7 @@ export {
     type QuickAddPreviewEntry,
     type QuickAddPreviewEntryKind,
     type QuickAddPreviewOptions,
+    type QuickAddPreviewOverrides,
 } from './quick-add-preview';
 
 export interface QuickAddDetectedDate {

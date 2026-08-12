@@ -30,14 +30,26 @@ export interface QuickAddPreviewEntry {
     tone: 'default' | 'warning';
 }
 
+/**
+ * What a surface's own pickers will force onto the saved task, mirroring its
+ * `CaptureTransactionOptions.transformProps`. A picked value always wins over
+ * the parsed one, so the chip has to show the picked value too. Each field is
+ * exactly the string the task will store — date-only stays date-only (#797).
+ */
+export interface QuickAddPreviewOverrides {
+    projectId?: string;
+    dueDate?: string;
+    startTime?: string;
+}
+
 export interface QuickAddPreviewOptions {
     t: TranslateFn;
     projects?: readonly Project[];
     areas?: readonly Area[];
     /** The draft as typed; the title chip shows only when parsing changed it. */
     rawInput?: string;
-    /** Mirrors CaptureAssemblyInput.suppressDetectedDate — a surface-picked due date wins. */
-    suppressDetectedDate?: boolean;
+    /** Surfaces without pickers (desktop, capture modal) leave this unset. */
+    overrides?: QuickAddPreviewOverrides;
 }
 
 const VALUE_PREVIEW_LIMIT = 48;
@@ -68,7 +80,7 @@ export function buildQuickAddPreviewEntries(
     parsed: QuickAddResult,
     options: QuickAddPreviewOptions,
 ): QuickAddPreviewEntry[] {
-    const { t, projects, areas, rawInput, suppressDetectedDate } = options;
+    const { t, projects, areas, rawInput, overrides } = options;
     const props = parsed.props;
     const entries: QuickAddPreviewEntry[] = [];
 
@@ -85,8 +97,9 @@ export function buildQuickAddPreviewEntries(
     // Same rule as buildCaptureTaskProps: a trailing natural-language date only
     // becomes the due date when nothing more explicit set one.
     const detectedDate = parsed.detectedDate;
-    const appliesDetectedDate = Boolean(detectedDate?.date && !props.dueDate && !suppressDetectedDate);
-    const dueValue = appliesDetectedDate && detectedDate ? detectedDate.date : props.dueDate;
+    const appliesDetectedDate = Boolean(detectedDate?.date && !props.dueDate && !overrides?.dueDate);
+    const dueValue = overrides?.dueDate
+        ?? (appliesDetectedDate && detectedDate ? detectedDate.date : props.dueDate);
     const title = (appliesDetectedDate && detectedDate ? detectedDate.titleWithoutDate : parsed.title).trim();
 
     if (rawInput !== undefined && title && title !== rawInput.trim()) {
@@ -108,12 +121,13 @@ export function buildQuickAddPreviewEntries(
             tone: 'default',
         });
     }
-    if (props.startTime) {
+    const startValue = overrides?.startTime ?? props.startTime;
+    if (startValue) {
         entries.push({
             id: 'start',
             kind: 'start',
             label: tFallback(t, 'taskEdit.startDateLabel', 'Start Date'),
-            value: formatPreviewDate(props.startTime),
+            value: formatPreviewDate(startValue),
             tone: 'default',
         });
     }
@@ -129,8 +143,9 @@ export function buildQuickAddPreviewEntries(
 
     // A `+Project` naming no existing project is reported as projectTitle: the
     // capture creates it, so the chip shows the name either way.
-    const projectName = props.projectId
-        ? projects?.find((project) => project.id === props.projectId)?.title
+    const projectId = overrides?.projectId ?? props.projectId;
+    const projectName = projectId
+        ? projects?.find((project) => project.id === projectId)?.title
         : parsed.projectTitle;
     if (projectName) {
         entries.push({
