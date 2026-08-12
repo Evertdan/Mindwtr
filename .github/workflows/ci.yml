@@ -58,6 +58,9 @@ jobs:
       - name: Store image asset check
         run: bash scripts/ci/validate-store-image-assets.sh
 
+      - name: AppStream metainfo locale check
+        run: python3 scripts/ci/validate-appstream-locales.py
+
       - name: Workflow JSON newline check
         run: node scripts/ci/validate-workflow-json-newlines.js
 
