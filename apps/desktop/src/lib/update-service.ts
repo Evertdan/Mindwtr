@@ -10,6 +10,11 @@ const GITHUB_RELEASES_API =
   "https://api.github.com/repos/dongdongbh/Mindwtr/releases/latest";
 const GITHUB_RELEASES_URL =
   "https://github.com/dongdongbh/Mindwtr/releases/latest";
+// No-API-rate-limit fallback: a public web feed, used only when the REST API
+// returns 403/429 (unauthenticated api.github.com is capped at 60 req/hr per
+// source IP, which shared NAT/VPN exits can blow through).
+const GITHUB_RELEASES_ATOM_URL =
+  "https://github.com/dongdongbh/Mindwtr/releases.atom";
 const MS_STORE_PRODUCT_ID = "9N0V5B0B6FRX";
 const MS_STORE_URL = `ms-windows-store://pdp/?ProductId=${MS_STORE_PRODUCT_ID}`;
 const MS_STORE_UPDATES_URL = "ms-windows-store://downloadsandupdates";
@@ -80,6 +85,10 @@ export interface UpdateInfo {
   source: UpdateSource;
   installSource: InstallSource;
   sourceFallback: boolean;
+  /** True when the GitHub REST API was rate-limited and the releases.atom
+   * feed was used instead: only latestVersion/hasUpdate/releaseUrl are real,
+   * releaseNotes/assets/downloadUrl are empty. */
+  atomFallback: boolean;
 }
 
 type UpdateAsset = { name: string; url: string };
@@ -368,6 +377,45 @@ export function getFlatpakInstallChannel(
   return branch || null;
 }
 
+class HttpError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "HttpError";
+    this.status = status;
+  }
+}
+
+const isRateLimitStatus = (status: number): boolean =>
+  status === 403 || status === 429;
+
+// GitHub's atom feed lists entries newest-first; the newest entry's link
+// looks like https://github.com/<owner>/<repo>/releases/tag/<tag>.
+const ATOM_RELEASE_TAG_PATTERN = /\/releases\/tag\/(v[0-9][^"<]*)/;
+
+const parseLatestReleaseTagFromAtom = (xml: string): string | null => {
+  const firstEntry = xml.match(/<entry\b[\s\S]*?<\/entry>/);
+  const scope = firstEntry ? firstEntry[0] : xml;
+  const match = scope.match(ATOM_RELEASE_TAG_PATTERN);
+  return match?.[1]?.trim() || null;
+};
+
+const buildGithubTagReleaseUrl = (tag: string): string =>
+  `https://github.com/dongdongbh/Mindwtr/releases/tag/${tag}`;
+
+export const UPDATE_RATE_LIMIT_MESSAGE =
+  "Update check is rate-limited right now — try again later or open the releases page.";
+
+/** Thrown when both the GitHub REST API and the releases.atom fallback are
+ * rate-limited: the caller should show a calm message instead of the raw
+ * HTTP status text. */
+export class UpdateRateLimitedError extends Error {
+  constructor() {
+    super(UPDATE_RATE_LIMIT_MESSAGE);
+    this.name = "UpdateRateLimitedError";
+  }
+}
+
 const fetchGithubLatestRelease = async (): Promise<GitHubRelease> => {
   const response = await fetchForUpdates(GITHUB_RELEASES_API, {
     headers: {
@@ -376,9 +424,57 @@ const fetchGithubLatestRelease = async (): Promise<GitHubRelease> => {
     },
   });
   if (!response.ok) {
-    throw new Error(`GitHub API error: ${response.status}`);
+    throw new HttpError(`GitHub API error: ${response.status}`, response.status);
   }
   return response.json();
+};
+
+const fetchGithubLatestReleaseTagFromAtom = async (): Promise<string> => {
+  const response = await fetchForUpdates(GITHUB_RELEASES_ATOM_URL, {
+    headers: {
+      Accept: "application/atom+xml",
+      "User-Agent": "Mindwtr-App",
+    },
+  });
+  if (!response.ok) {
+    throw new HttpError(
+      `GitHub releases feed error: ${response.status}`,
+      response.status,
+    );
+  }
+  const xml = await response.text();
+  const tag = parseLatestReleaseTagFromAtom(xml);
+  if (!tag) throw new Error("GitHub releases feed returned no tag.");
+  return tag;
+};
+
+type GithubLatestOutcome =
+  | { kind: "full"; release: GitHubRelease }
+  | { kind: "degraded"; tag: string; releaseUrl: string };
+
+/**
+ * Fetch the latest GitHub release, falling back to the no-rate-limit atom
+ * feed (tag + release page only, no notes/assets) when the API is
+ * rate-limited. Throws UpdateRateLimitedError only when BOTH surfaces are
+ * rate-limited; any other error is rethrown as-is.
+ */
+const fetchGithubLatestWithFallback = async (): Promise<GithubLatestOutcome> => {
+  try {
+    return { kind: "full", release: await fetchGithubLatestRelease() };
+  } catch (error) {
+    if (!(error instanceof HttpError) || !isRateLimitStatus(error.status)) {
+      throw error;
+    }
+    try {
+      const tag = await fetchGithubLatestReleaseTagFromAtom();
+      return { kind: "degraded", tag, releaseUrl: buildGithubTagReleaseUrl(tag) };
+    } catch (atomError) {
+      if (atomError instanceof HttpError && isRateLimitStatus(atomError.status)) {
+        throw new UpdateRateLimitedError();
+      }
+      throw error;
+    }
+  }
 };
 
 const fetchHomebrewLatestVersion = async (): Promise<SourceVersionResult> => {
@@ -592,6 +688,7 @@ export async function checkForUpdates(
   const cleanCurrentVersion = normalizeComparableVersion(currentVersion);
   let sourceResult: SourceVersionResult | null = null;
   let githubRelease: GitHubRelease | null = null;
+  let githubDegraded: { tag: string; releaseUrl: string } | null = null;
 
   try {
     if (installSource === "microsoft-store") {
@@ -599,7 +696,9 @@ export async function checkForUpdates(
         options.microsoftStoreUpdateProvider,
       );
       try {
-        githubRelease = await fetchGithubLatestRelease();
+        const outcome = await fetchGithubLatestWithFallback();
+        if (outcome.kind === "full") githubRelease = outcome.release;
+        else githubDegraded = outcome;
       } catch (error) {
         reportError("Failed to fetch GitHub release notes for Microsoft Store update", error, {
           toast: false,
@@ -607,7 +706,9 @@ export async function checkForUpdates(
       }
       const githubLatestVersion = githubRelease
         ? normalizeComparableVersion(githubRelease.tag_name)
-        : "";
+        : githubDegraded
+          ? normalizeComparableVersion(githubDegraded.tag)
+          : "";
       const latestVersion = storeInfo.hasUpdate
         ? storeInfo.latestVersion ?? githubLatestVersion ?? cleanCurrentVersion
         : cleanCurrentVersion;
@@ -628,6 +729,9 @@ export async function checkForUpdates(
         source: "microsoft-store",
         installSource,
         sourceFallback: false,
+        // The Microsoft Store is always the returned source here; a degraded
+        // GitHub notes lookup doesn't make this UpdateInfo itself degraded.
+        atomFallback: false,
       };
     }
 
@@ -645,7 +749,9 @@ export async function checkForUpdates(
     }
 
     try {
-      githubRelease = await fetchGithubLatestRelease();
+      const outcome = await fetchGithubLatestWithFallback();
+      if (outcome.kind === "full") githubRelease = outcome.release;
+      else githubDegraded = outcome;
     } catch (error) {
       if (!sourceResult) {
         throw error;
@@ -653,17 +759,20 @@ export async function checkForUpdates(
       reportError("Failed to check GitHub fallback for updates", error);
     }
 
-    if (!sourceResult && !githubRelease) {
+    if (!sourceResult && !githubRelease && !githubDegraded) {
       throw new Error("No update sources available.");
     }
 
     const githubLatestVersion = githubRelease
       ? normalizeComparableVersion(githubRelease.tag_name)
-      : "";
+      : githubDegraded
+        ? normalizeComparableVersion(githubDegraded.tag)
+        : "";
     let latestVersion =
       sourceResult?.version ?? githubLatestVersion ?? cleanCurrentVersion;
     let source: UpdateSource = sourceResult?.source ?? "github-release";
-    let releaseUrl = sourceResult?.releaseUrl ?? GITHUB_RELEASES_URL;
+    let releaseUrl =
+      sourceResult?.releaseUrl ?? githubDegraded?.releaseUrl ?? GITHUB_RELEASES_URL;
 
     if (!latestVersion) {
       latestVersion = cleanCurrentVersion;
@@ -680,7 +789,8 @@ export async function checkForUpdates(
     ) {
       latestVersion = githubLatestVersion;
       source = "github-release";
-      releaseUrl = githubRelease?.html_url || GITHUB_RELEASES_URL;
+      releaseUrl =
+        githubRelease?.html_url ?? githubDegraded?.releaseUrl ?? GITHUB_RELEASES_URL;
     }
 
     const hasUpdate = compareVersions(latestVersion, cleanCurrentVersion) > 0;
@@ -705,9 +815,15 @@ export async function checkForUpdates(
       source,
       installSource,
       sourceFallback: Boolean(sourceResult && source === "github-release"),
+      atomFallback: Boolean(
+        githubDegraded && !githubRelease && source === "github-release",
+      ),
     };
   } catch (error) {
-    reportError("Failed to check for updates", error);
+    reportError("Failed to check for updates", error, {
+      userMessage:
+        error instanceof UpdateRateLimitedError ? error.message : undefined,
+    });
     throw error;
   }
 }

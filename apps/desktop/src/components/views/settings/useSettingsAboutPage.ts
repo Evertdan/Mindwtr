@@ -9,6 +9,7 @@ import {
     HOMEBREW_CASK_URL,
     MS_STORE_UPDATES_URL,
     normalizeInstallSource,
+    UpdateRateLimitedError,
     verifyDownloadChecksum,
     WINGET_PACKAGE_URL,
     type InstallSource,
@@ -327,8 +328,11 @@ export function useSettingsAboutPage({
             setIsDownloadingUpdate(false);
             setShowUpdateModal(true);
         } catch (error) {
-            reportError('Update check failed', error);
-            setUpdateError(String(error));
+            const isRateLimited = error instanceof UpdateRateLimitedError;
+            reportError('Update check failed', error, {
+                userMessage: isRateLimited ? error.message : undefined,
+            });
+            setUpdateError(isRateLimited ? error.message : String(error));
         } finally {
             setIsCheckingUpdate(false);
         }

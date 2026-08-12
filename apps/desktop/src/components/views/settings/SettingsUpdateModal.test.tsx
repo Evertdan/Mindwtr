@@ -29,6 +29,7 @@ const updateInfo: UpdateInfo = {
     source: 'github-release',
     installSource: 'microsoft-store',
     sourceFallback: false,
+    atomFallback: false,
 };
 
 describe('SettingsUpdateModal', () => {

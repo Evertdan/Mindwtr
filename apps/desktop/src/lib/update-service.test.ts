@@ -5,6 +5,8 @@ import {
   getFlatpakInstallChannel,
   MS_STORE_UPDATES_URL,
   normalizeInstallSource,
+  UPDATE_RATE_LIMIT_MESSAGE,
+  UpdateRateLimitedError,
 } from "./update-service";
 import tauriConfig from "../../src-tauri/tauri.conf.json";
 
@@ -13,6 +15,17 @@ const jsonResponse = (body: unknown, status = 200): Response =>
     status,
     headers: { "Content-Type": "application/json" },
   });
+
+const atomResponse = (tags: string[], status = 200): Response =>
+  new Response(
+    `<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom">${tags
+      .map(
+        (tag) =>
+          `<entry><id>tag:github.com,2008:Repository/1/${tag}</id><link type="text/html" rel="alternate" href="https://github.com/dongdongbh/Mindwtr/releases/tag/${tag}"/><title>${tag}</title></entry>`,
+      )
+      .join("")}</feed>`,
+    { status, headers: { "Content-Type": "application/atom+xml" } },
+  );
 
 const originalFetch = globalThis.fetch;
 const originalUserAgent = navigator.userAgent;
@@ -358,5 +371,128 @@ describe("update-service channel selection", () => {
     ]);
 
     expect(asset?.name).toBe("mindwtr_1.2.0_windows_x64_portable.zip");
+  });
+
+  it("falls back to the releases.atom feed when the GitHub API is rate-limited (newer version)", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("api.github.com/repos/dongdongbh/Mindwtr/releases/latest")) {
+        return jsonResponse({}, 403);
+      }
+      if (url.includes("github.com/dongdongbh/Mindwtr/releases.atom")) {
+        return atomResponse(["v1.9.0", "v1.8.0"]);
+      }
+      return jsonResponse({}, 404);
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await checkForUpdates("1.0.0", {
+      installSource: "github-release",
+    });
+
+    expect(result.hasUpdate).toBe(true);
+    expect(result.latestVersion).toBe("1.9.0");
+    expect(result.source).toBe("github-release");
+    expect(result.atomFallback).toBe(true);
+    expect(result.releaseNotes).toBe("");
+    expect(result.assets).toEqual([]);
+    expect(result.downloadUrl).toBeNull();
+    expect(result.releaseUrl).toBe(
+      "https://github.com/dongdongbh/Mindwtr/releases/tag/v1.9.0",
+    );
+  });
+
+  it("falls back to the releases.atom feed when rate-limited (already up to date)", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("api.github.com/repos/dongdongbh/Mindwtr/releases/latest")) {
+        return jsonResponse({}, 429);
+      }
+      if (url.includes("github.com/dongdongbh/Mindwtr/releases.atom")) {
+        return atomResponse(["v1.0.0"]);
+      }
+      return jsonResponse({}, 404);
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await checkForUpdates("1.0.0", {
+      installSource: "github-release",
+    });
+
+    expect(result.hasUpdate).toBe(false);
+    expect(result.atomFallback).toBe(true);
+  });
+
+  it("does not consult the atom feed when the GitHub API succeeds", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("api.github.com/repos/dongdongbh/Mindwtr/releases/latest")) {
+        return jsonResponse({
+          tag_name: "v1.9.0",
+          html_url: "https://github.com/dongdongbh/Mindwtr/releases/tag/v1.9.0",
+          body: "latest notes",
+          assets: [],
+        });
+      }
+      return jsonResponse({}, 404);
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await checkForUpdates("1.0.0", {
+      installSource: "github-release",
+    });
+
+    expect(result.hasUpdate).toBe(true);
+    expect(result.atomFallback).toBe(false);
+    expect(
+      fetchMock.mock.calls.some((call) =>
+        String(call[0]).includes("releases.atom"),
+      ),
+    ).toBe(false);
+  });
+
+  it("surfaces a calm rate-limit message when both the API and the atom feed are rate-limited", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("api.github.com/repos/dongdongbh/Mindwtr/releases/latest")) {
+        return jsonResponse({}, 403);
+      }
+      if (url.includes("github.com/dongdongbh/Mindwtr/releases.atom")) {
+        return atomResponse([], 429);
+      }
+      return jsonResponse({}, 404);
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(
+      checkForUpdates("1.0.0", { installSource: "github-release" }),
+    ).rejects.toMatchObject(
+      expect.objectContaining({
+        message: UPDATE_RATE_LIMIT_MESSAGE,
+      }),
+    );
+    await expect(
+      checkForUpdates("1.0.0", { installSource: "github-release" }),
+    ).rejects.toBeInstanceOf(UpdateRateLimitedError);
+  });
+
+  it("leaves non-403 GitHub API errors unchanged (no atom fallback attempted)", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("api.github.com/repos/dongdongbh/Mindwtr/releases/latest")) {
+        return jsonResponse({}, 500);
+      }
+      return jsonResponse({}, 404);
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(
+      checkForUpdates("1.0.0", { installSource: "github-release" }),
+    ).rejects.toThrow("GitHub API error: 500");
+    expect(
+      fetchMock.mock.calls.some((call) =>
+        String(call[0]).includes("releases.atom"),
+      ),
+    ).toBe(false);
   });
 });
