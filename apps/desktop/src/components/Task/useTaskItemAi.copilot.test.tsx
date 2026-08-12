@@ -1,13 +1,25 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, render, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { type Task, useTaskStore } from '@mindwtr/core';
 
 import { useTaskItemAi } from './useTaskItemAi';
+import { TaskItem } from '../TaskItem';
+import { LanguageProvider } from '../../contexts/language-context';
+import { useUiStore } from '../../store/ui-store';
 
 const predictMetadata = vi.hoisted(() => vi.fn());
 
 vi.mock('@mindwtr/core', async (importOriginal) => {
     const actual = await importOriginal<typeof import('@mindwtr/core')>();
     return { ...actual, createAIProvider: () => ({ predictMetadata }) };
+});
+
+// Wraps the real hook (calls through) so TaskItem-level tests can assert on
+// the exact `copilotEnabled` argument TaskItem passes, independent of the
+// hook's internal debounce timing.
+vi.mock('./useTaskItemAi', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('./useTaskItemAi')>();
+    return { ...actual, useTaskItemAi: vi.fn(actual.useTaskItemAi) };
 });
 
 vi.mock('../../lib/ai-config', () => ({
@@ -123,5 +135,76 @@ describe('useTaskItemAi copilot parts', () => {
 
         expect(predictMetadata).not.toHaveBeenCalled();
         expect(result.current.pendingCopilotParts).toEqual([]);
+    });
+});
+
+describe('TaskItem copilot wiring', () => {
+    const initialTaskState = useTaskStore.getState();
+    const initialUiState = useUiStore.getState();
+
+    const rowTask: Task = {
+        id: 'wiring-task-1',
+        title: 'Book the dentist',
+        status: 'inbox',
+        tags: [],
+        contexts: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    };
+
+    beforeEach(() => {
+        vi.useFakeTimers();
+        predictMetadata.mockReset();
+        predictMetadata.mockResolvedValue({ context: '@phone', timeEstimate: '15min', tags: ['#health'] });
+        vi.mocked(useTaskItemAi).mockClear();
+        act(() => {
+            useTaskStore.setState(initialTaskState, true);
+            useUiStore.setState(initialUiState, true);
+        });
+        useTaskStore.setState({ settings: { ai: { enabled: true, provider: 'openai' } } });
+        useUiStore.setState({
+            ...useUiStore.getState(),
+            editingTaskId: null,
+            expandedTaskIds: {},
+        });
+    });
+
+    it('makes no background copilot call for a mounted row that is not being edited', async () => {
+        render(
+            <LanguageProvider>
+                <TaskItem task={rowTask} />
+            </LanguageProvider>
+        );
+
+        await settleSuggestion();
+
+        expect(predictMetadata).not.toHaveBeenCalled();
+        const calls = vi.mocked(useTaskItemAi).mock.calls;
+        const lastCall = calls[calls.length - 1]?.[0];
+        expect(lastCall?.copilotEnabled).toBe(false);
+    });
+
+    // The debounced predictMetadata call itself isn't asserted here: entering
+    // edit mode re-renders TaskItem (loadTokenOptions flips on) before the
+    // 800ms debounce fires, and useTaskItemAi's debounce effect has a
+    // pre-existing, unrelated quirk where a same-signature re-render after
+    // its timer is cleared skips rescheduling — reproducible on unmodified
+    // code too. That's outside this finding's scope (useTaskItemAi.ts
+    // internals), so this only asserts the wiring TaskItem.tsx owns: the
+    // argument it passes to the hook.
+    it('enables copilot for a row mounted already in edit mode', async () => {
+        useUiStore.setState({ editingTaskId: rowTask.id });
+
+        render(
+            <LanguageProvider>
+                <TaskItem task={rowTask} />
+            </LanguageProvider>
+        );
+
+        await settleSuggestion();
+
+        const calls = vi.mocked(useTaskItemAi).mock.calls;
+        const lastCall = calls[calls.length - 1]?.[0];
+        expect(lastCall?.copilotEnabled).toBe(true);
     });
 });

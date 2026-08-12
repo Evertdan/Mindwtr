@@ -423,6 +423,10 @@ export const TaskItem = memo(function TaskItem({
         projectContext,
         timeEstimatesEnabled,
         setField: setDraftField,
+        // Background copilot calls are per-mounted-row; every list/board/review
+        // surface renders one of these, so gate them on the row actually being
+        // edited instead of firing for every collapsed row on the screen.
+        copilotEnabled: isEditing,
     });
     const { resetCopilotDraft, resetAiState } = ai;
 
