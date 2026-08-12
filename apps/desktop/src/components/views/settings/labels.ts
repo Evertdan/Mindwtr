@@ -587,6 +587,7 @@ export const SETTINGS_LABEL_KEYS = [
     'upToDate',
     'updateAvailable',
     'checkFailed',
+    'updateRateLimited',
     'storeUpdateHint',
     'download',
     'downloadStarting',

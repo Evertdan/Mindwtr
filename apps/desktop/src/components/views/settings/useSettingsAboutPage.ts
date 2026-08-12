@@ -330,13 +330,13 @@ export function useSettingsAboutPage({
         } catch (error) {
             const isRateLimited = error instanceof UpdateRateLimitedError;
             reportError('Update check failed', error, {
-                userMessage: isRateLimited ? error.message : undefined,
+                userMessage: isRateLimited ? t.updateRateLimited : undefined,
             });
-            setUpdateError(isRateLimited ? error.message : String(error));
+            setUpdateError(isRateLimited ? t.updateRateLimited : String(error));
         } finally {
             setIsCheckingUpdate(false);
         }
-    }, [appVersion, installSource, linuxFlavor, persistUpdateBadge, t.downloadAURHint, t.upToDate]);
+    }, [appVersion, installSource, linuxFlavor, persistUpdateBadge, t.downloadAURHint, t.updateRateLimited, t.upToDate]);
 
     const handleDownloadUpdate = useCallback(async () => {
         const targetUrl = preferredDownloadUrl;

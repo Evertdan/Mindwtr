@@ -1699,6 +1699,7 @@ export const svOverrides: Record<string, string> = {
         'settings.upToDate': 'Du använder den senaste versionen!',
         'settings.updateAvailable': 'Uppdatering tillgänglig',
         'settings.checkFailed': 'Det gick inte att söka efter uppdateringar',
+        'settings.updateRateLimited': 'Uppdateringskontrollen är hastighetsbegränsad just nu – försök igen senare eller öppna utgåvesidan.',
         'settings.storeUpdateHint': 'Uppdateringar hanteras av Microsoft Store.',
         'settings.download': 'Ladda ned',
         'settings.downloadStarting': 'Öppnar nedladdning…',

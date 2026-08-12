@@ -399,8 +399,10 @@ const parseLatestReleaseTagFromAtom = (xml: string): string | null => {
 const buildGithubTagReleaseUrl = (tag: string): string =>
   `https://github.com/dongdongbh/Mindwtr/releases/tag/${tag}`;
 
+/** Diagnostic only. User-facing copy is the `settings.updateRateLimited`
+ * i18n key, resolved by whichever caller has a translator in scope. */
 export const UPDATE_RATE_LIMIT_MESSAGE =
-  "Update check is rate-limited right now — try again later or open the releases page.";
+  "GitHub REST API and releases.atom are both rate-limited";
 
 /** Thrown when both the GitHub REST API and the releases.atom fallback are
  * rate-limited: the caller should show a calm message instead of the raw
@@ -810,10 +812,9 @@ export async function checkForUpdates(
       sourceFallback: Boolean(sourceResult && source === "github-release"),
     };
   } catch (error) {
-    reportError("Failed to check for updates", error, {
-      userMessage:
-        error instanceof UpdateRateLimitedError ? error.message : undefined,
-    });
+    // No translator here. UpdateRateLimitedError carries the marker; callers
+    // with `t` in scope resolve the localized copy (useSettingsAboutPage).
+    reportError("Failed to check for updates", error);
     throw error;
   }
 }

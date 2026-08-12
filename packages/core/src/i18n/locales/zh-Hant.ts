@@ -1604,6 +1604,7 @@ export const zhHant: Record<string, string> = {
         'settings.upToDate': '您使用的是最新版本！',
         'settings.updateAvailable': '可用更新',
         'settings.checkFailed': '無法檢查更新',
+        'settings.updateRateLimited': '更新檢查目前受到頻率限制，請稍後重試或開啟發布頁面。',
         'settings.storeUpdateHint': '更新由 Microsoft Store 管理。',
         'settings.download': '下載',
         'settings.downloadStarting': '正在開啟下載...',

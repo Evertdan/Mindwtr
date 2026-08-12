@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useSettingsAboutPage } from './useSettingsAboutPage';
 import { getEnglishSettingsLabels } from './labels';
+import { UpdateRateLimitedError } from '../../../lib/update-service';
 
 const runtimeMock = vi.hoisted(() => ({
     isTauriRuntime: vi.fn(() => true),
@@ -37,8 +38,18 @@ vi.mock('../../../lib/app-log', async (importOriginal) => ({
     getLogPath: vi.fn(async () => ''),
 }));
 
+const reportErrorMock = vi.hoisted(() => vi.fn());
+vi.mock('../../../lib/report-error', () => ({ reportError: reportErrorMock }));
+
 function Harness() {
     useSettingsAboutPage({ t: getEnglishSettingsLabels() });
+    return null;
+}
+
+type AboutPageResult = ReturnType<typeof useSettingsAboutPage>;
+
+function CaptureHarness({ onResult }: { onResult: (result: AboutPageResult) => void }) {
+    onResult(useSettingsAboutPage({ t: getEnglishSettingsLabels() }));
     return null;
 }
 
@@ -79,5 +90,25 @@ describe('useSettingsAboutPage background update check', () => {
             expect.any(String),
             expect.objectContaining({ installSource: 'winget' }),
         );
+    });
+
+    it('reports the localized copy, not the error message, when the check is rate-limited', async () => {
+        const labels = getEnglishSettingsLabels();
+        runtimeMock.getInstallSourceOrFallback.mockResolvedValue('scoop');
+        updateServiceMock.checkForUpdates.mockRejectedValue(new UpdateRateLimitedError());
+
+        let result!: AboutPageResult;
+        render(<CaptureHarness onResult={(value) => { result = value; }} />);
+        await waitFor(() => expect(result).toBeDefined());
+
+        await result.aboutPageProps.onCheckUpdates();
+
+        expect(reportErrorMock).toHaveBeenCalledWith(
+            'Update check failed',
+            expect.any(UpdateRateLimitedError),
+            { userMessage: labels.updateRateLimited },
+        );
+        // The raw Error message is diagnostic-only and must never be the copy.
+        expect(labels.updateRateLimited).not.toBe(new UpdateRateLimitedError().message);
     });
 });

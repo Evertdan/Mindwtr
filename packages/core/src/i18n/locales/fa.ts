@@ -1699,6 +1699,7 @@ export const faOverrides: Record<string, string> = {
         'settings.upToDate': 'از آخرین نسخه استفاده می‌کنید!',
         'settings.updateAvailable': 'به‌روزرسانی موجود است',
         'settings.checkFailed': 'بررسی به‌روزرسانی‌ها ناموفق بود',
+        'settings.updateRateLimited': 'بررسی به‌روزرسانی در حال حاضر محدود شده است — بعداً دوباره تلاش کنید یا صفحهٔ انتشارها را باز کنید.',
         'settings.storeUpdateHint': 'به‌روزرسانی‌ها توسط Microsoft Store مدیریت می‌شوند.',
         'settings.download': 'دانلود',
         'settings.downloadStarting': 'در حال باز کردن دانلود…',

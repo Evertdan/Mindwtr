@@ -1604,6 +1604,7 @@ export const zhHans: Record<string, string> = {
         'settings.upToDate': '您正在使用最新版本！',
         'settings.updateAvailable': '有可用更新',
         'settings.checkFailed': '检查更新失败',
+        'settings.updateRateLimited': '更新检查当前受到频率限制，请稍后重试或打开发布页面。',
         'settings.storeUpdateHint': '更新由 Microsoft Store 管理。',
         'settings.download': '下载',
         'settings.downloadStarting': '正在打开下载…',

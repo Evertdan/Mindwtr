@@ -1733,6 +1733,7 @@ export const en: Record<string, string> = {
         'settings.upToDate': 'You are using the latest version!',
         'settings.updateAvailable': 'Update Available',
         'settings.checkFailed': 'Failed to check for updates',
+        'settings.updateRateLimited': 'Update check is rate-limited right now — try again later or open the releases page.',
         'settings.storeUpdateHint': 'Updates are managed by Microsoft Store.',
         'settings.download': 'Download',
         'settings.downloadStarting': 'Opening download…',
