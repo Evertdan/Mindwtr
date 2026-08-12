@@ -16,6 +16,20 @@ on:
       - "scripts/ci/validate-dependency-audit.test.js"
       - "scripts/ci/validate-mobile-npm-audit.js"
       - "tools/eas-cli/package.json"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/dependency-audit.yml"
+      - "**/package-lock.json"
+      - "apps/*/package.json"
+      - "apps/desktop/src-tauri/Cargo.lock"
+      - "apps/desktop/src-tauri/Cargo.toml"
+      - "bun.lock"
+      - "package.json"
+      - "packages/*/package.json"
+      - "scripts/ci/validate-dependency-audit.test.js"
+      - "scripts/ci/validate-mobile-npm-audit.js"
+      - "tools/eas-cli/package.json"
   workflow_dispatch:
 
 permissions:
