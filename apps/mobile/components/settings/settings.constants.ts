@@ -117,7 +117,7 @@ function derivedRowKeys(row: SettingsMenuRowId): string[] {
 // combined roster resolves, so a wrong or invented key fails CI rather than
 // silently contributing nothing.
 const MOBILE_ROW_EXTRA_KEYS: Record<SettingsMenuRowId, readonly string[]> = {
-    general: ['settings.theme', 'settings.mobile.appLock', 'settings.privacy'],
+    general: ['settings.theme', 'settings.mobile.appLock', 'settings.privacy', 'settings.appSearchLabel'],
     gtd: ['settings.gtdMobile.pomodoroSettings', 'settings.dailyReviewConfig'],
     // manage-settings-screen renders areas/contexts/tags via non-settings keys.
     // People has no dedicated title key in en.ts, so it is intentionally omitted.

@@ -153,6 +153,10 @@ describe('settings menu search index', () => {
         expect(visibleRowIds('clean up quick add')).toEqual(['gtd']);
         expect(visibleRowIds('editor typing help')).toEqual(['gtd']);
         expect(visibleRowIds('background sync')).toEqual(['sync']);
+        // Android-only, so it is absent from desktop's roster and no derived
+        // key covers it — general-settings-screen renders it behind
+        // isAppSearchSupported().
+        expect(visibleRowIds('expose to system search')).toEqual(['general']);
     });
 
     it('shows every row for an empty or whitespace query', () => {
