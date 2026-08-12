@@ -7113,6 +7113,27 @@ mod tests {
         assert_eq!(*active.borrow(), previous);
         assert!(journal.borrow().is_none());
     }
+
+    // T7: is_sync_lock_contention is defined far below this module (it's regular,
+    // non-test code after mod tests closes elsewhere in this file) but is visible
+    // here via `use super::*;` above — Rust module resolution isn't order-dependent.
+    #[cfg(windows)]
+    #[test]
+    fn windows_lock_violation_error_is_sync_lock_contention() {
+        let error = std::io::Error::from_raw_os_error(
+            windows_sys::Win32::Foundation::ERROR_LOCK_VIOLATION as i32,
+        );
+        assert!(is_sync_lock_contention(&error));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_unrelated_os_error_is_not_sync_lock_contention() {
+        let error = std::io::Error::from_raw_os_error(
+            windows_sys::Win32::Foundation::ERROR_ACCESS_DENIED as i32,
+        );
+        assert!(!is_sync_lock_contention(&error));
+    }
 }
 
 #[tauri::command]
