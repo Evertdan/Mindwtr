@@ -230,14 +230,17 @@ describe('ProjectWorkspace sections-as-columns (#1019)', () => {
         expect(columnTaskIds(container, 2)).toEqual(['task-3']);
     });
 
-    it('drops the unsectioned column when every task belongs to a section', () => {
+    it('keeps the No Section column as a drop target when every task belongs to a section', () => {
         const { container } = renderWorkspace({
             layout: 'columns',
             store: { allTasks: tasks.slice(0, 3) },
         });
 
         expect(columnTitles(container).map((title) => title.replace(/\d+$/, '')))
-            .toEqual(['Planning', 'Shipping']);
+            .toEqual(['No Section', 'Planning', 'Shipping']);
+        expect(columnTaskIds(container, 0)).toEqual([]);
+        expect(container.querySelectorAll('[data-project-section-columns] > div')[0].textContent)
+            .toContain('No tasks');
     });
 
     it('reorders within a column through the section-scoped store call', () => {
@@ -336,7 +339,8 @@ describe('ProjectWorkspace sections-as-columns (#1019)', () => {
             store: { allTasks: [tasks[0], tasks[1]] },
         });
 
-        expect(getAllByText('No tasks')).toHaveLength(1);
+        // Empty Shipping section + the empty No Section column (still a drop target).
+        expect(getAllByText('No tasks')).toHaveLength(2);
         expect(queryByText('No active tasks')).toBeNull();
     });
 

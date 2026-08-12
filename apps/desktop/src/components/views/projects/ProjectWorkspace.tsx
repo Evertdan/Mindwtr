@@ -1252,22 +1252,24 @@ export function ProjectWorkspace({
                 onPointerDown={handleColumnsPointerDown}
                 className="flex items-start gap-3 overflow-x-auto pb-2"
             >
-                {sectionTaskGroups.unsectioned.length > 0 && (
-                    <ProjectSectionColumn
-                        id={NO_SECTION_CONTAINER}
-                        dashed
-                        header={(
-                            <div className="flex items-center gap-2 text-sm font-semibold">
-                                <span className="truncate">{t('projects.noSection')}</span>
-                                <span className="text-xs text-muted-foreground">
-                                    {sectionTaskGroups.unsectioned.length}
-                                </span>
-                            </div>
-                        )}
-                    >
-                        {(scrollRef) => renderTasks(sectionTaskGroups.unsectioned, scrollRef)}
-                    </ProjectSectionColumn>
-                )}
+                <ProjectSectionColumn
+                    id={NO_SECTION_CONTAINER}
+                    dashed
+                    header={(
+                        <div className="flex items-center gap-2 text-sm font-semibold">
+                            <span className="truncate">{t('projects.noSection')}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {sectionTaskGroups.unsectioned.length}
+                            </span>
+                        </div>
+                    )}
+                >
+                    {(scrollRef) => (sectionTaskGroups.unsectioned.length > 0 ? (
+                        renderTasks(sectionTaskGroups.unsectioned, scrollRef)
+                    ) : (
+                        sectionEmptyState
+                    ))}
+                </ProjectSectionColumn>
                 {sectionTaskGroups.sections.map((group, index) => (
                     <ProjectSectionColumn
                         key={group.section.id}
