@@ -40,6 +40,23 @@ jobs:
         with:
           ref: ${{ inputs.tag || github.event.inputs.tag || github.ref }}
 
+      # D3: fail fast, before the ~90min build, when the AppStream metainfo's top
+      # <release> entry wasn't bumped for this release (rc.2 once shipped with the
+      # rc.1 entry still in place). Only enforced when a real release tag resolved;
+      # an ad-hoc workflow_dispatch with no tag falls back to the unsuffixed base
+      # version and must not be held to the tag's version.
+      - name: Validate AppStream metainfo version for tagged releases
+        run: |
+          set -euo pipefail
+          TAG_INPUT="${{ inputs.tag || github.event.inputs.tag }}"
+          TAG="${TAG_INPUT:-${GITHUB_REF#refs/tags/}}"
+          if [[ "${TAG}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            python3 scripts/ci/validate-appstream-locales.py --expected-version "${TAG#v}"
+          else
+            echo "No release tag resolved; skipping AppStream metainfo version check."
+          fi
+        shell: bash
+
       - name: Install system dependencies
         run: |
           sudo apt-get update

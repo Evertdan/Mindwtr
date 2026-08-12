@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -113,7 +114,23 @@ def require_translation(
     return german_element
 
 
-def main() -> int:
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Validate German localization (and, optionally, the top release "
+        "entry's version) of the desktop AppStream metainfo.",
+    )
+    parser.add_argument(
+        "--expected-version",
+        default=None,
+        help="Fail if the top <release version=...> entry does not equal this value. "
+        "Omit to skip the check (ordinary, non-release CI runs).",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(sys.argv[1:] if argv is None else argv)
+
     try:
         root = ET.parse(METADATA_PATH).getroot()
     except FileNotFoundError:
@@ -153,6 +170,11 @@ def main() -> int:
         default_release_notes = require_description_locale(errors, latest_release, f"{version} release notes")
         if default_release_notes is not None and default_release_notes.attrib.get("translate") == "no":
             errors.append(f"{version} release notes must not leave the default description marked translate=\"no\".")
+        if args.expected_version and version != args.expected_version:
+            errors.append(
+                f"Top AppStream release entry is {version}, expected {args.expected_version} "
+                f"({METADATA_PATH.name}'s top <release> was not updated for this release)."
+            )
 
     if errors:
         print("AppStream German locale validation failed:", file=sys.stderr)
