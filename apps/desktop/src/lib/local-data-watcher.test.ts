@@ -84,6 +84,33 @@ const flushScheduledTimers = async () => {
     await __localDataWatcherTestUtils.waitForPendingMergeForTests();
 };
 
+// Like flushScheduledTimers, but yields a few extra microtask ticks per round.
+// A single retry cycle (reject → catch → reschedule → registration cleanup)
+// is several hops; this fake zero-delay scheduler can fire the NEXT queued
+// retry timer before that chain settles, finding the previous attempt's
+// re-entrancy guard (channel.registration) still set and silently no-op'ing
+// instead of retrying. Only tests that chain multiple retries need this.
+const flushScheduledTimersSlowly = async () => {
+    let guard = 0;
+    let idleRounds = 0;
+    while (guard < 50 && idleRounds < 5) {
+        guard += 1;
+        if (scheduledTimers.size === 0) {
+            idleRounds += 1;
+            await Promise.resolve();
+            continue;
+        }
+        idleRounds = 0;
+        const callbacks = Array.from(scheduledTimers.entries());
+        scheduledTimers.clear();
+        callbacks.forEach(([, callback]) => callback());
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+    }
+    await __localDataWatcherTestUtils.waitForPendingMergeForTests();
+};
+
 const flushNextSqliteTimer = async () => {
     await vi.waitFor(() => expect(scheduledTimers.size).toBeGreaterThan(0));
     const nextTimer = scheduledTimers.entries().next().value;
@@ -226,6 +253,89 @@ describe('local-data-watcher', () => {
         controller.stop();
         expect(dataUnwatch).toHaveBeenCalledTimes(1);
         expect(sqliteUnwatch).toHaveBeenCalledTimes(1);
+    });
+
+    it('warns on watch registration exhaustion and re-arms from refreshFromDiskNow (#S6)', async () => {
+        const dataUnwatch = vi.fn();
+        let attempts = 0;
+        const watchFile = vi.fn(async () => {
+            attempts += 1;
+            if (attempts <= 3) throw new Error('mount unresponsive');
+            return dataUnwatch;
+        });
+        const logWarn = vi.fn();
+        const controller = createLocalDataWatcherController({
+            watchFile,
+            schedule: scheduleMock,
+            cancelSchedule: cancelScheduleMock,
+            readDataJson: async () => emptyData(),
+            logInfo: () => undefined,
+            logWarn,
+        });
+
+        await controller.start('/tmp/mindwtr/data.json');
+        await flushScheduledTimersSlowly(); // retry #1
+        await flushScheduledTimersSlowly(); // retry #2 — exhausts the budget
+
+        expect(attempts).toBe(3);
+        expect(logWarn).toHaveBeenCalledWith(
+            expect.stringContaining('exhausted'),
+            expect.anything(),
+        );
+
+        // Exhausted: the channel is now blind, nothing left scheduled on its own.
+        logWarn.mockClear();
+        await flushScheduledTimers();
+        expect(attempts).toBe(3);
+
+        // The coarse trigger re-arms it without a new timer kind.
+        await controller.refreshFromDiskNow();
+        expect(attempts).toBe(4);
+
+        controller.stop();
+    });
+
+    it('rearmExhaustedWatchers is a no-op for a healthy channel and retries an exhausted one (#S6)', async () => {
+        const healthyUnwatch = vi.fn();
+        let healthyAttempts = 0;
+        const healthyController = createLocalDataWatcherController({
+            watchFile: vi.fn(async () => {
+                healthyAttempts += 1;
+                return healthyUnwatch;
+            }),
+            schedule: scheduleMock,
+            cancelSchedule: cancelScheduleMock,
+            logInfo: () => undefined,
+            logWarn: () => undefined,
+        });
+        await healthyController.start('/tmp/mindwtr/data.json');
+        expect(healthyAttempts).toBe(1);
+
+        healthyController.rearmExhaustedWatchers();
+        expect(healthyAttempts).toBe(1); // O(1) no-op: nothing exhausted
+
+        healthyController.stop();
+
+        let attempts = 0;
+        const controller = createLocalDataWatcherController({
+            watchFile: vi.fn(async () => {
+                attempts += 1;
+                throw new Error('mount unresponsive');
+            }),
+            schedule: scheduleMock,
+            cancelSchedule: cancelScheduleMock,
+            logInfo: () => undefined,
+            logWarn: () => undefined,
+        });
+        await controller.start('/tmp/mindwtr/data.json');
+        await flushScheduledTimersSlowly();
+        await flushScheduledTimersSlowly();
+        expect(attempts).toBe(3); // exhausted
+
+        controller.rearmExhaustedWatchers();
+        expect(attempts).toBe(4); // one fresh attempt
+
+        controller.stop();
     });
 
     it('unwatches a registration that resolves after stop', async () => {

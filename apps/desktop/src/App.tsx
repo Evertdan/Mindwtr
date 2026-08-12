@@ -892,6 +892,7 @@ function App() {
         }
 
         const focusListener = () => {
+            LocalDataWatcher.rearmExhaustedWatchers();
             autoSyncController.handleFocus();
         };
 

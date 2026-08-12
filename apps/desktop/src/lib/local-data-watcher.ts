@@ -129,6 +129,7 @@ type LocalDataWatcherTestUtils = {
 
 export type LocalDataWatcherController = {
     refreshFromDiskNow: () => Promise<void>;
+    rearmExhaustedWatchers: () => void;
     markLocalWrite: (data?: AppData) => void;
     markLocalSqliteWrite: () => void;
     start: (dataPath: string, dbPath?: string) => Promise<void>;
@@ -920,7 +921,16 @@ export const createLocalDataWatcherController = (
         }, DEBOUNCE_MS);
     }
 
+    // Cheap: rearmExhaustedWatchChannel below is a no-op unless a channel is
+    // actually exhausted, so this is safe to call from a frequent trigger
+    // (window focus) without the cost of a full disk refresh.
+    function rearmExhaustedWatchers(): void {
+        rearmExhaustedWatchChannel(dataWatchChannel);
+        rearmExhaustedWatchChannel(sqliteWatchChannel);
+    }
+
     async function refreshFromDiskNow(): Promise<void> {
+        rearmExhaustedWatchers();
         await handleExternalChange({ immediate: true, ignoreSelfWindow: true });
     }
 
@@ -991,7 +1001,14 @@ export const createLocalDataWatcherController = (
     };
 
     const scheduleWatchRegistrationRetry = (channel: WatchChannelState): void => {
-        if (channel.retryTimer || channel.retryCount >= MAX_WATCH_REGISTRATION_RETRIES || !channel.path) {
+        if (!channel.path) return;
+        if (channel.retryTimer || channel.retryCount >= MAX_WATCH_REGISTRATION_RETRIES) {
+            if (channel.retryCount >= MAX_WATCH_REGISTRATION_RETRIES && !channel.retryTimer) {
+                localDataWatcherDependencies.logWarn(
+                    '[local-data-watcher] File watcher registration exhausted retries; channel blind until next re-arm',
+                    { path: channel.path, maxRetries: String(MAX_WATCH_REGISTRATION_RETRIES) },
+                );
+            }
             return;
         }
         channel.retryCount += 1;
@@ -1040,6 +1057,19 @@ export const createLocalDataWatcherController = (
                 channel.registration = null;
             }
         });
+    };
+
+    // A channel that exhausted its retry budget (scheduleWatchRegistrationRetry
+    // above) stays blind until something re-arms it — no timer keeps trying on
+    // its own. Coarse triggers (refreshFromDiskNow below) give it one fresh
+    // shot per call by resetting the count; if that attempt also exhausts, the
+    // per-burst cap applies again and it goes quiet until the next trigger, so
+    // this can never spin unbounded on a permanently dead path.
+    const rearmExhaustedWatchChannel = (channel: WatchChannelState): void => {
+        if (!channel.path || channel.unwatch || channel.registration || channel.retryTimer) return;
+        if (channel.retryCount < MAX_WATCH_REGISTRATION_RETRIES) return;
+        channel.retryCount = 0;
+        void registerWatchChannel(channel);
     };
 
     const startWatchChannel = (
@@ -1207,6 +1237,7 @@ export const createLocalDataWatcherController = (
 
     return {
         refreshFromDiskNow,
+        rearmExhaustedWatchers,
         markLocalWrite,
         markLocalSqliteWrite,
         start,
@@ -1218,6 +1249,8 @@ export const createLocalDataWatcherController = (
 const defaultLocalDataWatcherController = createLocalDataWatcherController();
 
 export const refreshFromDiskNow = (): Promise<void> => defaultLocalDataWatcherController.refreshFromDiskNow();
+
+export const rearmExhaustedWatchers = (): void => defaultLocalDataWatcherController.rearmExhaustedWatchers();
 
 export const markLocalWrite = (data?: AppData): void => {
     defaultLocalDataWatcherController.markLocalWrite(data);
