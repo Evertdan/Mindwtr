@@ -35,16 +35,18 @@ const draft = createTaskDraft({
 function CopilotHost({
   setDraftField,
   onResult,
+  titleDraft = 'Book the dentist',
 }: {
   setDraftField: (field: string, value: unknown) => void;
   onResult: (value: ReturnType<typeof useTaskEditCopilot>) => void;
+  titleDraft?: string;
 }) {
   const copilot = useTaskEditCopilot({
     settings: {} as never,
     aiEnabled: true,
     aiProvider: 'openai',
     timeEstimatesEnabled: true,
-    titleDraft: 'Book the dentist',
+    titleDraft,
     descriptionDraft: '',
     contextOptions: ['@phone'],
     tagOptions: ['#health'],
@@ -122,5 +124,32 @@ describe('useTaskEditCopilot suggestion parts', () => {
       ['timeEstimate', '15min'],
     ]);
     expect(current().pendingCopilotParts).toEqual([]);
+  });
+
+  it('offers a refreshed time estimate again after an earlier one was applied', async () => {
+    const setDraftField = vi.fn();
+    let copilot!: ReturnType<typeof useTaskEditCopilot>;
+    let tree!: ReturnType<typeof create>;
+    await act(async () => {
+      tree = create(<CopilotHost setDraftField={setDraftField} onResult={(value) => { copilot = value; }} />);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+
+    await act(async () => {
+      copilot.applyCopilotPart({ kind: 'timeEstimate', value: '15min' });
+    });
+    expect(copilot.copilotEstimate).toBe('15min');
+
+    predictMetadata.mockResolvedValue({ timeEstimate: '30min' });
+    await act(async () => {
+      tree.update(<CopilotHost setDraftField={setDraftField} onResult={(value) => { copilot = value; }} titleDraft="Book the dentist urgently" />);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+
+    expect(copilot.pendingCopilotParts).toContainEqual({ kind: 'timeEstimate', value: '30min' });
   });
 });

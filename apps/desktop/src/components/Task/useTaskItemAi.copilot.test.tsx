@@ -114,6 +114,42 @@ describe('useTaskItemAi copilot parts', () => {
         expect(result.current.pendingCopilotParts).toEqual([]);
     });
 
+    it('offers a refreshed time estimate again after an earlier one was applied', async () => {
+        const setField = vi.fn();
+        const { result, rerender } = renderHook(
+            (props: { editTitle: string }) => useTaskItemAi({
+                taskId: 'task-1',
+                settings,
+                t: (key: string) => key,
+                editTitle: props.editTitle,
+                editDescription: '',
+                editContexts: '',
+                editTags: '',
+                editStartTime: '',
+                editDueDate: '',
+                editReviewAt: '',
+                contextOptions: ['@phone'],
+                tagOptions: ['#health'],
+                projectContext: null,
+                timeEstimatesEnabled: true,
+                setField,
+            }),
+            { initialProps: { editTitle: 'Book the dentist' } },
+        );
+        await settleSuggestion();
+
+        act(() => {
+            result.current.applyCopilotPart({ kind: 'timeEstimate', value: '15min' });
+        });
+        expect(result.current.copilotEstimate).toBe('15min');
+
+        predictMetadata.mockResolvedValue({ timeEstimate: '30min' });
+        rerender({ editTitle: 'Book the dentist urgently' });
+        await settleSuggestion();
+
+        expect(result.current.pendingCopilotParts).toContainEqual({ kind: 'timeEstimate', value: '30min' });
+    });
+
     it('never offers a time estimate part when the feature is off', async () => {
         const setField = vi.fn();
         const { result } = renderAi(setField, { timeEstimatesEnabled: false });

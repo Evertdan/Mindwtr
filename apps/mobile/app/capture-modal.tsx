@@ -382,7 +382,7 @@ export default function CaptureScreen() {
     if (copilotSuggestion.context && copilotSuggestion.context !== copilotContext) {
       parts.push({ kind: 'context', value: copilotSuggestion.context });
     }
-    if (timeEstimatesEnabled && copilotSuggestion.timeEstimate && !copilotEstimate) {
+    if (timeEstimatesEnabled && copilotSuggestion.timeEstimate && copilotSuggestion.timeEstimate !== copilotEstimate) {
       parts.push({ kind: 'timeEstimate', value: copilotSuggestion.timeEstimate });
     }
     for (const tag of copilotSuggestion.tags ?? []) {
