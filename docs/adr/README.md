@@ -28,6 +28,7 @@ This folder contains small, focused decision documents that explain **why** we m
 - [ADR 0022: Checklist decoupled from description markdown](0022-checklist-decoupled-from-description-markdown.md)
 - [ADR 0023: Unified Projects-view DndContext](0023-unified-projects-view-dnd-context.md)
 - [ADR 0024: Mobile native SQLite engine (op-sqlite)](0024-mobile-native-sqlite-engine.md)
+- [ADR 0025: No first-party sync-payload encryption; pluggable encrypted backends welcome](0025-no-first-party-payload-encryption.md)
 
 ## Template
 
