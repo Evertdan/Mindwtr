@@ -10,7 +10,7 @@ import {
     type ProjectRef,
 } from './queries.js';
 import type { DbClient } from './db.js';
-import { searchAll } from '@mindwtr/core';
+import { filterTasksBySearch } from '@mindwtr/core';
 
 const createMockDb = (
     rows: any[] = [],
@@ -153,8 +153,8 @@ describe('mcp queries', () => {
 
 
     // scripts/mindwtr-automation-core.ts (the CLI's list/search path) resolves the same
-    // operator query with core's searchAll. Same fixture, same query, same task set: the two
-    // automation surfaces answer identically.
+    // operator query with core's filterTasksBySearch. Same fixture, same query, same task set:
+    // the two automation surfaces answer identically.
     test('answers the same operator queries as the CLI automation service', () => {
         const now = '2026-02-01T00:00:00.000Z';
         const fixture = [
@@ -172,9 +172,22 @@ describe('mcp queries', () => {
 
         for (const query of ['status:next', 'context:@phone', 'tag:#home', 'context:@phone -status:someday', '"Call bank"', 'port']) {
             const mcpIds = listTasks(db, { search: query }).map((task) => task.id).sort();
-            const cliIds = searchAll(asCoreTasks, [], query).tasks.map((task) => task.id).sort();
+            const cliIds = filterTasksBySearch(asCoreTasks, [], query).map((task) => task.id).sort();
             expect({ query, ids: mcpIds }).toEqual({ query, ids: cliIds });
         }
+    });
+
+    // core's filterTasksBySearch drops deletedAt unconditionally, so a search silently wins
+    // over includeDeleted. Documented in the tool schema; pinned here.
+    test('listTasks search excludes deleted tasks even with includeDeleted', () => {
+        const now = '2026-02-01T00:00:00.000Z';
+        const { db } = createMockDb([
+            { id: 'live', title: 'Report live', status: 'inbox', createdAt: now, updatedAt: now, isFocusedToday: 0 },
+            { id: 'gone', title: 'Report gone', status: 'inbox', deletedAt: now, createdAt: now, updatedAt: now, isFocusedToday: 0 },
+        ]);
+
+        expect(listTasks(db, { includeDeleted: true }).map((t) => t.id).sort()).toEqual(['gone', 'live']);
+        expect(listTasks(db, { includeDeleted: true, search: 'Report' }).map((t) => t.id)).toEqual(['live']);
     });
 
     // D2: eligibility depends on the whole library, so the base set must not be a page.

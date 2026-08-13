@@ -229,7 +229,7 @@ const listTasksSchema = z.object({
   dueDateTo: isoDateLikeSchema.optional(),
   isFocusedToday: z.boolean().optional(),
   view: z.enum(['available', 'deferred', 'blocked']).optional().describe(
-    "GTD availability: 'available' = actionable right now (a next action, in an active project, past any start date, and not waiting behind an earlier step of a sequential project); 'deferred' = start date still in the future; 'blocked' = an earlier step in a sequential project holds the slot.",
+    "GTD availability: 'available' = actionable right now (a next action, or a task whose review date has come due, in an active project, past any start date, and not waiting behind an earlier step of a sequential project); 'deferred' = start date still in the future; 'blocked' = an earlier step in a sequential project holds the slot.",
   ),
   sortBy: z.enum(['updatedAt', 'createdAt', 'dueDate', 'title', 'priority']).optional(),
   sortOrder: z.enum(['asc', 'desc']).optional(),
@@ -464,7 +464,7 @@ export const registerMindwtrTools = (
   server.registerTool(
     'mindwtr_list_tasks',
     {
-      description: "List tasks from the configured Mindwtr backend. Filter by status, project, date range, today's focus (isFocusedToday), and GTD availability (view). `search` accepts the documented operator language (status:, context:, tag:, project:, due:<=7d, \"quoted phrases\", -negation) as well as plain text. Supports sorting by various fields.",
+      description: "List tasks from the configured Mindwtr backend. Filter by status, project, date range, today's focus (isFocusedToday), and GTD availability (view). `search` accepts the documented operator language (status:, context:, tag:, project:, due:<=7d, \"quoted phrases\", -negation) as well as plain text; note that a search always excludes deleted tasks, so includeDeleted has no effect when search is set. Supports sorting by various fields.",
       inputSchema: listTasksSchema,
     },
     withMcpErrorHandling('mindwtr_list_tasks', async (input) => {
