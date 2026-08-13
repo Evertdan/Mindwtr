@@ -635,7 +635,7 @@ const getFocusEligibilityProjectMap = (
     return projects as Map<string, Project>;
 };
 
-const getFocusEligibilitySequentialProjectIds = (
+export const getFocusEligibilitySequentialProjectIds = (
     projectMap: ReadonlyMap<string, Project>,
 ): { sequentialProjectIds: Set<string>; sectionScopedProjectIds: Set<string> } => {
     const sequentialProjectIds = new Set<string>();

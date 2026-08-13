@@ -100,6 +100,12 @@ const createMockDb = (
                     return options.hasTasksFts ? [{ name: 'tasks_fts' }] : [];
                 }
                 if (options.projects && sql.includes('FROM projects')) return options.projects;
+                // Honor LIMIT/OFFSET: without this the mock hands back every row regardless of
+                // pagination, which hid the view filter reading a capped base set (D2).
+                if (/LIMIT \? OFFSET \?/.test(sql)) {
+                    const [limit, offset] = params.slice(-2) as number[];
+                    return rows.slice(offset, offset + limit);
+                }
                 return rows;
             },
             get: (...params: any[]) => {
@@ -169,6 +175,32 @@ describe('mcp queries', () => {
             const cliIds = searchAll(asCoreTasks, [], query).tasks.map((task) => task.id).sort();
             expect({ query, ids: mcpIds }).toEqual({ query, ids: cliIds });
         }
+    });
+
+    // D2: eligibility depends on the whole library, so the base set must not be a page.
+    // Step 1 sits past the 200-row default limit; if the view path reads a capped set it
+    // cannot see it, designates step 2 as first, and reports a blocked task as available.
+    test('listTasks view sees sequential step 1 beyond the pagination default', () => {
+        const now = '2026-02-01T00:00:00.000Z';
+        const filler = Array.from({ length: 250 }, (_unused, index) => ({
+            id: `filler-${String(index).padStart(3, '0')}`,
+            title: `Filler ${index}`,
+            status: 'someday',
+            projectId: null,
+            createdAt: now,
+            updatedAt: now,
+            isFocusedToday: 0,
+        }));
+        // Both steps sit PAST the 200-row default so a capped base set sees neither, and the
+        // mock returns rows in array order (it does not honor ORDER BY).
+        const { db } = createMockDb([
+            ...filler,
+            { id: 'step1', title: 'Step one', status: 'next', projectId: 'p-seq', orderNum: 1, createdAt: now, updatedAt: now, isFocusedToday: 0 },
+            { id: 'step2', title: 'Step two', status: 'next', projectId: 'p-seq', orderNum: 2, createdAt: now, updatedAt: now, isFocusedToday: 0 },
+        ], { projects: [{ id: 'p-seq', title: 'Sequential', status: 'active', isSequential: 1, createdAt: now, updatedAt: now }] });
+
+        expect(listTasks(db, { view: 'available' }).map((t) => t.id)).toEqual(['step1']);
+        expect(listTasks(db, { view: 'blocked' }).map((t) => t.id)).toEqual(['step2']);
     });
 
     // The GTD availability question ("what can I actually do now") — deferral and sequential

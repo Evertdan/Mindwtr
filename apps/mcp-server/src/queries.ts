@@ -5,6 +5,7 @@ import {
   areaFromSqliteRow,
   buildTaskWhere,
   filterTasksBySearch,
+  getFocusEligibilitySequentialProjectIds,
   getTaskFocusEligibility,
   mapSqliteTaskRow,
   parseQuickAdd as parseQuickAddCore,
@@ -267,13 +268,26 @@ export function listTasks(db: DbClient, input: ListTasksInput): TaskRow[] {
     if (input.view) {
       // GTD availability is core's, not re-derived here: getTaskFocusEligibility already
       // answers eligible / deferred (start date in the future) / sequential (an earlier step
-      // in a sequential project still holds the slot). Eligibility is relative to the WHOLE
-      // task set, so it is computed over every task, not the filtered page.
-      const all = listTasks(db, { includeDeleted: input.includeDeleted }) as unknown as CoreTask[];
+      // in a sequential project still holds the slot).
+      //
+      // Which task holds a sequential project's slot depends on the WHOLE library, so the base
+      // set must be every task — not a listTasks() page, whose 200 default (and 1000 cap) made
+      // step 1 invisible on big libraries and reported blocked tasks as available (D2).
+      const allWhere = buildTaskWhere({ includeDeleted: input.includeDeleted, includeArchived: true });
+      const all = db
+        .prepare(`SELECT ${selectColumns.join(', ')} FROM tasks${allWhere.sql ? ` WHERE ${allWhere.sql}` : ''}`)
+        .all<TaskSqliteRow>(...allWhere.params)
+        .map(mapTaskRow) as unknown as CoreTask[];
+      // Hoisted: deriving these per candidate made the filter O(matched x all).
+      const projectMap = new Map(projects.map((project) => [project.id, project]));
+      const { sequentialProjectIds, sectionScopedProjectIds } = getFocusEligibilitySequentialProjectIds(projectMap);
       const wanted = input.view === 'blocked' ? 'sequential' : input.view === 'deferred' ? 'deferred' : 'eligible';
-      matched = matched.filter(
-        (task) => getTaskFocusEligibility(task, { tasks: all, projects }).reason === wanted,
-      );
+      matched = matched.filter((task) => getTaskFocusEligibility(task, {
+        tasks: all,
+        projects: projectMap,
+        sequentialProjectIds,
+        sectionScopedProjectIds,
+      }).reason === wanted);
     }
 
     return matched.slice(offset, offset + limit) as unknown as TaskRow[];
