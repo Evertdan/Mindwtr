@@ -15,6 +15,7 @@ import {
   type ProjectSequenceTaskCue,
   shallow,
   normalizeFocusTaskLimit,
+  resolveFeatureFlags,
   tFallback,
   isTaskInActiveProject,
   getTaskMetadataFilterVisibility,
@@ -376,9 +377,10 @@ function TaskListComponent({
   const projectReorderMode = projectReorderModeProp ?? internalProjectReorderMode;
   const focusTaskLimit = normalizeFocusTaskLimit(settings?.gtd?.focusTaskLimit);
   const focusedCount = getDerivedState().focusedCount;
-  const prioritiesEnabled = settings?.features?.priorities !== false;
-  const timeEstimatesEnabled = settings?.features?.timeEstimates !== false;
-  const timeSpentEnabled = settings?.features?.pomodoro === true
+  const resolvedFeatureFlags = resolveFeatureFlags(settings);
+  const prioritiesEnabled = resolvedFeatureFlags.priorities;
+  const timeEstimatesEnabled = resolvedFeatureFlags.timeEstimates;
+  const timeSpentEnabled = resolvedFeatureFlags.pomodoro
     && settings?.gtd?.pomodoro?.linkTask === true;
   const showTaskAge = settings?.appearance?.showTaskAge === true;
   const rowContext = useMemo<SwipeableTaskItemRowContext>(() => ({

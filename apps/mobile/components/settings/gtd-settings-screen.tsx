@@ -30,6 +30,7 @@ import {
     normalizeFocusTaskLimit,
     getDefaultTaskAreaMode,
     resolveDefaultNewTaskAreaId,
+    resolveFeatureFlags,
     sanitizePomodoroDurations,
     shallow,
     tFallback,
@@ -124,9 +125,11 @@ export function GtdSettingsScreen({
     const autoArchiveDays = Number.isFinite(settings.gtd?.autoArchiveDays)
         ? Math.max(0, Math.floor(settings.gtd?.autoArchiveDays as number))
         : 7;
-    const prioritiesEnabled = settings.features?.priorities !== false;
-    const timeEstimatesEnabled = settings.features?.timeEstimates !== false;
-    const pomodoroEnabled = settings.features?.pomodoro === true;
+    const {
+        priorities: prioritiesEnabled,
+        timeEstimates: timeEstimatesEnabled,
+        pomodoro: pomodoroEnabled,
+    } = resolveFeatureFlags(settings);
     const pomodoroCustomDurations = sanitizePomodoroDurations(settings.gtd?.pomodoro?.customDurations);
     const pomodoroLinkTask = settings.gtd?.pomodoro?.linkTask === true;
     const pomodoroAutoStartBreaks = settings.gtd?.pomodoro?.autoStartBreaks === true;

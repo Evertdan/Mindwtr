@@ -61,6 +61,11 @@ vi.mock('@mindwtr/core', () => ({
     return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
   },
   normalizeFocusTaskLimit: (value?: number) => value ?? 3,
+  resolveFeatureFlags: (settings: AppData['settings']) => ({
+    priorities: settings?.features?.priorities !== false,
+    timeEstimates: settings?.features?.timeEstimates !== false,
+    pomodoro: settings?.features?.pomodoro === true,
+  }),
   resolveDefaultNewTaskAreaId: (settings: AppData['settings'], areas: AppData['areas']) => {
     const mode = settings?.gtd?.defaultAreaMode ?? (settings?.gtd?.defaultAreaId ? 'fixed' : 'none');
     if (mode !== 'fixed') return undefined;

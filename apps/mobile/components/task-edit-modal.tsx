@@ -15,6 +15,7 @@ import { Task,
     getLocalizedWeekdayButtons,
     getLocalizedWeekdayLabels,
     normalizeClockTimeInput,
+    resolveFeatureFlags,
     shallow, tFallback, } from '@mindwtr/core';
 import { taskDraftToUpdatePatch } from '@mindwtr/core/task-draft';
 import { useLanguage } from '../contexts/language-context';
@@ -133,9 +134,10 @@ function TaskEditModalInner({
     // Already identity-stable: resolveThemeTokens caches its result on the theme,
     // so this only changes when a colour actually does (#766).
     const tc = useThemeColors();
-    const prioritiesEnabled = settings.features?.priorities !== false;
-    const timeEstimatesEnabled = settings.features?.timeEstimates !== false;
-    const timeSpentEnabled = settings.features?.pomodoro === true && settings.gtd?.pomodoro?.linkTask === true;
+    const resolvedFeatureFlags = resolveFeatureFlags(settings);
+    const prioritiesEnabled = resolvedFeatureFlags.priorities;
+    const timeEstimatesEnabled = resolvedFeatureFlags.timeEstimates;
+    const timeSpentEnabled = resolvedFeatureFlags.pomodoro && settings.gtd?.pomodoro?.linkTask === true;
     const resetCopilotStateRef = useRef<() => void>(() => {});
     const descriptionToolbarInteractionUntilRef = useRef(0);
     const showTaskWriteError = useCallback((message?: string) => showToast({

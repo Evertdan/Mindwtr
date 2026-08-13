@@ -10,7 +10,7 @@ import Animated, {
   runOnJS,
   type SharedValue,
 } from 'react-native-reanimated';
-import { shallow, sortTasksByBoardOrder, useTaskStore, createTaskFilterPredicate, hasActiveFilterCriteria, getUsedTaskTokens, tFallback, projectMatchesAreaFilterSelection, SAVED_FILTER_NO_PROJECT_ID } from '@mindwtr/core';
+import { shallow, sortTasksByBoardOrder, useTaskStore, createTaskFilterPredicate, hasActiveFilterCriteria, getUsedTaskTokens, resolveFeatureFlags, tFallback, projectMatchesAreaFilterSelection, SAVED_FILTER_NO_PROJECT_ID } from '@mindwtr/core';
 import type { Task, TaskStatus, FilterCriteria } from '@mindwtr/core';
 import { useToast } from '@/contexts/toast-context';
 import { useVisibleTaskContext } from '@/hooks/use-visible-tasks';
@@ -370,7 +370,7 @@ export function BoardView() {
     deleteTask: state.deleteTask,
     duplicateTask: state.duplicateTask,
     reorderBoardTasks: state.reorderBoardTasks,
-    timeEstimatesEnabled: state.settings?.features?.timeEstimates !== false,
+    timeEstimatesEnabled: resolveFeatureFlags(state.settings).timeEstimates,
   }), shallow);
   const tc = useThemeColors();
   const { t } = useLanguage();

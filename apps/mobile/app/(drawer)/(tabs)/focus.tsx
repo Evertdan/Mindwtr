@@ -40,6 +40,7 @@ import {
   getProjectDeadlineBoosts,
   markSavedFilterDeleted,
   normalizeFocusTaskLimit,
+  resolveFeatureFlags,
   sortTasksBySavedPreference,
   sortTasksByFocusOrder,
   translateWithFallback,
@@ -256,9 +257,7 @@ export default function FocusScreen() {
   const lastOpenedFromNotificationRef = useRef<string | null>(null);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const focusReorderPositionRef = useRef<number | null>(null);
-  const pomodoroEnabled = settings?.features?.pomodoro === true;
-  const prioritiesEnabled = settings?.features?.priorities !== false;
-  const timeEstimatesEnabled = settings?.features?.timeEstimates !== false;
+  const { priorities: prioritiesEnabled, timeEstimates: timeEstimatesEnabled, pomodoro: pomodoroEnabled } = resolveFeatureFlags(settings);
   const focusTaskLimit = normalizeFocusTaskLimit(settings?.gtd?.focusTaskLimit);
   const focusGroupBy = normalizeFocusGroupBy(settings?.gtd?.focusGroupBy);
   const { areaById, projectById, resolvedAreaFilter, visibleTasks } = useVisibleTaskContext();

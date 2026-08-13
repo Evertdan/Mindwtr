@@ -32,6 +32,7 @@ import {
   parseQuickAdd,
   normalizeFocusTaskLimit,
   resolveDefaultNewTaskAreaId,
+  resolveFeatureFlags,
   safeFormatDate,
   safeParseDate,
   shallow,
@@ -190,7 +191,7 @@ export function QuickCaptureSheet({
   const inputRef = useRef<TextInput>(null);
   const contextInputRef = useRef<TextInput>(null);
   const isSavingRef = useRef(false);
-  const prioritiesEnabled = settings?.features?.priorities !== false;
+  const { priorities: prioritiesEnabled } = resolveFeatureFlags(settings);
   const { selectedAreaIdForNewTasks } = useMobileAreaFilter();
   const defaultAreaMode = getDefaultTaskAreaMode(settings);
   const defaultAreaId = defaultAreaMode === 'active'

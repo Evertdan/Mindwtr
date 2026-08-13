@@ -115,6 +115,7 @@ vi.mock('@mindwtr/core', async () => {
       ? areaId
       : undefined;
   },
+  resolveFeatureFlags: actual.resolveFeatureFlags,
   splitQuickAddBulkLines,
   safeFormatDate: (value: Date | string, formatStr: string) => {
     const date = value instanceof Date ? value : new Date(value);

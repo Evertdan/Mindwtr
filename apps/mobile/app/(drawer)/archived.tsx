@@ -6,6 +6,7 @@ import {
     getTaskMetadataFilterVisibility,
     getUsedTaskTokens,
     projectMatchesAreaFilterSelection,
+    resolveFeatureFlags,
     safeFormatDate,
     shallow,
     sortDoneTasksForListView,
@@ -352,12 +353,13 @@ export default function ArchivedScreen() {
         [sortedArchivedTasks, resolvedAreaFilter, projectById, areaById],
     );
 
+    const resolvedFeatureFlags = resolveFeatureFlags(settings);
     const metadataFilterVisibility = useMemo(
         () => getTaskMetadataFilterVisibility(allArchivedTasks, {
-            prioritiesEnabled: settings?.features?.priorities !== false,
-            timeEstimatesEnabled: settings?.features?.timeEstimates !== false,
+            prioritiesEnabled: resolvedFeatureFlags.priorities,
+            timeEstimatesEnabled: resolvedFeatureFlags.timeEstimates,
         }),
-        [allArchivedTasks, settings?.features?.priorities, settings?.features?.timeEstimates],
+        [allArchivedTasks, resolvedFeatureFlags.priorities, resolvedFeatureFlags.timeEstimates],
     );
     // view: 'list' on purpose — Archive shares its filter selections with the other
     // task lists, the same way desktop does, so a context picked in Next narrows

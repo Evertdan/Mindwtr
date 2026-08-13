@@ -78,6 +78,7 @@ vi.mock('@mindwtr/core', async () => {
       ? areaId
       : undefined;
   },
+  resolveFeatureFlags: actual.resolveFeatureFlags,
   shallow: (left: unknown, right: unknown) => Object.is(left, right),
   splitQuickAddBulkLines: (input: string) => input
     .replace(/\r\n?/g, '\n')

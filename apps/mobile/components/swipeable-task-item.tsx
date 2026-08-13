@@ -8,6 +8,7 @@ import {
     isTaskActionable,
     isTaskFinished,
     normalizeFocusTaskLimit,
+    resolveFeatureFlags,
     safeFormatDate,
     safeParseDate,
     safeParseDueDate,
@@ -182,19 +183,22 @@ function SwipeableTaskItemRow(props: SwipeableTaskItemProps) {
 export const SwipeableTaskItem = React.memo(SwipeableTaskItemRow, areRowPropsEqual);
 
 function StoreBackedSwipeableTaskItem(props: Omit<SwipeableTaskItemInnerProps, 'rowContext'>) {
-    const rowContext = useTaskStore((state): SwipeableTaskItemRowContext => ({
-        addTask: state.addTask,
-        updateTask: state.updateTask,
-        restoreTask: state.restoreTask,
-        projects: state.projects,
-        areas: state.areas,
-        focusedCount: state.getDerivedState().focusedCount,
-        focusTaskLimit: normalizeFocusTaskLimit(state.settings?.gtd?.focusTaskLimit),
-        timeEstimatesEnabled: state.settings?.features?.timeEstimates !== false,
-        timeSpentEnabled: state.settings?.features?.pomodoro === true
-            && state.settings?.gtd?.pomodoro?.linkTask === true,
-        showTaskAge: state.settings?.appearance?.showTaskAge === true,
-    }), shallow);
+    const rowContext = useTaskStore((state): SwipeableTaskItemRowContext => {
+        const resolvedFeatureFlags = resolveFeatureFlags(state.settings);
+        return {
+            addTask: state.addTask,
+            updateTask: state.updateTask,
+            restoreTask: state.restoreTask,
+            projects: state.projects,
+            areas: state.areas,
+            focusedCount: state.getDerivedState().focusedCount,
+            focusTaskLimit: normalizeFocusTaskLimit(state.settings?.gtd?.focusTaskLimit),
+            timeEstimatesEnabled: resolvedFeatureFlags.timeEstimates,
+            timeSpentEnabled: resolvedFeatureFlags.pomodoro
+                && state.settings?.gtd?.pomodoro?.linkTask === true,
+            showTaskAge: state.settings?.appearance?.showTaskAge === true,
+        };
+    }, shallow);
     return <SwipeableTaskItemInner {...props} rowContext={rowContext} />;
 }
 

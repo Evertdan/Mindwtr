@@ -23,6 +23,7 @@ import {
   isSelectableProjectForTaskAssignment,
   parseQuickAdd,
   resolveDefaultNewTaskAreaId,
+  resolveFeatureFlags,
   shallow,
   splitQuickAddBulkLines,
   tFallback,
@@ -264,7 +265,7 @@ export default function CaptureScreen() {
   const aiEnabled = settings.ai?.enabled === true;
   const aiProvider = (settings.ai?.provider ?? 'openai') as AIProviderId;
   const keyRequired = isAIKeyRequired(settings);
-  const timeEstimatesEnabled = settings.features?.timeEstimates !== false;
+  const { timeEstimates: timeEstimatesEnabled } = resolveFeatureFlags(settings);
 
   useEffect(() => {
     loadAIKey(aiProvider).then(setAiKey).catch((error) => {

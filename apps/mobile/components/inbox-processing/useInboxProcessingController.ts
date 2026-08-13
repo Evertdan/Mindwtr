@@ -21,6 +21,7 @@ import {
   getProcessInboxRemainingCandidates,
   hasTimeComponent,
   normalizeClockTimeInput,
+  resolveFeatureFlags,
   safeFormatDate,
   safeParseDate,
   isTaskVisibleInArea,
@@ -141,8 +142,7 @@ export function useInboxProcessingController({
   const scheduleEnabled = inboxProcessing.scheduleEnabled === true;
   const defaultScheduleTime = normalizeClockTimeInput(settings?.gtd?.defaultScheduleTime) || '';
   const referenceEnabled = true;
-  const prioritiesEnabled = settings?.features?.priorities !== false;
-  const timeEstimatesEnabled = settings?.features?.timeEstimates !== false;
+  const { priorities: prioritiesEnabled, timeEstimates: timeEstimatesEnabled } = resolveFeatureFlags(settings);
   const aiEnabled = settings?.ai?.enabled === true;
   const aiProvider = (settings?.ai?.provider ?? 'openai') as AIProviderId;
   const defaultHiddenTaskEditorFields = useMemo(() => {
