@@ -353,7 +353,7 @@ export function ChecklistField({
                                                 commitChecklistUpdate(newList);
                                             }}
                                             className={cn(
-                                                'w-4 h-4 border rounded flex items-center justify-center transition-colors',
+                                                'w-4 h-4 shrink-0 border rounded flex items-center justify-center transition-colors',
                                                 item.isCompleted
                                                     ? 'bg-primary border-primary text-primary-foreground'
                                                     : 'border-muted-foreground hover:border-primary'

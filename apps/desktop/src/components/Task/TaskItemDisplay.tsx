@@ -856,7 +856,7 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
                                         >
                                             <span
                                                 className={cn(
-                                                    "w-3 h-3 border rounded flex items-center justify-center",
+                                                    "w-3 h-3 shrink-0 border rounded flex items-center justify-center",
                                                     item.isCompleted
                                                         ? "bg-primary border-primary text-primary-foreground"
                                                         : "border-muted-foreground"
