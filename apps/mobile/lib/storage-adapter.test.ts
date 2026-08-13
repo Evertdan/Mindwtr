@@ -326,6 +326,65 @@ describe('mobile storage adapter', () => {
     await expect(mobileStorage.getData()).rejects.toThrow('SQLite read timed out');
   }, 20_000);
 
+  it('lets a contended SQLite read outlast the fail-fast cap when the JSON backup is unusable (#766)', async () => {
+    const makeTask = (id: string): Task => ({
+      id,
+      title: `Task ${id} ${'padding '.repeat(20)}`,
+      status: 'next',
+      tags: [],
+      contexts: [],
+      createdAt: '2026-06-15T00:00:00.000Z',
+      updatedAt: '2026-06-15T00:00:00.000Z',
+    });
+    const hugeSnapshot: AppData = {
+      tasks: Array.from({ length: 6_000 }, (_, index) => makeTask(`task-${index}`)),
+      projects: [],
+      sections: [],
+      areas: [],
+      people: [],
+      settings: {},
+    };
+
+    const { mobileStorage, __mobileStorageTestUtils } = await import('./storage-adapter');
+    if (!mobileStorage.saveTask) {
+      throw new Error('Expected mobile storage to support saveTask');
+    }
+    __mobileStorageTestUtils.setSqliteStateForTests({
+      adapter: { saveTask: sqliteAdapterSaveTask },
+      client: {},
+    });
+    // Oversized library ⇒ the JSON backup is skipped, so no fallback exists.
+    await mobileStorage.saveTask(hugeSnapshot.tasks[0], hugeSnapshot);
+    await __mobileStorageTestUtils.flushPendingStartupJsonBackup();
+    expect(logWarnMock).toHaveBeenCalledWith(
+      '[Storage] Skipped JSON backup; library exceeds the readable AsyncStorage size',
+      expect.objectContaining({ scope: 'storage' }),
+    );
+
+    vi.useFakeTimers();
+    try {
+      // A read that takes 5s (past the 3.5s fail-fast cap) while sync writes
+      // contend must still complete instead of failing the sync cycle.
+      __mobileStorageTestUtils.setSqliteStateForTests({
+        adapter: {
+          saveTask: sqliteAdapterSaveTask,
+          getData: () => new Promise((resolve) => {
+            setTimeout(() => resolve(hugeSnapshot), 5_000);
+          }),
+        },
+        client: {},
+      });
+      const read = mobileStorage.getData();
+      read.catch(() => undefined);
+      await vi.advanceTimersByTimeAsync(5_000);
+      await expect(read).resolves.toEqual(
+        expect.objectContaining({ tasks: expect.arrayContaining([expect.objectContaining({ id: 'task-0' })]) }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 20_000);
+
   it('writes and trusts an oversized JSON backup on iOS, where it is the only fallback when SQLite fails (#979)', async () => {
     mockPlatformOS.value = 'ios';
     const stored = new Map<string, string>();

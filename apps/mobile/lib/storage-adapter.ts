@@ -20,6 +20,12 @@ const STARTUP_BACKUP_VERSION = '2';
 const LEGACY_DATA_KEYS = ['focus-gtd-data', 'gtd-todo-data', 'gtd-data'];
 const EMPTY_APP_DATA: AppData = { tasks: [], projects: [], sections: [], areas: [], people: [], settings: {} };
 const SQLITE_STARTUP_TIMEOUT_MS = 3_500;
+// The 3.5s cap exists to fail fast INTO the JSON backup. When that backup is
+// unusable (skipped as oversized, #766) there is nothing to fall back to, so a
+// fast failure only fails the caller — on a slow device a contended read can
+// legitimately take >3.5s while sync writes land. Keep a bound (a stalled
+// native promise must not hang reads forever) but give real reads room.
+const SQLITE_NO_FALLBACK_READ_TIMEOUT_MS = 15_000;
 const SQLITE_QUERY_TIMEOUT_MS = 2_500;
 const SQLITE_RETRY_COOLDOWN_MS = 60_000;
 const SQLITE_NATIVE_MODULE_UNAVAILABLE = 'Native SQLite module unavailable; rebuild or reinstall the app so op-sqlite is included';
@@ -158,12 +164,12 @@ const withOperationTimeout = async <T>(promise: Promise<T>, timeoutMs: number, m
 
 // Wait for in-flight SQLite writes to finish before reading, but bounded: a save that
 // stalls must not strand reads (each read site falls back when this throws).
-const awaitQueuedSqliteWrites = async (phase: string): Promise<void> => {
+const awaitQueuedSqliteWrites = async (phase: string, timeoutMs = SQLITE_WRITE_WAIT_TIMEOUT_MS): Promise<void> => {
     const startedAt = Date.now();
     try {
         await withOperationTimeout(
             waitForQueuedSqliteWrites(),
-            SQLITE_WRITE_WAIT_TIMEOUT_MS,
+            timeoutMs,
             `Timed out waiting for queued SQLite writes before ${phase}`
         );
     } catch (error) {
@@ -1134,14 +1140,22 @@ const createStorage = (): StorageAdapter => {
                 if (!shouldUseSqlite) {
                     throw new Error(sqliteUnavailableReason ?? 'SQLite unavailable');
                 }
+                // Fail fast only when the JSON backup can actually catch us.
+                const hasJsonFallback = isJsonBackupUsable();
+                const readTimeoutMs = hasJsonFallback
+                    ? SQLITE_STARTUP_TIMEOUT_MS
+                    : SQLITE_NO_FALLBACK_READ_TIMEOUT_MS;
                 await measureStartupPhase(
                     'mobile.storage.get_data.await_sqlite_writes',
-                    async () => awaitQueuedSqliteWrites('get_data')
+                    async () => awaitQueuedSqliteWrites(
+                        'get_data',
+                        hasJsonFallback ? SQLITE_WRITE_WAIT_TIMEOUT_MS : SQLITE_NO_FALLBACK_READ_TIMEOUT_MS
+                    )
                 );
                 const state = await measureStartupPhase('mobile.storage.get_data.sqlite_get_state', async () =>
                     withOperationTimeout(
                         getSqliteState(),
-                        SQLITE_STARTUP_TIMEOUT_MS,
+                        readTimeoutMs,
                         'SQLite initialization timed out'
                     )
                 );
@@ -1150,13 +1164,20 @@ const createStorage = (): StorageAdapter => {
                 const data = await measureStartupPhase('mobile.storage.get_data.sqlite_read', async () =>
                     withOperationTimeout(
                         adapter.getData(),
-                        SQLITE_STARTUP_TIMEOUT_MS,
+                        readTimeoutMs,
                         'SQLite read timed out'
                     )
                 );
                 const readMs = Date.now() - readStartedAt;
                 if (readMs >= SQLITE_SLOW_WRITE_LOG_THRESHOLD_MS) {
-                    logStorageInfo('[Storage] Slow SQLite load', { readMs: String(readMs), ...(sqliteJournalDiagnostics ?? {}) });
+                    // readTimeoutMs distinguishes the no-fallback long bound in shared
+                    // logs; readMs above the 3.5s fail-fast cap = a sync cycle this
+                    // fix saved (#766 next-round marker).
+                    logStorageInfo('[Storage] Slow SQLite load', {
+                        readMs: String(readMs),
+                        readTimeoutMs: String(readTimeoutMs),
+                        ...(sqliteJournalDiagnostics ?? {}),
+                    });
                 }
                 data.areas = Array.isArray(data.areas) ? data.areas : [];
                 // Only the exact object returned by a healthy SQLite read can
@@ -1476,7 +1497,7 @@ export const __mobileStorageTestUtils = {
         initializeSqliteState = initializer;
         clearPreferJsonBackup();
     },
-    setSqliteStateForTests: (state: { adapter: Pick<SqliteAdapter, 'saveTask'>; client: Partial<SqliteClient> }) => {
+    setSqliteStateForTests: (state: { adapter: Pick<SqliteAdapter, 'saveTask'> & Partial<Pick<SqliteAdapter, 'getData'>>; client: Partial<SqliteClient> }) => {
         sqliteStatePromise = Promise.resolve(state as SqliteState);
         sqliteStateRetryAfter = 0;
         clearPreferJsonBackup();
