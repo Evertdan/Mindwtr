@@ -150,6 +150,59 @@ describe('serializeMindwtrCsv', () => {
         expect(result.data.projects.map((item) => item.title)).toEqual(['Marketing']);
     });
 
+    // V1 correction: the container carry read a live task's project without checking either
+    // was alive, so a re-import could orphan a NEW row into a project the user had deleted.
+    it('never carries a container from a tombstoned task or into a deleted project', () => {
+        const data = appData({
+            projects: [project({ deletedAt: '2026-08-02T00:00:00.000Z' })],
+            tasks: [
+                task({ id: 'gone', title: 'Old', projectId: 'project-1', deletedAt: '2026-08-02T00:00:00.000Z' }),
+                task({ id: 'fresh', title: 'New' }),
+            ],
+        });
+        const csv = serializeMindwtrCsv(appData({
+            projects: [project()],
+            tasks: [task({ id: 'gone', title: 'Old', projectId: 'project-1' }), task({ id: 'added', title: 'Added', projectId: 'project-1' })],
+        }));
+
+        const result = applyMindwtrCsvImport(data, reimport(csv));
+
+        const added = result.data.tasks.find((item) => item.title === 'Added');
+        const landedIn = result.data.projects.find((item) => item.id === added?.projectId);
+        expect(landedIn?.deletedAt).toBeUndefined();
+    });
+
+    // V1 correction: the carry was first-wins, so when one task had moved to another project
+    // the destination of new rows depended on CSV row order. Disagreement drops the carry.
+    it('does not let row order decide where a moved task redirects new rows', () => {
+        const exported = appData({
+            projects: [project({ id: 'proj-alpha', title: 'Alpha' }), project({ id: 'proj-beta', title: 'Beta' })],
+            tasks: [
+                task({ id: 't1', title: 'One', projectId: 'proj-alpha' }),
+                task({ id: 't2', title: 'Two', projectId: 'proj-alpha' }),
+                task({ id: 't3', title: 'Three', projectId: 'proj-alpha' }),
+            ],
+        });
+        const live = appData({
+            projects: exported.projects,
+            // t1 has since moved to Beta; t3 does not exist yet.
+            tasks: [task({ id: 't1', title: 'One', projectId: 'proj-beta' }), task({ id: 't2', title: 'Two', projectId: 'proj-alpha' })],
+        });
+
+        const forward = serializeMindwtrCsv(exported);
+        const lines = forward.split('\n');
+        const reversed = [lines[0], ...lines.slice(1).reverse()].join('\n');
+
+        const landed = (csv: string) => {
+            const result = applyMindwtrCsvImport(live, reimport(csv));
+            const three = result.data.tasks.find((item) => item.title === 'Three');
+            return result.data.projects.find((item) => item.id === three?.projectId)?.title;
+        };
+
+        expect(landed(forward)).toBe(landed(reversed));
+        expect(landed(forward)).not.toBe('Beta');
+    });
+
     it('skips rather than duplicates a re-imported export whose fields were edited', () => {
         const data = appData({ tasks: [task({ id: 'stable-id', title: 'Before' })] });
         const edited = serializeMindwtrCsv(data).replace('Before', 'After');

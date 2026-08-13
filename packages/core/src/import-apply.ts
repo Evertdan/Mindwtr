@@ -201,35 +201,6 @@ export function applyImport(
         usedTitles.add(project.title.trim().toLowerCase());
         usedProjectTitlesByAreaId.set(areaId, usedTitles);
     });
-    // Containers have no ID column, so they round-trip by NAME and a container the user
-    // already has under its own id is invisible to the derived-id lookups below: it used to be
-    // re-created AND renamed by the collision suffix, so re-importing an unmodified export
-    // added an empty duplicate project and a "<name> (Mindwtr CSV)" area (V1).
-    //
-    // The tasks carry the identity the containers lack: when a row resolves to a task we
-    // already have, that task's CURRENT container is the one this row's container means. Inert
-    // for the other importers, whose rows never resolve to existing tasks.
-    const liveTaskById = new Map(nextData.tasks.map((task) => [task.id, task] as const));
-    const liveProjectIdBySourceKey = new Map<string, string>();
-    const liveAreaIdBySourceKey = new Map<string, string>();
-    const liveSectionIdBySourceKey = new Map<string, string>();
-    parsed.tasks.forEach((task) => {
-        const liveTask = liveTaskById.get(idFor('task', task.sourceKey));
-        if (!liveTask) return;
-        if (task.projectSourceKey && liveTask.projectId && !liveProjectIdBySourceKey.has(task.projectSourceKey)) {
-            liveProjectIdBySourceKey.set(task.projectSourceKey, liveTask.projectId);
-        }
-        if (task.sectionSourceKey && liveTask.sectionId && !liveSectionIdBySourceKey.has(task.sectionSourceKey)) {
-            liveSectionIdBySourceKey.set(task.sectionSourceKey, liveTask.sectionId);
-        }
-        const liveAreaId = liveTask.projectId
-            ? nextData.projects.find((project) => project.id === liveTask.projectId)?.areaId
-            : liveTask.areaId;
-        if (task.areaSourceKey && liveAreaId && !liveAreaIdBySourceKey.has(task.areaSourceKey)) {
-            liveAreaIdBySourceKey.set(task.areaSourceKey, liveAreaId);
-        }
-    });
-
     const warnings = [...parsed.warnings];
 
     // Includes tombstones deliberately: a deterministic idFor must see prior deletions so a
@@ -238,6 +209,59 @@ export function applyImport(
     const existingProjectById = new Map(nextData.projects.map((project) => [project.id, project]));
     const existingSectionById = new Map(nextData.sections.map((section) => [section.id, section]));
     const existingTaskIds = new Set(nextData.tasks.map((task) => task.id));
+
+    // Containers have no ID column, so they round-trip by NAME and a container the user
+    // already has under its own id is invisible to the derived-id lookups below: it used to be
+    // re-created AND renamed by the collision suffix, so re-importing an unmodified export
+    // added an empty duplicate project and a "<name> (Mindwtr CSV)" area (V1).
+    //
+    // The tasks carry the identity the containers lack: when a row resolves to a task we
+    // already have, that task's CURRENT container is the one this row's container means. Inert
+    // for the other importers, whose rows never resolve to existing tasks.
+    //
+    // Two things this must NOT do, both regressions of the first version:
+    //   - carry a tombstone. Deleted tasks and deleted containers are skipped, so a re-import
+    //     cannot orphan a new row into a container the user removed.
+    //   - guess when rows disagree. A task moved to another project makes its old project's
+    //     source key ambiguous; first-wins made the destination depend on CSV row order. A
+    //     split verdict drops the carry and lets the derived path decide.
+    const liveTaskById = new Map(nextData.tasks.map((task) => [task.id, task] as const));
+    const carriedProjectIds = new Map<string, Set<string>>();
+    const carriedSectionIds = new Map<string, Set<string>>();
+    const carriedAreaIds = new Map<string, Set<string>>();
+    const recordCarry = (map: Map<string, Set<string>>, sourceKey: string, id: string) => {
+        const seen = map.get(sourceKey) ?? new Set<string>();
+        seen.add(id);
+        map.set(sourceKey, seen);
+    };
+    const isLive = (entity?: { deletedAt?: string; purgedAt?: string }): boolean => (
+        Boolean(entity) && !entity!.deletedAt && !entity!.purgedAt
+    );
+    parsed.tasks.forEach((task) => {
+        const liveTask = liveTaskById.get(idFor('task', task.sourceKey));
+        if (!isLive(liveTask)) return;
+        const liveProject = liveTask!.projectId ? existingProjectById.get(liveTask!.projectId) : undefined;
+        if (task.projectSourceKey && isLive(liveProject)) {
+            recordCarry(carriedProjectIds, task.projectSourceKey, liveProject!.id);
+        }
+        const liveSection = liveTask!.sectionId ? existingSectionById.get(liveTask!.sectionId) : undefined;
+        if (task.sectionSourceKey && isLive(liveSection)) {
+            recordCarry(carriedSectionIds, task.sectionSourceKey, liveSection!.id);
+        }
+        const liveAreaId = isLive(liveProject) ? liveProject!.areaId : liveTask!.areaId;
+        if (task.areaSourceKey && liveAreaId && isLive(existingAreaById.get(liveAreaId))) {
+            recordCarry(carriedAreaIds, task.areaSourceKey, liveAreaId);
+        }
+    });
+    // Unanimous verdicts only.
+    const settle = (map: Map<string, Set<string>>): Map<string, string> => new Map(
+        Array.from(map, ([sourceKey, ids]) => [sourceKey, ids.size === 1 ? [...ids][0] : ''] as const)
+            .filter((entry): entry is readonly [string, string] => entry[1] !== '')
+    );
+    const liveProjectIdBySourceKey = settle(carriedProjectIds);
+    const liveSectionIdBySourceKey = settle(carriedSectionIds);
+    const liveAreaIdBySourceKey = settle(carriedAreaIds);
+
     const deletedTaskIds = new Set(nextData.tasks.filter((task) => task.deletedAt || task.purgedAt).map((task) => task.id));
 
     const areaIdBySourceKey = new Map<string, string>();
@@ -289,15 +313,15 @@ export function applyImport(
     });
 
     parsed.projects.forEach((project) => {
-        const carriedProjectId = liveProjectIdBySourceKey.get(project.sourceKey);
-        if (carriedProjectId) {
-            projectIdBySourceKey.set(project.sourceKey, carriedProjectId);
-            return;
-        }
         const projectId = idFor('project', project.sourceKey);
         const existingProject = existingProjectById.get(projectId);
         if (existingProject) {
             if (!existingProject.deletedAt) projectIdBySourceKey.set(project.sourceKey, existingProject.id);
+            return;
+        }
+        const carriedProjectId = liveProjectIdBySourceKey.get(project.sourceKey);
+        if (carriedProjectId) {
+            projectIdBySourceKey.set(project.sourceKey, carriedProjectId);
             return;
         }
         const areaId = project.areaSourceKey ? areaIdBySourceKey.get(project.areaSourceKey) : undefined;
