@@ -714,6 +714,7 @@ export const useTaskStore = createWithEqualityFn<TaskStore>()(subscribeWithSelec
             get,
             debouncedSave,
             trackImmediateSave,
+            hasQueuedSnapshotSave: () => pendingSaves.length > 0,
             getStorage: () => storage,
         }),
         ...createProjectActions({

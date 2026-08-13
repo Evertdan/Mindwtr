@@ -223,6 +223,31 @@ describe('TaskStore', () => {
         expect(mockStorage.saveData).not.toHaveBeenCalled();
     });
 
+    it('skips incremental task storage while a queued snapshot save holds a new referenced project (#1024)', async () => {
+        const saveTask = vi.fn().mockResolvedValue(undefined);
+        mockStorage.saveTask = saveTask;
+        const task = createStoreTask('task-1', { status: 'inbox' });
+        useTaskStore.setState({
+            tasks: [task],
+            _allTasks: [task],
+            _tasksById: buildEntityMap([task]),
+        });
+
+        // Same sequence as Process Inbox "make it a project": the project is
+        // only in the debounced save queue when the task write happens.
+        const project = await useTaskStore.getState().addProject('New Project', '#2563EB');
+        expect(project).not.toBeNull();
+        const result = await useTaskStore.getState().updateTask('task-1', { projectId: project!.id, status: 'next' });
+
+        expect(result).toEqual({ success: true });
+        expect(saveTask).not.toHaveBeenCalled();
+        await flushPendingSave();
+        expect(mockStorage.saveData).toHaveBeenCalledTimes(1);
+        const savedData = vi.mocked(mockStorage.saveData).mock.calls[0]?.[0] as AppData;
+        expect(savedData.projects.some((item) => item.id === project!.id)).toBe(true);
+        expect(savedData.tasks.find((item) => item.id === 'task-1')?.projectId).toBe(project!.id);
+    });
+
     it('waits for incremental task storage during flushPendingSave', async () => {
         let resolveSaveTask: (() => void) | null = null;
         const saveTask = vi.fn(() => new Promise<void>((resolve) => {
@@ -3656,11 +3681,18 @@ describe('TaskStore', () => {
             retrying: false,
         });
 
-        mockStorage.saveTask = vi.fn().mockResolvedValue(undefined);
+        // The failed incremental save queued a retry snapshot, so the next edit
+        // folds into that snapshot instead of dispatching another incremental
+        // save (#1024). Keep the full save failing so the failure stays visible
+        // until the explicit retry below durably persists the latest snapshot.
+        const laterSaveTask = vi.fn().mockResolvedValue(undefined);
+        mockStorage.saveTask = laterSaveTask;
+        vi.mocked(mockStorage.saveData).mockRejectedValue(new Error('secret adapter detail'));
         await runWithImmediateSaveTracking(
             () => useTaskStore.getState().updateTask(task.id, { title: 'Latest edit' })
         );
-        await vi.advanceTimersByTimeAsync(10_000);
+        await vi.advanceTimersByTimeAsync(20_000);
+        expect(laterSaveTask).not.toHaveBeenCalled();
         expect(useTaskStore.getState().error).toBeNull();
         expect(useTaskStore.getState().persistenceFailure).not.toBeNull();
 

@@ -175,6 +175,7 @@ type TaskActionContext = {
     getStorage: () => StorageAdapter;
     debouncedSave: (data: AppData, onError?: (msg: string) => void) => void;
     trackImmediateSave: (save: Promise<void>, retrySnapshot?: AppData) => Promise<void>;
+    hasQueuedSnapshotSave: () => boolean;
 };
 
 const actionOk = (extra?: Omit<StoreActionResult, 'success'>): StoreActionResult => ({ success: true, ...extra });
@@ -367,7 +368,7 @@ const prepareTaskUpdatesForStore = ({
     };
 };
 
-export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackImmediateSave }: TaskActionContext): TaskActions => ({
+export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackImmediateSave, hasQueuedSnapshotSave }: TaskActionContext): TaskActions => ({
     /**
      * Add a new task to the store and persist to storage.
      * @param title Task title
@@ -619,7 +620,19 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
         const setStateMs = Date.now() - setStateStartedAt;
         const persistenceStartedAt = Date.now();
         const storage = getStorage();
-        if (incrementalPersistence.task && !incrementalPersistence.hasRecurringFollowUp && storage.saveTask) {
+        // A queued (not yet dispatched) full-state save can hold rows this task
+        // now references — e.g. Process Inbox creates the project through the
+        // debounced path and immediately points the task at it. A focused task
+        // save dispatched now would reach SQLite before the project row and
+        // fail its FOREIGN KEY check (#1024), so fold the task into the queued
+        // snapshot instead. Saves already in flight are safe: both platform
+        // adapters run writes through one FIFO queue.
+        if (
+            incrementalPersistence.task
+            && !incrementalPersistence.hasRecurringFollowUp
+            && storage.saveTask
+            && !hasQueuedSnapshotSave()
+        ) {
             const taskToPersist = incrementalPersistence.task;
             void trackImmediateSave(
                 storage.saveTask(taskToPersist, snapshot ?? undefined),
