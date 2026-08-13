@@ -134,10 +134,10 @@ Before pushing, run the baseline local verification gate:
 bun run verify
 ```
 
-`bun run verify` chains typecheck, core and cloud lint, the five workspace
-unit-test suites, governance and schema checks, locale parity, and README parity. CI also runs
-performance budgets, package-specific lint, coverage thresholds, Expo Doctor,
-and store/workflow metadata checks.
+`bun run verify` chains typecheck (core, cloud, desktop, mobile, and mcp), lint
+for every workspace app, the five workspace unit-test suites, governance and
+schema checks, locale parity, and README parity. CI also runs performance
+budgets, coverage thresholds, Expo Doctor, and store/workflow metadata checks.
 
 Run `bun run native:test` when you touch `apps/desktop/src-tauri/`, and run
 `bun run test:perf` for list, store, recurrence, or other hot-path changes.
