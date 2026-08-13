@@ -129,6 +129,27 @@ describe('serializeMindwtrCsv', () => {
     // (import-apply.ts's existingTaskIds check). So an edited export does NOT push the edit
     // back in — it is reported as skipped. Pinned here so the round-trip contract is explicit
     // rather than assumed; changing it to update-in-place is a product decision, not a bug fix.
+    // V1: containers round-trip by name, so an unmodified re-import used to add an empty
+    // duplicate project and a renamed "<name> (Mindwtr CSV)" area even though every task was
+    // skipped. Zero new entities of ANY kind is the contract.
+    it('adds nothing at all when an unmodified export is re-imported', () => {
+        const data = appData({
+            areas: [{ id: 'area-1', name: 'Work', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' }] as AppData['areas'],
+            projects: [project({ areaId: 'area-1' })],
+            sections: [{ id: 'section-1', projectId: 'project-1', title: 'Launch', order: 0, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' }] as Section[],
+            tasks: [task({ id: 'stable-id', projectId: 'project-1', sectionId: 'section-1' })],
+        });
+
+        const result = applyMindwtrCsvImport(data, reimport(serializeMindwtrCsv(data)));
+
+        expect(result.data.tasks).toHaveLength(1);
+        expect(result.data.projects).toHaveLength(1);
+        expect(result.data.sections).toHaveLength(1);
+        expect(result.data.areas).toHaveLength(1);
+        expect(result.data.areas.map((area) => area.name)).toEqual(['Work']);
+        expect(result.data.projects.map((item) => item.title)).toEqual(['Marketing']);
+    });
+
     it('skips rather than duplicates a re-imported export whose fields were edited', () => {
         const data = appData({ tasks: [task({ id: 'stable-id', title: 'Before' })] });
         const edited = serializeMindwtrCsv(data).replace('Before', 'After');

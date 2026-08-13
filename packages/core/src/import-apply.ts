@@ -201,6 +201,35 @@ export function applyImport(
         usedTitles.add(project.title.trim().toLowerCase());
         usedProjectTitlesByAreaId.set(areaId, usedTitles);
     });
+    // Containers have no ID column, so they round-trip by NAME and a container the user
+    // already has under its own id is invisible to the derived-id lookups below: it used to be
+    // re-created AND renamed by the collision suffix, so re-importing an unmodified export
+    // added an empty duplicate project and a "<name> (Mindwtr CSV)" area (V1).
+    //
+    // The tasks carry the identity the containers lack: when a row resolves to a task we
+    // already have, that task's CURRENT container is the one this row's container means. Inert
+    // for the other importers, whose rows never resolve to existing tasks.
+    const liveTaskById = new Map(nextData.tasks.map((task) => [task.id, task] as const));
+    const liveProjectIdBySourceKey = new Map<string, string>();
+    const liveAreaIdBySourceKey = new Map<string, string>();
+    const liveSectionIdBySourceKey = new Map<string, string>();
+    parsed.tasks.forEach((task) => {
+        const liveTask = liveTaskById.get(idFor('task', task.sourceKey));
+        if (!liveTask) return;
+        if (task.projectSourceKey && liveTask.projectId && !liveProjectIdBySourceKey.has(task.projectSourceKey)) {
+            liveProjectIdBySourceKey.set(task.projectSourceKey, liveTask.projectId);
+        }
+        if (task.sectionSourceKey && liveTask.sectionId && !liveSectionIdBySourceKey.has(task.sectionSourceKey)) {
+            liveSectionIdBySourceKey.set(task.sectionSourceKey, liveTask.sectionId);
+        }
+        const liveAreaId = liveTask.projectId
+            ? nextData.projects.find((project) => project.id === liveTask.projectId)?.areaId
+            : liveTask.areaId;
+        if (task.areaSourceKey && liveAreaId && !liveAreaIdBySourceKey.has(task.areaSourceKey)) {
+            liveAreaIdBySourceKey.set(task.areaSourceKey, liveAreaId);
+        }
+    });
+
     const warnings = [...parsed.warnings];
 
     // Includes tombstones deliberately: a deterministic idFor must see prior deletions so a
@@ -233,6 +262,11 @@ export function applyImport(
             if (!existingArea.deletedAt) areaIdBySourceKey.set(area.sourceKey, existingArea.id);
             return;
         }
+        const carriedAreaId = liveAreaIdBySourceKey.get(area.sourceKey);
+        if (carriedAreaId) {
+            areaIdBySourceKey.set(area.sourceKey, carriedAreaId);
+            return;
+        }
         const areaName = resolveUniqueName(area.name, usedAreaNames, opts.fallbacks.area, opts.suffix);
         if (areaName !== area.name) {
             warnings.push(`Imported area "${area.name}" was renamed to "${areaName}" to avoid a name conflict.`);
@@ -255,6 +289,11 @@ export function applyImport(
     });
 
     parsed.projects.forEach((project) => {
+        const carriedProjectId = liveProjectIdBySourceKey.get(project.sourceKey);
+        if (carriedProjectId) {
+            projectIdBySourceKey.set(project.sourceKey, carriedProjectId);
+            return;
+        }
         const projectId = idFor('project', project.sourceKey);
         const existingProject = existingProjectById.get(projectId);
         if (existingProject) {
@@ -296,6 +335,11 @@ export function applyImport(
     // A section with no matching project (its project was deduped away against a tombstone, or
     // never created) is dropped along with it — there is nothing to attach it to.
     (parsed.sections ?? []).forEach((section) => {
+        const carriedSectionId = liveSectionIdBySourceKey.get(section.sourceKey);
+        if (carriedSectionId) {
+            sectionIdBySourceKey.set(section.sourceKey, carriedSectionId);
+            return;
+        }
         const projectId = projectIdBySourceKey.get(section.projectSourceKey);
         if (!projectId) return;
         const sectionId = idFor('section', section.sourceKey);
