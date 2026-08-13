@@ -97,22 +97,35 @@ export const findCalendarFeedNamespace = (dataDir: string, token: string): strin
  * route-level check (server.ts) is what actually stops the feed from being
  * served in the meantime, this just reclaims the file.
  */
-export const pruneOrphanedCalendarFeeds = (dataDir: string, allowedKeys: ReadonlySet<string>): number => {
+export type PruneOrphanedCalendarFeedsResult = { pruned: number; failed: number };
+
+export const pruneOrphanedCalendarFeeds = (
+    dataDir: string,
+    allowedKeys: ReadonlySet<string>
+): PruneOrphanedCalendarFeedsResult => {
     let entries: string[];
     try {
         entries = readdirSync(dataDir);
     } catch {
-        return 0;
+        return { pruned: 0, failed: 0 };
     }
     let pruned = 0;
+    let failed = 0;
     for (const entry of entries) {
         if (!entry.endsWith(FEED_FILE_SUFFIX)) continue;
         const key = entry.slice(0, -FEED_FILE_SUFFIX.length);
         if (allowedKeys.has(key)) continue;
-        unlinkSync(join(dataDir, entry));
-        pruned += 1;
+        // Best-effort (I4): a permission error, an in-flight delete racing
+        // another process, or an unexpected directory at this path must never
+        // stop the server from starting - only the count is worth knowing.
+        try {
+            unlinkSync(join(dataDir, entry));
+            pruned += 1;
+        } catch {
+            failed += 1;
+        }
     }
-    return pruned;
+    return { pruned, failed };
 };
 
 /** The token in `/v1/calendar/<token>.ics`, or null when the path is not a feed request. */

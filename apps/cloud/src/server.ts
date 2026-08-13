@@ -1070,11 +1070,17 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
     }
     logInfo('cloud data directory ready');
     if (allowedAuthTokens) {
-        const prunedFeedCount = pruneOrphanedCalendarFeeds(dataDir, allowedAuthTokens.keys);
+        const { pruned: prunedFeedCount, failed: failedFeedCount } = pruneOrphanedCalendarFeeds(
+            dataDir,
+            allowedAuthTokens.keys
+        );
         if (prunedFeedCount > 0) {
             // Count only, no paths - the namespace key is a token digest (#952's
             // privacy ratchet already treats it as sensitive elsewhere).
             logInfo('pruned orphaned calendar feed sidecars', { count: String(prunedFeedCount) });
+        }
+        if (failedFeedCount > 0) {
+            logWarn('failed to prune some orphaned calendar feed sidecars', { count: String(failedFeedCount) });
         }
     }
     logInfo('cloud server listening', { port: String(port) });

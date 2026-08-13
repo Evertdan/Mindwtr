@@ -63,6 +63,7 @@ import {
     startCloudServer,
     type CloudRequestCompletion,
 } from './server';
+import { pruneOrphanedCalendarFeeds } from './server-calendar-feed';
 
 const expireFileForOrphanGc = (path: string): void => {
     const staleTime = new Date(Date.now() - 10 * 60 * 1000);
@@ -4386,6 +4387,32 @@ describe('cloud server calendar feed', () => {
             } finally {
                 restarted.stop();
             }
+        } finally {
+            rmSync(dataDir, { recursive: true, force: true });
+        }
+    });
+
+    // I4: an unlinkSync failure (permission error, a race with another
+    // process, an unexpected filesystem entry) must never crash startup - a
+    // directory can never be removed with unlinkSync regardless of
+    // permissions or the running user, so it's a deterministic way to force
+    // that failure without relying on file permissions (which root ignores).
+    test('pruneOrphanedCalendarFeeds counts an undeletable entry as a failure instead of throwing', () => {
+        const dataDir = mkdtempSync(join(tmpdir(), 'mindwtr-cloud-calendar-feed-'));
+        try {
+            const allowedKey = 'a'.repeat(64);
+            const orphanedKey = 'b'.repeat(64);
+            const undeletableKey = 'c'.repeat(64);
+            writeFileSync(join(dataDir, `${allowedKey}.ics.json`), '{}');
+            writeFileSync(join(dataDir, `${orphanedKey}.ics.json`), '{}');
+            mkdirSync(join(dataDir, `${undeletableKey}.ics.json`));
+
+            const result = pruneOrphanedCalendarFeeds(dataDir, new Set([allowedKey]));
+
+            expect(result).toEqual({ pruned: 1, failed: 1 });
+            expect(existsSync(join(dataDir, `${allowedKey}.ics.json`))).toBe(true);
+            expect(existsSync(join(dataDir, `${orphanedKey}.ics.json`))).toBe(false);
+            expect(existsSync(join(dataDir, `${undeletableKey}.ics.json`))).toBe(true);
         } finally {
             rmSync(dataDir, { recursive: true, force: true });
         }

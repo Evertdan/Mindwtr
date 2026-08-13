@@ -50,6 +50,7 @@ export const CLOUD_LOG_MESSAGES = [
     'cloud data directory is not writable',
     'cloud data directory ready',
     'cloud server listening',
+    'failed to prune some orphaned calendar feed sidecars',
     'pruned orphaned calendar feed sidecars',
     'request completed',
     'request failed',
