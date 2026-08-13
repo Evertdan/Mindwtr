@@ -3,6 +3,7 @@
 // Apply delegates to the shared import-apply.ts seam, which also creates this importer's
 // Sections (the only ImportSource caller that supplies any).
 import { safeParseDate } from './date';
+import { MINDWTR_CSV_KNOWN_COLUMNS } from './mindwtr-csv-columns';
 import { applyImport, type ImportExecutionResult, type ImportParseResult } from './import-apply';
 import {
     appendWarning,
@@ -136,11 +137,7 @@ export type MindwtrCsvImportParseResult = ImportParseResult<ParsedMindwtrCsvImpo
 
 export type MindwtrCsvImportExecutionResult = ImportExecutionResult & { importedSectionCount: number };
 
-const KNOWN_COLUMNS = new Set([
-    'TITLE', 'DESCRIPTION', 'STATUS', 'PROJECT', 'SECTION', 'AREA', 'CONTEXTS', 'TAGS',
-    'ASSIGNED TO', 'PRIORITY', 'ENERGY', 'START DATE', 'DUE DATE', 'REVIEW DATE',
-    'COMPLETED AT', 'CHECKLIST', 'LOCATION', 'ORDER', 'ID', 'CREATED AT', 'RECURRENCE',
-]);
+const KNOWN_COLUMNS = MINDWTR_CSV_KNOWN_COLUMNS;
 
 const VALID_STATUSES = new Set<TaskStatus>(['inbox', 'next', 'waiting', 'someday', 'reference', 'done', 'archived']);
 
