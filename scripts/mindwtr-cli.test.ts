@@ -169,6 +169,33 @@ describe('mindwtr-cli', () => {
         expect(completedTask.stdout).toContain('"status": "done"');
     });
 
+    // list --query used to route through core searchAll, which caps at SEARCH_RESULT_LIMIT
+    // (200) for the UI palette — so a CLI list silently stopped at 200 matches.
+    test('lists every search match, past the 200-result UI cap', () => {
+        const dir = makeTempDir();
+        const dataPath = join(dir, 'data.json');
+        const now = '2026-02-01T00:00:00.000Z';
+        writeFileSync(dataPath, JSON.stringify({
+            tasks: Array.from({ length: 250 }, (_unused, index) => ({
+                id: `t${String(index).padStart(3, '0')}`,
+                title: `Report ${index}`,
+                status: 'inbox',
+                tags: [],
+                contexts: [],
+                createdAt: now,
+                updatedAt: now,
+            })),
+            projects: [],
+            sections: [],
+            areas: [],
+            settings: {},
+        }, null, 2));
+
+        const listed = runCli(dataPath, ['list', '--all', '--query', 'Report']);
+        expect(listed.exitCode).toBe(0);
+        expect(listed.stdout.trim().split('\n')).toHaveLength(250);
+    });
+
     test('rejects invalid task statuses', () => {
         const dir = makeTempDir();
         const dataPath = join(dir, 'data.json');

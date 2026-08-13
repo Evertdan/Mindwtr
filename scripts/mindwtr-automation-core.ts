@@ -2,6 +2,7 @@ import {
     flushPendingSave,
     isTaskFinished,
     parseQuickAdd,
+    filterTasksBySearch,
     searchAll,
     setStorageAdapter,
     useTaskStore,
@@ -164,9 +165,9 @@ export async function createMindwtrAutomationService(options: AutomationServiceO
                 tasks = tasks.filter((task) => Boolean(task.isFocusedToday) === isFocusedToday);
             }
             if (typeof query === 'string' && query.trim().length > 0) {
-                const results = searchAll(tasks, filterProjectsForSearch(state._allProjects, includeDeleted), query);
-                const ids = new Set(results.tasks.map((task) => task.id));
-                tasks = tasks.filter((task) => ids.has(task.id));
+                // filterTasksBySearch, not searchAll: searchAll caps at SEARCH_RESULT_LIMIT
+                // (200) for the UI palette, which silently truncated list results here.
+                tasks = filterTasksBySearch(tasks, filterProjectsForSearch(state._allProjects, includeDeleted), query);
             }
             return tasks;
         },
