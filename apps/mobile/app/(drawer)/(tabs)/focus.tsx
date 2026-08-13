@@ -550,8 +550,12 @@ export default function FocusScreen() {
       return;
     }
     if (!selectedDate) return;
-    const nextDate = new Date(selectedDate);
+    let nextDate = new Date(selectedDate);
     nextDate.setHours(0, 0, 0, 0);
+    // Deferring means "not today": the iOS inline picker has no native
+    // minimumDate (see the render site), so enforce the tomorrow floor here.
+    const floor = getStartDateOffset(1);
+    if (nextDate < floor) nextDate = floor;
     setDeferPickerDate(nextDate);
     if (Platform.OS !== 'ios') {
       const task = deferPickerTask;
@@ -1852,11 +1856,15 @@ export default function FocusScreen() {
               >
                 {deferPickerTask.title}
               </Text>
+              {/* No minimumDate here: on iOS 26 the inline picker's
+                  UICalendarView asserts (SIGABRT) when setMinimumDate: replays
+                  an animated visible-month update during a Fabric mount
+                  transaction. handleDeferDateChange clamps to the same floor
+                  instead. */}
               <DateTimePicker
                 value={deferPickerDate}
                 mode="date"
                 display="inline"
-                minimumDate={getStartDateOffset(1)}
                 onChange={handleDeferDateChange}
               />
             </View>
