@@ -13,23 +13,31 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
+/**
+ * The UI language outside React — for code that runs in an event handler or
+ * a plain module, not during render, so it can't call the useLanguage hook
+ * (undo-registry.ts's toast label, mirroring App.tsx's `settingsLanguage ||
+ * language` precedence). Same source LanguageProvider's own state reads on
+ * mount, without the test short-circuit that exists there only to keep
+ * component renders deterministic — this is a one-shot read, not state.
+ */
+export function getCurrentUiLanguage(): Language {
+    if (typeof localStorage === 'undefined') return 'en';
+    return loadStoredLanguageSync(localStorage, getSystemDefaultLanguage());
+}
+
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
     const isTest = import.meta.env.MODE === 'test' || import.meta.env.VITEST || process.env.NODE_ENV === 'test';
     const [language, setLanguageState] = useState<Language>(() => {
         if (isTest) return 'en';
-        if (typeof localStorage !== 'undefined') {
-            return loadStoredLanguageSync(localStorage, getSystemDefaultLanguage());
-        }
-        return 'en';
+        return getCurrentUiLanguage();
     });
     const [translationsMap, setTranslationsMap] = useState<Record<string, string>>({});
     const [fallbackTranslations, setFallbackTranslations] = useState<Record<string, string>>(() => getTranslationsSync('en'));
 
     useEffect(() => {
         if (isTest) return;
-        if (typeof localStorage !== 'undefined') {
-            setLanguageState(loadStoredLanguageSync(localStorage, getSystemDefaultLanguage()));
-        }
+        setLanguageState(getCurrentUiLanguage());
         if (!fallbackTranslations['app.name']) {
             loadTranslations('en').then(setFallbackTranslations).catch(() => setFallbackTranslations({}));
         }

@@ -1250,12 +1250,10 @@ describe('CalendarView', () => {
             });
         });
 
-        // C2: CalendarView's own remove-from-calendar handler used to call
-        // registerUndoableAction unconditionally and only gate the toast,
-        // burning a registry slot even with undo notifications off. The
-        // shared showUndoToast now checks the gate before any registry
-        // write, so neither the toast nor the registration should happen.
-        it('does not register an undoable action or show a toast when undo notifications are disabled', async () => {
+        // The undo-notifications setting hides the toast, not Ctrl/Cmd+Z:
+        // showUndoToast always registers, so the shortcut still restores the
+        // cleared schedule even with the toast off.
+        it('registers the undo but shows no toast when undo notifications are disabled', async () => {
             storeMocks.taskStoreState.settings = {
                 ...storeMocks.taskStoreState.settings,
                 undoNotificationsEnabled: false,
@@ -1283,7 +1281,12 @@ describe('CalendarView', () => {
 
             expect(storeMocks.taskStoreState.updateTask).toHaveBeenCalled();
             expect(showToast).not.toHaveBeenCalled();
-            expect(takeUndoableAction()).toBeNull();
+
+            takeUndoableAction()?.();
+            expect(storeMocks.taskStoreState.updateTask).toHaveBeenCalledWith('scheduled-task', {
+                startTime: '2026-04-04T09:00:00',
+                relativeStartOffset: undefined,
+            });
         });
 
         it('clears only dueDate for a due-date chip, leaving startTime untouched, and undo restores it exactly', async () => {

@@ -1,11 +1,14 @@
-import { getTranslator, resolveI18nText, useTaskStore } from '@mindwtr/core';
+import { getTranslator, resolveI18nText, translateWithFallback, useTaskStore, type TranslateFn } from '@mindwtr/core';
 
+import { getCurrentUiLanguage } from '../contexts/language-context';
 import { useUiStore } from '../store/ui-store';
 
 // Holds the most recent undoable action (task completion or deletion) so
-// Ctrl/Cmd+Z can trigger the same restore the undo toast offers. Registration
-// is independent of whether the toast is shown, and both the toast button and
-// the keyboard shortcut run the same closure, so undoing twice is a no-op.
+// Ctrl/Cmd+Z can trigger the same restore. Registration always happens,
+// regardless of the "show an Undo toast" setting: that setting controls the
+// toast's visibility, not whether Ctrl+Z has something to undo. Both the
+// toast button and the keyboard shortcut run the same closure, so undoing
+// twice is a no-op.
 let lastUndoableAction: (() => void) | null = null;
 
 export function registerUndoableAction(action: () => void): () => void {
@@ -27,27 +30,36 @@ export function clearUndoableAction(): void {
     lastUndoableAction = null;
 }
 
+// Same precedence as App.tsx's configureDateFormatting call: the synced
+// setting wins when present, otherwise the UI's current language (which is
+// itself the settings value once sync catches up, or the system default
+// before it does). Used only when a caller has no `t` of its own handy;
+// every current call site does, so this is the defensive fallback, not the
+// common path.
 const resolveUndoText = (key: string, fallback: string): string => resolveI18nText(
-    getTranslator(useTaskStore.getState().settings?.language ?? 'en'),
+    getTranslator(useTaskStore.getState().settings?.language || getCurrentUiLanguage()),
     key,
     { fallback },
 );
 
 /**
- * Shows the undo toast for an action, registering `undo` first — unless undo
- * notifications are disabled, in which case NEITHER the toast NOR the
- * registry write happens. Checking the gate before any registry write (not
- * after) is deliberate: every call site used to hand-roll its own order, and
- * at least one (CalendarView) registered unconditionally and only gated the
- * toast, burning a registry slot with no toast to show for it. Folding the
- * gate in here makes that divergence impossible instead of just fixing the
- * one site that had it.
+ * Shows the undo toast for an action. Registration is unconditional — the
+ * "show an Undo toast" setting governs only whether this function's own
+ * `showToast` call runs, not whether Ctrl+Z has something to undo — so
+ * `registerUndoableAction` always runs first, and the gate below decides
+ * only the toast. This is the one place that decides toast visibility;
+ * callers just call it.
+ *
+ * `t` lets the caller hand in its already-resolved translator (the same one
+ * it used to build `message`) so the "Undo" label matches the active UI
+ * language instead of this module re-deriving it from settings/storage.
  */
-export function showUndoToast(message: string, undo: () => void): void {
-    if (useTaskStore.getState().settings?.undoNotificationsEnabled === false) return;
+export function showUndoToast(message: string, undo: () => void, t?: TranslateFn): void {
     const action = registerUndoableAction(undo);
+    if (useTaskStore.getState().settings?.undoNotificationsEnabled === false) return;
+    const label = t ? translateWithFallback(t, 'common.undo', 'Undo') : resolveUndoText('common.undo', 'Undo');
     useUiStore.getState().showToast(message, 'info', 5000, {
-        label: resolveUndoText('common.undo', 'Undo'),
+        label,
         onClick: action,
     });
 }

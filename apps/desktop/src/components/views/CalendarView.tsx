@@ -225,7 +225,7 @@ export function CalendarView() {
                 showUndoToast(tFallback(t, 'calendar.unschedule', 'Remove from calendar'), () => {
                     void updateTask(task.id, previousValues)
                         .catch((error) => reportError('Failed to undo remove from calendar', error));
-                });
+                }, t);
             })
             .catch((error) => reportError('Failed to remove task from calendar', error));
     }, [t, updateTask]);

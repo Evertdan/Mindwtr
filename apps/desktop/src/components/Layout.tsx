@@ -498,7 +498,7 @@ export function Layout({ children, currentView, onViewChange, onOpenSyncSettings
                 showUndoToast(formatTaskMovedMessage(t, title, nextStatus), () => {
                     void Promise.resolve(useTaskStore.getState().moveTask(taskId, previousStatus))
                         .catch((error) => reportError('Failed to undo task status change', error));
-                });
+                }, t);
             })
             .catch((error) => reportError('Failed to change task status', error));
     }, [clearCalendarDragNavTimeout, currentView, onViewChange, t]);

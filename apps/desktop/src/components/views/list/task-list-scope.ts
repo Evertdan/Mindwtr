@@ -212,7 +212,7 @@ export function createTaskListScope(deps: TaskListScopeDeps): TaskListScope {
                     showUndoToast(formatTaskMarkedDoneMessage(deps.t, task.title), () => {
                         void undoTaskCompletion(task.id, previousStatus, wasFocusedToday)
                             .catch((error) => reportError('Failed to undo task completion', error));
-                    });
+                    }, deps.t);
                 })
                 .catch((error) => reportError('Failed to change task status', error));
         },
@@ -231,7 +231,7 @@ export function createTaskListScope(deps: TaskListScopeDeps): TaskListScope {
                     assertStoreActionSucceeded(result, 'Failed to delete task');
                     showUndoToast(translate('list.taskDeleted', 'Task deleted'), () => {
                         void useTaskStore.getState().restoreTask(task.id);
-                    });
+                    }, deps.t);
                 })
                 .catch((error) => reportError('Failed to delete task', error));
         },
@@ -261,6 +261,7 @@ export function createTaskListScope(deps: TaskListScopeDeps): TaskListScope {
                             void useTaskStore.getState().moveTask(task.id, previousStatus)
                                 .catch((error) => reportError('Failed to undo task status change', error));
                         },
+                        deps.t,
                     );
                 })
                 .catch((error) => reportError('Failed to change task status', error));

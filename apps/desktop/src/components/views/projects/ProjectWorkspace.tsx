@@ -1449,7 +1449,7 @@ export function ProjectWorkspace({
                                 reportError('Failed to restore project', error);
                                 showToast(resolveText('projects.restoreFailed', 'Failed to restore project'), 'error');
                             });
-                    });
+                    }, t);
                 } finally {
                     setIsProjectDeleting(false);
                 }
