@@ -359,17 +359,20 @@ export function applyImport(
     // A section with no matching project (its project was deduped away against a tombstone, or
     // never created) is dropped along with it — there is nothing to attach it to.
     (parsed.sections ?? []).forEach((section) => {
-        const carriedSectionId = liveSectionIdBySourceKey.get(section.sourceKey);
-        if (carriedSectionId) {
-            sectionIdBySourceKey.set(section.sourceKey, carriedSectionId);
-            return;
-        }
         const projectId = projectIdBySourceKey.get(section.projectSourceKey);
         if (!projectId) return;
         const sectionId = idFor('section', section.sourceKey);
         const existingSection = existingSectionById.get(sectionId);
         if (existingSection) {
             if (!existingSection.deletedAt) sectionIdBySourceKey.set(section.sourceKey, existingSection.id);
+            return;
+        }
+        // Only a section of the project this row actually resolved to. A task that moved to
+        // another project carries that project's section, which would otherwise pair a
+        // project from one place with a section from another — a state the app cannot produce.
+        const carriedSectionId = liveSectionIdBySourceKey.get(section.sourceKey);
+        if (carriedSectionId && existingSectionById.get(carriedSectionId)?.projectId === projectId) {
+            sectionIdBySourceKey.set(section.sourceKey, carriedSectionId);
             return;
         }
         const siblingMaxOrder = nextData.sections

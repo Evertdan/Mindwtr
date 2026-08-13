@@ -168,6 +168,7 @@ describe('serializeMindwtrCsv', () => {
         const result = applyMindwtrCsvImport(data, reimport(csv));
 
         const added = result.data.tasks.find((item) => item.title === 'Added');
+        expect(added?.projectId).toBeDefined();
         const landedIn = result.data.projects.find((item) => item.id === added?.projectId);
         expect(landedIn?.deletedAt).toBeUndefined();
     });
@@ -196,11 +197,45 @@ describe('serializeMindwtrCsv', () => {
         const landed = (csv: string) => {
             const result = applyMindwtrCsvImport(live, reimport(csv));
             const three = result.data.tasks.find((item) => item.title === 'Three');
+            expect(three?.projectId).toBeDefined();
             return result.data.projects.find((item) => item.id === three?.projectId)?.title;
         };
 
         expect(landed(forward)).toBe(landed(reversed));
         expect(landed(forward)).not.toBe('Beta');
+    });
+
+    // Section carry: once a CSV import has created the containers, their ids ARE the derived
+    // ids, so a later re-import resolves the project by derivation while the section carry
+    // still points at wherever a matched task has since moved — pairing this row's project
+    // with another project's section, a state the app cannot otherwise produce.
+    it('never pairs a resolved project with another project\'s section', () => {
+        const csv = serializeMindwtrCsv(appData({ tasks: [task({ id: 't1', title: 'One' })] }))
+            .replace('One,,next,,,', 'One,,next,Alpha,Sprint,');
+
+        // Seed: the first import mints Alpha and Sprint under derived ids.
+        const seeded = applyMindwtrCsvImport(appData({}), reimport(csv));
+        const alpha = seeded.data.projects[0];
+        const sprint = seeded.data.sections[0];
+        expect(sprint?.projectId).toBe(alpha?.id);
+
+        // The user then moves that task to a different project and section.
+        const live = appData({
+            projects: [alpha, project({ id: 'proj-beta', title: 'Beta' })],
+            sections: [sprint, { id: 'sec-s2', projectId: 'proj-beta', title: 'Backlog', order: 0, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' }] as unknown as Section[],
+            tasks: seeded.data.tasks.map((item) => ({ ...item, projectId: 'proj-beta', sectionId: 'sec-s2' })),
+        });
+
+        const withNewRow = `${csv}\nThree,,next,Alpha,Sprint,,,,,,,,,,,,,0,t3,2026-08-01T00:00:00.000Z`;
+        const result = applyMindwtrCsvImport(live, reimport(withNewRow));
+
+        const three = result.data.tasks.find((item) => item.title === 'Three');
+        expect(three?.projectId).toBeDefined();
+        expect(three?.sectionId).not.toBe('sec-s2');
+        if (three?.sectionId) {
+            const section = result.data.sections.find((item) => item.id === three.sectionId);
+            expect(section?.projectId).toBe(three.projectId);
+        }
     });
 
     it('skips rather than duplicates a re-imported export whose fields were edited', () => {
