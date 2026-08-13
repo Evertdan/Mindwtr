@@ -34,6 +34,7 @@ import { TaskBulkOrganizeModal } from '../list/TaskBulkOrganizeModal';
 import { normalizeAttachmentInput } from '../../../lib/attachment-utils';
 import { cn } from '../../../lib/utils';
 import { reportError } from '../../../lib/report-error';
+import { showUndoToast } from '../../../lib/undo-registry';
 import { useMiddleMousePan } from './use-column-pan';
 import { useProjectAttachmentActions } from './useProjectAttachmentActions';
 import { useProjectSectionActions } from './useProjectSectionActions';
@@ -1441,24 +1442,14 @@ export function ProjectWorkspace({
                 try {
                     await Promise.resolve(deleteProject(projectId));
                     setSelectedProjectId(null);
-                    if (undoNotificationsEnabled) {
-                        showToast(
-                            resolveText('projects.deleted', 'Project moved to Trash'),
-                            'info',
-                            6000,
-                            {
-                                label: resolveText('common.undo', 'Undo'),
-                                onClick: () => {
-                                    void Promise.resolve(restoreProject(projectId))
-                                        .then(() => setSelectedProjectId(projectId))
-                                        .catch((error) => {
-                                            reportError('Failed to restore project', error);
-                                            showToast(resolveText('projects.restoreFailed', 'Failed to restore project'), 'error');
-                                        });
-                                },
-                            },
-                        );
-                    }
+                    showUndoToast(resolveText('projects.deleted', 'Project moved to Trash'), () => {
+                        void Promise.resolve(restoreProject(projectId))
+                            .then(() => setSelectedProjectId(projectId))
+                            .catch((error) => {
+                                reportError('Failed to restore project', error);
+                                showToast(resolveText('projects.restoreFailed', 'Failed to restore project'), 'error');
+                            });
+                    });
                 } finally {
                     setIsProjectDeleting(false);
                 }

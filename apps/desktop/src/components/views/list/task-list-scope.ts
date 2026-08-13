@@ -4,10 +4,9 @@ import type { StoreActionResult, Task, TaskStatus } from '@mindwtr/core';
 
 import { useOptionalKeybindings, type TaskListScope } from '../../../contexts/keybinding-context';
 import { reportError } from '../../../lib/report-error';
-import { registerUndoableAction } from '../../../lib/undo-registry';
+import { showUndoToast } from '../../../lib/undo-registry';
 import { undoTaskCompletion } from '../../../lib/undo-task-completion';
 import { requestTaskRowAction, type TaskRowAction } from '../../../lib/task-row-actions';
-import { useUiStore } from '../../../store/ui-store';
 
 type TranslateFn = (key: string) => string;
 
@@ -167,14 +166,6 @@ export function createTaskListScope(deps: TaskListScopeDeps): TaskListScope {
         if (task) reveal(task);
     };
 
-    const showUndoToast = (message: string, undo: () => void) => {
-        if (useTaskStore.getState().settings?.undoNotificationsEnabled === false) return;
-        useUiStore.getState().showToast(message, 'info', 5000, {
-            label: translate('common.undo', 'Undo'),
-            onClick: undo,
-        });
-    };
-
     const requestRowAction = (action: TaskRowAction) => {
         requestTaskRowAction(selectedRow(), action);
     };
@@ -218,11 +209,10 @@ export function createTaskListScope(deps: TaskListScopeDeps): TaskListScope {
                 .then((result) => {
                     assertStoreActionSucceeded(result, 'Failed to change task status');
                     if (nextStatus !== 'done' || previousStatus === 'done') return;
-                    const undo = registerUndoableAction(() => {
+                    showUndoToast(formatTaskMarkedDoneMessage(deps.t, task.title), () => {
                         void undoTaskCompletion(task.id, previousStatus, wasFocusedToday)
                             .catch((error) => reportError('Failed to undo task completion', error));
                     });
-                    showUndoToast(formatTaskMarkedDoneMessage(deps.t, task.title), undo);
                 })
                 .catch((error) => reportError('Failed to change task status', error));
         },
@@ -239,10 +229,9 @@ export function createTaskListScope(deps: TaskListScopeDeps): TaskListScope {
             void Promise.resolve(useTaskStore.getState().deleteTask(task.id))
                 .then((result) => {
                     assertStoreActionSucceeded(result, 'Failed to delete task');
-                    const undo = registerUndoableAction(() => {
+                    showUndoToast(translate('list.taskDeleted', 'Task deleted'), () => {
                         void useTaskStore.getState().restoreTask(task.id);
                     });
-                    showUndoToast(translate('list.taskDeleted', 'Task deleted'), undo);
                 })
                 .catch((error) => reportError('Failed to delete task', error));
         },
@@ -257,22 +246,21 @@ export function createTaskListScope(deps: TaskListScopeDeps): TaskListScope {
             void Promise.resolve(useTaskStore.getState().moveTask(task.id, status))
                 .then((result) => {
                     assertStoreActionSucceeded(result, 'Failed to change task status');
-                    const undo = registerUndoableAction(() => {
-                        // Completion has side effects (Today star, completedAt), so
-                        // undoing into/out of done goes through the shared core rule.
-                        if (status === 'done') {
-                            void undoTaskCompletion(task.id, previousStatus, wasFocusedToday)
-                                .catch((error) => reportError('Failed to undo task status change', error));
-                            return;
-                        }
-                        void useTaskStore.getState().moveTask(task.id, previousStatus)
-                            .catch((error) => reportError('Failed to undo task status change', error));
-                    });
                     showUndoToast(
                         status === 'done'
                             ? formatTaskMarkedDoneMessage(deps.t, task.title)
                             : formatTaskMovedMessage(deps.t, task.title, status),
-                        undo,
+                        () => {
+                            // Completion has side effects (Today star, completedAt), so
+                            // undoing into/out of done goes through the shared core rule.
+                            if (status === 'done') {
+                                void undoTaskCompletion(task.id, previousStatus, wasFocusedToday)
+                                    .catch((error) => reportError('Failed to undo task status change', error));
+                                return;
+                            }
+                            void useTaskStore.getState().moveTask(task.id, previousStatus)
+                                .catch((error) => reportError('Failed to undo task status change', error));
+                        },
                     );
                 })
                 .catch((error) => reportError('Failed to change task status', error));

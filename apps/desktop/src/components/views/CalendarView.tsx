@@ -12,15 +12,13 @@ import {
     isSameCalendarMonth,
     safeFormatDate,
     tFallback,
-    useTaskStore,
     type Task,
 } from '@mindwtr/core';
 
 import { ErrorBoundary } from '../ErrorBoundary';
 import { cn } from '../../lib/utils';
 import { reportError } from '../../lib/report-error';
-import { registerUndoableAction } from '../../lib/undo-registry';
-import { useUiStore } from '../../store/ui-store';
+import { showUndoToast } from '../../lib/undo-registry';
 import {
     getCalendarTaskDragItemKind,
     getCalendarTaskDragTaskId,
@@ -221,20 +219,13 @@ export function CalendarView() {
                 if (!result.success) {
                     throw new Error(result.error || 'Failed to remove task from calendar');
                 }
-                const undo = registerUndoableAction(() => {
-                    void updateTask(task.id, previousValues)
-                        .catch((error) => reportError('Failed to undo remove from calendar', error));
-                });
-                if (useTaskStore.getState().settings?.undoNotificationsEnabled === false) return;
                 // Reuses the existing "Remove from calendar" string for the toast
                 // too — the locale-parity gate (zh/zh-Hant full parity, pt floor)
                 // does not allow adding an English-only key here.
-                useUiStore.getState().showToast(
-                    tFallback(t, 'calendar.unschedule', 'Remove from calendar'),
-                    'info',
-                    5000,
-                    { label: tFallback(t, 'common.undo', 'Undo'), onClick: undo },
-                );
+                showUndoToast(tFallback(t, 'calendar.unschedule', 'Remove from calendar'), () => {
+                    void updateTask(task.id, previousValues)
+                        .catch((error) => reportError('Failed to undo remove from calendar', error));
+                });
             })
             .catch((error) => reportError('Failed to remove task from calendar', error));
     }, [t, updateTask]);

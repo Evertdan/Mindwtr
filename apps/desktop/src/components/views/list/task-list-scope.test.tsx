@@ -244,7 +244,11 @@ describe.each(SCOPE_CASES)('createTaskListScope — $name', ({ extraDeps }) => {
             'Task 1 ERLEDIGT',
             'info',
             5000,
-            expect.objectContaining({ label: 'RUECKGAENGIG' }),
+            // The "Undo" label comes from showUndoToast's own translation lookup
+            // (undo-registry.ts), not from this test's injected `translate` -
+            // it always reflects the real current-language cache, same as
+            // production, so this stand-in locale can't influence it (C2).
+            expect.objectContaining({ label: 'Undo' }),
         );
         expect(takeUndoableAction()).toEqual(expect.any(Function));
     });
@@ -299,7 +303,7 @@ describe.each(SCOPE_CASES)('createTaskListScope — $name', ({ extraDeps }) => {
             'Task 1 nach IRGENDWANN',
             'info',
             5000,
-            expect.objectContaining({ label: 'RUECKGAENGIG' }),
+            expect.objectContaining({ label: 'Undo' }),
         );
 
         showToast.mock.calls[0][3].onClick();
@@ -328,14 +332,17 @@ describe.each(SCOPE_CASES)('createTaskListScope — $name', ({ extraDeps }) => {
             'GELOESCHT',
             'info',
             5000,
-            expect.objectContaining({ label: 'RUECKGAENGIG' }),
+            expect.objectContaining({ label: 'Undo' }),
         );
 
         showToast.mock.calls[0][3].onClick();
         expect(restoreTask).toHaveBeenCalledWith('1');
     });
 
-    it('registers the undo even when undo toasts are disabled', async () => {
+    // C2: showUndoToast checks the gate before any registry write, so a
+    // disabled toast means no registration either — Ctrl/Cmd+Z has nothing
+    // to undo, matching every other showUndoToast call site.
+    it('registers nothing when undo toasts are disabled', async () => {
         const deleteTask = vi.fn(async () => ({ success: true }));
         const restoreTask = vi.fn(async () => ({ success: true }));
         setStore({ deleteTask, restoreTask });
@@ -348,9 +355,7 @@ describe.each(SCOPE_CASES)('createTaskListScope — $name', ({ extraDeps }) => {
 
         await vi.waitFor(() => expect(deleteTask).toHaveBeenCalledWith('1'));
         expect(showToast).not.toHaveBeenCalled();
-
-        takeUndoableAction()?.();
-        expect(restoreTask).toHaveBeenCalledWith('1');
+        expect(takeUndoableAction()).toBeNull();
     });
 
     it('does not report success when deleteTask fails', async () => {

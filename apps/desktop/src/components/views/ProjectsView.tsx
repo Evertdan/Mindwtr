@@ -54,6 +54,7 @@ import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
 import { checkBudget } from '../../config/performanceBudgets';
 import { useUiStore } from '../../store/ui-store';
 import { reportError } from '../../lib/report-error';
+import { showUndoToast } from '../../lib/undo-registry';
 import { useAreaSidebarState } from './projects/useAreaSidebarState';
 import { useProjectsViewStore } from './projects/useProjectsViewStore';
 import {
@@ -611,19 +612,12 @@ export function ProjectsView() {
                 }
                 const message = tFallback(t, 'projects.taskMovedTo', 'Moved to {{name}}')
                     .replace('{{name}}', destinationName);
-                if (settings?.undoNotificationsEnabled !== false) {
-                    showToast(message, 'success', 6000, {
-                        label: tFallback(t, 'common.undo', 'Undo'),
-                        onClick: () => {
-                            void Promise.resolve(updateTask(taskId, previous)).catch(failTaskMove);
-                        },
-                    });
-                } else {
-                    showToast(message, 'success');
-                }
+                showUndoToast(message, () => {
+                    void Promise.resolve(updateTask(taskId, previous)).catch(failTaskMove);
+                });
             })
             .catch(failTaskMove);
-    }, [NO_AREA, allTasks, areaById, projects, settings?.undoNotificationsEnabled, showToast, t, updateTask]);
+    }, [NO_AREA, allTasks, areaById, projects, showToast, t, updateTask]);
 
     const handleDndDragStart = useCallback((event: DragStartEvent) => {
         const data = event.active.data.current as ProjectsDragData | undefined;

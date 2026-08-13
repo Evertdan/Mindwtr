@@ -130,3 +130,4 @@ Changes collected after `v1.1.6` and before the next version tag.
 - Self-hosted cloud server: revoking a token now also stops its published calendar feed — the feed URL previously kept working forever, since only the token being revoked could reach the authenticated endpoint that would have stopped it.
 - Dutch: the daily digest and weekly review notifications are written in Dutch instead of falling back to English titles.
 - Notifications: a digest line whose translation a language does not carry now falls back to the English text instead of showing "undefined" — most visibly the Focus line in Italian and, before this release's translations, the Dutch digest titles.
+- Desktop: moving or deleting a project can now be undone with Ctrl+Z and offers the same Undo toast as list actions, and the "undo notifications" switch now consistently governs every undo toast.

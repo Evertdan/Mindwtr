@@ -9,6 +9,7 @@ import { combineDateAndTime } from './calendar/calendar-primitives';
 import { useDesktopCalendarController } from './calendar/useDesktopCalendarController';
 import { fetchExternalCalendarEvents } from '../../lib/external-calendar-events';
 import { setCalendarTaskDragData } from '../../lib/calendar-task-drag';
+import { clearUndoableAction, takeUndoableAction } from '../../lib/undo-registry';
 
 const storeMocks = vi.hoisted(() => {
     const taskStoreState = {
@@ -36,6 +37,7 @@ const storeMocks = vi.hoisted(() => {
             diagnostics: {
                 loggingEnabled: false,
             },
+            undoNotificationsEnabled: true as boolean | undefined,
             weekStart: 'sunday',
         },
         tasks: [] as Task[],
@@ -200,6 +202,11 @@ describe('CalendarView', () => {
         storeMocks.taskStoreState._allTasks = null;
         storeMocks.taskStoreState.projects = [];
         storeMocks.taskStoreState.areas = [];
+        storeMocks.taskStoreState.settings = {
+            diagnostics: { loggingEnabled: false },
+            undoNotificationsEnabled: true,
+            weekStart: 'sunday',
+        };
         storeMocks.taskStoreState.addProject.mockClear();
         storeMocks.taskStoreState.addTask.mockClear();
         storeMocks.taskStoreState.addTask.mockResolvedValue({ success: true, id: 'task-new' });
@@ -1168,6 +1175,7 @@ describe('CalendarView', () => {
         beforeEach(() => {
             showToast = vi.fn();
             useUiStore.setState({ showToast });
+            clearUndoableAction();
         });
 
         it('right-clicking a scheduled block opens the quick menu without opening the task editor or starting a drag', async () => {
@@ -1240,6 +1248,42 @@ describe('CalendarView', () => {
                 startTime: '2026-04-04T09:00:00',
                 relativeStartOffset: { amount: -1, unit: 'day' },
             });
+        });
+
+        // C2: CalendarView's own remove-from-calendar handler used to call
+        // registerUndoableAction unconditionally and only gate the toast,
+        // burning a registry slot even with undo notifications off. The
+        // shared showUndoToast now checks the gate before any registry
+        // write, so neither the toast nor the registration should happen.
+        it('does not register an undoable action or show a toast when undo notifications are disabled', async () => {
+            storeMocks.taskStoreState.settings = {
+                ...storeMocks.taskStoreState.settings,
+                undoNotificationsEnabled: false,
+            };
+            storeMocks.taskStoreState.tasks = [
+                makeTask({
+                    id: 'scheduled-task',
+                    title: 'Scheduled task',
+                    startTime: '2026-04-04T09:00:00',
+                }),
+            ];
+
+            renderCalendar();
+            await flushCalendarEffects();
+
+            const taskButton = screen.getByRole('button', { name: /Scheduled task/i });
+            await act(async () => {
+                fireEvent.contextMenu(taskButton);
+                await Promise.resolve();
+            });
+            await act(async () => {
+                fireEvent.click(screen.getByRole('menuitem', { name: 'Remove from calendar' }));
+                await Promise.resolve();
+            });
+
+            expect(storeMocks.taskStoreState.updateTask).toHaveBeenCalled();
+            expect(showToast).not.toHaveBeenCalled();
+            expect(takeUndoableAction()).toBeNull();
         });
 
         it('clears only dueDate for a due-date chip, leaving startTime untouched, and undo restores it exactly', async () => {

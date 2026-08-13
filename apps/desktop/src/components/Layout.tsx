@@ -27,7 +27,7 @@ import {
 import { cn } from '../lib/utils';
 import { shallow, useTaskStore, safeFormatDate, tFallback, isAllowedInsecureUrl } from '@mindwtr/core';
 import type { StoreActionResult, TaskStatus } from '@mindwtr/core';
-import { registerUndoableAction } from '../lib/undo-registry';
+import { showUndoToast } from '../lib/undo-registry';
 import { formatTaskMovedMessage } from './views/list/task-list-scope';
 import { useLanguage } from '../contexts/language-context';
 import { useUiStore } from '../store/ui-store';
@@ -495,17 +495,10 @@ export function Layout({ children, currentView, onViewChange, onOpenSyncSettings
                 if (outcome && outcome.success === false) {
                     throw new Error(outcome.error || 'Failed to change task status');
                 }
-                if (useTaskStore.getState().settings?.undoNotificationsEnabled === false) return;
-                const undo = registerUndoableAction(() => {
+                showUndoToast(formatTaskMovedMessage(t, title, nextStatus), () => {
                     void Promise.resolve(useTaskStore.getState().moveTask(taskId, previousStatus))
                         .catch((error) => reportError('Failed to undo task status change', error));
                 });
-                useUiStore.getState().showToast(
-                    formatTaskMovedMessage(t, title, nextStatus),
-                    'info',
-                    5000,
-                    { label: tFallback(t, 'common.undo', 'Undo'), onClick: undo },
-                );
             })
             .catch((error) => reportError('Failed to change task status', error));
     }, [clearCalendarDragNavTimeout, currentView, onViewChange, t]);
