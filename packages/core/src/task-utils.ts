@@ -124,6 +124,8 @@ export type TaskFocusEligibilityOptions = {
     now?: Date;
     sequentialProjectIds?: ReadonlySet<string>;
     sectionScopedProjectIds?: ReadonlySet<string>;
+    /** Precomputed by buildTaskFocusEligibilityContext; derived per call when absent. */
+    sequentialFirstTaskIds?: ReadonlySet<string>;
 };
 
 type SequentialTaskOrderFields = Pick<Task, 'createdAt' | 'order' | 'orderNum'>;
@@ -650,6 +652,35 @@ export const getFocusEligibilitySequentialProjectIds = (
     return { sequentialProjectIds, sectionScopedProjectIds };
 };
 
+/**
+ * Everything getTaskFocusEligibility derives from the whole task set, computed once. Pass the
+ * result as options when classifying more than one task against the same library.
+ */
+export function buildTaskFocusEligibilityContext(options: {
+    tasks: readonly Task[];
+    projects: readonly Project[] | Map<string, Project>;
+    now?: Date;
+}): Required<Pick<TaskFocusEligibilityOptions,
+    'projects' | 'sequentialProjectIds' | 'sectionScopedProjectIds' | 'sequentialFirstTaskIds'>> {
+    const now = options.now ?? new Date();
+    const projectMap = getFocusEligibilityProjectMap(options.projects);
+    const { sequentialProjectIds, sectionScopedProjectIds } = getFocusEligibilitySequentialProjectIds(projectMap);
+    return {
+        projects: projectMap,
+        sequentialProjectIds,
+        sectionScopedProjectIds,
+        sequentialFirstTaskIds: getFocusSequentialFirstTaskIds(
+            options.tasks.filter((candidate) => (
+                !candidate.deletedAt
+                && FOCUS_ELIGIBILITY_ACTIVE_STATUS_SET.has(candidate.status)
+                && isTaskInActiveProject(candidate, projectMap)
+            )),
+            sequentialProjectIds,
+            { now, sectionScopedProjectIds },
+        ),
+    };
+}
+
 export function getTaskFocusEligibility(
     task: Task,
     options: TaskFocusEligibilityOptions,
@@ -663,16 +694,19 @@ export function getTaskFocusEligibility(
     const sectionScopedProjectIds = options.sectionScopedProjectIds
         ?? derivedSequential?.sectionScopedProjectIds
         ?? new Set<string>();
-    const activeFocusBaseTasks = options.tasks.filter((candidate) => (
-        !candidate.deletedAt
-        && FOCUS_ELIGIBILITY_ACTIVE_STATUS_SET.has(candidate.status)
-        && isTaskInActiveProject(candidate, projectMap)
-    ));
-    const sequentialFirstTaskIds = getFocusSequentialFirstTaskIds(
-        activeFocusBaseTasks,
-        sequentialProjectIds,
-        { now, sectionScopedProjectIds },
-    );
+    // Scanning every task to find each sequential chain's head is O(all) — fine for one call,
+    // quadratic when a caller filters a whole library. Callers that ask repeatedly should pass
+    // buildTaskFocusEligibilityContext's result instead.
+    const sequentialFirstTaskIds = options.sequentialFirstTaskIds
+        ?? getFocusSequentialFirstTaskIds(
+            options.tasks.filter((candidate) => (
+                !candidate.deletedAt
+                && FOCUS_ELIGIBILITY_ACTIVE_STATUS_SET.has(candidate.status)
+                && isTaskInActiveProject(candidate, projectMap)
+            )),
+            sequentialProjectIds,
+            { now, sectionScopedProjectIds },
+        );
     const isSequentialBlocked = Boolean(
         task.projectId
         && sequentialProjectIds.has(task.projectId)

@@ -190,6 +190,40 @@ describe('mcp queries', () => {
         expect(listTasks(db, { includeDeleted: true, search: 'Report' }).map((t) => t.id)).toEqual(['live']);
     });
 
+    // V2 guard: the sequential-chain scan is O(all), so deriving it inside the filter made the
+    // view O(matched x all) — 10s at 10k tasks. Coarse on purpose: a wall-clock budget would be
+    // flaky, but a quadratic reintroduction shows up as a ~4x jump when the library doubles.
+    test('listTasks view cost grows about linearly with the library', () => {
+        const now = '2026-02-01T00:00:00.000Z';
+        const build = (count: number) => createMockDb(
+            Array.from({ length: count }, (_unused, index) => ({
+                id: `t${String(index).padStart(5, '0')}`,
+                title: `Task ${index}`,
+                status: 'next',
+                projectId: 'p-seq',
+                orderNum: index,
+                createdAt: now,
+                updatedAt: now,
+                isFocusedToday: 0,
+            })),
+            { projects: [{ id: 'p-seq', title: 'Sequential', status: 'active', isSequential: 1, createdAt: now, updatedAt: now }] },
+        ).db;
+
+        const time = (count: number) => {
+            const db = build(count);
+            const started = performance.now();
+            listTasks(db, { view: 'blocked', limit: 1000 });
+            return performance.now() - started;
+        };
+
+        time(500); // warm up, so JIT does not inflate the first real sample
+        const small = time(1000);
+        const large = time(2000);
+
+        // Linear would be ~2x; quadratic ~4x. 3x leaves room for noise on a loaded machine.
+        expect(large < Math.max(small, 1) * 3).toBe(true);
+    });
+
     // D2: eligibility depends on the whole library, so the base set must not be a page.
     // Step 1 sits past the 200-row default limit; if the view path reads a capped set it
     // cannot see it, designates step 2 as first, and reports a blocked task as available.

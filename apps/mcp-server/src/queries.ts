@@ -5,7 +5,7 @@ import {
   areaFromSqliteRow,
   buildTaskWhere,
   filterTasksBySearch,
-  getFocusEligibilitySequentialProjectIds,
+  buildTaskFocusEligibilityContext,
   getTaskFocusEligibility,
   mapSqliteTaskRow,
   parseQuickAdd as parseQuickAddCore,
@@ -278,16 +278,11 @@ export function listTasks(db: DbClient, input: ListTasksInput): TaskRow[] {
         .prepare(`SELECT ${selectColumns.join(', ')} FROM tasks${allWhere.sql ? ` WHERE ${allWhere.sql}` : ''}`)
         .all<TaskSqliteRow>(...allWhere.params)
         .map(mapTaskRow) as unknown as CoreTask[];
-      // Hoisted: deriving these per candidate made the filter O(matched x all).
-      const projectMap = new Map(projects.map((project) => [project.id, project]));
-      const { sequentialProjectIds, sectionScopedProjectIds } = getFocusEligibilitySequentialProjectIds(projectMap);
+      // Once, not per candidate: the sequential-chain scan is O(all), so deriving it inside the
+      // filter was O(matched x all) — 10s at 10k tasks, minutes at 50k (V2).
+      const context = buildTaskFocusEligibilityContext({ tasks: all, projects });
       const wanted = input.view === 'blocked' ? 'sequential' : input.view === 'deferred' ? 'deferred' : 'eligible';
-      matched = matched.filter((task) => getTaskFocusEligibility(task, {
-        tasks: all,
-        projects: projectMap,
-        sequentialProjectIds,
-        sectionScopedProjectIds,
-      }).reason === wanted);
+      matched = matched.filter((task) => getTaskFocusEligibility(task, { tasks: all, ...context }).reason === wanted);
     }
 
     return matched.slice(offset, offset + limit) as unknown as TaskRow[];
