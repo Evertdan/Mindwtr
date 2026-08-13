@@ -131,6 +131,7 @@ export * from './ticktick-import';
 export * from './dgt-import';
 export * from './omnifocus-import';
 export * from './mindwtr-csv-import';
+export * from './mindwtr-csv-export';
 export * from './mind-sweep';
 export * from './focus-star';
 export * from './focus-grouping';
