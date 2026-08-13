@@ -156,15 +156,18 @@ describe('MindwtrService conformance: local SQLite vs cloud REST', () => {
     expect(ids.indexOf('t-05') < ids.indexOf('t-03')).toBeTruthy(); // high before none
   });
 
-  describe('search: FTS token/prefix (local) vs substring (cloud) — a stated capability difference, not a bug', () => {
-    // "Reporting" contains "port" as a substring but does not START with it, so a prefix
-    // query only matches on the substring-based adapter.
-    test('local FTS prefix search does not match mid-word', async () => {
+  // Was "a stated capability difference": local used FTS prefix matching, cloud used
+  // substrings, so the same query returned different sets. Local now runs the same core
+  // search the desktop, mobile and CLI surfaces run, which is substring-based — the
+  // divergence is gone rather than documented.
+  describe('search matches mid-word on both adapters', () => {
+    // "Reporting" contains "port" as a substring but does not START with it.
+    test('local matches mid-word', async () => {
       const ids = (await local.listTasks({ search: 'port' })).map((task) => task.id);
-      expect(ids).not.toContain('t-report');
+      expect(ids).toContain('t-report');
     });
 
-    test('cloud substring search does match mid-word', async () => {
+    test('cloud matches mid-word', async () => {
       const ids = (await cloud.listTasks({ search: 'port' })).map((task) => task.id);
       expect(ids).toContain('t-report');
     });

@@ -4,6 +4,7 @@ import {
   TASK_SQLITE_COLUMNS,
   areaFromSqliteRow,
   buildTaskWhere,
+  filterTasksBySearch,
   mapSqliteTaskRow,
   parseQuickAdd as parseQuickAddCore,
   personFromSqliteRow,
@@ -97,7 +98,6 @@ export type AddTaskInput = {
 export type TaskRow = Task;
 
 type ColumnInfoRow = { name?: unknown };
-type SqliteNameRow = { name?: unknown };
 type TaskSqliteRow = Record<string, unknown>;
 type ProjectSqliteRow = Record<string, unknown> & {
   id: string;
@@ -165,7 +165,6 @@ type PersonSqliteRow = Record<string, unknown> & {
 const BASE_TASK_COLUMNS = [...TASK_SQLITE_COLUMNS];
 
 const taskColumnsCache = new WeakMap<DbClient, { hasOrderNum: boolean; insertColumns: string[]; selectColumns: string[] }>();
-const tasksFtsCache = new WeakMap<DbClient, boolean>();
 
 const getTaskColumns = (db: DbClient) => {
   const cached = taskColumnsCache.get(db);
@@ -186,33 +185,6 @@ const getTaskColumns = (db: DbClient) => {
   }
 };
 
-const hasTasksFts = (db: DbClient): boolean => {
-  const cached = tasksFtsCache.get(db);
-  if (cached !== undefined) return cached;
-  try {
-    const rows = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'tasks_fts'").all<SqliteNameRow>();
-    const hasFts = rows.some((row) => row.name === 'tasks_fts');
-    tasksFtsCache.set(db, hasFts);
-    return hasFts;
-  } catch {
-    tasksFtsCache.set(db, false);
-    return false;
-  }
-};
-
-const buildTasksFtsQuery = (search: string): string | null => {
-  const cleaned = String(search || '')
-    .replace(/[^\p{L}\p{N}#@]+/gu, ' ')
-    .trim();
-  if (!cleaned) return null;
-  const reservedTokens = new Set(['AND', 'OR', 'NOT', 'NEAR']);
-  const tokens = cleaned
-    .split(/\s+/)
-    .filter(Boolean)
-    .filter((token) => !reservedTokens.has(token.toUpperCase()));
-  if (tokens.length === 0) return null;
-  return tokens.map((token) => `${token}*`).join(' ');
-};
 
 // `priority` is a TEXT column, so sorting it directly is lexicographic ('high' sorts after
 // 'medium' and 'urgent' descending). Rank it through a CASE built from the shared
@@ -255,19 +227,6 @@ export function listTasks(db: DbClient, input: ListTasksInput): TaskRow[] {
   const where: string[] = coreWhere ? [coreWhere] : [];
   const params: unknown[] = [...coreParams];
 
-  if (input.search) {
-    const ftsQuery = buildTasksFtsQuery(input.search);
-    if (ftsQuery && hasTasksFts(db)) {
-      where.push("rowid IN (SELECT rowid FROM tasks_fts WHERE tasks_fts MATCH ?)");
-      params.push(ftsQuery);
-    } else {
-      where.push("(title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')");
-      // Escape SQL wildcards (%, _, \) in search input
-      const escaped = input.search.replace(/[\\%_]/g, '\\$&');
-      const pattern = `%${escaped}%`;
-      params.push(pattern, pattern);
-    }
-  }
   if (input.dueDateFrom) {
     where.push('date(dueDate) >= date(?)');
     params.push(input.dueDateFrom);
@@ -288,8 +247,25 @@ export function listTasks(db: DbClient, input: ListTasksInput): TaskRow[] {
   const orderExpr = sortBy === 'priority' ? PRIORITY_SQL_CASE : sortBy;
   // `id ASC` is a stable tie-break for equal sort keys and, like the cloud adapter's
   // `id.localeCompare`, never flips direction with sortOrder.
-  const sql = `SELECT ${selectColumns.join(', ')} FROM tasks ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY ${orderExpr} ${sortOrder}, id ASC LIMIT ? OFFSET ?`;
-  const rows = db.prepare(sql).all<TaskSqliteRow>(...params, limit, offset);
+  const selectSql = `SELECT ${selectColumns.join(', ')} FROM tasks ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY ${orderExpr} ${sortOrder}, id ASC`;
+
+  if (input.search) {
+    // The documented operator language (status:/context:/due:<=7d/negation/quotes) lives in
+    // core and cannot be expressed in SQL, so the non-search filters run in the database and
+    // the query runs over that result. filterTasksBySearch, NOT searchAll: searchAll caps at
+    // SEARCH_RESULT_LIMIT (200) before any caller paginates, which would silently strand
+    // every match past the 200th. Here limit/offset apply to the whole match set.
+    // ponytail: reads the pre-search matches into memory; push down only if a real database
+    // ever grows enough for it to show up.
+    const matched = filterTasksBySearch(
+      db.prepare(selectSql).all<TaskSqliteRow>(...params).map(mapTaskRow) as unknown as CoreTask[],
+      listProjects(db) as unknown as CoreProject[],
+      input.search,
+    );
+    return matched.slice(offset, offset + limit) as unknown as TaskRow[];
+  }
+
+  const rows = db.prepare(`${selectSql} LIMIT ? OFFSET ?`).all<TaskSqliteRow>(...params, limit, offset);
   return rows.map(mapTaskRow);
 }
 

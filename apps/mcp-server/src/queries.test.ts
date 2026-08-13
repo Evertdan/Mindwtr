@@ -10,6 +10,7 @@ import {
     type ProjectRef,
 } from './queries.js';
 import type { DbClient } from './db.js';
+import { searchAll } from '@mindwtr/core';
 
 const createMockDb = (
     rows: any[] = [],
@@ -131,25 +132,42 @@ describe('mcp queries', () => {
         expect(parsed.props.isFocusedToday).toBe(true);
     });
 
-    test('listTasks escapes wildcard characters in search input', () => {
+    test('listTasks treats SQL wildcards in the search as literal text', () => {
         const now = '2026-02-01T00:00:00.000Z';
-        const { db, calls } = createMockDb([
-            {
-                id: 't1',
-                title: 'Task',
-                status: 'inbox',
-                createdAt: now,
-                updatedAt: now,
-                isFocusedToday: 0,
-            },
+        const { db } = createMockDb([
+            { id: 't1', title: '100%_done\\now', status: 'inbox', createdAt: now, updatedAt: now, isFocusedToday: 0 },
+            { id: 't2', title: 'anything at all', status: 'inbox', createdAt: now, updatedAt: now, isFocusedToday: 0 },
         ]);
 
-        const tasks = listTasks(db, { search: '100%_done\\now', includeDeleted: false });
-        expect(tasks).toHaveLength(1);
-        const queryCall = calls.find((call) => call.sql.startsWith('SELECT') && call.sql.includes('FROM tasks '));
-        expect(queryCall).toBeTruthy();
-        expect(queryCall?.params[0]).toBe('%100\\%\\_done\\\\now%');
-        expect(queryCall?.params[1]).toBe('%100\\%\\_done\\\\now%');
+        // Under LIKE these were wildcards needing escaping; core matches them literally.
+        expect(listTasks(db, { search: '100%_done\\now', includeDeleted: false }).map((t) => t.id)).toEqual(['t1']);
+        expect(listTasks(db, { search: '%', includeDeleted: false }).map((t) => t.id)).toEqual(['t1']);
+    });
+
+
+    // scripts/mindwtr-automation-core.ts (the CLI's list/search path) resolves the same
+    // operator query with core's searchAll. Same fixture, same query, same task set: the two
+    // automation surfaces answer identically.
+    test('answers the same operator queries as the CLI automation service', () => {
+        const now = '2026-02-01T00:00:00.000Z';
+        const fixture = [
+            { id: 't1', title: 'Call plumber', status: 'next', contexts: '["@phone"]', tags: '["#home"]', createdAt: now, updatedAt: now, isFocusedToday: 0 },
+            { id: 't2', title: 'Call bank', status: 'someday', contexts: '["@phone"]', tags: '[]', createdAt: now, updatedAt: now, isFocusedToday: 0 },
+            { id: 't3', title: 'Mow lawn', status: 'next', contexts: '["@home"]', tags: '["#home"]', createdAt: now, updatedAt: now, isFocusedToday: 0 },
+            { id: 't4', title: 'Reporting weekly', status: 'inbox', contexts: '[]', tags: '[]', createdAt: now, updatedAt: now, isFocusedToday: 0 },
+        ];
+        const { db } = createMockDb(fixture);
+        const asCoreTasks = fixture.map((row) => ({
+            ...row,
+            contexts: JSON.parse(row.contexts),
+            tags: JSON.parse(row.tags),
+        })) as any[];
+
+        for (const query of ['status:next', 'context:@phone', 'tag:#home', 'context:@phone -status:someday', '"Call bank"', 'port']) {
+            const mcpIds = listTasks(db, { search: query }).map((task) => task.id).sort();
+            const cliIds = searchAll(asCoreTasks, [], query).tasks.map((task) => task.id).sort();
+            expect({ query, ids: mcpIds }).toEqual({ query, ids: cliIds });
+        }
     });
 
     test('listTasks filters isFocusedToday with a NULL-safe predicate', () => {
@@ -190,32 +208,61 @@ describe('mcp queries', () => {
         expect(queryCall?.sql.includes('isFocusedToday')).toBe(false);
     });
 
-    test('listTasks uses FTS search when tasks_fts is available', () => {
+    test('listTasks runs the search through core, not SQL', () => {
         const now = '2026-02-01T00:00:00.000Z';
         const { db, calls } = createMockDb(
             [
-                {
-                    id: 't1',
-                    title: 'Task',
-                    status: 'inbox',
-                    createdAt: now,
-                    updatedAt: now,
-                    isFocusedToday: 0,
-                },
+                { id: 't1', title: 'Write the report', status: 'inbox', createdAt: now, updatedAt: now, isFocusedToday: 0 },
+                { id: 't2', title: 'Book flights', status: 'inbox', createdAt: now, updatedAt: now, isFocusedToday: 0 },
             ],
             { hasTasksFts: true },
         );
 
-        listTasks(db, { search: 'project alpha', includeDeleted: false });
+        const tasks = listTasks(db, { search: 'report', includeDeleted: false });
+
+        expect(tasks.map((task) => task.id)).toEqual(['t1']);
+        // No FTS MATCH and no LIKE: the operator language cannot be expressed in SQL, so the
+        // query runs in core over the rows the other filters selected.
         const queryCall = calls.find((call) => call.sql.startsWith('SELECT') && call.sql.includes('FROM tasks '));
-        expect(queryCall).toBeTruthy();
-        expect(queryCall?.sql.includes('tasks_fts MATCH ?')).toBe(true);
-        // tasks_fts is a contentless FTS5 table (content=''), so its id column is
-        // always NULL; the lookup must join on rowid or it matches nothing.
-        expect(queryCall?.sql.includes('rowid IN (SELECT rowid FROM tasks_fts')).toBe(true);
-        expect(queryCall?.sql.includes('id IN (SELECT id FROM tasks_fts')).toBe(false);
-        expect(queryCall?.params[0]).toBe('project* alpha*');
+        expect(queryCall?.sql.includes('tasks_fts MATCH ?')).toBe(false);
+        expect(queryCall?.sql.includes('LIKE ?')).toBe(false);
     });
+
+    test('listTasks supports the documented search operators', () => {
+        const now = '2026-02-01T00:00:00.000Z';
+        const { db } = createMockDb([
+            { id: 't1', title: 'Call plumber', status: 'next', contexts: '["@phone"]', createdAt: now, updatedAt: now, isFocusedToday: 0 },
+            { id: 't2', title: 'Call bank', status: 'someday', contexts: '["@phone"]', createdAt: now, updatedAt: now, isFocusedToday: 0 },
+            { id: 't3', title: 'Mow lawn', status: 'next', contexts: '["@home"]', createdAt: now, updatedAt: now, isFocusedToday: 0 },
+        ]);
+
+        expect(listTasks(db, { search: 'status:next' }).map((t) => t.id)).toEqual(['t1', 't3']);
+        expect(listTasks(db, { search: 'context:@phone' }).map((t) => t.id)).toEqual(['t1', 't2']);
+        expect(listTasks(db, { search: 'context:@phone -status:someday' }).map((t) => t.id)).toEqual(['t1']);
+        expect(listTasks(db, { search: '"Call bank"' }).map((t) => t.id)).toEqual(['t2']);
+    });
+
+    // searchAll caps results at SEARCH_RESULT_LIMIT (200) BEFORE any caller paginates, so
+    // routing through it would strand every match past the 200th. listTasks uses the uncapped
+    // predicate: limit/offset page the FULL match set.
+    test('listTasks paginates the whole search match set, past 200', () => {
+        const now = '2026-02-01T00:00:00.000Z';
+        const rows = Array.from({ length: 250 }, (_unused, index) => ({
+            id: `t${String(index).padStart(3, '0')}`,
+            title: `Report ${index}`,
+            status: 'inbox',
+            createdAt: now,
+            updatedAt: now,
+            isFocusedToday: 0,
+        }));
+        const { db } = createMockDb(rows);
+
+        expect(listTasks(db, { search: 'Report', limit: 500 })).toHaveLength(250);
+        const page = listTasks(db, { search: 'Report', limit: 10, offset: 240 });
+        expect(page).toHaveLength(10);
+        expect(page[0]?.id).toBe('t240');
+    });
+
 
     test('listTasks compares mixed date-only and datetime due filters as dates', () => {
         const now = '2026-02-01T00:00:00.000Z';
