@@ -13,7 +13,6 @@ import {
   getUsedTaskTokens,
   type TaskSortBy,
   type ProjectSequenceTaskCue,
-  getTranslationsSync,
   shallow,
   normalizeFocusTaskLimit,
   tFallback,
@@ -245,7 +244,7 @@ function TaskListComponent({
   const taskListRenderStartedAt = Date.now();
   const rowRenderCountAtRenderStart = readTaskRowRenderCount();
   const { isDark } = useTheme();
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const { showToast } = useToast();
   const { width: windowWidth } = useWindowDimensions();
   const {
@@ -306,9 +305,7 @@ function TaskListComponent({
   // (when it first appears in the rendered data) rather than re-scrolling on
   // every unrelated list re-render during its ~3.5s highlight window (#916).
   const scrolledHighlightIdRef = useRef<string | null>(null);
-  const restoreActionLabel = getTranslationsSync(language)['trash.restoreToInbox']
-    || getTranslationsSync('en')['trash.restoreToInbox']
-    || 'Restore';
+  const restoreActionLabel = tFallback(t, 'trash.restoreToInbox', 'Restore');
   const pullSync = useManualPullSync();
 
   // Dynamic colors based on theme

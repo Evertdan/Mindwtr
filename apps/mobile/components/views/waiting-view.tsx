@@ -1,5 +1,5 @@
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { getTranslationsSync, getWaitingPerson, safeParseDueDate, shallow, useTaskStore,
+import { getWaitingPerson, safeParseDueDate, shallow, tFallback, useTaskStore,
     baseTextCollator,
 } from '@mindwtr/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -34,13 +34,11 @@ export function WaitingView() {
     setHighlightTask: state.setHighlightTask,
   }), shallow);
   const { isDark } = useTheme();
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [selectedWaitingPerson, setSelectedWaitingPerson] = useState('');
   const router = useRouter();
-  const restoreActionLabel = getTranslationsSync(language)['trash.restoreToInbox']
-    || getTranslationsSync('en')['trash.restoreToInbox']
-    || 'Restore';
+  const restoreActionLabel = tFallback(t, 'trash.restoreToInbox', 'Restore');
 
   const tc = useThemeColors();
   const insets = useSafeAreaInsets();

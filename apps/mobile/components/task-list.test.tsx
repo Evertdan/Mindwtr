@@ -151,7 +151,6 @@ vi.mock('react-native-draggable-flatlist', () => ({
 vi.mock('@mindwtr/core', async (importOriginal) => {
   const { mockCore } = await import('../test-support/mock-core');
   return mockCore(importOriginal as () => Promise<Record<string, unknown>>, () => storeState, {
-    getTranslationsSync: vi.fn(() => ({ 'trash.restoreToInbox': 'Restore' })),
     getTaskMetadataFilterVisibility: vi.fn(() => ({
       showEnergy: true,
       showLocation: true,

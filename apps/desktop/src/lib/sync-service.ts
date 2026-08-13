@@ -45,8 +45,8 @@ import {
     getInMemoryAppDataSnapshot,
     createAbortableFetch,
     ensureFreshLocalSyncSnapshot,
-    getTranslationsSync,
-    isSupportedLanguage,
+    getTranslator,
+    resolveI18nText,
     LEGACY_SYNC_FILE_NAME,
     SYNC_FILE_NAME,
     type CloudCalendarFeed,
@@ -261,7 +261,6 @@ let syncServiceDependencies: SyncServiceDependencies = {
 
 const isTauriRuntimeEnv = () => syncServiceDependencies.isTauriRuntime();
 const getStoreState = () => syncServiceDependencies.getStoreState();
-const fallbackSyncTranslations = getTranslationsSync('en');
 const syncRestoreQueue = createSerializedAsyncQueue();
 const runSyncRestoreExclusive = <T>(operation: () => Promise<T>): Promise<T> => (
     syncRestoreQueue.run(operation)
@@ -273,13 +272,11 @@ const runSyncDocumentWriteExclusive = <T>(operation: () => Promise<T>): Promise<
     runSyncRestoreExclusive(() => runSerializedSyncDocumentWriteOperation(operation))
 );
 
-const resolveSyncText = (key: string, fallback: string): string => {
-    const language = getStoreState().settings?.language;
-    const translations = language && isSupportedLanguage(language)
-        ? getTranslationsSync(language)
-        : fallbackSyncTranslations;
-    return translations[key] || fallbackSyncTranslations[key] || fallback;
-};
+const resolveSyncText = (key: string, fallback: string): string => resolveI18nText(
+    getTranslator(getStoreState().settings?.language ?? 'en'),
+    key,
+    { fallback },
+);
 
 const logSyncWarning = (message: string, error?: unknown) => {
     const extra = error

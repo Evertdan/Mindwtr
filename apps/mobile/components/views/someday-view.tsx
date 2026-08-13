@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, Platform } from 'react-native';
-import { getTranslationsSync, shallow, useTaskStore } from '@mindwtr/core';
+import { shallow, tFallback, useTaskStore } from '@mindwtr/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Task, TaskStatus } from '@mindwtr/core';
 import { useTheme } from '../../contexts/theme-context';
@@ -34,12 +34,10 @@ export function SomedayView() {
     setHighlightTask: state.setHighlightTask,
   }), shallow);
   const { isDark } = useTheme();
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const router = useRouter();
-  const restoreActionLabel = getTranslationsSync(language)['trash.restoreToInbox']
-    || getTranslationsSync('en')['trash.restoreToInbox']
-    || 'Restore';
+  const restoreActionLabel = tFallback(t, 'trash.restoreToInbox', 'Restore');
 
   const tc = useThemeColors();
   const insets = useSafeAreaInsets();

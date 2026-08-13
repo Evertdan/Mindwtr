@@ -1,8 +1,8 @@
 import {
     formatI18nTemplate,
-    getTranslationsSync,
-    isSupportedLanguage,
+    getTranslator,
     normalizeObsidianRelativePath,
+    resolveI18nText,
     useTaskStore,
     type ObsidianTask,
 } from '@mindwtr/core';
@@ -20,15 +20,11 @@ import {
 } from '../lib/obsidian-scanner';
 import { useUiStore } from './ui-store';
 
-// ponytail: same shape as sync-service's resolveSyncText / notification-service's
-// lookup. Extract a shared desktop helper if a fourth module needs one.
-const resolveObsidianText = (key: string, fallback: string): string => {
-    const language = useTaskStore.getState().settings?.language;
-    const translations = getTranslationsSync(
-        language && isSupportedLanguage(language) ? language : 'en',
-    );
-    return translations[key] || getTranslationsSync('en')[key] || fallback;
-};
+const resolveObsidianText = (key: string, fallback: string): string => resolveI18nText(
+    getTranslator(useTaskStore.getState().settings?.language ?? 'en'),
+    key,
+    { fallback },
+);
 
 type ObsidianWatchUpdateResult = {
     changedCount: number;

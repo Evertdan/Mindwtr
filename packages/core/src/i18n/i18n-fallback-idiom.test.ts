@@ -150,6 +150,43 @@ describe('i18n fallback idiom ratchet', () => {
         // Same slow-runner allowance as the idiom scan above.
     }, 60_000);
 
+    it('keeps hand-rolled locale-dictionary fallbacks out of apps/desktop and apps/mobile source', () => {
+        // Reading getTranslationsSync twice in one module is the signature of a
+        // hand-rolled "locale dictionary, else English dictionary" lookup. Core's
+        // getTranslator() owns that chain and resolveI18nText() owns what to show when
+        // both miss; the six copies this replaced (sync-service, obsidian-store,
+        // undo-registry, and the three mobile trash-restore labels) all indexed the raw
+        // dictionary instead, so any key a locale correctly omits came back undefined —
+        // that shipped an "undefined" digest notification title to Dutch users.
+        //
+        // Counted per FILE rather than per function on purpose: sync-service hoisted its
+        // English dictionary into a module-level const, so a per-function scan would have
+        // walked straight past it.
+        //
+        // One call per file is the legitimate loader read (language-context seeding its
+        // English map, widget-data building a payload) — those hold the dictionary itself,
+        // not a fallback policy.
+        const violations: string[] = [];
+        for (const { path, sourceFile } of collectSourceFiles()) {
+            let calls = 0;
+            const visit = (node: ts.Node) => {
+                if (
+                    ts.isCallExpression(node)
+                    && ts.isIdentifier(node.expression)
+                    && node.expression.escapedText === 'getTranslationsSync'
+                ) {
+                    calls += 1;
+                }
+                ts.forEachChild(node, visit);
+            };
+            visit(sourceFile);
+            if (calls > 1) violations.push(`${path}  (${calls} getTranslationsSync reads)`);
+        }
+
+        expect(violations).toEqual([]);
+        // Same slow-runner allowance as the idiom scan above.
+    }, 60_000);
+
     it('keeps every statically-referenced i18n key present in en.ts', () => {
         // Static analysis boundary: only literal-string keys are checkable this way.
         // A dynamic key built from a runtime value (e.g. t(`status.${task.status}`) or
