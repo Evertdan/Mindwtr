@@ -912,6 +912,7 @@ export const en: Record<string, string> = {
         'process.quickMoveHint': 'Move this item and continue to the next inbox item.',
         'process.followUpLabel': 'Follow-up',
         'process.delegateSendError': 'Could not send the delegation message.',
+        'process.delegateRequestCopied': 'Request copied — paste it into an email or chat.',
 
         // Settings
         'settings.title': 'Settings',

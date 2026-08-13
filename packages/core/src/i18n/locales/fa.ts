@@ -890,6 +890,7 @@ export const faOverrides: Record<string, string> = {
         'process.quickMoveHint': 'این مورد را منتقل کرده و به مورد بعدی صندوق ورودی ادامه دهید.',
         'process.followUpLabel': 'پیگیری',
         'process.delegateSendError': 'ارسال پیام واگذاری ممکن نشد.',
+        'process.delegateRequestCopied': 'درخواست کپی شد — آن را در ایمیل یا گفتگو جای‌گذاری کنید.',
 
         'settings.title': 'تنظیمات',
         'settings.subtitle': 'تجربه Mindwtr خود را سفارشی کنید',

@@ -41,6 +41,7 @@ export const zhHant: Record<string, string> = {
         'filters.remove': '移除篩選',
         'process.followUpLabel': '跟進',
         'process.delegateSendError': '無法發送委派訊息。',
+        'process.delegateRequestCopied': '請求已複製——貼到郵件或聊天中即可。',
         'settings.pomodoroSettings': '番茄鐘設置',
         'pomodoro.noTask': '沒有可用的專注任務',
         'pomodoro.selectedTask': '計時器任務',

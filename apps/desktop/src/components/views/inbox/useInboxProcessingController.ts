@@ -25,6 +25,7 @@ import {
 import type { InboxProcessingQuickPanelProps } from '../../InboxProcessingQuickPanel';
 import type { InboxProcessingWizardProps, ProcessingStep } from '../../InboxProcessingWizard';
 import { reportError } from '../../../lib/report-error';
+import { isTauriRuntime } from '../../../lib/runtime';
 import { useUiStore } from '../../../store/ui-store';
 import {
     buildDateTimeUpdate,
@@ -32,6 +33,7 @@ import {
     parseContextsInput,
     parseTagsInput,
     parseTokenListInput,
+    resolveDelegateEmail,
     type InboxProcessingOptionLists,
 } from './inbox-processing-utils';
 import { useInboxProcessingState } from './useInboxProcessingState';
@@ -478,7 +480,7 @@ export function useInboxProcessingController({
         goBack();
     }, [goBack]);
 
-    const handleSendDelegateRequest = useCallback(() => {
+    const handleSendDelegateRequest = useCallback(async () => {
         if (!processingTask) return;
         const title = draft.title.trim() || processingTask.title;
         const baseDescription = draft.description.trim() || processingTask.description || '';
@@ -494,9 +496,31 @@ export function useInboxProcessingController({
         ];
         const body = bodyParts.join('\n');
         const subject = `Delegation: ${title}`;
-        const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        window.open(mailto);
-    }, [delegateWho, draft.description, draft.title, processingTask]);
+        // The saved person's mailto: reference doubles as the recipient; the
+        // shell-open scope also requires one (a bare "mailto:?..." is refused).
+        const email = resolveDelegateEmail(people, who);
+        const mailto = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        if (!isTauriRuntime()) {
+            window.open(mailto);
+            return;
+        }
+        if (email) {
+            try {
+                const { open } = await import('@tauri-apps/plugin-shell');
+                await open(mailto);
+                return;
+            } catch {
+                // No mail handler (or scope refusal) — fall through to the clipboard.
+            }
+        }
+        try {
+            await navigator.clipboard.writeText(`${subject}\n\n${body}`);
+            showToast(tFallback(t, 'process.delegateRequestCopied', 'Request copied — paste it into an email or chat.'), 'success');
+        } catch (error) {
+            reportError('Failed to prepare delegation request', error);
+            showToast(tFallback(t, 'process.delegateSendError', 'Could not prepare the request.'), 'error');
+        }
+    }, [delegateWho, draft.description, draft.title, people, processingTask, showToast, t]);
 
     const updateSelectedContexts = useCallback((contexts: string[]) => {
         setField('contexts', formatTokenListInput(contexts));

@@ -890,6 +890,7 @@ export const svOverrides: Record<string, string> = {
         'process.quickMoveHint': 'Flytta den här posten och fortsätt till nästa post i inkorgen.',
         'process.followUpLabel': 'Uppföljning',
         'process.delegateSendError': 'Det gick inte att skicka delegeringsmeddelandet.',
+        'process.delegateRequestCopied': 'Förfrågan kopierad — klistra in den i ett mejl eller en chatt.',
 
         'settings.title': 'Inställningar',
         'settings.subtitle': 'Anpassa din Mindwtr-upplevelse',

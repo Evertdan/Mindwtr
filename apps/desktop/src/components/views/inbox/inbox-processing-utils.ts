@@ -1,5 +1,15 @@
-import { normalizeClockTimeInput, type Area, type Project, type TimeEstimate } from '@mindwtr/core';
+import { normalizeClockTimeInput, type Area, type Person, type Project, type TimeEstimate } from '@mindwtr/core';
 import { joinDateTime, splitDateTime } from '@mindwtr/core/date-draft';
+
+/** The delegate's email, taken from their saved mailto: reference link ('' when unknown). */
+export const resolveDelegateEmail = (people: readonly Person[], who: string): string => {
+    const name = who.trim().toLowerCase();
+    if (!name) return '';
+    const person = people.find((candidate) => !candidate.deletedAt && candidate.name.trim().toLowerCase() === name);
+    const referenceLink = person?.referenceLink?.trim() ?? '';
+    if (!referenceLink.toLowerCase().startsWith('mailto:')) return '';
+    return referenceLink.slice('mailto:'.length).split('?')[0] ?? '';
+};
 
 export const parseTokenListInput = (value: string, prefix: '@' | '#'): string[] => Array.from(
     new Set(
