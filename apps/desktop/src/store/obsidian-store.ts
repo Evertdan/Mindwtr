@@ -345,7 +345,7 @@ export const useObsidianStore = createWithEqualityFn<ObsidianStoreState>()((set,
                     if (totalFiles > 0) {
                         useUiStore.getState().showToast(
                             formatI18nTemplate(
-                                resolveObsidianText('obsidian.filesUpdated', 'Updated {{count}} Obsidian files.'),
+                                resolveObsidianText('obsidian.filesUpdated', 'Updated {{count}} Obsidian file(s).'),
                                 { count: totalFiles },
                             ),
                             'info',

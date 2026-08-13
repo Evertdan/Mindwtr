@@ -1042,7 +1042,7 @@ export const svOverrides: Record<string, string> = {
         'settings.externalSyncKeptLocal': 'Behöll lokala ändringar och uppdaterade synkfilen.',
         'settings.externalSyncUsedExternal': 'Läste in ändringarna från den externa synkfilen.',
         'settings.externalSyncMerged': 'Synkroniseringen slog samman externa ändringar.',
-        'settings.externalSyncMergedConflicts': 'Synkroniseringen slog samman externa ändringar och löste {{count}} konflikter.',
+        'settings.externalSyncMergedConflicts': 'Synkroniseringen slog samman externa ändringar och löste {{count}} konflikt(er).',
         'settings.externalSyncResolveFailed': 'Det gick inte att lösa den externa synkändringen.',
         'settings.syncRetryQueued': 'Lokala ändringar kom in under synkroniseringen. Nytt försök har köats.',
         'settings.dropboxCleanupRetry': 'Dropbox-inställningen sparades. Rensningen av inloggningsuppgifter försöker igen.',
@@ -2109,7 +2109,7 @@ export const svOverrides: Record<string, string> = {
         'obsidian.bringIntoMindwtrSuccess': 'Uppgiften lades till i Mindwtr.',
         'obsidian.bringIntoMindwtrAlreadyExists': 'Uppgiften finns redan i Mindwtr.',
         'obsidian.bringIntoMindwtrFailed': 'Det gick inte att lägga till uppgiften i Mindwtr.',
-        'obsidian.filesUpdated': 'Uppdaterade {{count}} Obsidian-filer.',
+        'obsidian.filesUpdated': 'Uppdaterade {{count}} Obsidian-fil(er).',
         'obsidian.sourceAttachmentTitle': 'Obsidian-källa',
 
         'onboarding.title': 'Välkommen till Mindwtr',

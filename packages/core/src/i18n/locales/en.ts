@@ -1066,7 +1066,7 @@ export const en: Record<string, string> = {
         'settings.externalSyncKeptLocal': 'Kept local changes and updated sync file.',
         'settings.externalSyncUsedExternal': 'Loaded external sync file changes.',
         'settings.externalSyncMerged': 'Sync merged external changes.',
-        'settings.externalSyncMergedConflicts': 'Sync merged external changes with {{count}} conflicts resolved.',
+        'settings.externalSyncMergedConflicts': 'Sync merged external changes with {{count}} conflict(s) resolved.',
         'settings.externalSyncResolveFailed': 'Failed to resolve external sync change.',
         'settings.syncRetryQueued': 'Local changes arrived during sync. Retry queued.',
         'settings.dropboxCleanupRetry': 'Dropbox setup was saved. Credential cleanup will retry.',
@@ -2145,7 +2145,7 @@ export const en: Record<string, string> = {
     'obsidian.bringIntoMindwtrSuccess': 'Task added to Mindwtr.',
     'obsidian.bringIntoMindwtrAlreadyExists': 'Task already exists in Mindwtr.',
     'obsidian.bringIntoMindwtrFailed': 'Could not add the task to Mindwtr.',
-        'obsidian.filesUpdated': 'Updated {{count}} Obsidian files.',
+        'obsidian.filesUpdated': 'Updated {{count}} Obsidian file(s).',
         'obsidian.sourceAttachmentTitle': 'Obsidian source',
 
         // First-run onboarding modal (both platforms).
