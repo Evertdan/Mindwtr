@@ -106,9 +106,10 @@ type ShowToast = (
     action?: { label: string; onClick: () => void }
 ) => void;
 
-export function reportArchivedTaskQueryFailure(error: unknown, showToast: ShowToast): void {
+// `message` is localized by the caller; the reportError label stays English (diagnostic).
+export function reportArchivedTaskQueryFailure(error: unknown, showToast: ShowToast, message: string): void {
     reportError('Failed to load archived tasks', error);
-    showToast('Failed to load archived tasks', 'error');
+    showToast(message, 'error');
 }
 
 export const ListView = memo(function ListView({ title, statusFilter }: ListViewProps) {
@@ -344,7 +345,7 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
                 }
             }).catch((error) => {
                 if (!cancelled) {
-                    reportArchivedTaskQueryFailure(error, showToast);
+                    reportArchivedTaskQueryFailure(error, showToast, resolveText('archive.loadFailed', 'Failed to load archived tasks'));
                     setBaseTasks([]);
                 }
             });

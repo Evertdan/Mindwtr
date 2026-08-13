@@ -15,6 +15,7 @@ type UseTaskItemSubmitParams = {
     setEditingTaskId: (id: string | null) => void;
     setIsEditing: (value: boolean) => void;
     showToast: (message: string, tone?: 'info' | 'error' | 'success') => void;
+    t: (key: string) => string;
     task: Task;
     updateTask: (id: string, patch: Partial<Task>) => Promise<StoreActionResult>;
 };
@@ -32,6 +33,7 @@ export function useTaskItemSubmit({
     setEditingTaskId,
     setIsEditing,
     showToast,
+    t,
     task,
     updateTask,
 }: UseTaskItemSubmitParams) {
@@ -55,7 +57,7 @@ export function useTaskItemSubmit({
 
         const result = await updateTask(task.id, patch);
         if (!result.success) {
-            showToast(result.error || 'Failed to update task', 'error');
+            showToast(result.error || t('task.updateFailed'), 'error');
             return result;
         }
         setIsEditing(false);

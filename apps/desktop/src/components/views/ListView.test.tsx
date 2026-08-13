@@ -1024,10 +1024,12 @@ describe('ListView', () => {
   it('shows an error toast when loading archived tasks fails', () => {
     const showToast = vi.fn();
 
-    reportArchivedTaskQueryFailure(new Error('disk read failed'), showToast);
+    reportArchivedTaskQueryFailure(new Error('disk read failed'), showToast, 'Kunde inte läsa in arkiverade uppgifter');
 
+    // The reportError label stays English (diagnostic); the toast shows the
+    // caller's localized copy.
     expect(reportErrorMock).toHaveBeenCalledWith('Failed to load archived tasks', expect.any(Error));
-    expect(showToast).toHaveBeenCalledWith('Failed to load archived tasks', 'error');
+    expect(showToast).toHaveBeenCalledWith('Kunde inte läsa in arkiverade uppgifter', 'error');
   });
 
   it('shows an error toast when a batch undo restore returns a failed result', async () => {

@@ -417,14 +417,15 @@ export function ProjectsView() {
             const created = await duplicateProject(projectId);
             if (created) {
                 setSelectedProjectId(created.id);
+                showToast(tFallback(t, 'projects.duplicated', 'Project duplicated'), 'success');
                 return;
             }
-            showToast('Failed to duplicate project', 'error');
+            showToast(tFallback(t, 'projects.duplicateFailed', 'Failed to duplicate project'), 'error');
         } catch (error) {
             reportError('Failed to duplicate project', error);
-            showToast('Failed to duplicate project', 'error');
+            showToast(tFallback(t, 'projects.duplicateFailed', 'Failed to duplicate project'), 'error');
         }
-    }, [duplicateProject, setSelectedProjectId, showToast]);
+    }, [duplicateProject, setSelectedProjectId, showToast, t]);
 
     useEffect(() => {
         if (!perf.enabled) return;

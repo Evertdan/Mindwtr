@@ -307,7 +307,7 @@ export const TaskItem = memo(function TaskItem({
         }
         void updateTask(task.id, action.patch)
             .then((result) => {
-                if (!result.success) showToast(result.error || 'Failed to update task', 'error');
+                if (!result.success) showToast(result.error || t('task.updateFailed'), 'error');
             });
     }, [effectiveReadOnly, focusTaskLimit, resolveFocusStar, showToast, t, task.id, updateTask]);
 
@@ -686,6 +686,7 @@ export const TaskItem = memo(function TaskItem({
         setEditingTaskId,
         setIsEditing,
         showToast,
+        t,
         task,
         updateTask,
     });

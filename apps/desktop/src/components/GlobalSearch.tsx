@@ -337,8 +337,8 @@ export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
         );
         if (shouldSwitchToAllAreas) {
             void updateSettings({ filters: { ...(settings?.filters ?? {}), ...areaFilterSelectionToFilters({ included: [], excluded: [] }) } })
-                .catch(() => showToast('Failed to update area filter.', 'error'));
-            showToast('Switched to All Areas so the selected item is visible.', 'info');
+                .catch(() => showToast(t('search.areaFilterFailed'), 'error'));
+            showToast(t('search.switchedToAllAreas'), 'info');
         }
         if (result.type === 'project') {
             setProjectView({ selectedProjectId: result.item.id });

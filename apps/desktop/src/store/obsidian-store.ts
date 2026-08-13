@@ -1,4 +1,11 @@
-import { normalizeObsidianRelativePath, type ObsidianTask } from '@mindwtr/core';
+import {
+    formatI18nTemplate,
+    getTranslationsSync,
+    isSupportedLanguage,
+    normalizeObsidianRelativePath,
+    useTaskStore,
+    type ObsidianTask,
+} from '@mindwtr/core';
 import { createWithEqualityFn } from 'zustand/traditional';
 import {
     ObsidianService,
@@ -12,6 +19,16 @@ import {
     sortObsidianTasks,
 } from '../lib/obsidian-scanner';
 import { useUiStore } from './ui-store';
+
+// ponytail: same shape as sync-service's resolveSyncText / notification-service's
+// lookup. Extract a shared desktop helper if a fourth module needs one.
+const resolveObsidianText = (key: string, fallback: string): string => {
+    const language = useTaskStore.getState().settings?.language;
+    const translations = getTranslationsSync(
+        language && isSupportedLanguage(language) ? language : 'en',
+    );
+    return translations[key] || getTranslationsSync('en')[key] || fallback;
+};
 
 type ObsidianWatchUpdateResult = {
     changedCount: number;
@@ -327,7 +344,10 @@ export const useObsidianStore = createWithEqualityFn<ObsidianStoreState>()((set,
                     const totalFiles = result.changedCount + result.deletedCount;
                     if (totalFiles > 0) {
                         useUiStore.getState().showToast(
-                            totalFiles === 1 ? 'Updated 1 Obsidian file.' : `Updated ${totalFiles} Obsidian files.`,
+                            formatI18nTemplate(
+                                resolveObsidianText('obsidian.filesUpdated', 'Updated {{count}} Obsidian files.'),
+                                { count: totalFiles },
+                            ),
                             'info',
                             2500,
                         );

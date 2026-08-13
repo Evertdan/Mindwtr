@@ -924,7 +924,7 @@ export function ProjectWorkspace({
 
         const failTaskMove = (error: unknown) => {
             reportError('Failed to reorder project tasks', error);
-            showToast('Failed to move task', 'error');
+            showToast(tFallback(t, 'projects.taskMoveFailed', 'Failed to move task'), 'error');
         };
 
         const { active, over } = event;

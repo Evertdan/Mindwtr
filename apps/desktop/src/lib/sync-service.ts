@@ -1484,7 +1484,7 @@ export class SyncService {
                 logSyncWarning('Dropbox setup committed; credential cleanup will retry');
                 try {
                     useUiStore.getState().showToast(
-                        'Dropbox setup was saved. Credential cleanup will retry.',
+                        resolveSyncText('settings.dropboxCleanupRetry', 'Dropbox setup was saved. Credential cleanup will retry.'),
                         'info',
                         6000,
                     );

@@ -25,6 +25,7 @@ Changes collected after `v1.1.6` and before the next version tag.
 - Desktop: checking for updates no longer fails with "GitHub API error: 403" on shared networks or VPNs — when GitHub's API rate limit blocks the check, the app now reads the public release feed instead, and at worst shows a calm try-again message with a link to the releases page.
 - Desktop (macOS): with "close to tray" enabled, the app no longer vanishes from the Dock, Cmd+Tab, and its own menu bar while the window is open. It now steps out of the Dock only while actually hidden in the tray, and comes back focused — with its menu bar — the moment the window is shown again.
 - Desktop (macOS): the global quick-add hotkey no longer brings the main Mindwtr window forward — the capture popup is now a non-activating panel, so the app you were working in stays active while you type, and keeps focus after you press Enter or Escape. (#794)
+- Desktop: sync-conflict, search, archive, Obsidian and project-duplication messages now appear in your language instead of always English, and duplicating a project confirms it the way mobile already did.
 
 - Calendar: a task with a start date but no time now shows "All day" in the desktop month grid and the mobile schedule list, instead of a phantom midnight time (shown as "12:00" on 12-hour clocks).
 - Desktop: attachment links pointing at a folder (for example `D:\Media\Movies\`) now open in the file manager instead of failing with "Path is outside Mindwtr-managed locations". Links to files anywhere already worked; folders now match.

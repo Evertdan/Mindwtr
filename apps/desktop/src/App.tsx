@@ -34,6 +34,7 @@ import {
     summarizeMergeStats,
     translateWithFallback,
     useTaskStore,
+    resolveI18nText,
     type AppAnnouncement,
     type AppAnnouncementAction,
 } from '@mindwtr/core';
@@ -476,26 +477,26 @@ function App() {
             const result = await SyncService.resolveExternalSyncChange(resolution);
             if (result.success) {
                 if (resolution === 'keep-local') {
-                    showToast('Kept local changes and updated sync file.', 'success');
+                    showToast(t('settings.externalSyncKeptLocal'), 'success');
                 } else if (resolution === 'use-external') {
-                    showToast('Loaded external sync file changes.', 'success');
+                    showToast(t('settings.externalSyncUsedExternal'), 'success');
                 } else {
                     const conflicts = summarizeMergeStats(result.stats).conflicts;
                     showToast(
                         conflicts > 0
-                            ? `Sync merged with ${conflicts} conflict${conflicts === 1 ? '' : 's'} resolved.`
-                            : 'Sync merged external changes.',
+                            ? resolveI18nText(t, 'settings.externalSyncMergedConflicts', { values: { count: conflicts } })
+                            : t('settings.externalSyncMerged'),
                         'success'
                     );
                 }
                 setExternalSyncChange(null);
                 return;
             }
-            showToast(result.error || 'Failed to resolve external sync change.', 'error');
+            showToast(result.error || t('settings.externalSyncResolveFailed'), 'error');
         } finally {
             setResolvingExternalSync(false);
         }
-    }, [showToast]);
+    }, [showToast, t]);
 
     const persistCloseBehavior = useCallback(async (behavior: 'tray' | 'quit') => {
         await updateSettings({
@@ -853,7 +854,7 @@ function App() {
             if (shouldAlert) {
                 lastSyncErrorRef.current = message;
                 lastSyncErrorAtRef.current = nowMs;
-                showToast(`Sync failed: ${message}`, 'error', 6000);
+                showToast(`${t('settings.lastSyncError')}: ${message}`, 'error', 6000);
             }
         };
 
@@ -884,7 +885,7 @@ function App() {
                     void logInfo(message, { scope: 'email-capture', extra });
                 },
                 onTerminalError: (error) => {
-                    showToast(`Email capture: ${error.message}`, 'error', 6000);
+                    showToast(`${t('settings.emailCaptureFailed')}: ${error.message}`, 'error', 6000);
                 },
             });
             registerEmailCaptureController(emailCaptureController);
