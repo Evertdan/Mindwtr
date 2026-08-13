@@ -453,7 +453,10 @@ fn handle_connection(
     let _ = write_response(&mut stream, response);
 }
 
-fn read_request(stream: &mut TcpStream, deadline: Instant) -> Result<Option<ApiRequest>, String> {
+// Generic over Read (R-05) so tests can drive it with an in-memory reader
+// instead of a real socket - TcpStream: Read, so the one call site in
+// handle_connection is unchanged.
+fn read_request(stream: &mut impl Read, deadline: Instant) -> Result<Option<ApiRequest>, String> {
     let mut buffer: Vec<u8> = Vec::new();
     let mut temp = [0_u8; 1024];
     let header_end = loop {
@@ -3298,6 +3301,99 @@ mod tests {
             started.elapsed() < Duration::from_millis(500),
             "the deadline check must short-circuit before blocking on read(), took {:?}",
             started.elapsed()
+        );
+    }
+
+    // Feeds fixed byte chunks to read_request one read() call at a time, so
+    // a test can force "split across multiple reads" deterministically and
+    // instantly - no real sockets or sleeps needed (R-05).
+    struct ChunkedReader {
+        chunks: std::collections::VecDeque<Vec<u8>>,
+    }
+
+    impl ChunkedReader {
+        fn new(chunks: Vec<&[u8]>) -> Self {
+            Self {
+                chunks: chunks.into_iter().map(|chunk| chunk.to_vec()).collect(),
+            }
+        }
+    }
+
+    impl Read for ChunkedReader {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            let Some(mut chunk) = self.chunks.pop_front() else {
+                return Ok(0);
+            };
+            let len = chunk.len().min(buf.len());
+            buf[..len].copy_from_slice(&chunk[..len]);
+            if len < chunk.len() {
+                chunk.drain(..len);
+                self.chunks.push_front(chunk);
+            }
+            Ok(len)
+        }
+    }
+
+    fn far_future_deadline() -> Instant {
+        Instant::now() + Duration::from_secs(60)
+    }
+
+    #[test]
+    fn read_request_rejects_oversized_headers() {
+        let garbage = vec![b'x'; REQUEST_HEADER_LIMIT_BYTES + 1];
+        let mut reader = ChunkedReader::new(vec![&garbage]);
+        assert_eq!(
+            read_request(&mut reader, far_future_deadline()).unwrap_err(),
+            "Request headers too large"
+        );
+    }
+
+    #[test]
+    fn read_request_rejects_oversized_declared_content_length() {
+        let request = format!(
+            "POST /tasks HTTP/1.1\r\nContent-Length: {}\r\n\r\n",
+            REQUEST_BODY_LIMIT_BYTES + 1
+        );
+        let mut reader = ChunkedReader::new(vec![request.as_bytes()]);
+        assert_eq!(
+            read_request(&mut reader, far_future_deadline()).unwrap_err(),
+            "Request body too large"
+        );
+    }
+
+    #[test]
+    fn read_request_reassembles_a_body_split_across_reads() {
+        let body = b"{\"a\":1}";
+        let header = format!(
+            "POST /tasks HTTP/1.1\r\nContent-Length: {}\r\n\r\n",
+            body.len()
+        );
+        let (body_first, body_second) = body.split_at(3);
+        let mut reader = ChunkedReader::new(vec![header.as_bytes(), body_first, body_second]);
+        let request = read_request(&mut reader, far_future_deadline())
+            .unwrap()
+            .unwrap();
+        assert_eq!(request.method, "POST");
+        assert_eq!(request.path, "/tasks");
+        assert_eq!(request.body, body);
+    }
+
+    #[test]
+    fn read_request_rejects_a_missing_request_line() {
+        let mut reader = ChunkedReader::new(vec![b"\r\n\r\n"]);
+        assert_eq!(
+            read_request(&mut reader, far_future_deadline()).unwrap_err(),
+            "Missing HTTP method"
+        );
+    }
+
+    #[test]
+    fn read_request_rejects_non_utf8_header_bytes() {
+        let invalid = b"GET / HTTP/1.1\r\nX-Bad: \xff\xfe\r\n\r\n";
+        let mut reader = ChunkedReader::new(vec![invalid]);
+        assert_eq!(
+            read_request(&mut reader, far_future_deadline()).unwrap_err(),
+            "Invalid HTTP header encoding"
         );
     }
 
