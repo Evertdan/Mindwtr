@@ -75,6 +75,8 @@ type UseSyncSettingsBackupActionsParams = {
         message: string;
         tone: 'warning' | 'error' | 'success' | 'info';
         durationMs?: number;
+        actionLabel?: string;
+        onAction?: () => void | Promise<void>;
     }) => void;
     t: (key: string) => string;
     updateSettings: (updates: Record<string, any>) => Promise<unknown>;
@@ -294,6 +296,43 @@ export function useSyncSettingsBackupActions({
         }
     }, [tr, setBackupAction, showSettingsErrorToast]);
 
+    // `undo` only swaps the copy: an undo IS a snapshot restore, so it keeps the
+    // same destructive-confirmation weight and the same restore path.
+    const handleRestoreRecoverySnapshot = useCallback(async (snapshotName: string, undo = false) => {
+        Alert.alert(
+            undo
+                ? tr('settings.undoImportConfirmTitle')
+                : tr('settings.backupMobile.restoreRecoverySnapshot'),
+            undo
+                ? tr('settings.undoImportConfirm', { snapshotName: formatRecoverySnapshotLabel(snapshotName) })
+                : tr('settings.backupMobile.restoreSnapshotReplaceLocalData', { snapshotName: formatRecoverySnapshotLabel(snapshotName) }),
+            [
+                { text: tr('common.cancel'), style: 'cancel' },
+                {
+                    text: tr('markdown.referenceRestore'),
+                    style: 'destructive',
+                    onPress: async () => {
+                        setBackupAction(`snapshot:${snapshotName}`);
+                        try {
+                            await restoreLocalDataSnapshot(snapshotName);
+                            await refreshRecoverySnapshots();
+                            showToast({
+                                title: tr('settings.backupMobile.restoreComplete'),
+                                message: tr('settings.backupMobile.recoverySnapshotRestored'),
+                                tone: 'success',
+                            });
+                        } catch (error) {
+                            logSettingsError(error);
+                            showSettingsErrorToast(tr('settings.backupMobile.restoreFailed'), String(error), 5200);
+                        } finally {
+                            setBackupAction(null);
+                        }
+                    },
+                },
+            ]
+        );
+    }, [formatRecoverySnapshotLabel, tr, refreshRecoverySnapshots, setBackupAction, showSettingsErrorToast, showToast]);
+
     const confirmRestoreBackup = useCallback(async (validation: BackupValidation) => {
         if (!validation.data) return;
         setBackupAction('restore');
@@ -372,6 +411,8 @@ export function useSyncSettingsBackupActions({
                 message: details.join('\n'),
                 tone: 'success',
                 durationMs: 5600,
+                actionLabel: tr('settings.undoImport'),
+                onAction: () => handleRestoreRecoverySnapshot(snapshotName, true),
             });
         } catch (error) {
             logSettingsError(error);
@@ -379,7 +420,7 @@ export function useSyncSettingsBackupActions({
         } finally {
             setBackupAction(null);
         }
-    }, [tr, refreshRecoverySnapshots, setBackupAction, showSettingsErrorToast, showToast]);
+    }, [handleRestoreRecoverySnapshot, tr, refreshRecoverySnapshots, setBackupAction, showSettingsErrorToast, showToast]);
 
     const handleMergeBackup = useCallback(async () => {
         setBackupAction('merge');
@@ -436,6 +477,8 @@ export function useSyncSettingsBackupActions({
                 message: details.join('\n'),
                 tone: 'success',
                 durationMs: 5600,
+                actionLabel: tr('settings.undoImport'),
+                onAction: () => handleRestoreRecoverySnapshot(snapshotName, true),
             });
         } catch (error) {
             logSettingsError(error);
@@ -443,7 +486,7 @@ export function useSyncSettingsBackupActions({
         } finally {
             setBackupAction(null);
         }
-    }, [formatImportMessages, formatThrownImportError, tr, refreshRecoverySnapshots, setBackupAction, showSettingsErrorToast, showToast]);
+    }, [handleRestoreRecoverySnapshot, formatImportMessages, formatThrownImportError, tr, refreshRecoverySnapshots, setBackupAction, showSettingsErrorToast, showToast]);
 
     const confirmTickTickImport = useCallback(async (parsedData: ParsedTickTickImportData) => {
         setBackupAction('import:ticktick');
@@ -463,6 +506,8 @@ export function useSyncSettingsBackupActions({
                 message: details.join('\n'),
                 tone: 'success',
                 durationMs: 6200,
+                actionLabel: tr('settings.undoImport'),
+                onAction: () => handleRestoreRecoverySnapshot(snapshotName, true),
             });
         } catch (error) {
             logSettingsError(error);
@@ -470,7 +515,7 @@ export function useSyncSettingsBackupActions({
         } finally {
             setBackupAction(null);
         }
-    }, [formatImportMessages, formatThrownImportError, tr, refreshRecoverySnapshots, setBackupAction, showSettingsErrorToast, showToast]);
+    }, [handleRestoreRecoverySnapshot, formatImportMessages, formatThrownImportError, tr, refreshRecoverySnapshots, setBackupAction, showSettingsErrorToast, showToast]);
 
     const confirmDgtImport = useCallback(async (parsedData: ParsedDgtImportData) => {
         setBackupAction('import:dgt');
@@ -490,6 +535,8 @@ export function useSyncSettingsBackupActions({
                 message: details.join('\n'),
                 tone: 'success',
                 durationMs: 6200,
+                actionLabel: tr('settings.undoImport'),
+                onAction: () => handleRestoreRecoverySnapshot(snapshotName, true),
             });
         } catch (error) {
             logSettingsError(error);
@@ -497,7 +544,7 @@ export function useSyncSettingsBackupActions({
         } finally {
             setBackupAction(null);
         }
-    }, [formatImportMessages, formatThrownImportError, tr, refreshRecoverySnapshots, setBackupAction, showSettingsErrorToast, showToast]);
+    }, [handleRestoreRecoverySnapshot, formatImportMessages, formatThrownImportError, tr, refreshRecoverySnapshots, setBackupAction, showSettingsErrorToast, showToast]);
 
     const confirmOmniFocusImport = useCallback(async (parsedData: ParsedOmniFocusImportData) => {
         setBackupAction('import:omnifocus');
@@ -523,6 +570,8 @@ export function useSyncSettingsBackupActions({
                 message: details.join('\n'),
                 tone: 'success',
                 durationMs: 6200,
+                actionLabel: tr('settings.undoImport'),
+                onAction: () => handleRestoreRecoverySnapshot(snapshotName, true),
             });
         } catch (error) {
             logSettingsError(error);
@@ -530,7 +579,7 @@ export function useSyncSettingsBackupActions({
         } finally {
             setBackupAction(null);
         }
-    }, [formatImportMessages, formatThrownImportError, tr, refreshRecoverySnapshots, setBackupAction, showSettingsErrorToast, showToast]);
+    }, [handleRestoreRecoverySnapshot, formatImportMessages, formatThrownImportError, tr, refreshRecoverySnapshots, setBackupAction, showSettingsErrorToast, showToast]);
 
     const confirmMindwtrCsvImport = useCallback(async (parsedData: ParsedMindwtrCsvImportData) => {
         setBackupAction('import:mindwtr-csv');
@@ -555,6 +604,8 @@ export function useSyncSettingsBackupActions({
                 message: details.join('\n'),
                 tone: 'success',
                 durationMs: 6200,
+                actionLabel: tr('settings.undoImport'),
+                onAction: () => handleRestoreRecoverySnapshot(snapshotName, true),
             });
         } catch (error) {
             logSettingsError(error);
@@ -562,7 +613,7 @@ export function useSyncSettingsBackupActions({
         } finally {
             setBackupAction(null);
         }
-    }, [formatImportMessages, formatThrownImportError, tr, refreshRecoverySnapshots, setBackupAction, showSettingsErrorToast, showToast]);
+    }, [handleRestoreRecoverySnapshot, formatImportMessages, formatThrownImportError, tr, refreshRecoverySnapshots, setBackupAction, showSettingsErrorToast, showToast]);
 
     const handleImportTodoist = useCallback(async () => {
         setBackupAction('import:todoist');
@@ -727,37 +778,6 @@ export function useSyncSettingsBackupActions({
             setBackupAction(null);
         }
     }, [buildMindwtrCsvSummary, confirmMindwtrCsvImport, formatImportError, formatThrownImportError, tr, setBackupAction, showSettingsErrorToast, showSettingsWarning]);
-
-    const handleRestoreRecoverySnapshot = useCallback(async (snapshotName: string) => {
-        Alert.alert(
-            tr('settings.backupMobile.restoreRecoverySnapshot'),
-            tr('settings.backupMobile.restoreSnapshotReplaceLocalData', { snapshotName: formatRecoverySnapshotLabel(snapshotName) }),
-            [
-                { text: tr('common.cancel'), style: 'cancel' },
-                {
-                    text: tr('markdown.referenceRestore'),
-                    style: 'destructive',
-                    onPress: async () => {
-                        setBackupAction(`snapshot:${snapshotName}`);
-                        try {
-                            await restoreLocalDataSnapshot(snapshotName);
-                            await refreshRecoverySnapshots();
-                            showToast({
-                                title: tr('settings.backupMobile.restoreComplete'),
-                                message: tr('settings.backupMobile.recoverySnapshotRestored'),
-                                tone: 'success',
-                            });
-                        } catch (error) {
-                            logSettingsError(error);
-                            showSettingsErrorToast(tr('settings.backupMobile.restoreFailed'), String(error), 5200);
-                        } finally {
-                            setBackupAction(null);
-                        }
-                    },
-                },
-            ]
-        );
-    }, [formatRecoverySnapshotLabel, tr, refreshRecoverySnapshots, setBackupAction, showSettingsErrorToast, showToast]);
 
     const toggleDebugLogging = useCallback((value: boolean) => {
         updateSettings({

@@ -27,6 +27,7 @@ Changes collected after `v1.1.6` and before the next version tag.
 - Desktop (macOS): the global quick-add hotkey no longer brings the main Mindwtr window forward — the capture popup is now a non-activating panel, so the app you were working in stays active while you type, and keeps focus after you press Enter or Escape. (#794)
 - Desktop: sync-conflict, search, archive, Obsidian and project-duplication messages now appear in your language instead of always English, and duplicating a project confirms it the way mobile already did.
 - The language picker now marks a language as "Partly translated" when much of the app is still English in it, so an unfinished translation is visible before you switch. Desktop and mobile.
+- Imports, restores, and merges can now be undone straight from the result message — one "Undo import" tap rolls back to the recovery snapshot taken just before, instead of hunting for its name under Settings. Desktop and mobile.
 
 - Calendar: a task with a start date but no time now shows "All day" in the desktop month grid and the mobile schedule list, instead of a phantom midnight time (shown as "12:00" on 12-hour clocks).
 - Desktop: attachment links pointing at a folder (for example `D:\Media\Movies\`) now open in the file manager instead of failing with "Path is outside Mindwtr-managed locations". Links to files anywhere already worked; folders now match.

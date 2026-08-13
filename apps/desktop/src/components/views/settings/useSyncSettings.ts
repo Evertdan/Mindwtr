@@ -1214,6 +1214,28 @@ export const useSyncSettings = ({
         }
     }, [resolveText, showToast]);
 
+    // Undo rides the result toast itself, so the affordance dies with the message —
+    // no persistent roll-back button anywhere. Restore is destructive, so this goes
+    // behind a confirmation of the same weight as a manual snapshot restore.
+    const buildUndoAction = useCallback((snapshotName?: string | null) => {
+        if (!snapshotName) return undefined;
+        return {
+            label: resolveText('settings.undoImport', 'Undo import'),
+            onClick: () => void (async () => {
+                const confirmed = await requestConfirmation({
+                    title: resolveText('settings.undoImportConfirmTitle', 'Undo import?'),
+                    message: formatText(
+                        'settings.undoImportConfirm',
+                        'Restore the snapshot taken just before the import ({{snapshotName}})? Anything you changed since the import is rolled back too.',
+                        { snapshotName },
+                    ),
+                });
+                if (!confirmed) return;
+                await handleRestoreSnapshot(snapshotName);
+            })(),
+        };
+    }, [formatText, handleRestoreSnapshot, requestConfirmation, resolveText]);
+
     const handleExportBackup = useCallback(async () => {
         addBreadcrumb('transfer:export');
         setTransferAction('export');
@@ -1255,13 +1277,13 @@ export const useSyncSettings = ({
             }
             showToast(snapshotName
                 ? formatText('settings.backupMobile.backupRestoredWithSnapshot', 'Backup restored successfully. Recovery snapshot saved as {{snapshotName}}.', { snapshotName })
-                : resolveText('settings.backupMobile.restoreComplete', 'Restore complete'), 'success', 6000);
+                : resolveText('settings.backupMobile.restoreComplete', 'Restore complete'), 'success', 6000, buildUndoAction(snapshotName));
         } catch (error) {
             showToast(formatThrownBackupError(error, resolveText('settings.backupMobile.restoreFailed', 'Restore failed')), 'error');
         } finally {
             setTransferAction(null);
         }
-    }, [appVersion, formatImportDiagnosticText, formatImportError, formatText, formatThrownBackupError, isTauri, requestConfirmation, resolveText, showToast]);
+    }, [buildUndoAction, appVersion, formatImportDiagnosticText, formatImportError, formatText, formatThrownBackupError, isTauri, requestConfirmation, resolveText, showToast]);
 
     const handleMergeBackup = useCallback(async () => {
         addBreadcrumb('transfer:restore');
@@ -1301,13 +1323,13 @@ export const useSyncSettings = ({
                 ),
                 snapshotName ? formatText('settings.backupMobile.recoverySnapshotSaved', 'Recovery snapshot saved as {{snapshotName}}.', { snapshotName }) : null,
             ].filter(Boolean).join('\n');
-            showToast(details, 'success', 6000);
+            showToast(details, 'success', 6000, buildUndoAction(snapshotName));
         } catch (error) {
             showToast(formatThrownBackupError(error, resolveText('settings.mergeBackupFailed', 'Merge failed')), 'error');
         } finally {
             setTransferAction(null);
         }
-    }, [appVersion, formatImportDiagnosticText, formatImportError, formatText, formatThrownBackupError, isTauri, requestConfirmation, resolveText, showToast]);
+    }, [buildUndoAction, appVersion, formatImportDiagnosticText, formatImportError, formatText, formatThrownBackupError, isTauri, requestConfirmation, resolveText, showToast]);
 
     const handleImportTodoist = useCallback(async () => {
         addBreadcrumb('transfer:restore');
@@ -1358,13 +1380,13 @@ export const useSyncSettings = ({
                 snapshotName ? formatText('settings.backupMobile.recoverySnapshotSaved', 'Recovery snapshot saved as {{snapshotName}}.', { snapshotName }) : null,
                 ...(result.warnings.length > 0 ? ['', ...formatImportMessages(result.warnings)] : []),
             ].filter(Boolean).join('\n');
-            showToast(details, 'success', 7000);
+            showToast(details, 'success', 7000, buildUndoAction(snapshotName));
         } catch (error) {
             showToast(toErrorMessage(error, resolveText('settings.backupMobile.importFailed', 'Import failed')), 'error');
         } finally {
             setTransferAction(null);
         }
-    }, [formatImportError, formatImportMessages, formatText, isTauri, requestConfirmation, resolveText, showToast, toErrorMessage]);
+    }, [buildUndoAction, formatImportError, formatImportMessages, formatText, isTauri, requestConfirmation, resolveText, showToast, toErrorMessage]);
 
 
     const handleImportTickTick = useCallback(async () => {
@@ -1419,13 +1441,13 @@ export const useSyncSettings = ({
                 snapshotName ? formatText('settings.backupMobile.recoverySnapshotSaved', 'Recovery snapshot saved as {{snapshotName}}.', { snapshotName }) : null,
                 ...(result.warnings.length > 0 ? ['', ...formatImportMessages(result.warnings)] : []),
             ].filter(Boolean).join('\n');
-            showToast(details, 'success', 8000);
+            showToast(details, 'success', 8000, buildUndoAction(snapshotName));
         } catch (error) {
             showToast(toErrorMessage(error, resolveText('settings.backupMobile.importFailed', 'Import failed')), 'error');
         } finally {
             setTransferAction(null);
         }
-    }, [formatImportError, formatImportMessages, formatText, isTauri, requestConfirmation, resolveText, showToast, toErrorMessage]);
+    }, [buildUndoAction, formatImportError, formatImportMessages, formatText, isTauri, requestConfirmation, resolveText, showToast, toErrorMessage]);
 
     const handleImportDgt = useCallback(async () => {
         addBreadcrumb('transfer:restore');
@@ -1480,13 +1502,13 @@ export const useSyncSettings = ({
                 snapshotName ? formatText('settings.backupMobile.recoverySnapshotSaved', 'Recovery snapshot saved as {{snapshotName}}.', { snapshotName }) : null,
                 ...(result.warnings.length > 0 ? ['', ...formatImportMessages(result.warnings)] : []),
             ].filter(Boolean).join('\n');
-            showToast(details, 'success', 8000);
+            showToast(details, 'success', 8000, buildUndoAction(snapshotName));
         } catch (error) {
             showToast(toErrorMessage(error, resolveText('settings.backupMobile.importFailed', 'Import failed')), 'error');
         } finally {
             setTransferAction(null);
         }
-    }, [formatImportError, formatImportMessages, formatText, isTauri, requestConfirmation, resolveText, showToast, toErrorMessage]);
+    }, [buildUndoAction, formatImportError, formatImportMessages, formatText, isTauri, requestConfirmation, resolveText, showToast, toErrorMessage]);
 
     const handleImportOmniFocus = useCallback(async () => {
         addBreadcrumb('transfer:restore');
@@ -1543,13 +1565,13 @@ export const useSyncSettings = ({
                 snapshotName ? formatText('settings.backupMobile.recoverySnapshotSaved', 'Recovery snapshot saved as {{snapshotName}}.', { snapshotName }) : null,
                 ...(result.warnings.length > 0 ? ['', ...formatImportMessages(result.warnings)] : []),
             ].filter(Boolean).join('\n');
-            showToast(details, 'success', 8000);
+            showToast(details, 'success', 8000, buildUndoAction(snapshotName));
         } catch (error) {
             showToast(toErrorMessage(error, resolveText('settings.backupMobile.importFailed', 'Import failed')), 'error');
         } finally {
             setTransferAction(null);
         }
-    }, [formatImportError, formatImportMessages, formatText, isTauri, requestConfirmation, resolveText, showToast, toErrorMessage]);
+    }, [buildUndoAction, formatImportError, formatImportMessages, formatText, isTauri, requestConfirmation, resolveText, showToast, toErrorMessage]);
 
     const handleImportMindwtrCsv = useCallback(async () => {
         addBreadcrumb('transfer:restore');
@@ -1606,13 +1628,13 @@ export const useSyncSettings = ({
                 snapshotName ? formatText('settings.backupMobile.recoverySnapshotSaved', 'Recovery snapshot saved as {{snapshotName}}.', { snapshotName }) : null,
                 ...(result.warnings.length > 0 ? ['', ...formatImportMessages(result.warnings)] : []),
             ].filter(Boolean).join('\n');
-            showToast(details, 'success', 8000);
+            showToast(details, 'success', 8000, buildUndoAction(snapshotName));
         } catch (error) {
             showToast(toErrorMessage(error, resolveText('settings.backupMobile.importFailed', 'Import failed')), 'error');
         } finally {
             setTransferAction(null);
         }
-    }, [formatImportError, formatImportMessages, formatText, isTauri, requestConfirmation, resolveText, showToast, toErrorMessage]);
+    }, [buildUndoAction, formatImportError, formatImportMessages, formatText, isTauri, requestConfirmation, resolveText, showToast, toErrorMessage]);
 
     const syncPreferences = settings?.syncPreferences ?? {};
     const handleUpdateSyncPreferences = useCallback(

@@ -193,6 +193,87 @@ describe('useSyncSettings cloud token validation', () => {
         expect(showToast).toHaveBeenCalledWith('localized:settings.exportSuccess', 'success');
     });
 
+    // #Q-03: the snapshot name used to appear only as text in a toast that vanished,
+    // leaving Settings → snapshots → match-the-name as the only rollback.
+    const setupTodoistImport = () => {
+        vi.spyOn(dataTransfer, 'inspectDesktopTodoistImport').mockResolvedValue({
+            valid: true,
+            diagnostics: [],
+            parsedProjects: [],
+            preview: {
+                taskCount: 1,
+                projectCount: 1,
+                sectionCount: 0,
+                checklistItemCount: 0,
+                projects: [{ name: 'Inbox', taskCount: 1 }],
+                warnings: [],
+            },
+        } as never);
+        vi.spyOn(dataTransfer, 'importDesktopTodoistData').mockResolvedValue({
+            snapshotName: 'data.2026-08-13T10-00-00.000.snapshot.json',
+            result: { importedTaskCount: 1, importedProjectCount: 1, warnings: [] },
+        } as never);
+    };
+
+    it('offers Undo import on the result and restores that exact snapshot', async () => {
+        languageMocks.t.mockImplementation((key: string) => `localized:${key}`);
+        const showToast = vi.fn();
+        useUiStore.setState({ showToast } as never);
+        const requestConfirmation = vi.fn().mockResolvedValue(true);
+        const restoreDataSnapshot = vi.spyOn(SyncService, 'restoreDataSnapshot')
+            .mockResolvedValue({ success: true } as never);
+        vi.spyOn(SyncService, 'listDataSnapshots').mockResolvedValue([] as never);
+        setupTodoistImport();
+
+        const { result } = setup(vi.fn(), requestConfirmation);
+        await waitFor(() => expect(SyncService.getCloudConfig).toHaveBeenCalled());
+        await act(async () => {
+            await result.current.dataTransferProps.onImportTodoist();
+        });
+
+        const calls = showToast.mock.calls;
+        const action = calls[calls.length - 1]?.[3];
+        expect(action?.label).toBe('localized:settings.undoImport');
+
+        await act(async () => {
+            action.onClick();
+            await Promise.resolve();
+        });
+
+        // Same weight as a manual snapshot restore, and it names the snapshot.
+        const confirmCalls = requestConfirmation.mock.calls;
+        const confirmCall = confirmCalls[confirmCalls.length - 1]?.[0];
+        expect(confirmCall.title).toBe('localized:settings.undoImportConfirmTitle');
+        expect(restoreDataSnapshot).toHaveBeenCalledWith('data.2026-08-13T10-00-00.000.snapshot.json');
+    });
+
+    it('does not restore anything when the Undo confirmation is declined', async () => {
+        languageMocks.t.mockImplementation((key: string) => `localized:${key}`);
+        const showToast = vi.fn();
+        useUiStore.setState({ showToast } as never);
+        // true for the import confirmation, false for the undo confirmation.
+        const requestConfirmation = vi.fn()
+            .mockResolvedValueOnce(true)
+            .mockResolvedValue(false);
+        const restoreDataSnapshot = vi.spyOn(SyncService, 'restoreDataSnapshot')
+            .mockResolvedValue({ success: true } as never);
+        vi.spyOn(SyncService, 'listDataSnapshots').mockResolvedValue([] as never);
+        setupTodoistImport();
+
+        const { result } = setup(vi.fn(), requestConfirmation);
+        await waitFor(() => expect(SyncService.getCloudConfig).toHaveBeenCalled());
+        await act(async () => {
+            await result.current.dataTransferProps.onImportTodoist();
+        });
+
+        await act(async () => {
+            showToast.mock.calls[showToast.mock.calls.length - 1]?.[3].onClick();
+            await Promise.resolve();
+        });
+
+        expect(restoreDataSnapshot).not.toHaveBeenCalled();
+    });
+
     it('uses the active locale for sync setup feedback', async () => {
         languageMocks.t.mockImplementation((key: string) => (
             key === 'settings.sync.readyToVerify' ? 'Paramètres prêts à vérifier.' : key

@@ -231,6 +231,44 @@ describe('useSyncSettingsBackupActions', () => {
         expect(dataTransfer.restoreDataFromBackup).not.toHaveBeenCalled();
     });
 
+    // #Q-03: the result toast carries the rollback, so it dies with the message
+    // instead of leaving a persistent affordance.
+    it('offers Undo import on the result and restores that exact snapshot', async () => {
+        vi.mocked(dataTransfer.pickBackupDocument).mockResolvedValue({ uri: 'file://backup.json', fileName: 'backup.json' });
+        vi.mocked(dataTransfer.inspectBackupDocument).mockResolvedValue({
+            valid: true,
+            data: { tasks: [], projects: [], sections: [], areas: [], people: [], settings: {} },
+            errors: [],
+            warnings: [],
+            metadata: { taskCount: 0, projectCount: 0, sectionCount: 0, areaCount: 0 },
+        } as never);
+        vi.mocked(dataTransfer.mergeDataFromBackup).mockResolvedValue({
+            snapshotName: 'data.2026-08-13T10-00-00.000.snapshot.json',
+            result: { stats: { tasks: { incomingOnly: 0, resolvedUsingIncoming: 0 } } },
+        } as never);
+
+        await act(async () => {
+            create(<Harness />);
+        });
+        await latest?.handleMergeBackup();
+        const [, , confirmButtons] = vi.mocked(Alert.alert).mock.calls[0] as [string, string, Array<{ onPress?: () => void }>];
+        await act(async () => { confirmButtons[1].onPress?.(); });
+
+        const toast = showToast.mock.calls.at(-1)?.[0];
+        expect(toast.actionLabel).toBe('settings.undoImport');
+
+        vi.mocked(Alert.alert).mockClear();
+        await act(async () => { await toast.onAction?.(); });
+
+        // Same destructive confirmation as a manual snapshot restore.
+        const [undoTitle, , undoButtons] = vi.mocked(Alert.alert).mock.calls[0] as [string, string, Array<{ onPress?: () => void }>];
+        expect(undoTitle).toBe('settings.undoImportConfirmTitle');
+        expect(dataTransfer.restoreLocalDataSnapshot).not.toHaveBeenCalled();
+
+        await act(async () => { await undoButtons[1].onPress?.(); });
+        expect(dataTransfer.restoreLocalDataSnapshot).toHaveBeenCalledWith('data.2026-08-13T10-00-00.000.snapshot.json');
+    });
+
     it('renders structured backup warnings through the active locale', async () => {
         vi.mocked(dataTransfer.pickBackupDocument).mockResolvedValue({ uri: 'file://backup.json', fileName: 'backup.json' });
         vi.mocked(dataTransfer.inspectBackupDocument).mockResolvedValue({
