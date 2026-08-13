@@ -8,6 +8,9 @@ import { CONTEXTS_VIEW_STATE_STORAGE_KEY, dispatchContextsTokenSelection } from 
 import { selectToolbarOption } from '../../test/toolbar-select';
 import { expectScrolledEndGap } from '../../test/list-end-gap';
 
+// Its own key, separate from the view state above: see the note in ContextsView.
+const CONTEXTS_GROUP_COLLAPSE_STORAGE_KEY = 'mindwtr:view:contexts:groups:v1';
+
 const initialTaskState = useTaskStore.getState();
 const now = '2026-05-12T12:00:00.000Z';
 
@@ -124,6 +127,70 @@ describe('ContextsView', () => {
 
         expect(getAllByText('#ERP').length).toBeGreaterThan(0);
         expect(getAllByText('#Finance').length).toBeGreaterThan(0);
+    });
+
+    it('folds a context group and keeps it folded across a remount', () => {
+        const tasks = [
+            makeTask('grp-erp', { title: 'ERP task', tags: ['#ERP'] }),
+            makeTask('grp-finance', { title: 'Finance task', tags: ['#Finance'] }),
+        ];
+        useTaskStore.setState({ tasks, _allTasks: tasks });
+        const firstRender = renderContextsView();
+
+        selectToolbarOption('Group', 'Tags', firstRender);
+
+        const erpGroup = firstRender.getByRole('button', { name: /#ERP\s*1/i });
+        expect(erpGroup).toHaveAttribute('aria-expanded', 'true');
+
+        fireEvent.click(erpGroup);
+
+        expect(firstRender.getByRole('button', { name: /#ERP\s*1/i })).toHaveAttribute('aria-expanded', 'false');
+        expect(firstRender.queryByText('ERP task')).not.toBeInTheDocument();
+        expect(firstRender.getByText('Finance task')).toBeInTheDocument();
+
+        const persisted = JSON.parse(
+            window.localStorage.getItem(CONTEXTS_GROUP_COLLAPSE_STORAGE_KEY) ?? '{}'
+        ) as { collapsedGroups?: Record<string, string[]> };
+        expect(persisted.collapsedGroups?.tag).toEqual(['tag:#ERP']);
+
+        firstRender.unmount();
+        const secondRender = renderContextsView();
+
+        expect(secondRender.getByRole('button', { name: /#ERP\s*1/i })).toHaveAttribute('aria-expanded', 'false');
+        expect(secondRender.queryByText('ERP task')).not.toBeInTheDocument();
+    });
+
+    it('leaves a folded group out of Select all', () => {
+        const tasks = [
+            makeTask('grp-erp', { title: 'ERP task', tags: ['#ERP'] }),
+            makeTask('grp-finance', { title: 'Finance task', tags: ['#Finance'] }),
+        ];
+        useTaskStore.setState({ tasks, _allTasks: tasks });
+        const view = renderContextsView();
+
+        selectToolbarOption('Group', 'Tags', view);
+        fireEvent.click(view.getByRole('button', { name: /#ERP\s*1/i }));
+        fireEvent.click(view.getByRole('button', { name: 'Select' }));
+        fireEvent.click(view.getByRole('button', { name: 'Select All' }));
+
+        // The folded group renders no rows, so it contributes no tasks to act on.
+        expect(view.getAllByRole('checkbox', { name: 'Select task' }).map((checkbox) => (
+            (checkbox as HTMLInputElement).checked
+        ))).toEqual([true]);
+    });
+
+    it('virtualizes a grouped context list instead of rendering every row', () => {
+        const tasks = Array.from({ length: 200 }, (_, index) => makeTask(`bulk-${index}`, {
+            title: `Bulk task ${index}`,
+            tags: [index % 2 === 0 ? '#ERP' : '#Finance'],
+        }));
+        useTaskStore.setState({ tasks, _allTasks: tasks });
+        const view = renderContextsView();
+
+        selectToolbarOption('Group', 'Tags', view);
+
+        expect(view.getByTestId('virtualized-task-list')).toHaveAttribute('data-grouped', 'true');
+        expect(document.querySelectorAll('[data-task-id]').length).toBeLessThan(100);
     });
 
     it('hides done tasks from the default context filter while keeping the Done status available', () => {

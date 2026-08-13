@@ -25,6 +25,7 @@ import { useVisibleTaskContext } from '../../hooks/useVisibleTaskContext';
 import { useTaskSelection } from './list/useTaskSelection';
 import {
     LIST_VIRTUALIZATION_THRESHOLD,
+    LIST_VIRTUAL_HEADER_ESTIMATE,
     LIST_VIRTUAL_OVERSCAN_ROWS,
     LIST_VIRTUAL_ROW_ESTIMATE,
 } from './list/virtual-list';
@@ -40,7 +41,8 @@ import {
     type ContextsViewGroupBy,
 } from '../../lib/contexts-view-state';
 import { CONTEXTS_AXES, groupTasks, type TaskGroup } from './list/next-grouping';
-import { GroupedTaskSections } from './list/GroupedTaskSections';
+import { GroupedTaskList } from './list/GroupedTaskSections';
+import { useCollapsedGroupsViewState, useTaskGroupCollapse } from './list/useTaskGroupCollapse';
 import { GroupBySelect } from './list/GroupBySelect';
 import { LIST_END_GAP, SortBySelect, ToolbarButton, VIEW_FILTER_INPUT } from './list/list-toolbar';
 import { useUiStore } from '../../store/ui-store';
@@ -59,6 +61,10 @@ const matchesSelected = (task: Task, context: string) => {
 };
 
 const hasContext = (task: Task) => (task.contexts?.length || 0) > 0 || (task.tags?.length || 0) > 0;
+
+// Its own key, as in ArchiveView: the view state above is rewritten wholesale by
+// the cross-window token-selection subscriber, which would drop folds it never read.
+const CONTEXTS_GROUP_COLLAPSE_STORAGE_KEY = 'mindwtr:view:contexts:groups:v1';
 
 export function ContextsView() {
     const perf = usePerformanceMonitor('ContextsView');
@@ -83,6 +89,10 @@ export function ContextsView() {
         CONTEXTS_VIEW_STATE_STORAGE_KEY,
         DEFAULT_CONTEXTS_VIEW_STATE,
         sanitizeContextsViewState
+    );
+    const { collapsedGroups, setCollapsedGroups } = useCollapsedGroupsViewState(
+        CONTEXTS_GROUP_COLLAPSE_STORAGE_KEY,
+        CONTEXTS_AXES,
     );
     const selectedContext = persistedViewState.selectedContext;
     const statusFilters = persistedViewState.statusFilters;
@@ -186,13 +196,24 @@ export function ContextsView() {
         () => groupTasks(groupBy, { tasks: sortedTasks, areas, projectMap, t, theme }),
         [areas, groupBy, projectMap, sortedTasks, t, theme],
     );
-    const isGrouping = groupBy !== 'none';
-    // Grouping reorders the rows, so the keyboard walks the grouped order.
-    const keyboardVisibleTasks = useMemo(
-        () => (isGrouping ? groupedTasks.flatMap((group) => group.tasks) : sortedTasks),
-        [groupedTasks, isGrouping, sortedTasks],
-    );
-    const filteredTaskIds = useMemo(() => sortedTasks.map((task) => task.id), [sortedTasks]);
+    const {
+        collapsedGroupIds,
+        getSectionDomId,
+        toggleGroup,
+        virtualRows: groupedVirtualRows,
+        // Grouping reorders the rows, so the keyboard walk and "Select all" walk
+        // the grouped order. A collapsed group renders no rows, so it contributes
+        // no tasks either.
+        visibleTasks,
+    } = useTaskGroupCollapse({
+        axis: groupBy,
+        groups: groupedTasks,
+        tasks: sortedTasks,
+        idPrefix: 'contexts-group',
+        collapsedGroups,
+        setCollapsedGroups,
+    });
+    const filteredTaskIds = useMemo(() => visibleTasks.map((task) => task.id), [visibleTasks]);
     const {
         activeAction,
         allVisibleTasksSelected,
@@ -218,13 +239,26 @@ export function ContextsView() {
         tasksById,
         undoNotificationsEnabled,
     });
-    const shouldVirtualize = !isGrouping && filteredTasks.length > LIST_VIRTUALIZATION_THRESHOLD;
+    // One engine for both shapes, as in ListView and ArchiveView: grouped rows
+    // carry headers, flat rows are the sorted tasks.
+    const virtualRowCount = groupedVirtualRows?.length ?? sortedTasks.length;
+    const shouldVirtualize = virtualRowCount > LIST_VIRTUALIZATION_THRESHOLD;
     const rowVirtualizer = useVirtualizer({
-        count: shouldVirtualize ? sortedTasks.length : 0,
+        count: shouldVirtualize ? virtualRowCount : 0,
         getScrollElement: () => listScrollRef.current,
-        estimateSize: () => LIST_VIRTUAL_ROW_ESTIMATE,
+        estimateSize: (index) => (
+            groupedVirtualRows?.[index]?.kind === 'header'
+                ? LIST_VIRTUAL_HEADER_ESTIMATE
+                : LIST_VIRTUAL_ROW_ESTIMATE
+        ),
         overscan: LIST_VIRTUAL_OVERSCAN_ROWS,
-        getItemKey: (index) => sortedTasks[index]?.id ?? index,
+        getItemKey: (index) => {
+            const row = groupedVirtualRows?.[index];
+            if (!row) return sortedTasks[index]?.id ?? index;
+            return row.kind === 'header'
+                ? `group:${row.group.id}`
+                : `task:${row.group.id}:${row.task.id}`;
+        },
     });
     const addTagOptions = useMemo(
         () => Array.from(new Set([
@@ -243,7 +277,7 @@ export function ContextsView() {
 
     const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
     useTaskListScope({
-        getTasks: () => keyboardVisibleTasks,
+        getTasks: () => visibleTasks,
         getSelectedIndex: () => selectedTaskIndex,
         setSelectedIndex: setSelectedTaskIndex,
         t,
@@ -263,6 +297,17 @@ export function ContextsView() {
             .map((area) => ({ id: area.id, name: area.name })),
         [areas]
     );
+
+    const renderContextTask = useCallback((task: Task) => (
+        <StoreTaskItem
+            key={task.id}
+            taskId={task.id}
+            selectionMode={selectionMode}
+            isMultiSelected={multiSelectedIds.has(task.id)}
+            onToggleSelectId={toggleMultiSelect}
+            showProjectBadgeInActions={false}
+        />
+    ), [multiSelectedIds, selectionMode, toggleMultiSelect]);
 
     const handleBatchMove = moveSelectedTasks;
 
@@ -614,75 +659,18 @@ export function ContextsView() {
                             ref={listScrollRef}
                             className="flex-1 min-h-0 overflow-y-auto pr-2"
                         >
-                            <div
-                                data-list-end
-                                className={cn(
-                                    LIST_END_GAP,
-                                    !shouldVirtualize && !isGrouping && "divide-y divide-border/30",
-                                )}
-                            >
+                            <div data-list-end className={LIST_END_GAP}>
                             {sortedTasks.length > 0 ? (
-                                shouldVirtualize ? (
-                                    <div
-                                        data-testid="virtualized-task-list"
-                                        style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}
-                                    >
-                                        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                                            const task = sortedTasks[virtualRow.index];
-                                            if (!task) return null;
-                                            return (
-                                                <div
-                                                    key={virtualRow.key}
-                                                    ref={rowVirtualizer.measureElement}
-                                                    data-index={virtualRow.index}
-                                                    style={{
-                                                        position: 'absolute',
-                                                        top: 0,
-                                                        left: 0,
-                                                        width: '100%',
-                                                        transform: `translateY(${virtualRow.start}px)`,
-                                                    }}
-                                                >
-                                                    <div className="pb-1.5">
-                                                        <StoreTaskItem
-                                                            taskId={task.id}
-                                                            selectionMode={selectionMode}
-                                                            isMultiSelected={multiSelectedIds.has(task.id)}
-                                                            onToggleSelectId={toggleMultiSelect}
-                                                            showProjectBadgeInActions={false}
-                                                        />
-                                                        <div className="mx-3 mt-1 h-px bg-border/30" />
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                ) : isGrouping ? (
-                                    <GroupedTaskSections
-                                        groups={groupedTasks}
-                                        renderTask={(task) => (
-                                            <StoreTaskItem
-                                                key={task.id}
-                                                taskId={task.id}
-                                                selectionMode={selectionMode}
-                                                isMultiSelected={multiSelectedIds.has(task.id)}
-                                                onToggleSelectId={toggleMultiSelect}
-                                                showProjectBadgeInActions={false}
-                                            />
-                                        )}
-                                    />
-                                ) : (
-                                    sortedTasks.map(task => (
-                                        <StoreTaskItem
-                                            key={task.id}
-                                            taskId={task.id}
-                                            selectionMode={selectionMode}
-                                            isMultiSelected={multiSelectedIds.has(task.id)}
-                                            onToggleSelectId={toggleMultiSelect}
-                                            showProjectBadgeInActions={false}
-                                        />
-                                    ))
-                                )
+                                <GroupedTaskList
+                                    groups={groupedTasks}
+                                    tasks={sortedTasks}
+                                    virtualRows={groupedVirtualRows}
+                                    virtualizer={shouldVirtualize ? rowVirtualizer : null}
+                                    collapsedGroupIds={collapsedGroupIds}
+                                    onToggleGroup={toggleGroup}
+                                    getSectionDomId={getSectionDomId}
+                                    renderTask={renderContextTask}
+                                />
                             ) : (
                                 <div className="px-1 py-8 text-left text-sm text-muted-foreground">
                                     {normalizedSearchQuery ? t('filters.noMatch') : t('contexts.noTasks')}
