@@ -96,6 +96,10 @@ export function useTaskItemAi({
     useEffect(() => {
         if (!aiEnabled || !copilotEnabled || (keyRequired && !aiKey)) {
             setCopilotSuggestion(null);
+            // Row went inactive with a signature already dispatched (e.g. the
+            // editor closed): clear it so reopening with unchanged text isn't
+            // treated as a duplicate of a request that never really re-ran.
+            copilotInputRef.current = '';
             return;
         }
         const title = editTitle.trim();
@@ -219,6 +223,7 @@ export function useTaskItemAi({
         setCopilotContext(undefined);
         setCopilotEstimate(undefined);
         setCopilotTags([]);
+        copilotInputRef.current = '';
     }, []);
 
     const clearAiBreakdown = useCallback(() => {

@@ -172,6 +172,42 @@ describe('useTaskItemAi copilot parts', () => {
         expect(predictMetadata).not.toHaveBeenCalled();
         expect(result.current.pendingCopilotParts).toEqual([]);
     });
+
+    it('fires again when the same row reopens with unchanged text after closing (C3)', async () => {
+        const setField = vi.fn();
+        const { rerender } = renderHook(
+            (props: { copilotEnabled: boolean }) => useTaskItemAi({
+                taskId: 'task-1',
+                settings,
+                t: (key: string) => key,
+                editTitle: 'Book the dentist',
+                editDescription: '',
+                editContexts: '',
+                editTags: '',
+                editStartTime: '',
+                editDueDate: '',
+                editReviewAt: '',
+                contextOptions: ['@phone'],
+                tagOptions: ['#health'],
+                projectContext: null,
+                timeEstimatesEnabled: true,
+                setField,
+                copilotEnabled: props.copilotEnabled,
+            }),
+            { initialProps: { copilotEnabled: true } },
+        );
+        await settleSuggestion();
+        expect(predictMetadata).toHaveBeenCalledTimes(1);
+
+        // Row closes (e.g. editor collapses): copilotEnabled goes false.
+        rerender({ copilotEnabled: false });
+
+        // Row reopens with the same, unchanged text.
+        rerender({ copilotEnabled: true });
+        await settleSuggestion();
+
+        expect(predictMetadata).toHaveBeenCalledTimes(2);
+    });
 });
 
 describe('TaskItem copilot wiring', () => {
