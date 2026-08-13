@@ -37,6 +37,7 @@ import {
     type MindwtrCsvImportExecutionResult,
     type ParsedMindwtrCsvImportData,
 } from '@mindwtr/core/mindwtr-csv-import';
+import { serializeMindwtrCsv } from '@mindwtr/core/mindwtr-csv-export';
 
 import { SyncService } from './sync-service';
 import { tauriStorage } from './storage-adapter';
@@ -139,12 +140,16 @@ const pickTransferDocument = async (
         };
 };
 
-const downloadTextFile = async (fileName: string, text: string): Promise<void> => {
+const downloadTextFile = async (
+    fileName: string,
+    text: string,
+    format: { name: string; extension: string; mimeType: string } = { name: 'JSON', extension: 'json', mimeType: 'application/json' },
+): Promise<void> => {
     if (isTauriRuntime()) {
         const { save } = await import('@tauri-apps/plugin-dialog');
         const selected = await save({
             defaultPath: fileName,
-            filters: [{ name: 'JSON', extensions: ['json'] }],
+            filters: [{ name: format.name, extensions: [format.extension] }],
             title: 'Export backup',
         });
         if (!selected || typeof selected !== 'string') return;
@@ -157,7 +162,7 @@ const downloadTextFile = async (fileName: string, text: string): Promise<void> =
         throw new Error('Browser download is unavailable in this environment.');
     }
 
-    const blob = new Blob([text], { type: 'application/json' });
+    const blob = new Blob([text], { type: format.mimeType });
     const url = window.URL.createObjectURL(blob);
     try {
         const link = document.createElement('a');
@@ -228,6 +233,29 @@ export const exportDesktopBackup = async (data: AppData): Promise<void> => {
         });
     } catch (error) {
         void logError(error, { scope: 'transfer', extra: { operation: 'exportBackup' } });
+        throw error;
+    }
+};
+
+export const exportDesktopCsv = async (data: AppData): Promise<void> => {
+    addBreadcrumb('transfer:export');
+    void logInfo('CSV export started', {
+        scope: 'transfer',
+        extra: { operation: 'exportCsv', source: 'local' },
+    });
+    try {
+        await flushPendingSave();
+        await downloadTextFile(
+            createBackupFileName().replace(/\.json$/u, '.csv'),
+            serializeMindwtrCsv(data),
+            { name: 'CSV', extension: 'csv', mimeType: 'text/csv' },
+        );
+        void logInfo('CSV export complete', {
+            scope: 'transfer',
+            extra: { operation: 'exportCsv', source: 'local', ...toCountExtra(data) },
+        });
+    } catch (error) {
+        void logError(error, { scope: 'transfer', extra: { operation: 'exportCsv' } });
         throw error;
     }
 };

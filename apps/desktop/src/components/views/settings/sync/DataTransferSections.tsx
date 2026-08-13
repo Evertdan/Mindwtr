@@ -8,6 +8,7 @@ type BackupSectionProps = Pick<
     | 't'
     | 'transferAction'
     | 'onExportBackup'
+    | 'onExportCsv'
     | 'onRestoreBackup'
     | 'onMergeBackup'
     | 'onAddGettingStartedContent'
@@ -61,6 +62,7 @@ function TransferActionButton({
 // expandSettingsSection); nothing persists the choice.
 export function BackupSection({
     onExportBackup,
+    onExportCsv,
     onMergeBackup,
     onRestoreBackup,
     onAddGettingStartedContent,
@@ -85,6 +87,14 @@ export function BackupSection({
                 description={t.exportBackupDesc}
                 statusText={transferAction === 'export' ? t.syncing : null}
                 onClick={() => void onExportBackup()}
+            />
+            <TransferActionButton
+                disabled={disabled}
+                settingsKey="exportCsv"
+                label={t.exportCsv}
+                description={t.exportCsvDesc}
+                statusText={transferAction === 'export:csv' ? t.syncing : null}
+                onClick={() => void onExportCsv()}
             />
             <TransferActionButton
                 disabled={disabled}

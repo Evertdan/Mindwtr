@@ -46,6 +46,7 @@ import {
     type ParsedMindwtrCsvImportData,
 } from '@mindwtr/core/mindwtr-csv-import';
 
+import { serializeMindwtrCsv } from '@mindwtr/core/mindwtr-csv-export';
 import { logError, logInfo } from './app-log';
 import { mobileStorage } from './storage-adapter';
 
@@ -548,10 +549,14 @@ export const restoreLocalDataSnapshot = async (snapshotName: string): Promise<vo
     }
 };
 
-export const exportCurrentDataBackup = async (data: AppData): Promise<void> => {
+// One export path for both formats: the SAF/sharing dance below is identical,
+// only the filename, body and mime type differ.
+export const exportCurrentDataBackup = async (data: AppData, format: 'json' | 'csv' = 'json'): Promise<void> => {
     addBreadcrumb('transfer:export');
-    const snapshotName = createBackupFileName();
-    const jsonContent = serializeBackupData(data);
+    const isCsv = format === 'csv';
+    const snapshotName = isCsv ? createBackupFileName().replace(/\.json$/u, '.csv') : createBackupFileName();
+    const jsonContent = isCsv ? serializeMindwtrCsv(data) : serializeBackupData(data);
+    const mimeType = isCsv ? 'text/csv' : 'application/json';
     void logInfo('Backup export started', {
         scope: 'transfer',
         extra: {
@@ -569,7 +574,7 @@ export const exportCurrentDataBackup = async (data: AppData): Promise<void> => {
                     const fileUri = await StorageAccessFramework.createFileAsync(
                         directoryUri,
                         snapshotName,
-                        'application/json'
+                        mimeType
                     );
                     await StorageAccessFramework.writeAsStringAsync(fileUri, jsonContent);
                     void logInfo('Backup export complete', {
@@ -594,8 +599,8 @@ export const exportCurrentDataBackup = async (data: AppData): Promise<void> => {
             throw new Error('Sharing is not available on this device.');
         }
         await Sharing.shareAsync(fileUri, {
-            UTI: 'public.json',
-            mimeType: 'application/json',
+            UTI: isCsv ? 'public.comma-separated-values-text' : 'public.json',
+            mimeType,
             dialogTitle: 'Export Mindwtr Backup',
         });
         void logInfo('Backup export complete', {

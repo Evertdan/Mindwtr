@@ -274,6 +274,22 @@ describe('useSyncSettings cloud token validation', () => {
         expect(restoreDataSnapshot).not.toHaveBeenCalled();
     });
 
+    it('exports CSV through the shared save path and reports it', async () => {
+        languageMocks.t.mockImplementation((key: string) => `localized:${key}`);
+        const showToast = vi.fn();
+        useUiStore.setState({ showToast } as never);
+        const exportCsv = vi.spyOn(dataTransfer, 'exportDesktopCsv').mockResolvedValue(undefined);
+
+        const { result } = setup();
+        await waitFor(() => expect(SyncService.getCloudConfig).toHaveBeenCalled());
+        await act(async () => {
+            await result.current.dataTransferProps.onExportCsv();
+        });
+
+        expect(exportCsv).toHaveBeenCalledTimes(1);
+        expect(showToast).toHaveBeenCalledWith('localized:settings.exportCsvSuccess', 'success');
+    });
+
     it('uses the active locale for sync setup feedback', async () => {
         languageMocks.t.mockImplementation((key: string) => (
             key === 'settings.sync.readyToVerify' ? 'Paramètres prêts à vérifier.' : key

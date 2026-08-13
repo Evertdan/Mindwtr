@@ -131,6 +131,7 @@ type SyncBackupSectionProps = {
   backupAction: BackupAction;
   handleAddGettingStartedContent: () => void;
   handleBackup: () => void;
+  handleExportCsv: () => void;
   handleImportDgt: () => void;
   handleImportMindwtrCsv: () => void;
   handleImportOmniFocus: () => void;
@@ -158,6 +159,7 @@ export function SyncBackupSection({
   backupAction,
   handleAddGettingStartedContent,
   handleBackup,
+  handleExportCsv,
   handleImportDgt,
   handleImportMindwtrCsv,
   handleImportOmniFocus,
@@ -220,6 +222,22 @@ export function SyncBackupSection({
               <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>{t('settings.saveToSyncFolder')}</Text>
             </View>
             {backupAction === 'export' && renderDecorativeActivityIndicator(tc.tint)}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}
+            onPress={handleExportCsv}
+            disabled={isSyncing || isBackupBusy}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.exportCsv')}
+            accessibilityHint={t('settings.exportCsvDesc')}
+            accessibilityState={{ busy: backupAction === 'export:csv', disabled: isSyncing || isBackupBusy }}
+            testID="data-transfer-export-csv"
+          >
+            <View style={styles.settingInfo}>
+              <Text style={[styles.settingLabel, { color: '#3B82F6' }]}>{t('settings.exportCsv')}</Text>
+              <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>{t('settings.exportCsvDesc')}</Text>
+            </View>
+            {backupAction === 'export:csv' && renderDecorativeActivityIndicator(tc.tint)}
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}

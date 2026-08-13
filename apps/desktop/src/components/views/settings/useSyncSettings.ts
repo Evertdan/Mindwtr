@@ -30,6 +30,7 @@ import {
 import {
     importDesktopDgtData,
     exportDesktopBackup,
+    exportDesktopCsv,
     importDesktopMindwtrCsvData,
     importDesktopOmniFocusData,
     importDesktopTickTickData,
@@ -1249,6 +1250,19 @@ export const useSyncSettings = ({
         }
     }, [resolveText, showToast, toErrorMessage]);
 
+    const handleExportCsv = useCallback(async () => {
+        addBreadcrumb('transfer:export');
+        setTransferAction('export:csv');
+        try {
+            await exportDesktopCsv(getInMemoryAppDataSnapshot());
+            showToast(resolveText('settings.exportCsvSuccess', 'CSV exported successfully!'), 'success');
+        } catch (error) {
+            showToast(toErrorMessage(error, resolveText('settings.exportCsvFailed', 'Failed to export CSV')), 'error');
+        } finally {
+            setTransferAction(null);
+        }
+    }, [resolveText, showToast, toErrorMessage]);
+
     const handleRestoreBackup = useCallback(async () => {
         addBreadcrumb('transfer:restore');
         setTransferAction('restore');
@@ -1761,6 +1775,7 @@ export const useSyncSettings = ({
         dataTransferProps: {
             transferAction,
             onExportBackup: handleExportBackup,
+            onExportCsv: handleExportCsv,
             onRestoreBackup: handleRestoreBackup,
             onMergeBackup: handleMergeBackup,
             onImportTodoist: handleImportTodoist,

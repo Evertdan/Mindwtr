@@ -54,6 +54,7 @@ import { logSettingsError } from '@/lib/settings-utils';
 export type BackupAction =
     | null
     | 'export'
+    | 'export:csv'
     | 'restore'
     | 'merge'
     | 'import:todoist'
@@ -291,6 +292,18 @@ export function useSyncSettingsBackupActions({
         } catch (error) {
             logSettingsError(error);
             showSettingsErrorToast(tr('settings.syncMobile.error'), tr('settings.backupMobile.failedToExportBackup'));
+        } finally {
+            setBackupAction(null);
+        }
+    }, [tr, setBackupAction, showSettingsErrorToast]);
+
+    const handleExportCsv = useCallback(async () => {
+        setBackupAction('export:csv');
+        try {
+            await exportCurrentDataBackup(getInMemoryAppDataSnapshot(), 'csv');
+        } catch (error) {
+            logSettingsError(error);
+            showSettingsErrorToast(tr('settings.syncMobile.error'), tr('settings.exportCsvFailed'));
         } finally {
             setBackupAction(null);
         }
@@ -839,6 +852,7 @@ export function useSyncSettingsBackupActions({
     return {
         formatRecoverySnapshotLabel,
         handleBackup,
+        handleExportCsv,
         handleClearLog,
         handleImportDgt,
         handleImportMindwtrCsv,

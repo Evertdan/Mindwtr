@@ -234,6 +234,7 @@ const dataProps: Parameters<typeof SettingsDataPage>[0] = {
     onClearLog: noop,
     transferAction: null,
     onExportBackup: noop,
+    onExportCsv: noop,
     onRestoreBackup: noop,
     onMergeBackup: noop,
     onImportTodoist: noop,

@@ -35,6 +35,7 @@ const backupProps = {
     t: labels,
     transferAction: null,
     onExportBackup: vi.fn(),
+    onExportCsv: vi.fn(),
     onRestoreBackup: vi.fn(),
     onMergeBackup: vi.fn(),
     onAddGettingStartedContent: vi.fn(),

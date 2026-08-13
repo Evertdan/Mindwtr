@@ -18,6 +18,8 @@ export type SettingsSyncLabels = {
     importSetupGuideDesc: string;
     exportBackup: string;
     exportBackupDesc: string;
+    exportCsv: string;
+    exportCsvDesc: string;
     restoreBackup: string;
     restoreBackupDesc: string;
     mergeBackup: string;
@@ -253,6 +255,7 @@ export type SettingsDiagnosticsProps = {
 export type TransferAction =
     | null
     | 'export'
+    | 'export:csv'
     | 'restore'
     | 'merge'
     | 'import:todoist'
@@ -264,6 +267,7 @@ export type TransferAction =
 export type SettingsDataTransferProps = {
     transferAction: TransferAction;
     onExportBackup: () => Promise<void> | void;
+    onExportCsv: () => Promise<void> | void;
     onRestoreBackup: () => Promise<void> | void;
     onMergeBackup: () => Promise<void> | void;
     onImportTodoist: () => Promise<void> | void;

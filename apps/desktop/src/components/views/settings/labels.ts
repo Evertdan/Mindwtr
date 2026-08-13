@@ -311,6 +311,8 @@ export const SETTINGS_LABEL_KEYS = [
     'importSetupGuideTitle',
     'importSetupGuideDesc',
     'exportBackup',
+    'exportCsv',
+    'exportCsvDesc',
     'exportBackupDesc',
     'restoreBackup',
     'restoreBackupDesc',

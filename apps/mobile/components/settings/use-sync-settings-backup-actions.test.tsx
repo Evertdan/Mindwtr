@@ -231,6 +231,15 @@ describe('useSyncSettingsBackupActions', () => {
         expect(dataTransfer.restoreDataFromBackup).not.toHaveBeenCalled();
     });
 
+    it('exports CSV through the shared export path', async () => {
+        await act(async () => {
+            create(<Harness />);
+        });
+        await latest?.handleExportCsv();
+
+        expect(dataTransfer.exportCurrentDataBackup).toHaveBeenCalledWith(expect.anything(), 'csv');
+    });
+
     // #Q-03: the result toast carries the rollback, so it dies with the message
     // instead of leaving a persistent affordance.
     it('offers Undo import on the result and restores that exact snapshot', async () => {
