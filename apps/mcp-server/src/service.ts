@@ -109,6 +109,29 @@ const isRetryableSqliteWriteError = (error: unknown): boolean => {
   );
 };
 
+/**
+ * Retries the WHOLE callback, which is safe even for multi-write callbacks (quickAdd can mint
+ * a project and then a task) because of two invariants. Break either and retries start
+ * duplicating:
+ *
+ *  1. Every core write commits durably before it returns — core-adapter's addProject and
+ *     writeTask both await flushPendingSave (flushCoreSave) before handing back. So a write
+ *     that completed in a failed attempt is already in SQLite when the next attempt reads.
+ *  2. The callback re-derives its plan from storage on EVERY attempt — it re-runs
+ *     listProjects and parseQuickAdd inside the retried body, never from values captured
+ *     outside it. So the retry sees the project attempt 1 created and resolves `+Launch` to
+ *     that id instead of minting a second one.
+ *
+ * Verified against a real database by injecting one retryable SQLITE_BUSY at each write point
+ * (R-08, 2026-08-13): failing addProject, failing addTask, or neither all end with exactly one
+ * project and one task, correctly linked.
+ *
+ * NOTE for anyone writing that fault-injection test: `queries.ts` exports its own narrowing
+ * `parseQuickAdd` that DROPS `projectTitle`, while this file imports the real one from
+ * '@mindwtr/core'. A test whose deps spread `...queries` silently swaps the parser, the
+ * capture then never creates the project at all, and the result looks like a persistence bug
+ * that isn't one. Always run the no-fault control first.
+ */
 const runCoreWriteWithRetries = async <T>(
   options: DbOptions,
   deps: ServiceDeps,
