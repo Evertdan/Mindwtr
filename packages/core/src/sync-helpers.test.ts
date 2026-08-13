@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     areSyncPayloadsEqual,
     assertNoPendingAttachmentUploads,
+    computeCoveredSettingsFingerprint,
     computeSyncChangeFingerprint,
     computeSyncPayloadFingerprint,
     findPendingAttachmentUploads,
@@ -602,6 +603,33 @@ describe('sync-helpers areSyncPayloadsEqual', () => {
         };
 
         expect(areSyncPayloadsEqual(left, right)).toBe(false);
+    });
+});
+
+describe('sync-helpers computeCoveredSettingsFingerprint', () => {
+    it('changes when a device-local field like the area filter changes (#316)', () => {
+        const before = computeCoveredSettingsFingerprint({
+            filters: { areaIds: ['area-1'] },
+        } as AppData['settings']);
+        const after = computeCoveredSettingsFingerprint({
+            filters: { areaIds: ['area-2'] },
+        } as AppData['settings']);
+        expect(after).not.toBe(before);
+    });
+
+    it('ignores sync status bookkeeping fields the running cycle rewrites', () => {
+        const before = computeCoveredSettingsFingerprint({
+            filters: { areaIds: ['area-1'] },
+            lastSyncAt: '2026-04-01T00:00:00.000Z',
+            lastSyncStatus: 'success',
+        } as AppData['settings']);
+        const after = computeCoveredSettingsFingerprint({
+            filters: { areaIds: ['area-1'] },
+            lastSyncAt: '2026-04-02T00:00:00.000Z',
+            lastSyncStatus: 'error',
+            lastSyncError: 'offline',
+        } as AppData['settings']);
+        expect(after).toBe(before);
     });
 });
 

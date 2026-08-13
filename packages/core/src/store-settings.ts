@@ -23,6 +23,7 @@ import {
     stripSensitiveSettings,
     withTimeout,
 } from './store-helpers';
+import { SYNC_STATUS_BOOKKEEPING_SETTINGS_KEYS } from './sync-helpers';
 import { DEFAULT_TOMBSTONE_RETENTION_DAYS, purgeExpiredTombstones } from './sync-tombstones';
 import { buildLoadContext, runAutoArchive, runLoadMigrations } from './store-load-migrations';
 import { createSeedGettingStartedAction } from './getting-started-seed';
@@ -38,17 +39,7 @@ const getFetchDataErrorMessage = (error: unknown): string => {
     if (/timed out/i.test(trimmed)) return 'Storage request timed out. Try again.';
     return `Failed to fetch data: ${trimmed}`;
 };
-const NON_MUTATING_SETTINGS_KEYS = new Set<keyof AppData['settings']>([
-    'network',
-    'lastSyncAt',
-    'lastSyncStatus',
-    'lastSyncError',
-    'pendingRemoteWriteAt',
-    'pendingRemoteWriteRetryAt',
-    'pendingRemoteWriteAttempts',
-    'lastSyncStats',
-    'lastSyncHistory',
-]);
+const NON_MUTATING_SETTINGS_KEYS = new Set<keyof AppData['settings']>(SYNC_STATUS_BOOKKEEPING_SETTINGS_KEYS);
 
 let derivedCache: DerivedCache | null = null;
 

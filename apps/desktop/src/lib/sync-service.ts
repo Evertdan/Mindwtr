@@ -28,6 +28,7 @@ import {
     sanitizeAppDataForRemote,
     computeStableValueFingerprint,
     computeSyncPayloadFingerprint,
+    computeCoveredSettingsFingerprint,
     areSyncPayloadsEqual,
     findDeletedAttachmentsForFileCleanup,
     findOrphanedAttachments,
@@ -901,6 +902,22 @@ export class SyncService {
                 syncedFingerprint,
                 rawPayloadsEqual: String(rawPayloadsEqual),
                 ...buildSyncPayloadDiffTraceExtra(currentData, syncedData),
+            });
+            return false;
+        }
+
+        // The payload fingerprint is blind to device-local settings (the
+        // sanitizer strips them), but finalize applies expectedData.settings to
+        // the store wholesale — accepting coverage while e.g. the sidebar area
+        // filter changed mid-cycle would revert that change (#316). A mismatch
+        // here falls back to the normal requeue path.
+        const currentSettingsFingerprint = computeCoveredSettingsFingerprint(currentData.settings);
+        const syncedSettingsFingerprint = computeCoveredSettingsFingerprint(syncedData.settings);
+        if (currentSettingsFingerprint !== syncedSettingsFingerprint) {
+            logSyncInfo('Sync trace covered local snapshot differs in device-local settings', {
+                currentChangeAt: String(currentChangeAt),
+                currentSettingsFingerprint,
+                syncedSettingsFingerprint,
             });
             return false;
         }

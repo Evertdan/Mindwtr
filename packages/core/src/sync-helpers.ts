@@ -311,6 +311,40 @@ export const computeStableValueFingerprint = (value: unknown): string => {
 export const computeSyncPayloadFingerprint = (data: AppData): string =>
     computeStableValueFingerprint(sanitizeAppDataForRemote(data));
 
+/**
+ * Sync's own status bookkeeping fields. Writes to these never mark the store
+ * dirty (store-settings builds its non-mutating list from this), and the
+ * covered-settings fingerprint below ignores them because the sync cycle
+ * itself rewrites them while it runs.
+ */
+export const SYNC_STATUS_BOOKKEEPING_SETTINGS_KEYS = [
+    'network',
+    'lastSyncAt',
+    'lastSyncStatus',
+    'lastSyncError',
+    'pendingRemoteWriteAt',
+    'pendingRemoteWriteRetryAt',
+    'pendingRemoteWriteAttempts',
+    'lastSyncStats',
+    'lastSyncHistory',
+] as const satisfies readonly (keyof AppData['settings'])[];
+
+/**
+ * Fingerprint of the settings a sync apply would overwrite, including the
+ * device-local fields that sanitizeSettingsForRemote strips from the payload
+ * (e.g. `filters`, the sidebar area selection). The payload fingerprint alone
+ * cannot see those fields, so a covered-snapshot check that trusts it would
+ * let the cycle's finalize revert a device-local change made mid-sync (#316).
+ * Sync status bookkeeping is excluded — the running cycle mutates it.
+ */
+export const computeCoveredSettingsFingerprint = (settings: AppData['settings']): string => {
+    const comparable: Record<string, unknown> = { ...(settings ?? {}) };
+    for (const key of SYNC_STATUS_BOOKKEEPING_SETTINGS_KEYS) {
+        delete comparable[key];
+    }
+    return computeStableValueFingerprint(comparable);
+};
+
 type RevisionedEntity = {
     id: string;
     rev?: number;

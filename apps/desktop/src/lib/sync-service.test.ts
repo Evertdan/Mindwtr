@@ -119,6 +119,43 @@ afterEach(async () => {
     sessionStorage.clear();
 });
 
+describe('covered local snapshot', () => {
+    const dataWithSettings = (settings: AppData['settings']): AppData => ({
+        tasks: [],
+        projects: [],
+        sections: [],
+        areas: [],
+        people: [],
+        settings,
+    });
+
+    it('rejects coverage when a device-local setting changed mid-cycle (#316)', () => {
+        __syncServiceTestUtils.setDependenciesForTests({
+            getStoreState: () => ({ lastDataChangeAt: 5 }) as any,
+            getInMemoryAppDataSnapshot: () => dataWithSettings({ filters: { areaIds: ['area-2'] } }),
+        });
+
+        const covered = (SyncService as any).isCoveredLocalSnapshot(
+            dataWithSettings({ filters: { areaIds: ['area-1'] } }),
+        );
+
+        expect(covered).toBe(false);
+    });
+
+    it('accepts coverage when the mid-cycle change left settings identical', () => {
+        __syncServiceTestUtils.setDependenciesForTests({
+            getStoreState: () => ({ lastDataChangeAt: 5 }) as any,
+            getInMemoryAppDataSnapshot: () => dataWithSettings({ filters: { areaIds: ['area-1'] } }),
+        });
+
+        const covered = (SyncService as any).isCoveredLocalSnapshot(
+            dataWithSettings({ filters: { areaIds: ['area-1'] }, lastSyncStatus: 'success' }),
+        );
+
+        expect(covered).toBe(true);
+    });
+});
+
 describe('sync-service test utils', () => {
     it('serializes desktop sync document work with imports and restores', async () => {
         const events: string[] = [];
