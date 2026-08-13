@@ -18,6 +18,11 @@ export const DEFAULT_HTTP_PORT = 8722;
 export const MIN_HTTP_TOKEN_LENGTH = 16;
 export const RECOMMENDED_HTTP_TOKEN_LENGTH = 20;
 export const MAX_HTTP_BODY_BYTES = 1024 * 1024; // 1 MiB
+/** Auth failures allowed per key per window before 429s take over. Mirrors cloud's default. */
+export const AUTH_FAILURE_RATE_MAX = 30;
+export const AUTH_FAILURE_WINDOW_MS = 60_000;
+/** Bounds memory against spoofed source addresses; oldest window is dropped at capacity. */
+const AUTH_FAILURE_MAX_KEYS = 5_000;
 
 export type HttpServerConfig = {
   host: string;
@@ -140,12 +145,98 @@ export type HttpMcpDeps = {
   token: string;
   maxBodyBytes?: number;
   logError?: (message: string, error?: unknown) => void;
+  /** Host the server is bound to; Origin headers must match it. */
+  host?: string;
+  /** Clock override for tests. */
+  now?: () => number;
 };
 
-const handleMcpPost = async (req: IncomingMessage, res: ServerResponse, deps: Required<HttpMcpDeps>) => {
+type AuthFailureWindow = { count: number; resetAt: number };
+
+/**
+ * Fixed-window auth-failure throttle, the same shape as the cloud server's
+ * (apps/cloud/src/server-rate-limit.ts) but re-implemented rather than imported: the MCP
+ * server is a separate workspace on node:http, and the cloud limiter speaks Bun `Response`.
+ * Only FAILURES are counted, so a client presenting the right token is never throttled —
+ * matching cloud, where the limiter is consulted solely from unauthorizedResponse.
+ */
+const createAuthFailureThrottle = (now: () => number) => {
+  const windows = new Map<string, AuthFailureWindow>();
+
+  return (keys: string[]): number | null => {
+    const nowMs = now();
+    let retryAfterSeconds: number | null = null;
+    for (const key of keys) {
+      const existing = windows.get(key);
+      const window = existing && nowMs < existing.resetAt
+        ? existing
+        : { count: 0, resetAt: nowMs + AUTH_FAILURE_WINDOW_MS };
+      window.count += 1;
+      if (!windows.has(key) && windows.size >= AUTH_FAILURE_MAX_KEYS) {
+        for (const [candidate, state] of windows) {
+          if (nowMs > state.resetAt) windows.delete(candidate);
+        }
+        if (windows.size >= AUTH_FAILURE_MAX_KEYS) {
+          windows.delete(windows.keys().next().value as string);
+        }
+      }
+      windows.set(key, window);
+      if (window.count > AUTH_FAILURE_RATE_MAX) {
+        retryAfterSeconds = Math.max(retryAfterSeconds ?? 0, Math.ceil((window.resetAt - nowMs) / 1000));
+      }
+    }
+    return retryAfterSeconds;
+  };
+};
+
+const digest = (value: string): string => createHash('sha256').update(value).digest('hex').slice(0, 32);
+
+const authFailureKeys = (req: IncomingMessage): string[] => {
+  const address = req.socket.remoteAddress;
+  const authHeader = req.headers.authorization;
+  const presented = Array.isArray(authHeader) ? authHeader[0] : authHeader;
+  return [
+    `auth-failure:ip:${address || 'unknown'}`,
+    ...(presented ? [`auth-failure:token:${digest(presented)}`] : []),
+  ];
+};
+
+/**
+ * DNS-rebinding guard for a local HTTP transport (MCP spec guidance): a browser page on
+ * another origin can reach 127.0.0.1, but it cannot omit or forge Origin. A request with no
+ * Origin at all is a non-browser client (CLI, agent runtime) and is allowed through.
+ */
+export const isAllowedOrigin = (origin: string | undefined, host: string): boolean => {
+  if (!origin) return true;
+  try {
+    return new URL(origin).hostname === host;
+  } catch {
+    return false;
+  }
+};
+
+const handleMcpPost = async (
+  req: IncomingMessage,
+  res: ServerResponse,
+  deps: Required<HttpMcpDeps>,
+  throttle: (keys: string[]) => number | null,
+) => {
+  const originHeader = req.headers.origin;
+  const origin = Array.isArray(originHeader) ? originHeader[0] : originHeader;
+  if (!isAllowedOrigin(origin, deps.host)) {
+    sendJson(res, 403, { error: 'forbidden_origin' });
+    return;
+  }
+
   const authHeader = req.headers.authorization;
   const authHeaderValue = Array.isArray(authHeader) ? authHeader[0] : authHeader;
   if (!isAuthorizedBearerToken(authHeaderValue, deps.token)) {
+    const retryAfterSeconds = throttle(authFailureKeys(req));
+    if (retryAfterSeconds !== null) {
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': String(retryAfterSeconds) });
+      res.end(JSON.stringify({ error: 'rate_limit_exceeded', retryAfterSeconds }));
+      return;
+    }
     res.writeHead(401, { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' });
     res.end(JSON.stringify({ error: 'unauthorized' }));
     return;
@@ -197,7 +288,10 @@ export const createHttpRequestListener = (deps: HttpMcpDeps) => {
     token: deps.token,
     maxBodyBytes: deps.maxBodyBytes ?? MAX_HTTP_BODY_BYTES,
     logError: deps.logError ?? (() => {}),
+    host: deps.host ?? DEFAULT_HTTP_HOST,
+    now: deps.now ?? Date.now,
   };
+  const throttle = createAuthFailureThrottle(resolvedDeps.now);
 
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const url = new URL(req.url ?? '/', 'http://localhost');
@@ -219,7 +313,7 @@ export const createHttpRequestListener = (deps: HttpMcpDeps) => {
         res.end(JSON.stringify({ error: 'method_not_allowed' }));
         return;
       }
-      await handleMcpPost(req, res, resolvedDeps);
+      await handleMcpPost(req, res, resolvedDeps, throttle);
       return;
     }
 

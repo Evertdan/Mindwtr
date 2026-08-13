@@ -857,6 +857,7 @@ export async function startMcpServer(argv: string[] = process.argv.slice(2)) {
     const httpServer = createMindwtrHttpServer({
       createServer: () => createMindwtrMcpServer(service, config),
       token: httpConfig.token,
+      host: httpConfig.host,
       logError,
     });
     attachLifecycleHandlers(service, () => {
