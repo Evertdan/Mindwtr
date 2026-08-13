@@ -4094,6 +4094,83 @@ mod tests {
         release_sync_lock(&owner);
     }
 
+    /// Slices `source` from the start of `fn <name>(` to the next top-level
+    /// item declaration, the same boundary `write_sync_file_to_dir`'s check
+    /// above uses. `name` is built at runtime by the caller (not spelled out
+    /// as a literal), so this test's own source text can never be the match.
+    fn find_function_body<'a>(source: &'a str, name: &str) -> &'a str {
+        let declaration = format!("fn {name}(");
+        assert_eq!(
+            source.matches(declaration.as_str()).count(),
+            1,
+            "{name} must be declared exactly once for this check to mean anything"
+        );
+        let after_decl = source
+            .split_once(declaration.as_str())
+            .unwrap_or_else(|| panic!("{name} not found"))
+            .1;
+        let boundaries = ["\n#[tauri::command", "\npub(crate) fn ", "\nfn "];
+        let body_end = boundaries
+            .iter()
+            .filter_map(|marker| after_decl.find(marker))
+            .min()
+            .unwrap_or(after_decl.len());
+        &after_decl[..body_end]
+    }
+
+    // I1/V3: every command that writes config.toml through a CRED-only path
+    // (update_bound_credential, publish_sync_backend_paths_with, the torn-
+    // publication repair or migration writers inside read_sync_backend_
+    // publication_state/read_dropbox_credential_state/read_sync_configuration_
+    // pair) must hold lock_config_read_modify_write() as its outermost lock,
+    // or a concurrent RMW-guarded writer's read..write gap can silently
+    // revert it (I1). This list is transcribed from the real call sites, not
+    // generated, so it only catches a guard actually being REMOVED - it
+    // won't notice a new writer added without one. Red-checked by deleting
+    // one guard and confirming the assertion for that function fails.
+    #[test]
+    fn every_config_toml_writer_holds_the_outer_rmw_lock() {
+        let config_source = include_str!("config.rs");
+        let functions: &[(&str, &str, &str)] = &[
+            ("config.rs", config_source, "get_ai_key"),
+            ("config.rs", config_source, "set_ai_key"),
+            ("config.rs", config_source, "get_sync_backend"),
+            ("config.rs", config_source, "get_sync_cloud_provider"),
+            ("config.rs", config_source, "get_sync_cloud_provider_state"),
+            ("config.rs", config_source, "get_sync_configuration_snapshot"),
+            ("config.rs", config_source, "set_sync_backend"),
+            ("config.rs", config_source, "set_sync_cloud_provider"),
+            ("config.rs", config_source, "set_obsidian_config"),
+            ("config.rs", config_source, "set_webdav_config"),
+            ("config.rs", config_source, "set_cloud_config"),
+            ("config.rs", config_source, "set_network_proxy"),
+            ("config.rs", config_source, "set_external_calendars"),
+            (
+                "email_capture.rs",
+                include_str!("email_capture.rs"),
+                "set_email_capture_config",
+            ),
+            ("lib.rs", include_str!("lib.rs"), "set_desktop_rendering_config"),
+            (
+                "local_api.rs",
+                include_str!("local_api.rs"),
+                "write_local_api_config",
+            ),
+            ("sync.rs", include_str!("sync.rs"), "clear_sync_path"),
+            ("sync.rs", include_str!("sync.rs"), "set_sync_path"),
+        ];
+
+        for (file, source, name) in functions {
+            let body = find_function_body(source, name);
+            assert!(
+                body.contains("lock_config_read_modify_write()"),
+                "{file}: {name} must hold lock_config_read_modify_write() across its \
+                 whole body (I1) — without it, a concurrent RMW-guarded writer can \
+                 silently revert this function's change to config.toml"
+            );
+        }
+    }
+
     /// (name, is_async) for every `#[tauri::command...]` declaration found in
     /// `source`, in source order. Scans forward from each attribute occurrence
     /// (not backward from a known name), so it finds commands this test never
