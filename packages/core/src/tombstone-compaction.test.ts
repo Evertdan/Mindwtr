@@ -4,7 +4,8 @@ import { compactPurgedTaskForLocalStorage, hasUncompactedPurgedTaskTombstone } f
 import { normalizeTaskForLoad } from './task-status';
 import { normalizeTaskForSyncMerge } from './sync-normalization';
 import { mergeAppDataWithStats } from './sync';
-import { taskToSqliteRow } from './task-sync-schema';
+import { TASK_SQLITE_COLUMNS, taskToSqliteRow } from './task-sync-schema';
+import { mapSqliteTaskRow } from './sqlite-adapter';
 
 const nowIso = '2026-08-04T00:00:00.000Z';
 
@@ -92,6 +93,42 @@ describe('purged tombstone compaction is stable across load cycles', () => {
         const secondBase: AppData = { ...emptyData, tasks: [reloaded] };
         const second = mergeAppDataWithStats(secondBase, secondBase, { nowIso: '2026-08-10T12:05:00.000Z' });
         expect(JSON.stringify(second.data.tasks[0])).toBe(JSON.stringify(merged));
+    });
+
+    // The rc.3 log shape from #766/#784: 3,306 purged tombstones, tombstoneRepairs 0,
+    // yet every cycle rewrote every tombstone row with ONLY the rev column changed
+    // and requeued sync. The SQLite row codec rehydrates absent columns as explicit
+    // null/false (completedAtBeforeProjectArchive and friends), which re-flagged
+    // every SQL-loaded tombstone as uncompacted; the rev bump happened in
+    // readLocalDataForSyncCycle's stats-discarding pre-merge, so the counted
+    // tombstoneRepairs metric stayed 0. A tombstone loaded through the REAL row
+    // codec must not flag, and its rev must hold across full merge cycles.
+    it('a tombstone loaded through the SQLite row codec keeps rev stable across merge cycles', () => {
+        const emptyData: AppData = { tasks: [], projects: [], sections: [], areas: [], people: [], settings: {} };
+        const sqlRoundTrip = (task: Task): Task => {
+            const row = taskToSqliteRow(task);
+            const record: Record<string, unknown> = {};
+            TASK_SQLITE_COLUMNS.forEach((column, index) => { record[column] = row[index]; });
+            return normalizeTaskForLoad(mapSqliteTaskRow(record), nowIso);
+        };
+
+        const compacted = compactPurgedTaskForLocalStorage(purgedTask);
+        const loaded = sqlRoundTrip(compacted);
+        // The codec really does rehydrate nulls — the shape under test.
+        expect(loaded.completedAtBeforeProjectArchive).toBeNull();
+        expect(hasUncompactedPurgedTaskTombstone(loaded, true)).toBe(false);
+        expect(hasUncompactedPurgedTaskTombstone(loaded, false)).toBe(false);
+
+        // Full cycle: pre-merge (persisted vs store), then persist and reload
+        // through the codec again — rev must not move on any cycle.
+        let persisted = loaded;
+        for (const cycleNow of ['2026-08-13T20:00:00.000Z', '2026-08-13T20:01:00.000Z', '2026-08-13T20:02:00.000Z']) {
+            const base: AppData = { ...emptyData, tasks: [persisted] };
+            const result = mergeAppDataWithStats(base, base, { nowIso: cycleNow });
+            expect(result.stats.tombstoneRepairs).toBe(0);
+            expect(result.data.tasks[0].rev).toBe(purgedTask.rev);
+            persisted = sqlRoundTrip(result.data.tasks[0]);
+        }
     });
 
     it('live tasks still get the pushCount backfill on load', () => {

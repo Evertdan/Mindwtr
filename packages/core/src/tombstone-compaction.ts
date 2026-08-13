@@ -23,6 +23,14 @@ const hasValuesOutsideCompactedTombstone = (
     compacted: Record<string, unknown>,
 ): boolean => Object.entries(value).some(([key, item]) => (
     item !== undefined
+    // The SQLite row codec rehydrates absent columns as explicit null
+    // (e.g. completedAtBeforeProjectArchive), and null ≡ missing everywhere
+    // in sync. Without this, every SQL-loaded tombstone re-flags as
+    // uncompacted and takes an uncounted rev bump per cycle — the #766
+    // rev-only rewrite of every purged row that kept sync re-triggering
+    // while tombstoneRepairs read 0 (the bump happened in the stats-discarding
+    // pre-cycle merge, not the counted one).
+    && !(item === null && compacted[key] === undefined)
     && !(item === false && compacted[key] === undefined && SQLITE_NEUTRAL_FALSE_FIELDS.has(key))
     && !(item === 0 && compacted[key] === undefined && NEUTRAL_ZERO_FIELDS.has(key))
     && JSON.stringify(item) !== JSON.stringify(compacted[key])
