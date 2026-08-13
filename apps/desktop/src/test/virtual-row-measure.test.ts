@@ -13,7 +13,9 @@ const SRC_ROOT = existsSync(LOCAL_SRC) ? LOCAL_SRC : join(process.cwd(), 'apps',
  * the attribute the ref is a silent no-op — nothing throws, rows just stop
  * re-measuring and an expanding inline editor paints over the row below (#825).
  *
- * Seven sites wire this by hand, so pin it at the source rather than per view.
+ * Six sites wire this by hand, so pin it at the source rather than per view.
+ * The floor only ratchets down when a hand-rolled virtualizer is folded into a
+ * shared component — ContextsView's site went that way into GroupedTaskList.
  */
 function collectSourceFiles(dir: string): string[] {
     return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -42,6 +44,6 @@ describe('virtualized rows registered for re-measurement', () => {
 
     // A regex that quietly stops matching would make the check above vacuous.
     it('still finds every measureElement site', () => {
-        expect(sites.length).toBeGreaterThanOrEqual(7);
+        expect(sites.length).toBeGreaterThanOrEqual(6);
     });
 });

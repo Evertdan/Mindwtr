@@ -62,8 +62,9 @@ const matchesSelected = (task: Task, context: string) => {
 
 const hasContext = (task: Task) => (task.contexts?.length || 0) > 0 || (task.tags?.length || 0) > 0;
 
-// Its own key, as in ArchiveView: the view state above is rewritten wholesale by
-// the cross-window token-selection subscriber, which would drop folds it never read.
+// Its own key, not a field on the contexts view state: persistContextsViewSelection
+// rewrites that key from a fixed three-field shape, so any fold stored there would be
+// dropped the next time another view navigated to a token.
 const CONTEXTS_GROUP_COLLAPSE_STORAGE_KEY = 'mindwtr:view:contexts:groups:v1';
 
 export function ContextsView() {
