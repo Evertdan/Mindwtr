@@ -50,6 +50,7 @@ export const CLOUD_LOG_MESSAGES = [
     'cloud data directory is not writable',
     'cloud data directory ready',
     'cloud server listening',
+    'pruned orphaned calendar feed sidecars',
     'request completed',
     'request failed',
     'shutdown signal received',
@@ -61,6 +62,7 @@ export const CLOUD_LOG_MESSAGES = [
 type CloudLogMessage = typeof CLOUD_LOG_MESSAGES[number];
 type CloudOperationalLogContext = Partial<Record<
     | 'allowedTokens'
+    | 'count'
     | 'elapsedMs'
     | 'hint'
     | 'maxNamespaces'

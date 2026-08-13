@@ -95,6 +95,7 @@ import {
     calendarFeedResponse,
     findCalendarFeedNamespace,
     parseCalendarFeedPathToken,
+    pruneOrphanedCalendarFeeds,
     readCalendarFeed,
     revokeCalendarFeed,
     rotateCalendarFeed,
@@ -1068,6 +1069,14 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
         throw new Error('Cloud data directory is not writable');
     }
     logInfo('cloud data directory ready');
+    if (allowedAuthTokens) {
+        const prunedFeedCount = pruneOrphanedCalendarFeeds(dataDir, allowedAuthTokens.keys);
+        if (prunedFeedCount > 0) {
+            // Count only, no paths - the namespace key is a token digest (#952's
+            // privacy ratchet already treats it as sensitive elsewhere).
+            logInfo('pruned orphaned calendar feed sidecars', { count: String(prunedFeedCount) });
+        }
+    }
     logInfo('cloud server listening', { port: String(port) });
 
     const bunRuntime = getBunRuntime();
@@ -1383,7 +1392,13 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                     // rotating token strings cannot allocate limiter keys while
                     // forcing namespace sidecar scans.
                     const feedNamespaceKey = findCalendarFeedNamespace(dataDir, calendarFeedToken);
-                    if (!feedNamespaceKey) return errorResponse('Not found', 404);
+                    // A namespace whose token left the allowlist gets the same 404 as an
+                    // unknown feed token - revoking sync access must also stop the feed
+                    // (R-03), not just the authenticated API. Any-token mode has no
+                    // allowlist to fall out of, so every feed stays valid there, unchanged.
+                    if (!feedNamespaceKey || (allowedAuthTokens && !allowedAuthTokens.keys.has(feedNamespaceKey))) {
+                        return errorResponse('Not found', 404);
+                    }
                     const feedRateLimitResponse = rateLimiter.check(
                         `ics:${tokenToKey(calendarFeedToken)}`,
                         maxPerWindow,

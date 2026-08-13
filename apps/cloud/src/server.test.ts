@@ -4304,4 +4304,90 @@ describe('cloud server calendar feed', () => {
             rmSync(dataDir, { recursive: true, force: true });
         }
     });
+
+    // R-03: revoking a token (the documented rotation flow) must also stop the
+    // calendar feed it published - the feed URL has no auth of its own, so an
+    // unrevoked feed would keep serving that namespace's data forever.
+    test('404s a published feed and prunes its sidecar once the token leaves the allowlist', async () => {
+        const dataDir = mkdtempSync(join(tmpdir(), 'mindwtr-cloud-calendar-feed-'));
+        try {
+            const server = await startCloudServer({
+                host: '127.0.0.1', port: 0, dataDir, allowedAuthTokens: [FEED_TOKEN],
+            });
+            const url = `http://127.0.0.1:${server.port}`;
+            await seedData(url, [scheduledTask]);
+            const created = await fetch(`${url}/v1/calendar/feed`, { method: 'POST', headers: authHeaders });
+            const feed = (await created.json()).feed as { path: string; token: string };
+            expect((await fetch(`${url}${feed.path}`)).status).toBe(200);
+            server.stop();
+
+            // Rotation: the next allowlist no longer contains FEED_TOKEN.
+            const restarted = await startCloudServer({
+                host: '127.0.0.1', port: 0, dataDir,
+                allowedAuthTokens: ['rotated-replacement-token-1234567890'],
+            });
+            try {
+                const restartedUrl = `http://127.0.0.1:${restarted.port}`;
+                expect((await fetch(`${restartedUrl}${feed.path}`)).status).toBe(404);
+                expect(readdirSync(dataDir).some((entry) => entry.endsWith('.ics.json'))).toBe(false);
+            } finally {
+                restarted.stop();
+            }
+        } finally {
+            rmSync(dataDir, { recursive: true, force: true });
+        }
+    });
+
+    test('any-token mode keeps every feed valid, including across a restart', async () => {
+        const dataDir = mkdtempSync(join(tmpdir(), 'mindwtr-cloud-calendar-feed-'));
+        try {
+            const server = await startCloudServer({
+                host: '127.0.0.1', port: 0, dataDir, allowedAuthTokens: null,
+            });
+            const url = `http://127.0.0.1:${server.port}`;
+            await seedData(url, [scheduledTask]);
+            const created = await fetch(`${url}/v1/calendar/feed`, { method: 'POST', headers: authHeaders });
+            const feed = (await created.json()).feed as { path: string; token: string };
+            expect((await fetch(`${url}${feed.path}`)).status).toBe(200);
+            server.stop();
+
+            const restarted = await startCloudServer({
+                host: '127.0.0.1', port: 0, dataDir, allowedAuthTokens: null,
+            });
+            try {
+                expect((await fetch(`http://127.0.0.1:${restarted.port}${feed.path}`)).status).toBe(200);
+            } finally {
+                restarted.stop();
+            }
+        } finally {
+            rmSync(dataDir, { recursive: true, force: true });
+        }
+    });
+
+    test('a feed stays valid and its sidecar untouched when its token is still allowlisted after a restart', async () => {
+        const dataDir = mkdtempSync(join(tmpdir(), 'mindwtr-cloud-calendar-feed-'));
+        const allowedTokens = [FEED_TOKEN, 'another-allowed-token-1234567890'];
+        try {
+            const server = await startCloudServer({
+                host: '127.0.0.1', port: 0, dataDir, allowedAuthTokens: allowedTokens,
+            });
+            const url = `http://127.0.0.1:${server.port}`;
+            await seedData(url, [scheduledTask]);
+            const created = await fetch(`${url}/v1/calendar/feed`, { method: 'POST', headers: authHeaders });
+            const feed = (await created.json()).feed as { path: string; token: string };
+            server.stop();
+
+            const restarted = await startCloudServer({
+                host: '127.0.0.1', port: 0, dataDir, allowedAuthTokens: allowedTokens,
+            });
+            try {
+                expect((await fetch(`http://127.0.0.1:${restarted.port}${feed.path}`)).status).toBe(200);
+                expect(readdirSync(dataDir).some((entry) => entry.endsWith('.ics.json'))).toBe(true);
+            } finally {
+                restarted.stop();
+            }
+        } finally {
+            rmSync(dataDir, { recursive: true, force: true });
+        }
+    });
 });

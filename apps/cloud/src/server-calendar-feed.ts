@@ -89,6 +89,32 @@ export const findCalendarFeedNamespace = (dataDir: string, token: string): strin
     return null;
 };
 
+/**
+ * Deletes feed sidecars whose namespace key is no longer in the allowlist.
+ * A revoked token's feed sidecar has no other cleanup path: the authenticated
+ * DELETE route needs the very token being revoked, so nothing else ever
+ * removes it. Called once at startup when an allowlist is configured; the
+ * route-level check (server.ts) is what actually stops the feed from being
+ * served in the meantime, this just reclaims the file.
+ */
+export const pruneOrphanedCalendarFeeds = (dataDir: string, allowedKeys: ReadonlySet<string>): number => {
+    let entries: string[];
+    try {
+        entries = readdirSync(dataDir);
+    } catch {
+        return 0;
+    }
+    let pruned = 0;
+    for (const entry of entries) {
+        if (!entry.endsWith(FEED_FILE_SUFFIX)) continue;
+        const key = entry.slice(0, -FEED_FILE_SUFFIX.length);
+        if (allowedKeys.has(key)) continue;
+        unlinkSync(join(dataDir, entry));
+        pruned += 1;
+    }
+    return pruned;
+};
+
 /** The token in `/v1/calendar/<token>.ics`, or null when the path is not a feed request. */
 export const parseCalendarFeedPathToken = (pathname: string): string | null => {
     if (!pathname.startsWith(CALENDAR_FEED_PATH_PREFIX) || !pathname.endsWith('.ics')) return null;
