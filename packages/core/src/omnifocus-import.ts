@@ -1208,7 +1208,13 @@ export const applyOmniFocusImport = (
     {
         areas: [...parsedData.areas].sort((left, right) => left.order - right.order || left.name.localeCompare(right.name)),
         projects: [...parsedData.projects].sort((left, right) => left.order - right.order || left.name.localeCompare(right.name)),
-        tasks: [...parsedData.tasks].sort((left, right) => left.order - right.order || left.title.localeCompare(right.title)),
+        // Escape hatch (R-07): OmniFocus exports carry no stable per-item id, so there is no
+        // real key to supply. This positional one is never read today — applyOmniFocusImport
+        // passes no idFor, so ids come from the uuid default — but it keeps the tasks distinct
+        // if an idFor is ever added here, instead of collapsing every one of them onto ''.
+        tasks: [...parsedData.tasks]
+            .sort((left, right) => left.order - right.order || left.title.localeCompare(right.title))
+            .map((task, index) => ({ ...task, sourceKey: `omnifocus-task-${index}` })),
         warnings: parsedData.warnings,
     },
     {

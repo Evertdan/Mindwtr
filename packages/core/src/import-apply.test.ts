@@ -16,6 +16,28 @@ const OPTS = {
 };
 
 describe('applyImport', () => {
+    // R-07: the identity is idFor('task', sourceKey), so a missing key collapsed every task
+    // onto one id and dropped all but the first as "already imported". sourceKey is required
+    // now — the compiler is that guard (see the OmniFocus callsite). This pins the behaviour
+    // the requirement exists to protect.
+    it('dedupes repeated sourceKeys but keeps distinct ones apart', () => {
+        const parsed = {
+            areas: [],
+            projects: [],
+            warnings: [],
+            tasks: [
+                { order: 0, sourceKey: 'a', status: 'inbox', title: 'A' },
+                { order: 1, sourceKey: 'b', status: 'inbox', title: 'B' },
+            ],
+        } as unknown as ImportSource;
+
+        const first = applyImport(mockAppData([], [], []), parsed, { ...OPTS, now: '2026-06-17T12:00:00.000Z' });
+        expect(first.data.tasks.map((task) => task.title)).toEqual(['A', 'B']);
+
+        const second = applyImport(first.data, parsed, { ...OPTS, now: '2026-06-18T12:00:00.000Z' });
+        expect(second.data.tasks).toHaveLength(2);
+    });
+
     it('renames on name collision, allocates order after existing siblings, and stamps a fresh rev', () => {
         // This area was "already imported" in a prior run (its id already matches what idFor
         // would produce), so this import must dedupe it rather than create a duplicate — and a

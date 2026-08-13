@@ -66,7 +66,10 @@ export type ImportTaskSource = {
     recurrence?: Task['recurrence'];
     reviewAt?: string;
     sectionSourceKey?: string;
-    sourceKey?: string;
+    /** REQUIRED: idFor('task', sourceKey) is the identity. Every '' collapses to one id, so an
+     *  omitted key silently drops every task but the first (R-07). An importer without a
+     *  natural key must mint a stable one at its own callsite, never here. */
+    sourceKey: string;
     startTime?: string;
     status: TaskStatus;
     tags?: string[];
@@ -351,7 +354,7 @@ export function applyImport(
     let skippedExistingTaskCount = 0;
     let skippedDeletedTaskCount = 0;
     parsed.tasks.forEach((task) => {
-        const taskId = idFor('task', task.sourceKey ?? '');
+        const taskId = idFor('task', task.sourceKey);
         if (existingTaskIds.has(taskId)) {
             if (deletedTaskIds.has(taskId)) skippedDeletedTaskCount += 1;
             else skippedExistingTaskCount += 1;
