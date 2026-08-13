@@ -1,6 +1,7 @@
 import {
     flushPendingSave,
     isTaskFinished,
+    buildQuickAddParseOptions,
     parseQuickAdd,
     filterTasksBySearch,
     searchAll,
@@ -123,7 +124,16 @@ export async function createMindwtrAutomationService(options: AutomationServiceO
             const beforeTaskIds = new Set(state._allTasks.map((task) => task.id));
             const now = new Date();
             const parsed = typeof input === 'string' && input.trim().length > 0
-                ? parseQuickAdd(input, state._allProjects, now, state._allAreas)
+                ? parseQuickAdd(
+                    input,
+                    state._allProjects,
+                    now,
+                    state._allAreas,
+                    buildQuickAddParseOptions(state.settings, {
+                        tasks: state._allTasks,
+                        people: state.people,
+                    }),
+                )
                 : { title: typeof title === 'string' ? title : '', props: {} };
             const resolvedTitle = (parsed.title || title || input || '').trim();
             if (!resolvedTitle) {

@@ -2,7 +2,7 @@ import { hasTimeComponent, safeFormatDate, safeParseDate } from './date';
 import { formatI18nTemplate } from './i18n';
 import { en as ENGLISH_TRANSLATIONS } from './i18n/locales/en';
 import type { ExternalCalendarEvent } from './ics';
-import { parseQuickAdd } from './quick-add';
+import { parseQuickAdd, type QuickAddParseOptions } from './quick-add';
 import { isSelectableProjectForTaskAssignment } from './project-utils';
 import { getTaskDateCoherenceIssues, type TaskDateCoherenceIssue } from './task-date-coherence';
 import { isTaskActionable } from './task-status';
@@ -66,6 +66,8 @@ type CalendarQuickAddTaskDraftOptions = {
     areas?: Area[];
     durationMinutes: number;
     now?: Date;
+    /** The capture surface's parse bag; without it `@John Smith` splits at the space. */
+    parseOptions?: QuickAddParseOptions;
     projects?: Project[];
     start: Date;
 };
@@ -207,7 +209,13 @@ export function buildCalendarQuickAddTaskDraft(
     input: string,
     options: CalendarQuickAddTaskDraftOptions,
 ): CalendarQuickAddTaskDraft {
-    const parsed = parseQuickAdd(input, options.projects, options.now ?? new Date(), options.areas);
+    const parsed = parseQuickAdd(
+        input,
+        options.projects,
+        options.now ?? new Date(),
+        options.areas,
+        options.parseOptions,
+    );
     const props: Partial<Task> = {
         status: 'next',
         ...parsed.props,

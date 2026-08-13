@@ -35,6 +35,13 @@ export type Person = CorePerson;
 export type Section = CoreSection;
 export type ProjectRef = Pick<CoreProject, 'id' | 'title'>;
 
+// Deliberately parses without a QuickAddParseOptions bag, unlike every capture
+// surface in the apps: building one needs the full task list plus people, which
+// here means a whole-library SQLite scan on every call. The cost is that
+// multi-word `@Some Context` and `%Jim Smith` tokens split at the space instead
+// of resolving against known values — acceptable for a scripted caller that can
+// quote or hyphenate, not acceptable for a person typing. Pass a bag through if
+// this ever backs an interactive surface.
 export const parseQuickAdd = (input: string, projects: ProjectRef[]): { title: string; props: Partial<Task> } => {
   const parsed = parseQuickAddCore(input, projects as CoreProject[]);
   return {

@@ -14,6 +14,7 @@ import {
   DEFAULT_CALENDAR_DAY_START_HOUR,
   addCalendarMonths as addCalendarSystemMonths,
   buildCalendarEventTaskDraft,
+  buildQuickAddParseOptions,
   expandCalendarRecurringTaskSetInRange,
   formatCalendarTimeInputValue,
   getCalendarPlanningCandidates,
@@ -22,6 +23,7 @@ import {
   normalizeDateFormatSetting,
   resolveCalendarSystemSetting,
   resolveDateLocaleTag,
+  resolveFeatureFlags,
   findFreeSlotForDay as findCalendarFreeSlotForDay,
   resolveI18nText,
   type I18nTemplateValues,
@@ -162,8 +164,9 @@ const formatTimeInputValue = formatCalendarTimeInputValue;
 const parseTimeOnDate = parseCalendarTimeOnDate;
 
 export function useCalendarViewController() {
-  const { tasks, allTasks, projects, areas, addTask, addProject, updateTask, deleteTask, updateSettings, settings } = useTaskStore((state) => ({
+  const { tasks, allTasks, projects, areas, addTask, addProject, updateTask, deleteTask, people, updateSettings, settings } = useTaskStore((state) => ({
     tasks: state.tasks,
+    people: state.people,
     // Archived tasks are absent from the visible `tasks` projection, so the
     // completed look-back reads the full list like the Archive screen (#955).
     allTasks: state._allTasks,
@@ -181,6 +184,10 @@ export function useCalendarViewController() {
   const tc = useThemeColors();
   const { t, language } = useLanguage();
   const { areaById, projectById, resolvedAreaFilter, visibleTasks: areaVisibleTasks } = useVisibleTaskContext();
+  const quickAddParseOptions = useMemo(
+    () => buildQuickAddParseOptions(settings, { tasks, people }),
+    [people, settings, tasks],
+  );
 
   const toRgba = (hex: string, alpha: number) => {
     const normalized = hex.replace('#', '');
@@ -196,8 +203,7 @@ export function useCalendarViewController() {
 
   const tr = (key: string, values?: I18nTemplateValues) => resolveI18nText(t, key, { values });
 
-  const timeEstimatesEnabled = settings?.features?.timeEstimates !== false;
-  const prioritiesEnabled = settings?.features?.priorities !== false;
+  const { priorities: prioritiesEnabled, timeEstimates: timeEstimatesEnabled } = resolveFeatureFlags(settings);
   const calendarSettings: CalendarSettings | undefined = settings?.calendar;
   const today = new Date();
   const systemLocale = typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function'
@@ -705,6 +711,7 @@ export function useCalendarViewController() {
       isSlotFree: (start, durationMinutes, excludeTaskId) => (
         isSlotFreeForDay(start, start, durationMinutes, excludeTaskId)
       ),
+      parseOptions: quickAddParseOptions,
       projects,
     }, { addProject, addTask, updateTask });
     if (!result.success) {

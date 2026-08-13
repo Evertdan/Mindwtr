@@ -20,9 +20,11 @@ import {
     isTaskVisibleInArea,
     isTaskInCalendarHistoryProject,
     isProjectedRecurringTask,
+    buildQuickAddParseOptions,
     hasTimeComponent,
     resolveAreaFilterSelection,
     resolveCalendarSystemSetting,
+    resolveFeatureFlags,
     safeParseDate,
     safeParseDueDate,
     shallow,
@@ -81,10 +83,11 @@ export function useDesktopCalendarController() {
         const [year, monthIndex, date] = localDayKey.split('-').map(Number);
         return new Date(year!, monthIndex!, date!).toISOString();
     }, [localDayKey]);
-    const { tasks, allTasks, projects, areas, addTask, addProject, updateTask, settings, getDerivedState } = useTaskStore(
+    const { tasks, allTasks, projects, areas, addTask, addProject, updateTask, people, settings, getDerivedState } = useTaskStore(
         (state) => ({
             addProject: state.addProject,
             addTask: state.addTask,
+            people: state.people,
             tasks: state.tasks,
             // The completed look-back needs archived tasks, and the visible
             // `tasks` projection drops those (store-helpers' isTaskVisible) —
@@ -112,8 +115,11 @@ export function useDesktopCalendarController() {
         },
         [t]
     );
-    const timeEstimatesEnabled = settings?.features?.timeEstimates !== false;
-    const prioritiesEnabled = settings?.features?.priorities !== false;
+    const { priorities: prioritiesEnabled, timeEstimates: timeEstimatesEnabled } = resolveFeatureFlags(settings);
+    const quickAddParseOptions = useMemo(
+        () => buildQuickAddParseOptions(settings, { tasks, people }),
+        [people, settings, tasks],
+    );
     const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
     const resolvedAreaFilter = useMemo(
         () => resolveAreaFilterSelection(settings?.filters, areas),
@@ -429,6 +435,7 @@ export function useDesktopCalendarController() {
             feedback.clearScheduleFeedback();
             if (start) nav.revealDate(start);
         },
+        parseOptions: quickAddParseOptions,
         projects,
         resolveText,
         schedulableTasks,

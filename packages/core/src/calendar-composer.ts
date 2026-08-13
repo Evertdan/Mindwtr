@@ -24,7 +24,7 @@ import {
     parseCalendarTimeOnDate,
 } from './calendar-scheduling';
 import { DEFAULT_PROJECT_COLOR } from './color-constants';
-import { getQuickAddProjectInitialProps } from './quick-add';
+import { getQuickAddProjectInitialProps, type QuickAddParseOptions } from './quick-add';
 import type { StoreActionResult } from './store-types';
 import type { Area, Project, Task } from './types';
 
@@ -95,6 +95,8 @@ export type CalendarComposerSaveContext = {
     /** Overlap check for the composed slot; excludes the task being rescheduled. */
     isSlotFree: (start: Date, durationMinutes: number, excludeTaskId?: string) => boolean;
     now?: Date;
+    /** `buildQuickAddParseOptions(settings, state)`, so the composer parses like quick add. */
+    parseOptions?: QuickAddParseOptions;
     projects?: Project[];
 };
 
@@ -264,6 +266,7 @@ export function prepareComposerSave(
         areas: context.areas,
         durationMinutes,
         now: context.now ?? new Date(),
+        parseOptions: context.parseOptions,
         projects: context.projects,
         start,
     });

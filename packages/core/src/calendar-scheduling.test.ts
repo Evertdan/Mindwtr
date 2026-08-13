@@ -19,6 +19,7 @@ import {
     timeEstimateToFilterBucket,
     timeEstimateToMinutes,
 } from './calendar-scheduling';
+import { buildQuickAddParseOptions, parseQuickAdd } from './quick-add';
 import type { Area, ExternalCalendarEvent, Project, Task } from './index';
 
 const task = (overrides: Partial<Task>): Task => ({
@@ -174,6 +175,37 @@ describe('calendar scheduling helpers', () => {
             tags: ['#deep'],
             timeEstimate: '30min',
         }));
+    });
+
+    // The composer is a capture surface like quick add, so the same typed text has
+    // to mean the same thing in both. Without the parse bag both multi-word tokens
+    // split at the space: `@John Smith` captured `@John` and left "Smith" in the
+    // title, and `%"Jim Smith"` never matched the known person.
+    it('resolves multi-word contexts and people exactly like quick add', () => {
+        const input = 'Sync notes @John Smith %"Jim Smith"';
+        const now = new Date('2026-04-25T10:00:00.000Z');
+        const parseOptions = buildQuickAddParseOptions(
+            {},
+            {
+                tasks: [task({ id: 'seed', contexts: ['@John Smith'] })],
+                people: [{ id: 'person-jim', name: 'Jim Smith', createdAt: now.toISOString(), updatedAt: now.toISOString() }],
+            },
+        );
+
+        const draft = buildCalendarQuickAddTaskDraft(input, {
+            durationMinutes: 30,
+            now,
+            parseOptions,
+            start: new Date('2026-04-26T14:00:00.000Z'),
+        });
+        const quickAdd = parseQuickAdd(input, undefined, now, undefined, parseOptions);
+
+        expect(draft.title).toBe(quickAdd.title);
+        expect(draft.props.contexts).toEqual(quickAdd.props.contexts);
+        expect(draft.props.assignedTo).toBe(quickAdd.props.assignedTo);
+        // Pin the shared answer, so a parity that degrades on both sides still fails.
+        expect(draft.props.contexts).toEqual(['@John Smith']);
+        expect(draft.props.assignedTo).toBe('Jim Smith');
     });
 
     it('keeps new-project intent separate for the caller to create', () => {

@@ -11,6 +11,7 @@ import {
     formatCalendarTimeInputValue,
     type Area,
     type Project,
+    type QuickAddParseOptions,
     type StoreActionResult,
     type Task,
 } from '@mindwtr/core';
@@ -50,6 +51,8 @@ export type CalendarComposerOptions = {
     isSlotFree: (start: Date, durationMinutes: number, excludeTaskId?: string) => boolean;
     /** Runs after a successful save, with the slot the task landed on. */
     onSaved: (start: Date | null) => void;
+    /** The shared quick-add parse bag, so the composer resolves tokens like quick add. */
+    parseOptions?: QuickAddParseOptions;
     projects: Project[];
     /** Translator with an English fallback, for keys a locale may not carry yet. */
     resolveText: (key: string, fallback: string) => string;
@@ -68,6 +71,7 @@ export function useCalendarComposer({
     findFreeSlot,
     isSlotFree,
     onSaved,
+    parseOptions,
     projects,
     resolveText,
     schedulableTasks,
@@ -208,6 +212,7 @@ export function useCalendarComposer({
         const result = await executeComposerSave(taskComposer, {
             areas,
             isSlotFree,
+            parseOptions,
             projects,
         }, { addProject, addTask, updateTask });
         if (!result.success) {

@@ -14,6 +14,7 @@ import {
     isTaskFinished,
     mergeAppDataWithStats,
     normalizeTaskUpdate,
+    buildQuickAddParseOptions,
     parseQuickAdd,
     repairMergedSyncReferences,
     resolveCaptureStatusForStart,
@@ -552,7 +553,13 @@ const ENTITY_ROUTES: Array<EntityRouteDefinition<any>> = [
             }
 
             const parsed = input
-                ? parseQuickAdd(input, data.projects, new Date(nowIso), data.areas)
+                ? parseQuickAdd(
+                    input,
+                    data.projects,
+                    new Date(nowIso),
+                    data.areas,
+                    buildQuickAddParseOptions(data.settings, { tasks: data.tasks, people: data.people }),
+                )
                 : { title: rawTitle, props: {} };
             const title = (parsed.title || rawTitle || input).trim();
             if (!title) return errorResponse('Missing task title');
