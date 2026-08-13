@@ -187,6 +187,11 @@ export const createLocalDataWatcherController = (
     let hasPendingSqliteChangeDuringSelfWrite = false;
     let pendingSqliteChangePaths: string[] = [];
     let pendingExternalChange = false;
+    // Set by stop() when it drops a real pending change (StrictMode/HMR/
+    // teardown mid-debounce); consumed by the next start() to recover it.
+    // Ordinary first-start at launch never sets this, so start() doesn't run
+    // a merge against a still-unhydrated store.
+    let droppedPendingChangeAtStop = false;
     let mergeInFlight: Promise<void> | null = null;
     let mergeInFlightGeneration: number | null = null;
     let sqliteRefreshInFlight: Promise<void> | null = null;
@@ -1131,13 +1136,24 @@ export const createLocalDataWatcherController = (
         // A write can land in the 750ms debounce right before a stop/start
         // (StrictMode/HMR/teardown) — stop() clears pendingExternalChange and
         // cancels that timer, so without this the change is only observed if
-        // data.json changes again. One immediate, self-write-window-ignoring
-        // check here picks it up regardless.
-        await handleExternalChange({ immediate: true, ignoreSelfWindow: true });
+        // data.json changes again. Only run this when stop() actually dropped
+        // one: an ordinary first start() at launch can beat fetchData, and
+        // merging against the still-empty store here would persist a
+        // full-document save with no CAS baseline and stomp the real load.
+        if (droppedPendingChangeAtStop) {
+            droppedPendingChangeAtStop = false;
+            await handleExternalChange({ immediate: true, ignoreSelfWindow: true });
+        }
     }
 
     function stop(): void {
         watcherGeneration += 1;
+        // A real change is about to be dropped only if one was actually
+        // pending (debounced or mid-debounce) — not on an ordinary stop with
+        // nothing queued.
+        if (pendingExternalChange || debounceTimer) {
+            droppedPendingChangeAtStop = true;
+        }
         const hadWatcherLifecycle = Boolean(
             dataWatchChannel.path ||
             sqliteWatchChannel.path ||
@@ -1223,6 +1239,7 @@ export const createLocalDataWatcherController = (
         resetForTests() {
             stop();
             resetDependencies();
+            droppedPendingChangeAtStop = false;
             ignoreUntil = 0;
             sqliteIgnoreUntil = 0;
             sqliteSelfWriteUntil = 0;

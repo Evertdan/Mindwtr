@@ -1187,8 +1187,8 @@ describe('local-data-watcher', () => {
             },
         });
 
-        // Disk matches local (both empty) when the watcher starts, so its own
-        // trailing immediate check (#S11) is a no-op here.
+        // Nothing was dropped by a prior stop(), so this first start() does
+        // not run its trailing immediate check (#S11/C2).
         await start('/tmp/mindwtr/data.json');
 
         // A write lands while the watcher is up: debounced, not yet merged.
@@ -1217,6 +1217,33 @@ describe('local-data-watcher', () => {
 
         expect(saveCalls).toHaveLength(1);
         expect(saveCalls[0]?.tasks.some((task) => task.id === 'ext-1')).toBe(true);
+    });
+
+    it('runs no merge on an ordinary first start() with nothing dropped by a prior stop() (C2)', async () => {
+        __localDataWatcherTestUtils.setDependenciesForTests({
+            watchFile: async () => () => undefined,
+        });
+
+        // Disk differs from the (still unhydrated) local store — if start()
+        // ran its trailing check unconditionally here, it would find a
+        // difference and persist a full-document save with no CAS baseline,
+        // stomping whatever fetchData is about to load.
+        externalData = {
+            ...emptyData(),
+            tasks: [
+                {
+                    id: 'launch-race',
+                    title: 'Should not merge on launch',
+                    status: 'inbox',
+                    createdAt: '2026-01-01T00:00:00.000Z',
+                    updatedAt: '2026-01-01T00:00:00.000Z',
+                },
+            ],
+        } as AppData;
+
+        await start('/tmp/mindwtr/data.json');
+
+        expect(saveCalls).toHaveLength(0);
     });
 
     it('can merge an explicit cross-window refresh without waiting for the watcher debounce', async () => {
