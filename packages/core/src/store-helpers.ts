@@ -1,7 +1,7 @@
 import { createNextRecurringTask, normalizeRecurrenceForLoad } from './recurrence';
 import { getTaskDateCoherenceIssues } from './task-date-coherence';
 import {
-    collectTaskTokenUsage,
+    createTaskTokenUsageAccumulator,
     getUsedTaskTokensFromUsage,
 } from './task-token-usage';
 import { resolveRelativeStartUpdates } from './task-relative-start';
@@ -762,8 +762,11 @@ export const computeTaskDerivedState = (
     const focusedTasks: Task[] = [];
     const projectTaskSummaryById = new Map<string, { activeTaskCount: number; nextAction?: Task }>();
     const dateCoherenceIssuesByTaskId = new Map<string, ReturnType<typeof getTaskDateCoherenceIssues>>();
-    const contextTokenUsage = collectTaskTokenUsage(tasks, (task) => task.contexts, { prefix: '@' });
-    const tagTokenUsage = collectTaskTokenUsage(tasks, (task) => task.tags, { prefix: '#' });
+    // Accumulated in the main loop below rather than in two extra full passes over `tasks`
+    // (A-04). The accumulator carries collectTaskTokenUsage's own inclusion rule, so the
+    // deleted-task handling and first-seen ordering stay identical.
+    const contextTokens = createTaskTokenUsageAccumulator({ prefix: '@' });
+    const tagTokens = createTaskTokenUsageAccumulator({ prefix: '#' });
     let focusedCount = 0;
 
     tasks.forEach((task) => {
@@ -788,6 +791,8 @@ export const computeTaskDerivedState = (
                 projectTaskSummaryById.set(task.projectId, summary);
             }
         }
+        contextTokens.add(task, (candidate) => candidate.contexts);
+        tagTokens.add(task, (candidate) => candidate.tags);
         (task.contexts ?? []).forEach((context) => {
             const contextTasks = tasksByContext.get(context) ?? [];
             contextTasks.push(task);
@@ -808,6 +813,9 @@ export const computeTaskDerivedState = (
             focusedTasks.push(task);
         }
     });
+
+    const contextTokenUsage = contextTokens.toUsage();
+    const tagTokenUsage = tagTokens.toUsage();
 
     return {
         tasksById: resolvedTasksById,

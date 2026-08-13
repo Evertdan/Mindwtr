@@ -634,6 +634,43 @@ describe('derived store state helpers', () => {
         expect(derived.focusedCount).toBe(1);
     });
 
+    // A-04 pin, written BEFORE folding token accumulation into the main loop:
+    // collectTaskTokenUsage skips deletedAt and nothing else (archived/done still count), and
+    // returns tokens in first-seen order with per-task dedupe. The fold must reproduce all
+    // three exactly, so this asserts the full shape rather than just membership.
+    it('counts tokens from every non-deleted task, in first-seen order', () => {
+        const derived = computeTaskDerivedState([
+            createTask('a', undefined, 0, {
+                contexts: ['@phone', '@phone', '@home'],
+                tags: ['#urgent'],
+                updatedAt: '2026-01-03T00:00:00.000Z',
+            }),
+            createTask('archived', undefined, 1, {
+                status: 'archived',
+                contexts: ['@home'],
+                tags: ['#urgent'],
+                updatedAt: '2026-01-05T00:00:00.000Z',
+            }),
+            createTask('deleted', undefined, 2, {
+                contexts: ['@ghost'],
+                tags: ['#ghost'],
+                deletedAt: '2026-01-04T00:00:00.000Z',
+                updatedAt: '2026-01-09T00:00:00.000Z',
+            }),
+        ]);
+
+        expect(derived.contextTokenUsage).toEqual([
+            { token: '@phone', count: 1, lastUsedAt: Date.parse('2026-01-03T00:00:00.000Z') },
+            { token: '@home', count: 2, lastUsedAt: Date.parse('2026-01-05T00:00:00.000Z') },
+        ]);
+        expect(derived.tagTokenUsage).toEqual([
+            { token: '#urgent', count: 2, lastUsedAt: Date.parse('2026-01-05T00:00:00.000Z') },
+        ]);
+        // allContexts/allTags are the sorted projection of the same usage.
+        expect(derived.allContexts).toEqual(['@home', '@phone']);
+        expect(derived.allTags).toEqual(['#urgent']);
+    });
+
     it('derives transient date-coherence issues without mutating tasks', () => {
         const incoherent = createTask('incoherent', 'project-1', 0, {
             startTime: '2026-04-25',

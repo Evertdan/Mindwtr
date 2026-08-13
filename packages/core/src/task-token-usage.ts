@@ -24,45 +24,53 @@ const getTaskTimestamp = (task: Task): number =>
     ?? safeParseDate(task.createdAt)?.getTime()
     ?? 0;
 
+/**
+ * Per-task token accumulation, shared so the streaming caller and collectTaskTokenUsage
+ * cannot drift on the three things that define the output: skip deleted tasks, dedupe within
+ * a task, and keep first-seen insertion order.
+ */
+export const createTaskTokenUsageAccumulator = (options?: TaskTokenOptions) => {
+    const prefix = options?.prefix;
+    const usage = new Map<string, TaskTokenUsage>();
+
+    return {
+        add: (task: Task, selector: TaskTokenSelector): void => {
+            if (task.deletedAt) return;
+            const tokens = selector(task) ?? [];
+            if (tokens.length === 0) return;
+
+            const taskTimestamp = getTaskTimestamp(task);
+            const seenInTask = new Set<string>();
+
+            tokens.forEach((rawToken) => {
+                const token = normalizeToken(rawToken);
+                if (!token || !matchesPrefix(token, prefix) || seenInTask.has(token)) return;
+                seenInTask.add(token);
+
+                const existing = usage.get(token);
+                if (existing) {
+                    existing.count += 1;
+                    if (taskTimestamp > existing.lastUsedAt) {
+                        existing.lastUsedAt = taskTimestamp;
+                    }
+                    return;
+                }
+
+                usage.set(token, { token, count: 1, lastUsedAt: taskTimestamp });
+            });
+        },
+        toUsage: (): TaskTokenUsage[] => Array.from(usage.values()),
+    };
+};
+
 export const collectTaskTokenUsage = (
     tasks: Task[],
     selector: TaskTokenSelector,
     options?: TaskTokenOptions
 ): TaskTokenUsage[] => {
-    const prefix = options?.prefix;
-    const usage = new Map<string, TaskTokenUsage>();
-
-    tasks.forEach((task) => {
-        if (task.deletedAt) return;
-        const tokens = selector(task) ?? [];
-        if (tokens.length === 0) return;
-
-        const taskTimestamp = getTaskTimestamp(task);
-        const seenInTask = new Set<string>();
-
-        tokens.forEach((rawToken) => {
-            const token = normalizeToken(rawToken);
-            if (!token || !matchesPrefix(token, prefix) || seenInTask.has(token)) return;
-            seenInTask.add(token);
-
-            const existing = usage.get(token);
-            if (existing) {
-                existing.count += 1;
-                if (taskTimestamp > existing.lastUsedAt) {
-                    existing.lastUsedAt = taskTimestamp;
-                }
-                return;
-            }
-
-            usage.set(token, {
-                token,
-                count: 1,
-                lastUsedAt: taskTimestamp,
-            });
-        });
-    });
-
-    return Array.from(usage.values());
+    const accumulator = createTaskTokenUsageAccumulator(options);
+    tasks.forEach((task) => accumulator.add(task, selector));
+    return accumulator.toUsage();
 };
 
 export const getUsedTaskTokens = (
