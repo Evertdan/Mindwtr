@@ -4086,67 +4086,289 @@ mod tests {
         release_sync_lock(&owner);
     }
 
+    /// (name, is_async) for every `#[tauri::command...]` declaration found in
+    /// `source`, in source order. Scans forward from each attribute occurrence
+    /// (not backward from a known name), so it finds commands this test never
+    /// heard of — the whole point of inverting the old hardcoded-list check.
+    fn tauri_command_declarations(source: &str) -> Vec<(String, bool)> {
+        let marker = "#[tauri::command";
+        let mut declarations = Vec::new();
+        let mut cursor = 0usize;
+        while let Some(relative) = source[cursor..].find(marker) {
+            let attr_start = cursor + relative;
+            // A real attribute starts its own line (only whitespace before it
+            // since the last newline). This crate's source also mentions the
+            // literal text `#[tauri::command` inside comments and this very
+            // test's own strings — those aren't line-starting and must not
+            // count as a declaration.
+            let line_start = source[..attr_start].rfind('\n').map_or(0, |i| i + 1);
+            let is_real_attribute = source[line_start..attr_start].trim().is_empty();
+            if !is_real_attribute {
+                cursor = attr_start + marker.len();
+                continue;
+            }
+            let after_attr = &source[attr_start + marker.len()..];
+            let attribute_is_async = after_attr.starts_with("(async)");
+            // The real declaration follows within a handful of lines
+            // (attribute, maybe another attribute or doc comment, then
+            // `pub(crate) [async] fn name(`). Bound the search so a later,
+            // unrelated `fn ` deep in the file can't be mistaken for it.
+            let window_len = after_attr.len().min(400);
+            let window = &after_attr[..window_len];
+            let fn_relative = window
+                .find("fn ")
+                .unwrap_or_else(|| panic!(
+                    "no `fn` declaration within 400 chars after a #[tauri::command] attribute at byte {attr_start}"
+                ));
+            // `#[tauri::command]` (no `(async)`) on an `async fn` already runs
+            // off the main thread — Tauri hands async fns to the async
+            // runtime regardless of the attribute. `(async)` is specifically
+            // for moving a blocking (sync) fn to the blocking pool. So a
+            // command is safe if EITHER the attribute says (async) OR the fn
+            // itself is declared `async fn`.
+            let fn_is_async = window[..fn_relative].trim_end().ends_with("async");
+            let is_async = attribute_is_async || fn_is_async;
+            let after_fn = &window[fn_relative + "fn ".len()..];
+            let name_end = after_fn.find('(').unwrap_or(after_fn.len());
+            let name = after_fn[..name_end].trim().to_string();
+            declarations.push((name, is_async));
+            cursor = attr_start + marker.len();
+        }
+        declarations
+    }
+
     #[test]
-    fn blocking_io_commands_never_run_on_the_ui_thread() {
-        // A plain `#[tauri::command]` on a blocking fn runs on the main thread,
-        // so a slow sync mount freezes the whole window until the I/O returns.
-        // Email capture is the same class, on a five-minute timer: an IMAP
-        // round trip would otherwise block the UI for the life of the socket.
-        // So are the Obsidian writers, against a vault on a network share or a
-        // FUSE mount; `VAULT_WRITE_MUTEX` keeps their read-modify-write atomic
-        // once they are no longer serialized by the main thread.
-        let sources: [(&str, &[&str]); 3] = [
+    fn every_plain_tauri_command_is_explicitly_allowed_on_the_main_thread() {
+        // A plain `#[tauri::command]` on a blocking fn runs on the Tauri
+        // main/event-loop thread, so any real I/O in its body freezes the
+        // whole window until it returns — a slow sync mount, an IMAP round
+        // trip, an Obsidian vault write on a network share or FUSE mount, a
+        // snapshot/query against SQLite on a cache-off rclone/WinFSP mount
+        // (R-01, storage.rs's five snapshot/query/search commands — the
+        // hardcoded 11-name list this test used to check missed them
+        // entirely; this scans every command in the crate instead).
+        //
+        // Each entry: (command name, one-line reason it's safe as-is — pure
+        // in-memory/state access, or an OS window/tray/hotkey API call that
+        // is inherently main-thread-bound in most GUI toolkits, not merely
+        // "fast today". Every entry below was read end to end before listing.
+        const ALLOWED_MAIN_THREAD_COMMANDS: &[(&str, &str)] = &[
             (
-                include_str!("sync.rs"),
-                &[
-                    "set_sync_path",
-                    "read_sync_file",
-                    "read_sync_file_versioned",
-                    "write_sync_file",
-                ],
+                "consume_quick_add_pending",
+                "only a Mutex-guarded in-memory field swap",
             ),
             (
-                include_str!("email_capture.rs"),
-                &[
-                    "set_email_capture_config",
-                    "email_capture_poll",
-                    "email_capture_commit",
-                ],
+                "set_global_quick_add_shortcut",
+                "OS global-hotkey (un)registration, inherently main/event-loop-bound",
             ),
             (
-                include_str!("obsidian_writer.rs"),
-                &[
-                    "obsidian_toggle_task",
-                    "obsidian_toggle_tasknotes",
-                    "obsidian_create_task",
-                    "obsidian_create_tasknotes",
-                ],
+                "set_tray_visible",
+                "tray-icon visibility is a live GUI-toolkit object mutation, no I/O",
+            ),
+            (
+                "set_tray_tooltip",
+                "tray-icon tooltip is a live GUI-toolkit object mutation (no-op on Linux)",
+            ),
+            (
+                "notify_ui_ready",
+                "window show/focus/activation-policy calls only, no I/O in the call graph",
+            ),
+            (
+                "hide_quick_add_window",
+                "window hide + foreground-window restore, OS window API only",
+            ),
+            (
+                "cloudkit_consume_pending_remote_change",
+                "only flips an in-process flag set by the CloudKit callback",
+            ),
+            (
+                "cloudkit_register_for_notifications",
+                "one-time OS push-notification registration, no CloudKit round trip parsed",
+            ),
+            (
+                "get_managed_data_dir",
+                "builds a path string; the only I/O is one Path::exists() stat",
+            ),
+            (
+                "set_macos_activation_policy",
+                "synchronous NSApplication activation-policy setter, no I/O",
+            ),
+            (
+                "get_data_path_cmd",
+                "builds a path string; the only I/O is one Path::exists() stat",
+            ),
+            (
+                "get_db_path_cmd",
+                "builds a path string; the only I/O is one Path::exists() stat",
+            ),
+            (
+                "get_dropbox_redirect_uri",
+                "pure string builder, no I/O",
+            ),
+            (
+                "discard_staged_dropbox_credentials",
+                "only mutates an in-memory Mutex-guarded staged-credential map",
             ),
         ];
-        for (source, commands) in sources {
-            for command in commands {
-                let declaration = format!("fn {command}(");
-                // `find` takes the FIRST match, so a second declaration (a test
-                // helper, a renamed sibling) would let this check silently read
-                // the wrong attribute and pass on a command it never inspected.
-                assert_eq!(
-                    source.matches(&declaration).count(),
-                    1,
-                    "{command} must be declared exactly once for this check to mean anything"
-                );
-                let offset = source
-                    .find(&declaration)
-                    .unwrap_or_else(|| panic!("{command} not found"));
-                let attribute = source[..offset]
-                    .rsplit_once("#[tauri::command")
-                    .expect("command attribute")
-                    .1;
-                assert!(
-                    attribute.starts_with("(async)"),
-                    "{command} must be #[tauri::command(async)] so blocking I/O stays off the UI thread"
-                );
+
+        // Known-unfixed debt this inversion uncovered beyond R-01's five
+        // (each does real file/keyring/SQLite/EventKit/process I/O — read
+        // every one before trusting this comment, don't extend it casually).
+        // Shrink-only: never add a name here — a new plain command must
+        // become (async) or get a justified ALLOWED_MAIN_THREAD_COMMANDS
+        // entry. Remove an entry in the same commit that fixes it; the test
+        // below fails if an entry here is no longer a plain command, so a fix
+        // that forgets to remove its own baseline line doesn't silently pass.
+        const KNOWN_BLOCKING_COMMANDS: &[&str] = &[
+            // config.rs — every getter/setter round-trips fs::read_to_string
+            // of config.toml/secrets.toml; writes are atomic temp+fsync+
+            // rename. Several also hit the OS keyring (Secret Service/
+            // Keychain/Credential Manager IPC).
+            "get_ai_key",
+            "set_ai_key",
+            "get_sync_backend",
+            "get_sync_cloud_provider",
+            "get_sync_cloud_provider_state",
+            "get_sync_configuration_snapshot",
+            "set_sync_backend",
+            "set_sync_cloud_provider",
+            "get_obsidian_config",
+            "set_obsidian_config",
+            "expand_obsidian_vault_scope",
+            "get_webdav_config",
+            "set_webdav_config",
+            "get_webdav_password",
+            "get_cloud_config",
+            "set_cloud_config",
+            "set_network_proxy",
+            "get_external_calendars",
+            "set_external_calendars",
+            // email_capture.rs — config+keyring read.
+            "get_email_capture_config",
+            // install.rs — fs::read_to_string("/etc/os-release").
+            "get_linux_distro",
+            // lib.rs — config file read/write.
+            "get_desktop_rendering_config",
+            "set_desktop_rendering_config",
+            // local_api.rs — config file read/write; port change also does a
+            // blocking TCP bind and joins the server thread.
+            "get_local_api_server_status",
+            "set_local_api_server_config",
+            // logging.rs — synchronous log file write/rotation/delete.
+            "append_log_line",
+            "clear_log_file",
+            // obsidian_watcher.rs — recursive notify watch setup; stop joins
+            // the worker thread (bounded ~100ms poll, still a real wait).
+            "start_obsidian_watcher",
+            "stop_obsidian_watcher",
+            // platform.rs — synchronous EventKit FFI (same class Apple docs
+            // as slow; the sibling get_macos_calendar_events is already
+            // async for exactly this reason). open_path canonicalizes a path
+            // and spawns the OS file-open shell command.
+            "get_macos_calendar_permission_status",
+            "get_macos_writable_calendars",
+            "ensure_macos_mindwtr_calendar",
+            "create_macos_calendar_event",
+            "update_macos_calendar_event",
+            "delete_macos_calendar_event",
+            "open_path",
+            // storage.rs — same open_sqlite(&app)-per-call pattern as
+            // query_tasks/search_fts (R-01), just not in that five.
+            "get_calendar_sync_entry",
+            "upsert_calendar_sync_entry",
+            "delete_calendar_sync_entry",
+            "get_all_calendar_sync_entries",
+            // sync.rs — config file + Dropbox credential-state file +
+            // keyring I/O; the already-async siblings (connect_dropbox,
+            // get_dropbox_access_token, disconnect_dropbox) do the same work.
+            "get_sync_path",
+            "clear_sync_path",
+            "is_dropbox_connected",
+            "recover_dropbox_credentials_before_sync_configuration",
+            "finalize_staged_dropbox_credentials",
+            // ui.rs — get_system_theme_preference spawns/waits on `gsettings`
+            // (twice); acknowledge_close_request/quit_app both call the
+            // synchronous native-log file-append path.
+            "get_system_theme_preference",
+            "acknowledge_close_request",
+            "quit_app",
+        ];
+
+        let sources: &[(&str, &str)] = &[
+            ("audio.rs", include_str!("audio.rs")),
+            ("autostart.rs", include_str!("autostart.rs")),
+            ("config.rs", include_str!("config.rs")),
+            ("email_capture.rs", include_str!("email_capture.rs")),
+            ("install.rs", include_str!("install.rs")),
+            ("lib.rs", include_str!("lib.rs")),
+            ("linux_calendar.rs", include_str!("linux_calendar.rs")),
+            ("local_api.rs", include_str!("local_api.rs")),
+            ("logging.rs", include_str!("logging.rs")),
+            ("obsidian_watcher.rs", include_str!("obsidian_watcher.rs")),
+            ("obsidian_writer.rs", include_str!("obsidian_writer.rs")),
+            ("platform.rs", include_str!("platform.rs")),
+            ("storage.rs", include_str!("storage.rs")),
+            ("sync.rs", include_str!("sync.rs")),
+            ("ui.rs", include_str!("ui.rs")),
+        ];
+
+        let allowed_names: std::collections::HashSet<&str> = ALLOWED_MAIN_THREAD_COMMANDS
+            .iter()
+            .map(|(name, _)| *name)
+            .collect();
+        assert_eq!(
+            allowed_names.len(),
+            ALLOWED_MAIN_THREAD_COMMANDS.len(),
+            "ALLOWED_MAIN_THREAD_COMMANDS has a duplicate entry"
+        );
+        let known_blocking: std::collections::HashSet<&str> =
+            KNOWN_BLOCKING_COMMANDS.iter().copied().collect();
+        assert_eq!(
+            known_blocking.len(),
+            KNOWN_BLOCKING_COMMANDS.len(),
+            "KNOWN_BLOCKING_COMMANDS has a duplicate entry"
+        );
+        assert!(
+            allowed_names.is_disjoint(&known_blocking),
+            "a command can't be both explicitly allowed and known-blocking debt"
+        );
+
+        let mut seen_known_blocking: std::collections::HashSet<&str> =
+            std::collections::HashSet::new();
+        let mut violations: Vec<String> = Vec::new();
+        for (file, source) in sources {
+            for (name, is_async) in tauri_command_declarations(source) {
+                if is_async || allowed_names.contains(name.as_str()) {
+                    continue;
+                }
+                if known_blocking.contains(name.as_str()) {
+                    seen_known_blocking.insert(
+                        *known_blocking.get(name.as_str()).expect("just checked contains"),
+                    );
+                    continue;
+                }
+                violations.push(format!(
+                    "{name} ({file}) is a new plain command outside both lists — \
+                     mark it #[tauri::command(async)], or add a justified \
+                     ALLOWED_MAIN_THREAD_COMMANDS entry if it's genuinely safe, \
+                     or a KNOWN_BLOCKING_COMMANDS entry if it's real unfixed debt"
+                ));
             }
         }
+        // Shrink-only: a baseline entry that's no longer a plain command means
+        // its fix landed without removing the debt marker — fail so that
+        // removal happens in the same commit as the fix, not forgotten.
+        for stale in known_blocking.difference(&seen_known_blocking) {
+            violations.push(format!(
+                "{stale} is listed in KNOWN_BLOCKING_COMMANDS but is no longer a \
+                 plain command — remove it from the baseline"
+            ));
+        }
+
+        assert!(
+            violations.is_empty(),
+            "blocking-command governance check failed:\n{violations:#?}"
+        );
     }
 
     #[test]
