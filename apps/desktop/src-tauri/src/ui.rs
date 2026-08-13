@@ -178,7 +178,9 @@ fn is_kde_desktop() -> bool {
         .any(|var| std::env::var(var).is_ok_and(|value| is_kde_desktop_value(&value)))
 }
 
-#[tauri::command]
+// Spawns and waits on `gsettings` (up to twice) — real process I/O, no
+// shared state to race (B1).
+#[tauri::command(async)]
 pub(crate) fn get_system_theme_preference() -> Option<String> {
     if is_kde_desktop() {
         return None;

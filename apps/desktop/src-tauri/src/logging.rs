@@ -54,12 +54,16 @@ pub(crate) fn append_native_log_line(app: &tauri::AppHandle, message: &str) {
     }
 }
 
-#[tauri::command]
+// Synchronous log file I/O (open/append/flush, occasional rotation) off the
+// UI thread; O_APPEND writes to this file are already safe under concurrent
+// writers, and a rotation race costs at worst a diagnostic log hiccup, not
+// app data (B1).
+#[tauri::command(async)]
 pub(crate) fn append_log_line(app: tauri::AppHandle, line: String) -> Result<String, String> {
     write_log_line(&app, &line)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn clear_log_file(app: tauri::AppHandle) -> Result<String, String> {
     let log_path = get_data_dir(&app).join("logs").join("mindwtr.log");
     if log_path.exists() {

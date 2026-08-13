@@ -3502,7 +3502,9 @@ fn row_to_calendar_sync_entry(
     })
 }
 
-#[tauri::command]
+// Each call opens its own SQLite connection and runs one atomic statement
+// (WAL) — no app-level read-modify-write, so no extra lock (B1).
+#[tauri::command(async)]
 pub(crate) fn get_calendar_sync_entry(
     app: tauri::AppHandle,
     task_id: String,
@@ -3518,7 +3520,7 @@ pub(crate) fn get_calendar_sync_entry(
     .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn upsert_calendar_sync_entry(
     app: tauri::AppHandle,
     entry: CalendarSyncEntryRecord,
@@ -3543,7 +3545,7 @@ pub(crate) fn upsert_calendar_sync_entry(
     Ok(true)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn delete_calendar_sync_entry(
     app: tauri::AppHandle,
     task_id: String,
@@ -3558,7 +3560,7 @@ pub(crate) fn delete_calendar_sync_entry(
     Ok(true)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn get_all_calendar_sync_entries(
     app: tauri::AppHandle,
     platform: String,

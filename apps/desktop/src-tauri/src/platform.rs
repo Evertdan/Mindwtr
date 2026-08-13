@@ -124,7 +124,9 @@ fn parse_macos_eventkit_json(raw: *mut c_char) -> Result<Value, String> {
         .map_err(|error| format!("Failed to parse EventKit bridge output: {error}"))
 }
 
-#[tauri::command]
+// Off the UI thread, same reason as get_macos_calendar_events: the shim
+// allocates its own EKEventStore per call, so there's no shared-state race.
+#[tauri::command(async)]
 pub(crate) fn get_macos_calendar_permission_status() -> Result<String, String> {
     #[cfg(target_os = "macos")]
     {
@@ -195,7 +197,7 @@ pub(crate) fn get_macos_calendar_events(
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn get_macos_writable_calendars() -> Result<Vec<MacOsCalendarPushTarget>, String> {
     #[cfg(target_os = "macos")]
     {
@@ -210,7 +212,7 @@ pub(crate) fn get_macos_writable_calendars() -> Result<Vec<MacOsCalendarPushTarg
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn ensure_macos_mindwtr_calendar(
     stored_calendar_id: Option<String>,
 ) -> Result<Option<MacOsCalendarPushTarget>, String> {
@@ -244,7 +246,7 @@ fn encode_macos_calendar_event_payload(
     CString::new(raw).map_err(|error| format!("Invalid EventKit event payload: {error}"))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn create_macos_calendar_event(
     details: MacOsCalendarEventPayload,
 ) -> Result<MacOsCalendarEventWriteResult, String> {
@@ -269,7 +271,7 @@ pub(crate) fn create_macos_calendar_event(
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn update_macos_calendar_event(
     event_id: String,
     details: MacOsCalendarEventPayload,
@@ -298,7 +300,7 @@ pub(crate) fn update_macos_calendar_event(
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn delete_macos_calendar_event(
     event_id: String,
 ) -> Result<MacOsCalendarEventWriteResult, String> {
@@ -775,7 +777,9 @@ pub(crate) fn migrate_portable_attachments(
     Ok(result)
 }
 
-#[tauri::command]
+// Stateless: canonicalizes the path and spawns the OS file-open shell
+// command, no shared state to race (B1).
+#[tauri::command(async)]
 pub(crate) fn open_path(app: tauri::AppHandle, path: String) -> Result<bool, String> {
     let normalized = normalize_open_path(&path)?;
     let allowed_roots = allowed_open_roots(&app);

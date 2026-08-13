@@ -417,7 +417,8 @@ pub(crate) fn parse_os_release_value(raw: &str) -> String {
         .unwrap_or_else(|| raw.trim().trim_matches('"').trim_matches('\'').to_string())
 }
 
-#[tauri::command]
+// fs::read_to_string("/etc/os-release") — pure read, no shared state (B1).
+#[tauri::command(async)]
 pub(crate) fn get_linux_distro() -> Option<LinuxDistroInfo> {
     if !cfg!(target_os = "linux") {
         return None;

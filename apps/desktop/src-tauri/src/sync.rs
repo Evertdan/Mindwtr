@@ -4243,10 +4243,11 @@ mod tests {
             "set_network_proxy",
             "get_external_calendars",
             "set_external_calendars",
-            // email_capture.rs — config+keyring read.
+            // email_capture.rs — routes through the same config.rs credential
+            // helpers as the config.rs group above (first-binding write on
+            // the common path, not just a migration edge case) — not a pure
+            // read despite the name; verified by reading the full call graph.
             "get_email_capture_config",
-            // install.rs — fs::read_to_string("/etc/os-release").
-            "get_linux_distro",
             // lib.rs — config file read/write.
             "get_desktop_rendering_config",
             "set_desktop_rendering_config",
@@ -4254,30 +4255,6 @@ mod tests {
             // blocking TCP bind and joins the server thread.
             "get_local_api_server_status",
             "set_local_api_server_config",
-            // logging.rs — synchronous log file write/rotation/delete.
-            "append_log_line",
-            "clear_log_file",
-            // obsidian_watcher.rs — recursive notify watch setup; stop joins
-            // the worker thread (bounded ~100ms poll, still a real wait).
-            "start_obsidian_watcher",
-            "stop_obsidian_watcher",
-            // platform.rs — synchronous EventKit FFI (same class Apple docs
-            // as slow; the sibling get_macos_calendar_events is already
-            // async for exactly this reason). open_path canonicalizes a path
-            // and spawns the OS file-open shell command.
-            "get_macos_calendar_permission_status",
-            "get_macos_writable_calendars",
-            "ensure_macos_mindwtr_calendar",
-            "create_macos_calendar_event",
-            "update_macos_calendar_event",
-            "delete_macos_calendar_event",
-            "open_path",
-            // storage.rs — same open_sqlite(&app)-per-call pattern as
-            // query_tasks/search_fts (R-01), just not in that five.
-            "get_calendar_sync_entry",
-            "upsert_calendar_sync_entry",
-            "delete_calendar_sync_entry",
-            "get_all_calendar_sync_entries",
             // sync.rs — config file + Dropbox credential-state file +
             // keyring I/O; the already-async siblings (connect_dropbox,
             // get_dropbox_access_token, disconnect_dropbox) do the same work.
@@ -4286,10 +4263,8 @@ mod tests {
             "is_dropbox_connected",
             "recover_dropbox_credentials_before_sync_configuration",
             "finalize_staged_dropbox_credentials",
-            // ui.rs — get_system_theme_preference spawns/waits on `gsettings`
-            // (twice); acknowledge_close_request/quit_app both call the
+            // ui.rs — acknowledge_close_request/quit_app both call the
             // synchronous native-log file-append path.
-            "get_system_theme_preference",
             "acknowledge_close_request",
             "quit_app",
         ];
