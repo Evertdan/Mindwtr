@@ -7,9 +7,13 @@ export type TaskMetadataFilterVisibility = {
     timeEstimate: boolean;
 };
 
+// Both fields are resolved booleans (see resolveFeatureFlags), not raw
+// settings reads — this function no longer has a default-polarity opinion
+// of its own, so a caller can't silently disagree with resolveFeatureFlags
+// by omitting one.
 export type TaskMetadataFilterVisibilityOptions = {
-    prioritiesEnabled?: boolean;
-    timeEstimatesEnabled?: boolean;
+    prioritiesEnabled: boolean;
+    timeEstimatesEnabled: boolean;
 };
 
 const hasText = (value: unknown): boolean => (
@@ -18,10 +22,8 @@ const hasText = (value: unknown): boolean => (
 
 export function getTaskMetadataFilterVisibility(
     tasks: readonly Pick<Task, 'energyLevel' | 'location' | 'priority' | 'timeEstimate'>[],
-    options: TaskMetadataFilterVisibilityOptions = {},
+    { prioritiesEnabled, timeEstimatesEnabled }: TaskMetadataFilterVisibilityOptions,
 ): TaskMetadataFilterVisibility {
-    const prioritiesEnabled = options.prioritiesEnabled !== false;
-    const timeEstimatesEnabled = options.timeEstimatesEnabled !== false;
     return {
         energyLevel: tasks.some((task) => Boolean(task.energyLevel)),
         location: tasks.some((task) => hasText(task.location)),
