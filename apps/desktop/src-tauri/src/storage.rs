@@ -713,6 +713,21 @@ fn lock_data_json_publication() -> Result<std::sync::MutexGuard<'static, ()>, St
         .map_err(|error| format!("Failed to lock data.json publication: {error}"))
 }
 
+fn snapshot_operation_lock() -> &'static std::sync::Mutex<()> {
+    static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+    LOCK.get_or_init(|| std::sync::Mutex::new(()))
+}
+
+// ponytail: one global lock serializes snapshot create/restore against each
+// other now that both run off the main thread (blocking pool, no more
+// implicit serialization); per-profile lock if concurrent snapshot ops ever
+// become a real workload.
+fn lock_snapshot_operation() -> Result<std::sync::MutexGuard<'static, ()>, String> {
+    snapshot_operation_lock()
+        .lock()
+        .map_err(|error| format!("Failed to lock snapshot operation: {error}"))
+}
+
 fn sync_parent_directory(path: &Path) -> Result<(), String> {
     #[cfg(unix)]
     {
@@ -4660,15 +4675,19 @@ fn create_data_snapshot_from_connection(
     Ok(file_name)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn create_data_snapshot(app: tauri::AppHandle) -> Result<String, String> {
+    let _snapshot_guard = lock_snapshot_operation()?;
     load_data_snapshot(&app)?;
     let conn = open_sqlite(&app)?;
     let snapshot_dir = get_snapshot_dir(&app)?;
     create_data_snapshot_from_connection(&conn, &snapshot_dir, OffsetDateTime::now_utc())
 }
 
-#[tauri::command]
+// Directory listing only: new snapshot files land via atomic rename
+// (write_new_data_snapshot) and prune's own file-not-found races are already
+// silently ignored, so this doesn't need the create/restore lock.
+#[tauri::command(async)]
 pub(crate) fn list_data_snapshots(app: tauri::AppHandle) -> Result<Vec<String>, String> {
     ensure_data_file(&app)?;
     let snapshot_dir = get_snapshot_dir(&app)?;
@@ -4683,11 +4702,12 @@ pub(crate) fn list_data_snapshots(app: tauri::AppHandle) -> Result<Vec<String>, 
     Ok(names)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn restore_data_snapshot(
     app: tauri::AppHandle,
     snapshot_file_name: String,
 ) -> Result<bool, String> {
+    let _snapshot_guard = lock_snapshot_operation()?;
     ensure_data_file(&app)?;
     let trimmed = snapshot_file_name.trim();
     if trimmed.is_empty() || trimmed.contains('/') || trimmed.contains('\\') {
@@ -4707,7 +4727,7 @@ pub(crate) fn restore_data_snapshot(
     Ok(true)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn query_tasks(
     app: tauri::AppHandle,
     options: TaskQueryOptions,
@@ -4784,7 +4804,7 @@ fn query_tasks_with_connection(
     Ok(tasks)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn search_fts(app: tauri::AppHandle, query: String) -> Result<Value, String> {
     let mut conn = open_sqlite(&app)?;
     search_fts_with_connection(&mut conn, &query)
@@ -8762,6 +8782,25 @@ mod tests {
             .and_then(|tasks| tasks.first())
             .expect("task should exist");
         assert_eq!(task.get("projectId"), None);
+    }
+
+    // create_data_snapshot/restore_data_snapshot need a real tauri::AppHandle,
+    // which this crate has no test harness to construct — this proves the
+    // lock those commands share (lock_snapshot_operation) actually serializes
+    // two concurrent holders, the mechanism they rely on now that both run
+    // off the main thread.
+    #[test]
+    fn snapshot_operation_lock_blocks_a_concurrent_holder() {
+        let guard = lock_snapshot_operation().expect("first holder acquires");
+        assert!(
+            snapshot_operation_lock().try_lock().is_err(),
+            "a second holder must not acquire while the first is still held"
+        );
+        drop(guard);
+        assert!(
+            snapshot_operation_lock().try_lock().is_ok(),
+            "the lock must be free again once the first holder releases"
+        );
     }
 }
 
