@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { serializeMindwtrCsv } from './mindwtr-csv-export';
 import { MINDWTR_CSV_COLUMNS, MINDWTR_CSV_KNOWN_COLUMNS } from './mindwtr-csv-columns';
-import { parseMindwtrCsvImportSource } from './mindwtr-csv-import';
+import { applyMindwtrCsvImport, parseMindwtrCsvImportSource } from './mindwtr-csv-import';
 import type { AppData, Project, Section, Task } from './types';
 
 const task = (overrides: Partial<Task> = {}): Task => ({
@@ -113,14 +113,31 @@ describe('serializeMindwtrCsv', () => {
         expect(new Date(parsed.tasks[0].dueDate!).toISOString()).toBe('2026-09-05T14:30:00.000Z');
     });
 
-    it('keeps ids stable so a re-import updates rather than duplicates', () => {
+    // D1: the previous version of this test only checked the PARSE output, so it proved the
+    // parser was deterministic and never that importing an export leaves the task count alone.
+    // Round-trip through applyMindwtrCsvImport or it proves nothing.
+    it('re-imports an export onto the same tasks instead of duplicating them', () => {
         const data = appData({ tasks: [task({ id: 'stable-id' }), task({ id: 'other-id', title: 'Second' })] });
 
-        const first = reimport(serializeMindwtrCsv(data));
-        const second = reimport(serializeMindwtrCsv(data));
+        const result = applyMindwtrCsvImport(data, reimport(serializeMindwtrCsv(data)));
 
-        expect(first.tasks.map((item) => item.sourceId)).toEqual(['stable-id', 'other-id']);
-        expect(second.tasks.map((item) => item.sourceKey)).toEqual(first.tasks.map((item) => item.sourceKey));
+        expect(result.data.tasks).toHaveLength(2);
+        expect(result.data.tasks.map((item) => item.id).sort()).toEqual(['other-id', 'stable-id']);
+    });
+
+    // The importer is add-only: an already-present id is skipped, not updated
+    // (import-apply.ts's existingTaskIds check). So an edited export does NOT push the edit
+    // back in — it is reported as skipped. Pinned here so the round-trip contract is explicit
+    // rather than assumed; changing it to update-in-place is a product decision, not a bug fix.
+    it('skips rather than duplicates a re-imported export whose fields were edited', () => {
+        const data = appData({ tasks: [task({ id: 'stable-id', title: 'Before' })] });
+        const edited = serializeMindwtrCsv(data).replace('Before', 'After');
+
+        const result = applyMindwtrCsvImport(data, reimport(edited));
+
+        expect(result.data.tasks).toHaveLength(1);
+        expect(result.data.tasks[0]).toMatchObject({ id: 'stable-id', title: 'Before' });
+        expect(result.warnings.join(' ')).toContain('already imported');
     });
 
     it('survives quotes, delimiters, newlines and CJK in text', () => {
