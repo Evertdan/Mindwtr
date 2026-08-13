@@ -6,23 +6,23 @@ Written by the 2026-08-13 improve audit (Phase 2 of the review-improve loop), st
 
 | # | Plan | Findings | Effort | Status |
 |---|------|----------|--------|--------|
-| 001 | tauri-main-thread-commands | R-01, R-02 | S-M | TODO |
-| 002 | calendar-feed-revocation | R-03 | S | TODO |
-| 003 | local-api-hardening | R-04, R-05 | S-M | TODO |
-| 004 | mcp-hardening | R-06, R-08 | S | TODO |
-| 005 | import-sourcekey-identity | R-07 | S | TODO |
-| 006 | derived-state-hot-path | A-02, A-04 | S | TODO |
-| 007 | capture-import-chain | A-05 | S | TODO |
-| 008 | source-hygiene-pair | A-03, A-07 | S | TODO |
-| 009 | i18n-toast-leaks | Q-02 | S | TODO |
-| 010 | locale-coverage-label | Q-01 | S | TODO |
-| 011 | undo-import | Q-03 | S-M | TODO |
-| 012 | csv-export | DIR-01 | M | TODO |
-| 013 | automation-query-unification | DIR-02 | M | TODO |
-| 014 | dx-batch | DX-01/02/04/05 | S | TODO |
-| 015 | core-lint-ci | DX-03 | S | TODO |
-| 016 | desktop-flat-eslint | DX-06 | S-M | TODO |
-| 017 | adr-encryption-at-rest | DOCS-01 | S | TODO |
+| 001 | tauri-main-thread-commands | R-01, R-02 | S-M | DONE |
+| 002 | calendar-feed-revocation | R-03 | S | DONE |
+| 003 | local-api-hardening | R-04, R-05 | S-M | DONE |
+| 004 | mcp-hardening | R-06, R-08 | S | DONE |
+| 005 | import-sourcekey-identity | R-07 | S | DONE |
+| 006 | derived-state-hot-path | A-02, A-04 | S | DONE |
+| 007 | capture-import-chain | A-05 | S | DONE |
+| 008 | source-hygiene-pair | A-03, A-07 | S | DONE |
+| 009 | i18n-toast-leaks | Q-02 | S | DONE |
+| 010 | locale-coverage-label | Q-01 | S | DONE |
+| 011 | undo-import | Q-03 | S-M | DONE |
+| 012 | csv-export | DIR-01 | M | DONE |
+| 013 | automation-query-unification | DIR-02 | M | DONE |
+| 014 | dx-batch | DX-01/02/04/05 | S | DONE |
+| 015 | core-lint-ci | DX-03 | S | DONE |
+| 016 | desktop-flat-eslint | DX-06 | S-M | DONE |
+| 017 | adr-encryption-at-rest | DOCS-01 | S | DONE |
 
 Dependencies: 015 before 016 (both touch lint wiring; 015 is upstream in CI). 001's commit 2 depends on its commit 1. 006 commit 2 depends on commit 1 only for merge cleanliness. Everything else independent.
 
