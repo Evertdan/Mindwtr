@@ -114,9 +114,12 @@ const isRetryableSqliteWriteError = (error: unknown): boolean => {
  * a project and then a task) because of two invariants. Break either and retries start
  * duplicating:
  *
- *  1. Every core write commits durably before it returns — core-adapter's addProject and
- *     writeTask both await flushPendingSave (flushCoreSave) before handing back. So a write
- *     that completed in a failed attempt is already in SQLite when the next attempt reads.
+ *  1. Completed writes are flushed by the end of the capture — core-adapter's addProject and
+ *     writeTask both await flushPendingSave (flushCoreSave), and any write still pending when
+ *     a later write flushes rides along. So whatever a failed attempt completed is in SQLite
+ *     by the time the next attempt re-reads. (This is a per-capture guarantee, not a strict
+ *     per-call durability barrier — service.test.ts's fault-injection test is sensitive to
+ *     invariant 2, which is the one that actually prevents duplication.)
  *  2. The callback re-derives its plan from storage on EVERY attempt — it re-runs
  *     listProjects and parseQuickAdd inside the retried body, never from values captured
  *     outside it. So the retry sees the project attempt 1 created and resolves `+Launch` to
