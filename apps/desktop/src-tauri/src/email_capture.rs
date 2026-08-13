@@ -475,6 +475,13 @@ pub(crate) fn set_email_capture_config(
     config: Value,
     password: Option<String>,
 ) -> Result<Value, EmailCaptureError> {
+    // I1: both branches below write config.toml via update_bound_credential,
+    // which only holds lock_dropbox_credential_state for its own transaction
+    // — an RMW-lock holder's gap could still land here and lose it. Disjoint
+    // from lock_email_capture_state (protects the separate IMAP watermark
+    // file), so ordering between the two doesn't matter; RMW first to match
+    // every other config.toml writer's convention.
+    let _config_guard = lock_config_read_modify_write().map_err(EmailCaptureError::other)?;
     let _state_guard = lock_email_capture_state().map_err(EmailCaptureError::other)?;
     let payload = serde_json::from_value::<EmailCaptureConfigPayload>(config)
         .map(normalize_email_capture_payload)

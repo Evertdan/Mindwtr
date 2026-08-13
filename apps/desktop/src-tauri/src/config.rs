@@ -1134,10 +1134,15 @@ where
     Ok(())
 }
 
+// Poison-recovering (I1): a panic while holding this must not permanently
+// block every future config read/write. Matches the codebase's established
+// recovery shape (local_api.rs's LocalApiServerState lock) rather than
+// failing the caller — the protected data is a Mutex<()>, so "recovering"
+// just means proceeding; there's no partially-mutated state to distrust.
 fn lock_dropbox_credential_state() -> Result<std::sync::MutexGuard<'static, ()>, String> {
-    DROPBOX_CREDENTIAL_STATE_MUTEX
+    Ok(DROPBOX_CREDENTIAL_STATE_MUTEX
         .lock()
-        .map_err(|_| "Dropbox credential state lock is unavailable".to_string())
+        .unwrap_or_else(|poisoned| poisoned.into_inner()))
 }
 
 // Distinct from lock_dropbox_credential_state: that one guards individual
@@ -1168,11 +1173,12 @@ fn config_read_modify_write_lock() -> &'static std::sync::Mutex<()> {
     LOCK.get_or_init(|| std::sync::Mutex::new(()))
 }
 
+// Poison-recovering (I1) — same rationale as lock_dropbox_credential_state above.
 pub(crate) fn lock_config_read_modify_write() -> Result<std::sync::MutexGuard<'static, ()>, String>
 {
-    config_read_modify_write_lock()
+    Ok(config_read_modify_write_lock()
         .lock()
-        .map_err(|error| format!("Failed to lock config read-modify-write: {error}"))
+        .unwrap_or_else(|poisoned| poisoned.into_inner()))
 }
 
 pub(crate) fn write_config_files(
@@ -1964,9 +1970,7 @@ pub(crate) fn set_keyring_secret(
 // lock_config_read_modify_write's definition).
 #[tauri::command(async)]
 pub(crate) fn get_ai_key(app: tauri::AppHandle, provider: String) -> Option<String> {
-    let Ok(_config_guard) = lock_config_read_modify_write() else {
-        return None;
-    };
+    let _config_guard = lock_config_read_modify_write().ok()?;
     let mut config = read_config(&app);
     let (key_name, legacy_value) = match provider.as_str() {
         "openai" => (KEYRING_AI_OPENAI, config.ai_key_openai.clone()),
@@ -2499,10 +2503,14 @@ fn expand_obsidian_payload_scope(app: &tauri::AppHandle, payload: &ObsidianConfi
     expand_tauri_fs_scope(app, &PathBuf::from(vault_path));
 }
 
-// read_sync_backend_publication_state already holds lock_dropbox_credential_state
-// across its whole read + torn-publication repair write (B3) — safe as-is.
+// I1: the repair write below only holds lock_dropbox_credential_state, a
+// different mutex from lock_config_read_modify_write — an RMW-lock holder's
+// read..write gap could land a torn-publication repair here and then have it
+// silently reverted by the RMW writer's stale-snapshot write. Outer RMW lock
+// closes that; see lock_config_read_modify_write's LOCK ORDERING comment.
 #[tauri::command(async)]
 pub(crate) fn get_sync_backend(app: tauri::AppHandle) -> Result<String, String> {
+    let _config_guard = lock_config_read_modify_write()?;
     let (raw, state) = read_sync_backend_publication_state(&app)?;
     let marker = normalize_backend(state.sync_backend_marker.trim())
         .expect("validated Dropbox backend marker");
@@ -2512,16 +2520,18 @@ pub(crate) fn get_sync_backend(app: tauri::AppHandle) -> Result<String, String> 
     Ok(marker.to_string())
 }
 
-// read_dropbox_credential_state already holds lock_dropbox_credential_state
-// across its whole read + migration write (B3) — safe as-is.
+// I1: same race as get_sync_backend above — read_dropbox_credential_state's
+// migration write only holds lock_dropbox_credential_state, not the RMW lock.
 #[tauri::command(async)]
 pub(crate) fn get_sync_cloud_provider(app: tauri::AppHandle) -> Result<String, String> {
+    let _config_guard = lock_config_read_modify_write()?;
     Ok(read_dropbox_credential_state(&app)?.cloud_provider)
 }
 
-// Same as get_sync_cloud_provider above (B3) — safe as-is.
+// Same as get_sync_cloud_provider above (I1) — identical migration-write path.
 #[tauri::command(async)]
 pub(crate) fn get_sync_cloud_provider_state(app: tauri::AppHandle) -> Result<Value, String> {
+    let _config_guard = lock_config_read_modify_write()?;
     let state = read_dropbox_credential_state(&app)?;
     Ok(serde_json::json!({
         "provider": state.cloud_provider,
@@ -2529,15 +2539,16 @@ pub(crate) fn get_sync_cloud_provider_state(app: tauri::AppHandle) -> Result<Val
     }))
 }
 
-// read_sync_configuration_pair already holds lock_dropbox_credential_state
-// across its whole span (B3) — pure read despite touching several files;
-// safe as-is.
+// I1: read_sync_configuration_pair calls the same torn-publication repair
+// path as get_sync_backend internally (read_sync_backend_publication_state_
+// paths_unlocked_with) — not a pure read; same race, same fix.
 #[tauri::command(async)]
 pub(crate) fn get_sync_configuration_snapshot(
     app: tauri::AppHandle,
     require_webdav_password: Option<bool>,
     require_cloud_token: Option<bool>,
 ) -> Result<Value, String> {
+    let _config_guard = lock_config_read_modify_write()?;
     let (config, webdav_password, cloud_token, provider_state) =
         read_sync_configuration_pair(&app)?;
     if require_webdav_password.unwrap_or(false)
@@ -2557,10 +2568,12 @@ pub(crate) fn get_sync_configuration_snapshot(
     ))
 }
 
-// publish_sync_backend_paths_with already holds lock_dropbox_credential_state
-// across its whole read+mutate+write (B3) — safe as-is.
+// I1: publish_sync_backend_paths_with only holds lock_dropbox_credential_state
+// for its own read+mutate+write, so an RMW-lock holder's gap could still land
+// a concurrent write here and lose it (or lose this one) — outer RMW lock.
 #[tauri::command(async)]
 pub(crate) fn set_sync_backend(app: tauri::AppHandle, backend: String) -> Result<bool, String> {
+    let _config_guard = lock_config_read_modify_write()?;
     let Some(normalized) = normalize_backend(backend.trim()) else {
         return Err("Invalid sync backend".to_string());
     };
@@ -2756,8 +2769,11 @@ fn validate_webdav_config_url(url: &str, allow_insecure_http: bool) -> Result<()
     crate::sync::assert_webdav_url_allowed(url, allow_insecure_http)
 }
 
-// update_bound_credential already holds lock_dropbox_credential_state across
-// its whole read+mutate+write transaction (B3) — safe as-is.
+// I1: update_bound_credential only holds lock_dropbox_credential_state for
+// its own transaction — that serializes it against other CRED-only callers,
+// but not against an RMW-lock holder's read..write gap on config.toml. Outer
+// RMW lock closes that (deadlock-safe: update_bound_credential's internal
+// CRED lock is a different mutex — see the LOCK ORDERING comment).
 #[tauri::command(async)]
 pub(crate) fn set_webdav_config(
     app: tauri::AppHandle,
@@ -2768,6 +2784,7 @@ pub(crate) fn set_webdav_config(
     allow_weak_fingerprint: Option<bool>,
     replace_password: Option<bool>,
 ) -> Result<bool, String> {
+    let _config_guard = lock_config_read_modify_write()?;
     let url = url.trim().to_string();
     let allow_insecure_http = allow_insecure_http.unwrap_or(false);
     validate_webdav_config_url(&url, allow_insecure_http)?;
@@ -2833,7 +2850,7 @@ pub(crate) fn get_cloud_config(app: tauri::AppHandle) -> Result<Value, String> {
     }))
 }
 
-// Same as set_webdav_config above (B3) — safe as-is.
+// Same as set_webdav_config above (I1) — outer RMW lock.
 #[tauri::command(async)]
 pub(crate) fn set_cloud_config(
     app: tauri::AppHandle,
@@ -2841,6 +2858,7 @@ pub(crate) fn set_cloud_config(
     token: String,
     allow_insecure_http: Option<bool>,
 ) -> Result<bool, String> {
+    let _config_guard = lock_config_read_modify_write()?;
     let url = url.trim().to_string();
     let next_token = {
         let trimmed = token.trim().to_string();
@@ -3919,6 +3937,126 @@ mod tests {
         .expect("cleared binding reads");
         assert!(cleared_config.webdav_url.is_none());
         assert!(cleared_password.is_none());
+    }
+
+    // I1: reproduces the lost-update race at the mechanism level (no
+    // AppHandle needed — the race lives entirely in which mutex each writer
+    // takes, and these are the same raw-path primitives the real command
+    // functions call). An RMW-guarded writer (the pre-fix shape of e.g.
+    // set_ai_key) reads, then blocks on a channel instead of sleeping — a
+    // fixed-duration sleep here was flaky under `cargo test`'s parallel
+    // scheduling (this test run alone: passes; run inside the full suite,
+    // with dozens of threads contending for CPU: the sleep windows drift and
+    // the interleaving this test depends on stops happening). A CRED-only
+    // writer (the PRE-FIX shape of set_webdav_config — no outer RMW lock,
+    // just what update_bound_credential_paths_with takes internally) runs
+    // and fully completes before the RMW writer is released to mutate+write.
+    // The RMW writer's write uses its stale snapshot and silently reverts
+    // the CRED-only writer's change.
+    #[test]
+    fn rmw_holder_gap_loses_a_cred_only_writers_update_without_the_outer_rmw_lock() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.toml");
+        let secrets_path = dir.path().join("secrets.toml");
+        write_config_files(&config_path, &secrets_path, &AppConfigToml::default())
+            .expect("seed config");
+
+        let (read_done_tx, read_done_rx) = std::sync::mpsc::channel::<()>();
+        let (proceed_tx, proceed_rx) = std::sync::mpsc::channel::<()>();
+        let (rmw_config_path, rmw_secrets_path) = (config_path.clone(), secrets_path.clone());
+        let rmw_writer = std::thread::spawn(move || {
+            let _guard = lock_config_read_modify_write().expect("rmw lock");
+            let mut config = read_config_files_verified(&rmw_config_path, &rmw_secrets_path)
+                .expect("read");
+            read_done_tx.send(()).expect("signal read done");
+            proceed_rx.recv().expect("wait for the cred-only writer to finish");
+            config.proxy_url = Some("https://rmw-writer.example".to_string());
+            write_config_files(&rmw_config_path, &rmw_secrets_path, &config).expect("write");
+        });
+
+        read_done_rx.recv().expect("wait for the rmw writer's read");
+        update_bound_credential_paths_with(
+            &config_path,
+            &secrets_path,
+            CredentialService::Webdav,
+            CredentialSecretUpdate::Replace(None),
+            |config| config.webdav_url = Some("https://cred-writer.example".to_string()),
+            || Ok(None),
+            |_| Ok(()),
+            |_| Ok(()),
+        )
+        .expect("cred-only writer completes");
+        proceed_tx.send(()).expect("let the rmw writer proceed");
+
+        rmw_writer.join().expect("rmw writer thread");
+
+        let final_config = read_config_toml(&config_path);
+        assert_eq!(
+            final_config.proxy_url.as_deref(),
+            Some("https://rmw-writer.example")
+        );
+        assert_eq!(
+            final_config.webdav_url, None,
+            "demonstrates the bug: the CRED-only writer's change is gone, \
+             reverted by the RMW holder's stale-snapshot write"
+        );
+    }
+
+    // Same race as above, but the CRED-only side now also takes the outer
+    // RMW lock first — the FIXED shape of set_webdav_config/set_cloud_config/
+    // set_sync_backend/get_sync_backend/get_sync_cloud_provider(_state)/
+    // get_sync_configuration_snapshot (I1). Both changes must survive. This
+    // one needs no timing coordination at all: the mutex fully serializes
+    // the two writers regardless of which reaches lock_config_read_modify_write
+    // first, so the assertions hold either way.
+    #[test]
+    fn outer_rmw_lock_on_both_sides_prevents_the_lost_update() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.toml");
+        let secrets_path = dir.path().join("secrets.toml");
+        write_config_files(&config_path, &secrets_path, &AppConfigToml::default())
+            .expect("seed config");
+
+        let (rmw_config_path, rmw_secrets_path) = (config_path.clone(), secrets_path.clone());
+        let rmw_writer = std::thread::spawn(move || {
+            let _guard = lock_config_read_modify_write().expect("rmw lock");
+            let mut config = read_config_files_verified(&rmw_config_path, &rmw_secrets_path)
+                .expect("read");
+            config.proxy_url = Some("https://rmw-writer.example".to_string());
+            write_config_files(&rmw_config_path, &rmw_secrets_path, &config).expect("write");
+        });
+
+        let (cred_config_path, cred_secrets_path) = (config_path.clone(), secrets_path.clone());
+        let cred_writer = std::thread::spawn(move || {
+            let _guard = lock_config_read_modify_write().expect("rmw lock");
+            update_bound_credential_paths_with(
+                &cred_config_path,
+                &cred_secrets_path,
+                CredentialService::Webdav,
+                CredentialSecretUpdate::Replace(None),
+                |config| config.webdav_url = Some("https://cred-writer.example".to_string()),
+                || Ok(None),
+                |_| Ok(()),
+                |_| Ok(()),
+            )
+        });
+
+        rmw_writer.join().expect("rmw writer thread");
+        cred_writer
+            .join()
+            .expect("cred writer thread")
+            .expect("cred-only writer completes");
+
+        let final_config = read_config_toml(&config_path);
+        assert_eq!(
+            final_config.proxy_url.as_deref(),
+            Some("https://rmw-writer.example")
+        );
+        assert_eq!(
+            final_config.webdav_url.as_deref(),
+            Some("https://cred-writer.example"),
+            "both writers' changes must survive once both take the outer RMW lock"
+        );
     }
 
     #[cfg(unix)]
