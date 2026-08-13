@@ -562,6 +562,14 @@ fn parse_request_target(target: &str) -> (String, HashMap<String, String>) {
 }
 
 fn write_response(stream: &mut TcpStream, response: ApiResponse) -> Result<(), String> {
+    // Without this, write_all against a client that never reads its socket
+    // buffer (or a peer that vanished) blocks forever once the buffer fills.
+    // The shared write path for both handle_connection's real response and
+    // accept_or_reject's 503 rejection - that second one runs synchronously
+    // on the accept loop's own thread, so an unbounded block there would
+    // stop the server from accepting any connection at all, not just pin one
+    // of the capped slots (I3).
+    let _ = stream.set_write_timeout(Some(Duration::from_secs(5)));
     let raw = http_response(&response);
     stream.write_all(raw.as_bytes()).map_err(|e| e.to_string())
 }
@@ -3301,6 +3309,29 @@ mod tests {
             started.elapsed() < Duration::from_millis(500),
             "the deadline check must short-circuit before blocking on read(), took {:?}",
             started.elapsed()
+        );
+    }
+
+    // I3: without a write timeout, write_all against a peer that never drains
+    // its socket buffer blocks forever - and since accept_or_reject's 503
+    // rejection runs synchronously on the accept loop's own thread, that
+    // would stop the server from accepting any connection at all, not just
+    // pin one of the capped slots. TcpStream::write_timeout() reads back
+    // what's actually configured on the socket, so this checks the real
+    // write_response wiring directly and fast, instead of filling a send
+    // buffer with a non-reading peer to force an actual multi-second block.
+    #[test]
+    fn write_response_sets_a_write_timeout_so_a_non_reading_peer_cannot_block_it_forever() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let addr = listener.local_addr().unwrap();
+        let _client = TcpStream::connect(addr).unwrap();
+        let (mut stream, _) = listener.accept().unwrap();
+
+        write_response(&mut stream, ApiResponse::ok(json!({}))).unwrap();
+
+        assert_eq!(
+            stream.write_timeout().unwrap(),
+            Some(Duration::from_secs(5))
         );
     }
 
