@@ -15,9 +15,9 @@
   },
   "type": "module",
   "scripts": {
-    "dev": "cargo tauri dev",
+    "dev": "bunx tauri dev",
     "dev:vite": "vite",
-    "build": "cargo tauri build",
+    "build": "bunx tauri build",
     "build:vite": "tsc && vite build",
     "lint": "ESLINT_USE_FLAT_CONFIG=false ../../node_modules/.bin/eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
