@@ -36,6 +36,36 @@ const baseProps: SettingsMainPageProps = {
 };
 
 describe('SettingsMainPage', () => {
+    it('flags only partly-translated languages in the picker', () => {
+        const { getByRole } = render(
+            <SettingsMainPage
+                {...baseProps}
+                languages={[
+                    { id: 'en', native: 'English' },
+                    { id: 'sv', native: 'Svenska' },
+                    { id: 'nl', native: 'Nederlands' },
+                ]}
+            />,
+        );
+
+        const options = Array.from(getByRole('combobox', { name: 'Language' }).querySelectorAll('option'))
+            .map((option) => option.textContent);
+        expect(options).toEqual(['English', 'Svenska', 'Nederlands — Partly translated']);
+    });
+
+    it('says so on the row when the active language is partly translated', () => {
+        const { getAllByText } = render(
+            <SettingsMainPage
+                {...baseProps}
+                language="nl"
+                languages={[{ id: 'nl', native: 'Nederlands' }]}
+            />,
+        );
+
+        // The row description and the sole option both carry it.
+        expect(getAllByText('Nederlands — Partly translated')).toHaveLength(2);
+    });
+
     it('renders and toggles launch at startup when available', () => {
         const onLaunchAtStartupChange = vi.fn();
 

@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
     canUseJalaliCalendar,
+    getLocaleCoverageTier,
     normalizeDateFormatSetting,
     normalizeTimeFormatSetting,
     normalizeWeekStartPreference,
@@ -49,6 +50,13 @@ export function GeneralSettingsScreen() {
     const [quickAccessPickerOpen, setQuickAccessPickerOpen] = useState(false);
     const [appLockBusy, setAppLockBusy] = useState(false);
     const [appLockErrorKey, setAppLockErrorKey] = useState<string | null>(null);
+
+    const languageLabel = (code: string) => {
+        const native = LANGUAGES.find((lang) => lang.id === code)?.native ?? code;
+        return getLocaleCoverageTier(code) === 'partial'
+            ? `${native} — ${tr('settings.languagePartlyTranslated')}`
+            : native;
+    };
 
     const weekStart = normalizeWeekStartPreference(settings.weekStart);
     const dateFormat = normalizeDateFormatSetting(settings.dateFormat);
@@ -370,7 +378,7 @@ export function GeneralSettingsScreen() {
                     <SettingRow
                         onPress={() => setLanguagePickerOpen(true)}
                         label={t('settings.language')}
-                        description={LANGUAGES.find((lang) => lang.id === language)?.native ?? language}
+                        description={languageLabel(language)}
                     >
                         <Ionicons color={tc.secondaryText} name="chevron-down" size={18} />
                     </SettingRow>
@@ -404,7 +412,7 @@ export function GeneralSettingsScreen() {
                                             }}
                                         >
                                             <Text style={[styles.pickerOptionText, { color: selected ? tc.tint : tc.text }]}>
-                                                {lang.native}
+                                                {languageLabel(lang.id)}
                                             </Text>
                                             {selected && <Ionicons color={tc.tint} name="checkmark" size={18} />}
                                         </TouchableOpacity>

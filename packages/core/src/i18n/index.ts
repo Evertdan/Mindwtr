@@ -1,5 +1,6 @@
 export type { Language } from './i18n-types';
 import { en } from './locales/en';
+import { LOCALES, MIXED_ENGLISH_COVERAGE_CEILING, type LocaleDescriptor } from './i18n-locales';
 
 export type TranslateFn = (key: string) => string;
 
@@ -18,6 +19,25 @@ export function getI18nKeyForEnglishText(text: string): string | undefined {
 
 export function getEnglishI18nValue(key: string): string | undefined {
     return en[key];
+}
+
+/**
+ * Whether a language is complete enough to present without a caveat. Derived from the
+ * locale's `translatedKeyFloor` (the ratcheted commitment, so this self-updates as
+ * translation work lands) over the English key count — no hand-maintained per-locale data.
+ *
+ * Reuses MIXED_ENGLISH_COVERAGE_CEILING rather than minting a second ~90 constant: that
+ * number already encodes "at or above this the locale is essentially complete and the
+ * English left in it is deliberate", which is the same judgement a user-facing
+ * "partly translated" caveat needs. 'all' is full by definition.
+ *
+ * Lives here, not in i18n-locales.ts, because that table deliberately imports no dictionary.
+ */
+export function getLocaleCoverageTier(code: string): 'full' | 'partial' {
+    const descriptor = (LOCALES as Record<string, LocaleDescriptor | undefined>)[code];
+    if (!descriptor || descriptor.translatedKeyFloor === 'all') return 'full';
+    const coverage = (descriptor.translatedKeyFloor / Object.keys(en).length) * 100;
+    return coverage < MIXED_ENGLISH_COVERAGE_CEILING ? 'partial' : 'full';
 }
 
 export function translateWithFallback(t: TranslateFn, key: string, fallback: string): string {

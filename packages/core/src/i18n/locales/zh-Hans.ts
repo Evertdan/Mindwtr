@@ -933,6 +933,7 @@ export const zhHans: Record<string, string> = {
         'settings.material3Theme': 'Material 3 主题',
         'settings.material3ThemeDesc': '在 Android 上使用 Material 3 配色',
         'settings.selectLang': '选择您的首选语言',
+        'settings.languagePartlyTranslated': '部分翻译',
         'settings.privacy': '隐私',
         'settings.mobile.appLock': '应用锁',
         'settings.mobile.appLockDesc': '打开 Mindwtr 或返回应用时需要设备锁验证。它保护应用界面，不加密设备上的数据库。',

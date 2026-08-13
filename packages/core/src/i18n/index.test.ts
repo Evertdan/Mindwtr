@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatI18nTemplate, getEnglishI18nValue, getI18nKeyForEnglishText, resolveI18nText } from './index';
+import { formatI18nTemplate, getEnglishI18nValue, getI18nKeyForEnglishText, getLocaleCoverageTier, resolveI18nText } from './index';
 
 describe('formatI18nTemplate', () => {
     it('replaces repeated named placeholders wherever translators place them', () => {
@@ -20,6 +20,32 @@ describe('getI18nKeyForEnglishText', () => {
 
     it('returns undefined for dynamic text that is not in the locale table', () => {
         expect(getI18nKeyForEnglishText('Backup date: 2026-01-01')).toBeUndefined();
+    });
+});
+
+describe('getLocaleCoverageTier', () => {
+    it('calls a locale held to every English key full', () => {
+        // 'all' commitment, both load modes.
+        expect(getLocaleCoverageTier('zh')).toBe('full');
+        expect(getLocaleCoverageTier('sv')).toBe('full');
+    });
+
+    it('calls a locale with a low key floor partial', () => {
+        // nl is the worst of them (~26% of en at time of writing).
+        expect(getLocaleCoverageTier('nl')).toBe('partial');
+        expect(getLocaleCoverageTier('de')).toBe('partial');
+    });
+
+    it('treats English and unknown codes as full', () => {
+        // en is not in LOCALES — it is the base dictionary, never a partial one.
+        expect(getLocaleCoverageTier('en')).toBe('full');
+        expect(getLocaleCoverageTier('kl')).toBe('full');
+    });
+
+    it('tracks the floor rather than a hand-kept list', () => {
+        // vi sits just under 'all' but far above the ceiling; if this ever flips,
+        // a floor moved and the label follows it automatically.
+        expect(getLocaleCoverageTier('vi')).toBe('full');
     });
 });
 

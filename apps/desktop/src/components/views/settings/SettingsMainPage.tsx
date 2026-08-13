@@ -4,7 +4,7 @@ import {
     GLOBAL_QUICK_ADD_SHORTCUT_DISABLED,
     getGlobalQuickAddShortcutOptions,
 } from '../../../lib/global-quick-add-shortcut';
-import { normalizeWeekStartSetting } from '@mindwtr/core';
+import { getLocaleCoverageTier, normalizeWeekStartSetting } from '@mindwtr/core';
 import { Switch } from '../../ui/Switch';
 import { SettingRow, SettingsCard, SettingsSectionHeader } from './SettingRow';
 
@@ -46,6 +46,7 @@ type Labels = {
     dracula: string;
     sepia: string;
     language: string;
+    languagePartlyTranslated: string;
     weekStart: string;
     weekStartSunday: string;
     weekStartMonday: string;
@@ -183,6 +184,13 @@ export function SettingsMainPage({
     trayVisible = true,
     onTrayVisibleChange,
 }: SettingsMainPageProps) {
+    // A <select> takes text, not markup, so the caveat rides the option label itself.
+    const languageLabel = (code: string) => {
+        const native = languages.find((l) => l.id === code)?.native ?? code;
+        return getLocaleCoverageTier(code) === 'partial'
+            ? `${native} — ${t.languagePartlyTranslated}`
+            : native;
+    };
     const hasWindowSection = showWindowDecorations || showCloseBehavior || showLaunchAtStartup || showTrayToggle;
     const isMac = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform);
     const isWindows = typeof navigator !== 'undefined' && /win/i.test(navigator.userAgent);
@@ -266,7 +274,7 @@ export function SettingsMainPage({
                 <SettingRow padded
                     settingsKey="language"
                     title={t.language}
-                    description={languages.find((l) => l.id === language)?.native ?? language}
+                    description={languageLabel(language)}
                 >
                     <select
                         aria-label={t.language}
@@ -276,7 +284,7 @@ export function SettingsMainPage({
                     >
                         {languages.map((lang) => (
                             <option key={lang.id} value={lang.id}>
-                                {lang.native}
+                                {languageLabel(lang.id)}
                             </option>
                         ))}
                     </select>

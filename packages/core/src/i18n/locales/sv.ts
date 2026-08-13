@@ -964,6 +964,7 @@ export const svOverrides: Record<string, string> = {
         'settings.material3Theme': 'Material 3-tema',
         'settings.material3ThemeDesc': 'Använd Material 3-färgtoken på Android',
         'settings.selectLang': 'Välj ditt önskade språk',
+        'settings.languagePartlyTranslated': 'Delvis översatt',
         'settings.privacy': 'Integritet',
         'settings.mobile.appLock': 'Applås',
         'settings.mobile.appLockDesc': 'Kräv enhetens lås när du öppnar Mindwtr eller återgår till appen. Det här skyddar appvyn, inte databasen på enheten.',
