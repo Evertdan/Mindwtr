@@ -632,13 +632,23 @@ export const writeSyncFile = async (fileUri: string, data: AppData, options?: Sy
             try {
                 await StorageAccessFramework.writeAsStringAsync(resolvedUri, paddedContent);
             } catch (error) {
-                // Passthrough providers (e.g. RSAF over rclone crypt) can fail
-                // expo's canWrite pre-check on a just-created data.json while
-                // the provider's metadata query is still stale. One delayed
-                // retry, then surface the failure.
+                // expo's legacy SAF write refuses whenever the provider's
+                // metadata omits FLAG_SUPPORTS_WRITE — RSAF (rclone) omits it
+                // deliberately, so no delay ever helps (#1001). The new File
+                // API writes through contentResolver.openOutputStream with no
+                // writability pre-check: attempt the operation instead of
+                // trusting the metadata.
                 if (!isReadOnlyError(error)) throw error;
-                await sleep(1000);
-                await StorageAccessFramework.writeAsStringAsync(resolvedUri, paddedContent);
+                try {
+                    new ExpoFile(resolvedUri).write(paddedContent);
+                } catch (streamError) {
+                    void logWarn('SAF output-stream write failed; retrying the provider write once', {
+                        scope: 'sync',
+                        extra: { error: streamError instanceof Error ? streamError.message : String(streamError) },
+                    });
+                    await sleep(1000);
+                    await StorageAccessFramework.writeAsStringAsync(resolvedUri, paddedContent);
+                }
             }
             const writtenContent = await readFileText(resolvedUri);
             if (!writtenContent) {

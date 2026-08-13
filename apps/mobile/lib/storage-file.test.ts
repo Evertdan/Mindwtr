@@ -47,6 +47,7 @@ vi.mock('expo-sharing', () => ({
 }));
 
 const expoFilesMock = vi.hoisted(() => new Map<string, string>());
+const streamWriteState = vi.hoisted(() => ({ failNext: false }));
 
 vi.mock('expo-file-system', () => {
   class File {
@@ -61,7 +62,16 @@ vi.mock('expo-file-system', () => {
       expoFilesMock.set(this.uri, '');
     }
     write(content: string) {
+      if (streamWriteState.failNext) {
+        streamWriteState.failNext = false;
+        throw new Error('Unable to open output stream for URI: ' + this.uri);
+      }
       expoFilesMock.set(this.uri, content);
+      // content:// writes land in the same store the SAF read mock serves, so
+      // writeSyncFile's read-back verification sees what the stream wrote.
+      if (this.uri.startsWith('content://')) {
+        fileSystemMock.__setStoredText(content);
+      }
     }
     delete() {
       expoFilesMock.delete(this.uri);
@@ -150,11 +160,29 @@ describe('storage-file sync writes', () => {
     expect(JSON.parse(fileSystemMock.__getStoredText())).toEqual(nextData);
   }, 10_000);
 
-  it('retries the SAF write once when the provider pre-check reports not writable', async () => {
+  // The RSAF shape from #1001: the provider never declares FLAG_SUPPORTS_WRITE,
+  // so expo's legacy SAF write refuses every attempt and waiting cannot help —
+  // the raw output-stream write must carry the sync file instead.
+  it('falls back to the output-stream write when the provider pre-check reports not writable', async () => {
+    const nextData = appData({ weekStart: 'monday' });
+    fileSystemMock.StorageAccessFramework.writeAsStringAsync.mockRejectedValueOnce(
+      new Error(
+        "Call to function 'ExponentFileSystem.writeAsStringAsync' has been rejected.\n→ Caused by: java.io.IOException: Location 'content://com.chiller3.rsaf.documents/tree/Crypt/document/Crypt%2Fdata.json' isn't writable."
+      )
+    );
+
+    await writeSyncFile(syncFileUri, nextData);
+
+    expect(fileSystemMock.StorageAccessFramework.writeAsStringAsync).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fileSystemMock.__getStoredText())).toEqual(nextData);
+  }, 10_000);
+
+  it('retries the provider write once when the stream fallback also fails', async () => {
     const nextData = appData({ weekStart: 'monday' });
     fileSystemMock.StorageAccessFramework.writeAsStringAsync.mockRejectedValueOnce(
       new Error("Location 'content://x/data.json' isn't writable.")
     );
+    streamWriteState.failNext = true;
 
     await writeSyncFile(syncFileUri, nextData);
 
