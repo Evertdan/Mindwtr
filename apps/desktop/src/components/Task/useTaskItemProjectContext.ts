@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Project, Section, Task, TaskDraftSetter, Area } from '@mindwtr/core';
-import { getFrequentTaskTokens, getPersonOptionNames, getUsedTaskTokens, useTaskStore } from '@mindwtr/core';
+import { getFrequentTaskTokens, getPersonOptionNames, getUsedTaskTokens, useTaskStore,
+    baseTextCollator,
+} from '@mindwtr/core';
 
 type UseTaskItemProjectContextParams = {
     task: Task;
@@ -33,7 +35,7 @@ const uniquePrefixedTokenOptions = (tokens: string[], prefix: '@' | '#'): string
 };
 
 const sortTokenOptions = (tokens: string[]): string[] =>
-    [...tokens].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    [...tokens].sort((a, b) => baseTextCollator.compare(a, b));
 
 export function useTaskItemProjectContext({
     task,

@@ -23,7 +23,9 @@ import { buildProjectOrderMap,
     TaskPriority,
     TimeEstimate,
     resolveI18nText,
-    useTaskStore, tFallback, } from '@mindwtr/core';
+    useTaskStore, tFallback,
+    baseTextCollator,
+} from '@mindwtr/core';
 import type { FilterCriteria, Task, TaskStatus } from '@mindwtr/core';
 import type { BulkOrganizeTaskUpdateInput } from '@mindwtr/core';
 import type { TaskSortBy } from '@mindwtr/core';
@@ -376,7 +378,7 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
             const key = person.toLowerCase();
             if (!people.has(key)) people.set(key, person);
         }
-        return [...people.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+        return [...people.values()].sort((a, b) => baseTextCollator.compare(a, b));
     }, [baseTasks, statusFilter, waitingVisibility]);
 
     useEffect(() => {

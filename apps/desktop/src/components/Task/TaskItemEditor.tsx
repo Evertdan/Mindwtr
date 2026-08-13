@@ -11,6 +11,7 @@ import {
     type TaskDraftSetter,
     type TaskEditorFieldId,
     type TaskEditorSectionId,
+    numericTextCollator,
 } from '@mindwtr/core';
 import { AreaSelector } from '../ui/AreaSelector';
 import { ProjectSelector } from '../ui/ProjectSelector';
@@ -150,7 +151,7 @@ export function TaskItemEditor({
     const [editorLayoutHelpOpen, setEditorLayoutHelpOpen] = useState(false);
 
     const compareLabels = (left: string, right: string) =>
-        left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
+        numericTextCollator.compare(left, right);
     const sortedProjects = [...projects].sort((a, b) => compareLabels(a.title, b.title));
     const sortedAreas = [...areas].sort((a, b) => compareLabels(a.name, b.name));
     const projectFilterAreaId = editAreaId || undefined;

@@ -4,6 +4,7 @@ import {
     DEFAULT_AREA_COLOR,
     getContextColor,
     tFallback,
+    baseTextCollator,
 } from '@mindwtr/core';
 import type { Area, Project, Task, TaskEnergyLevel, TaskPriority, TaskStatus } from '@mindwtr/core';
 
@@ -174,7 +175,7 @@ export function groupTasksByContext({
 
     const groups: TaskGroup[] = [];
     const sortedContexts = [...grouped.keys()].sort((a, b) =>
-        a.localeCompare(b, undefined, { sensitivity: 'base' })
+        baseTextCollator.compare(a, b)
     );
     sortedContexts.forEach((context) => {
         const contextTasks = grouped.get(context) ?? [];
@@ -350,7 +351,7 @@ export function groupTasksByPerson({
 
     const groups: TaskGroup[] = [];
     const sortedPeople = [...grouped.values()].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+        baseTextCollator.compare(a.name, b.name)
     );
     sortedPeople.forEach((entry) => {
         groups.push({
@@ -427,7 +428,7 @@ export function groupTasksByTag({
 
     const groups: TaskGroup[] = [];
     const sortedTags = [...grouped.keys()].sort((a, b) =>
-        a.localeCompare(b, undefined, { sensitivity: 'base' })
+        baseTextCollator.compare(a, b)
     );
     sortedTags.forEach((tag) => {
         const tagTasks = grouped.get(tag) ?? [];

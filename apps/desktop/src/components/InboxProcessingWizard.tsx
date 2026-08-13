@@ -1,6 +1,8 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { ArrowRight, BookOpen, Check, CheckCircle, ChevronLeft, ClipboardList, Clock, Loader2, Sparkles, Trash2, User, X } from 'lucide-react';
-import { DEFAULT_PROJECT_COLOR, filterProjectsBySelectedArea, formatTimeEstimateLabel, safeFormatDate, safeParseDate, tFallback, type AppData, type Area, type Project, type Task, type TaskDraft, type TaskDraftSetter, type TaskPriority, type TimeEstimate } from '@mindwtr/core';
+import { DEFAULT_PROJECT_COLOR, filterProjectsBySelectedArea, formatTimeEstimateLabel, safeFormatDate, safeParseDate, tFallback, type AppData, type Area, type Project, type Task, type TaskDraft, type TaskDraftSetter, type TaskPriority, type TimeEstimate,
+    numericTextCollator,
+} from '@mindwtr/core';
 
 import { cn } from '../lib/utils';
 import { useNativeDateInputLocale } from '../hooks/use-native-date-input-locale';
@@ -254,7 +256,7 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
     const isReferenceOrganizationStep = processingStep === 'reference';
     const selectedOrganizationCount = selectedContexts.length + selectedTags.length;
     const compareLabels = (left: string, right: string) =>
-        left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
+        numericTextCollator.compare(left, right);
     const sortedProjects = [...projects].sort((a, b) => compareLabels(a.title, b.title));
     const projectFilterAreaId = selectedAreaId || undefined;
     const areaFilteredProjects = filterProjectsBySelectedArea(sortedProjects, projectFilterAreaId);

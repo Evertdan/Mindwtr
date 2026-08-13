@@ -21,6 +21,20 @@ import type { Language } from './i18n/i18n-types';
  */
 const textCollator = new Intl.Collator();
 
+/**
+ * Shared collators for the comparator sites that pass an options bag. V8 caches only the
+ * argless `localeCompare()`, so `localeCompare(b, undefined, opts)` builds a fresh collator
+ * per comparison — measurable in the per-mutation derived-state pass.
+ *
+ * `new Intl.Collator(undefined, opts).compare(a, b)` is equivalent to
+ * `a.localeCompare(b, undefined, opts)`, so swapping a site preserves its order exactly.
+ *
+ * The two are NOT interchangeable: `numeric` makes "item 10" sort after "item 9". Sites that
+ * asked for it are user-visible orderings and must keep it.
+ */
+export const baseTextCollator = new Intl.Collator(undefined, { sensitivity: 'base' });
+export const numericTextCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
 export function buildTasksByProjectId(tasks: readonly Task[]): Map<string, Task[]> {
     const tasksByProjectId = new Map<string, Task[]>();
 

@@ -4,6 +4,7 @@ import {
   type Area,
   type Project,
   type Task,
+    baseTextCollator,
 } from '@mindwtr/core';
 
 /**
@@ -176,7 +177,7 @@ export function buildTaskGroupSections({
 
     const items: TaskGroupItem[] = [];
     [...grouped.keys()]
-      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+      .sort((a, b) => baseTextCollator.compare(a, b))
       .forEach((tag) => appendSection(items, `tag:${tag}`, tag, grouped.get(tag) ?? []));
     appendSection(items, 'tag:none', tFallback(t, 'taskEdit.noTags', 'No tags'), noTagTasks, true);
     return items;

@@ -1,6 +1,8 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { ArrowRight, BookOpen, CheckCircle, ClipboardList, Clock, Trash2, User, X } from 'lucide-react';
-import { DEFAULT_PROJECT_COLOR, filterProjectsBySelectedArea, formatTimeEstimateLabel, safeFormatDate, safeParseDate, tFallback, type Project, type Task, type TaskDraft, type TaskDraftSetter, type TaskPriority, type TimeEstimate } from '@mindwtr/core';
+import { DEFAULT_PROJECT_COLOR, filterProjectsBySelectedArea, formatTimeEstimateLabel, safeFormatDate, safeParseDate, tFallback, type Project, type Task, type TaskDraft, type TaskDraftSetter, type TaskPriority, type TimeEstimate,
+    numericTextCollator,
+} from '@mindwtr/core';
 
 import { cn } from '../lib/utils';
 import { useNativeDateInputLocale } from '../hooks/use-native-date-input-locale';
@@ -189,7 +191,7 @@ export function InboxProcessingQuickPanel({
     const laterLabel = tFallback(t, 'process.later', 'Later');
     const laterHint = tFallback(t, 'process.laterHint', 'Set a start date and move this to Next.');
     const compareLabels = (left: string, right: string) =>
-        left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
+        numericTextCollator.compare(left, right);
     const sortedProjects = [...projects].sort((a, b) => compareLabels(a.title, b.title));
     const projectFilterAreaId = selectedAreaId || undefined;
     const filteredProjects = filterProjectsBySelectedArea(sortedProjects, projectFilterAreaId);

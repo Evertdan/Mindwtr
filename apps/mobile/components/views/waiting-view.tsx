@@ -1,5 +1,7 @@
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { getTranslationsSync, getWaitingPerson, safeParseDueDate, shallow, useTaskStore } from '@mindwtr/core';
+import { getTranslationsSync, getWaitingPerson, safeParseDueDate, shallow, useTaskStore,
+    baseTextCollator,
+} from '@mindwtr/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Task, TaskStatus } from '@mindwtr/core';
 import { useTheme } from '../../contexts/theme-context';
@@ -77,7 +79,7 @@ export function WaitingView() {
       const key = person.toLowerCase();
       if (!people.has(key)) people.set(key, person);
     }
-    return [...people.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    return [...people.values()].sort((a, b) => baseTextCollator.compare(a, b));
   }, [waitingTasks]);
   const filteredWaitingTasks = useMemo(() => {
     return waitingTasks.filter((task) => {

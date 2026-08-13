@@ -5,7 +5,7 @@ import {
     getUsedTaskTokensFromUsage,
 } from './task-token-usage';
 import { resolveRelativeStartUpdates } from './task-relative-start';
-import { compareTasksByProjectOrder, isTaskFutureStart, rescheduleTask, shouldAutoArchiveCompletedTask } from './task-utils';
+import { compareTasksByProjectOrder, isTaskFutureStart, rescheduleTask, shouldAutoArchiveCompletedTask, baseTextCollator } from './task-utils';
 import { isTaskActionable, isTaskFinished } from './task-status';
 import { safeParseDate } from './date';
 import { filterNotDeleted } from './sync-helpers';
@@ -368,7 +368,7 @@ export const selectVisibleAreas = (areas: Area[]): Area[] =>
     filterNotDeleted(areas);
 
 export const selectVisiblePeople = (people: Person[]): Person[] =>
-    filterNotDeleted(people).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    filterNotDeleted(people).sort((a, b) => baseTextCollator.compare(a.name, b.name));
 
 export const completeTaskForProjectArchive = (task: Task, archivedAt: string, deviceId?: string): Task => ({
     ...task,

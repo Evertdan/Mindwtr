@@ -1,3 +1,4 @@
+import { baseTextCollator } from '@mindwtr/core';
 export type TokenAutocompletePrefix = '@' | '#';
 
 const TOKEN_PREFIX_PATTERN = /^[@#]+/;
@@ -39,7 +40,7 @@ export const compareAutocompleteLabels = (left: string, right: string, query: st
     if (leftStartsWithQuery !== rightStartsWithQuery) {
         return leftStartsWithQuery ? -1 : 1;
     }
-    return left.localeCompare(right, undefined, { sensitivity: 'base' });
+    return baseTextCollator.compare(left, right);
 };
 
 export const matchesAutocompleteQuery = (label: string, query: string): boolean => {

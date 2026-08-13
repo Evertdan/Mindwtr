@@ -12,6 +12,7 @@ import {
     type Area,
     type Person,
     useTaskStore,
+    baseTextCollator,
 } from '@mindwtr/core';
 
 import { useThemeColors } from '@/hooks/use-theme-colors';
@@ -120,7 +121,7 @@ export function ManageSettingsScreen() {
     const deletePerson = useTaskStore((state) => state.deletePerson);
     const sortedAreas = [...areas].sort((a, b) => a.order - b.order);
     const sortedPeople = useMemo(
-        () => [...people].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+        () => [...people].sort((a, b) => baseTextCollator.compare(a.name, b.name)),
         [people],
     );
     const assignedTaskCountByPerson = useMemo(() => {

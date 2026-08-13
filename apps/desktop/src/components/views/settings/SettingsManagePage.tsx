@@ -3,7 +3,9 @@ import { DndContext, type DragEndEvent, closestCenter, useSensor, useSensors, Po
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Trash2, ChevronDown, ChevronRight, Pencil, Check, X, ExternalLink } from 'lucide-react';
-import { DEFAULT_AREA_COLOR, formatI18nTemplate, getPersonNameKey, translateWithFallback, useTaskStore, type Area, type Person } from '@mindwtr/core';
+import { DEFAULT_AREA_COLOR, formatI18nTemplate, getPersonNameKey, translateWithFallback, useTaskStore, type Area, type Person,
+    baseTextCollator,
+} from '@mindwtr/core';
 import { AreaColorPicker } from '../projects/AreaColorPicker';
 import { reportError } from '../../../lib/report-error';
 import { isTauriRuntime } from '../../../lib/runtime';
@@ -377,7 +379,7 @@ export function SettingsManagePage({ t: _t, translate, requestConfirmation }: Se
 
     // Sort areas by order
     const sortedAreas = [...areas].sort((a, b) => a.order - b.order);
-    const sortedPeople = [...people].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    const sortedPeople = [...people].sort((a, b) => baseTextCollator.compare(a.name, b.name));
     const assignedTaskCountByPerson = new Map<string, number>();
     tasks.forEach((task) => {
         if (task.deletedAt) return;

@@ -1,3 +1,4 @@
+import { baseTextCollator } from './task-utils';
 import type { Person, Task } from './types';
 import { nextRevision } from './sync-revision';
 import { generateUUID } from './uuid';
@@ -161,7 +162,7 @@ export function getPersonSuggestionNames(
         .sort((a, b) => Number(b.managed) - Number(a.managed)
             || b.lastUsedAt - a.lastUsedAt
             || b.count - a.count
-            || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+            || baseTextCollator.compare(a.name, b.name))
         .slice(0, limit)
         .map((entry) => entry.name);
 }
@@ -212,6 +213,6 @@ export function getPersonOptionNames(
 ): string[] {
     return getPersonOptionEntries(people, tasks)
         .sort((a, b) => Number(b.managed) - Number(a.managed)
-            || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+            || baseTextCollator.compare(a.name, b.name))
         .map((entry) => entry.name);
 }

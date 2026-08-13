@@ -1,5 +1,6 @@
 import type { Area, FocusGroupBy, Project, Task, TaskEnergyLevel, TaskPriority } from './types';
 import type { ProjectDeadlineBoost } from './task-utils';
+import { baseTextCollator } from './task-utils';
 import { DEFAULT_AREA_COLOR } from './color-constants';
 import { getContextColor } from './context-color';
 
@@ -87,7 +88,7 @@ function buildOrderedGroups(
             const leftOrder = Number.isFinite(left.sortOrder) ? left.sortOrder as number : Number.POSITIVE_INFINITY;
             const rightOrder = Number.isFinite(right.sortOrder) ? right.sortOrder as number : Number.POSITIVE_INFINITY;
             if (leftOrder !== rightOrder) return leftOrder - rightOrder;
-            return left.label.localeCompare(right.label, undefined, { sensitivity: 'base' });
+            return baseTextCollator.compare(left.label, right.label);
         })
         .map((descriptor) => stripSortOrder(descriptor, grouped.get(descriptor.key) ?? []));
 }
@@ -125,7 +126,7 @@ function buildTokenGroups(
         groups.push({ key: `${keyPrefix}:none`, label: noneLabel, tasks: noneTasks, muted: true });
     }
     [...grouped.keys()]
-        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+        .sort((a, b) => baseTextCollator.compare(a, b))
         .forEach((token) => {
             groups.push({
                 key: `${keyPrefix}:${token}`,

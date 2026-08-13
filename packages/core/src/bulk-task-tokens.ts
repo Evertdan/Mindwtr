@@ -1,3 +1,4 @@
+import { baseTextCollator } from './task-utils';
 import type { Task } from './types';
 
 export type BulkTaskTokenField = 'tags' | 'contexts';
@@ -20,7 +21,7 @@ const getTaskFromLookup = (lookup: TaskLookup, id: string): Task | undefined => 
 
 const sortTokens = (tokens: Iterable<string>): string[] =>
     Array.from(new Set(tokens)).sort((left, right) =>
-        left.localeCompare(right, undefined, { sensitivity: 'base' })
+        baseTextCollator.compare(left, right)
     );
 
 export const normalizeBulkTaskTokenInput = (

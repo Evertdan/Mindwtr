@@ -1,3 +1,4 @@
+import { baseTextCollator } from './task-utils';
 import { safeParseDate } from './date';
 import type { Task } from './types';
 
@@ -74,7 +75,7 @@ export const getUsedTaskTokens = (
 export const getUsedTaskTokensFromUsage = (usage: readonly TaskTokenUsage[]): string[] =>
     usage
         .map((entry) => entry.token)
-        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+        .sort((a, b) => baseTextCollator.compare(a, b));
 
 export const getFrequentTaskTokens = (
     tasks: Task[],
@@ -92,7 +93,7 @@ export const getFrequentTaskTokensFromUsage = (
         .sort((a, b) =>
             b.count - a.count
             || b.lastUsedAt - a.lastUsedAt
-            || a.token.localeCompare(b.token, undefined, { sensitivity: 'base' })
+            || baseTextCollator.compare(a.token, b.token)
         )
         .slice(0, Math.max(0, limit))
         .map((entry) => entry.token);
@@ -107,7 +108,7 @@ export const getRecentTaskTokens = (
         .sort((a, b) =>
             b.lastUsedAt - a.lastUsedAt
             || b.count - a.count
-            || a.token.localeCompare(b.token, undefined, { sensitivity: 'base' })
+            || baseTextCollator.compare(a.token, b.token)
         )
         .slice(0, Math.max(0, limit))
         .map((entry) => entry.token);
