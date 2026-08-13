@@ -14,7 +14,7 @@ import { searchAll } from '@mindwtr/core';
 
 const createMockDb = (
     rows: any[] = [],
-    options: { hasTasksFts?: boolean; hasPeopleTable?: boolean } = {},
+    options: { hasTasksFts?: boolean; hasPeopleTable?: boolean; projects?: any[] } = {},
 ): { db: DbClient; calls: { sql: string; params: any[] }[] } => {
     const calls: { sql: string; params: any[] }[] = [];
     const db: DbClient = {
@@ -99,6 +99,7 @@ const createMockDb = (
                 if (sql.includes("FROM sqlite_master")) {
                     return options.hasTasksFts ? [{ name: 'tasks_fts' }] : [];
                 }
+                if (options.projects && sql.includes('FROM projects')) return options.projects;
                 return rows;
             },
             get: (...params: any[]) => {
@@ -168,6 +169,25 @@ describe('mcp queries', () => {
             const cliIds = searchAll(asCoreTasks, [], query).tasks.map((task) => task.id).sort();
             expect({ query, ids: mcpIds }).toEqual({ query, ids: cliIds });
         }
+    });
+
+    // The GTD availability question ("what can I actually do now") — deferral and sequential
+    // blocking come from core's getTaskFocusEligibility, not re-derived here.
+    test('listTasks view splits available, deferred and blocked', () => {
+        const now = '2026-02-01T00:00:00.000Z';
+        const future = '2099-01-01T00:00:00.000Z';
+        const { db } = createMockDb([
+            { id: 'ready', title: 'Ready', status: 'next', projectId: null, createdAt: now, updatedAt: now, isFocusedToday: 0 },
+            { id: 'later', title: 'Later', status: 'next', projectId: null, startTime: future, createdAt: now, updatedAt: now, isFocusedToday: 0 },
+            { id: 'step1', title: 'Step one', status: 'next', projectId: 'p-seq', orderNum: 1, createdAt: now, updatedAt: now, isFocusedToday: 0 },
+            { id: 'step2', title: 'Step two', status: 'next', projectId: 'p-seq', orderNum: 2, createdAt: now, updatedAt: now, isFocusedToday: 0 },
+        ], { projects: [{ id: 'p-seq', title: 'Sequential', status: 'active', isSequential: 1, createdAt: now, updatedAt: now }] });
+
+        expect(listTasks(db, { view: 'available' }).map((t) => t.id).sort()).toEqual(['ready', 'step1']);
+        expect(listTasks(db, { view: 'deferred' }).map((t) => t.id)).toEqual(['later']);
+        expect(listTasks(db, { view: 'blocked' }).map((t) => t.id)).toEqual(['step2']);
+        // Without a view the deferred and blocked tasks are still listed.
+        expect(listTasks(db, {}).map((t) => t.id).sort()).toEqual(['later', 'ready', 'step1', 'step2']);
     });
 
     test('listTasks filters isFocusedToday with a NULL-safe predicate', () => {

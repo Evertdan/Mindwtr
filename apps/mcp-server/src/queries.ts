@@ -5,6 +5,7 @@ import {
   areaFromSqliteRow,
   buildTaskWhere,
   filterTasksBySearch,
+  getTaskFocusEligibility,
   mapSqliteTaskRow,
   parseQuickAdd as parseQuickAddCore,
   personFromSqliteRow,
@@ -51,6 +52,8 @@ export type ListTasksInput = {
   dueDateFrom?: string;
   dueDateTo?: string;
   isFocusedToday?: boolean;
+  /** GTD availability, via core getTaskFocusEligibility. */
+  view?: 'available' | 'deferred' | 'blocked';
   sortBy?: 'updatedAt' | 'createdAt' | 'dueDate' | 'title' | 'priority';
   sortOrder?: 'asc' | 'desc';
 };
@@ -249,7 +252,7 @@ export function listTasks(db: DbClient, input: ListTasksInput): TaskRow[] {
   // `id.localeCompare`, never flips direction with sortOrder.
   const selectSql = `SELECT ${selectColumns.join(', ')} FROM tasks ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY ${orderExpr} ${sortOrder}, id ASC`;
 
-  if (input.search) {
+  if (input.search || input.view) {
     // The documented operator language (status:/context:/due:<=7d/negation/quotes) lives in
     // core and cannot be expressed in SQL, so the non-search filters run in the database and
     // the query runs over that result. filterTasksBySearch, NOT searchAll: searchAll caps at
@@ -257,11 +260,22 @@ export function listTasks(db: DbClient, input: ListTasksInput): TaskRow[] {
     // every match past the 200th. Here limit/offset apply to the whole match set.
     // ponytail: reads the pre-search matches into memory; push down only if a real database
     // ever grows enough for it to show up.
-    const matched = filterTasksBySearch(
-      db.prepare(selectSql).all<TaskSqliteRow>(...params).map(mapTaskRow) as unknown as CoreTask[],
-      listProjects(db) as unknown as CoreProject[],
-      input.search,
-    );
+    const projects = listProjects(db) as unknown as CoreProject[];
+    const rows = db.prepare(selectSql).all<TaskSqliteRow>(...params).map(mapTaskRow) as unknown as CoreTask[];
+    let matched = input.search ? filterTasksBySearch(rows, projects, input.search) : rows;
+
+    if (input.view) {
+      // GTD availability is core's, not re-derived here: getTaskFocusEligibility already
+      // answers eligible / deferred (start date in the future) / sequential (an earlier step
+      // in a sequential project still holds the slot). Eligibility is relative to the WHOLE
+      // task set, so it is computed over every task, not the filtered page.
+      const all = listTasks(db, { includeDeleted: input.includeDeleted }) as unknown as CoreTask[];
+      const wanted = input.view === 'blocked' ? 'sequential' : input.view === 'deferred' ? 'deferred' : 'eligible';
+      matched = matched.filter(
+        (task) => getTaskFocusEligibility(task, { tasks: all, projects }).reason === wanted,
+      );
+    }
+
     return matched.slice(offset, offset + limit) as unknown as TaskRow[];
   }
 
