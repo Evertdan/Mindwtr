@@ -1221,13 +1221,13 @@ export const useSyncSettings = ({
     const buildUndoAction = useCallback((snapshotName?: string | null) => {
         if (!snapshotName) return undefined;
         return {
-            label: resolveText('settings.undoImport', 'Undo import'),
+            label: resolveText('settings.undoImport', 'Undo'),
             onClick: () => void (async () => {
                 const confirmed = await requestConfirmation({
-                    title: resolveText('settings.undoImportConfirmTitle', 'Undo import?'),
+                    title: resolveText('settings.undoImportConfirmTitle', 'Undo this change?'),
                     message: formatText(
                         'settings.undoImportConfirm',
-                        'Restore the snapshot taken just before the import ({{snapshotName}})? Anything you changed since the import is rolled back too.',
+                        'Restore the snapshot taken just before this change ({{snapshotName}})? Anything you changed since is rolled back too.',
                         { snapshotName },
                     ),
                 });
