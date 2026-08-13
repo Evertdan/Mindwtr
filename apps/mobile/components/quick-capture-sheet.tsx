@@ -53,7 +53,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAndroidKeyboardInset, useKeyboardInset } from '../lib/use-android-keyboard-inset';
 import { logError, logWarn } from '../lib/app-log';
 import { showInvalidDateCommandToast } from '@/lib/quick-add-toast';
-import { createMobileRecoverySnapshot } from '../lib/data-transfer';
+import { createMobileRecoverySnapshot } from '../lib/recovery-snapshot';
 import { openTaskScreen } from '@/lib/task-meta-navigation';
 import {
   buildCaptureExtra,

@@ -154,7 +154,7 @@ vi.mock('expo-file-system', () => ({
   readAsStringAsync: fileSystemReadAsStringAsync,
 }));
 
-vi.mock('../lib/data-transfer', () => ({
+vi.mock('../lib/recovery-snapshot', () => ({
   createMobileRecoverySnapshot,
 }));
 

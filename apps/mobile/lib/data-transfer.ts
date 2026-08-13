@@ -48,16 +48,21 @@ import {
 
 import { serializeMindwtrCsv } from '@mindwtr/core/mindwtr-csv-export';
 import { logError, logInfo } from './app-log';
+import {
+    createMobileRecoverySnapshot,
+    getLocalChangeAt,
+    getSnapshotDirectory,
+    listSnapshotEntries,
+    pruneSnapshots,
+    saveCurrentDataSnapshot,
+    SNAPSHOT_FILE_PATTERN,
+    toCountExtra,
+} from './recovery-snapshot';
 import { mobileStorage } from './storage-adapter';
 
 const StorageAccessFramework = FileSystem.StorageAccessFramework;
-const SNAPSHOT_DIR_NAME = 'snapshots';
-const SNAPSHOT_FILE_PATTERN = /^data\.(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})(?:\.(\d{3})(?:\.(\d+))?)?\.snapshot\.json$/u;
-const MAX_LOCAL_SNAPSHOTS = 5;
 // Deliberately does not match SNAPSHOT_FILE_PATTERN, so a half-written snapshot
 // is invisible to the restore roster and to pruning.
-const SNAPSHOT_PENDING_FILE_NAME = 'data.pending.snapshot.tmp';
-const MAX_SNAPSHOT_NAME_COLLISIONS = 100;
 
 export type TransferDocument = {
     fileName: string;
@@ -70,78 +75,12 @@ type SnapshotApplyResult = {
     snapshotName: string;
 };
 
-const toCountExtra = (data: AppData): Record<string, string> => {
-    const counts = countActiveRecords(data);
-    return {
-        tasks: String(counts.tasks),
-        projects: String(counts.projects),
-        sections: String(counts.sections),
-        areas: String(counts.areas),
-        people: String(counts.people),
-    };
-};
 
-const getLocalChangeAt = (): number => useTaskStore.getState().lastDataChangeAt;
 
-const normalizeBaseUri = (value?: string | null): string | null => {
-    const trimmed = String(value || '').trim();
-    if (!trimmed) return null;
-    return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed;
-};
 
-const getSnapshotDirectory = (): Directory | null => {
-    const baseUri = normalizeBaseUri(Paths.document?.uri ?? FileSystem.documentDirectory);
-    if (!baseUri) return null;
-    return new Directory(`${baseUri}/${SNAPSHOT_DIR_NAME}`);
-};
 
-const buildSnapshotFileName = (date: Date = new Date(), collisionIndex = 0): string => {
-    const iso = date.toISOString();
-    const [datePart, timePartWithZone] = iso.split('T');
-    const safeTime = String(timePartWithZone || '00:00:00.000Z')
-        .replace(/Z$/u, '')
-        .replace(/:/gu, '-');
-    const collisionSuffix = collisionIndex > 0 ? `.${collisionIndex}` : '';
-    return `data.${datePart}T${safeTime}${collisionSuffix}.snapshot.json`;
-};
 
-const listSnapshotEntries = (directory: Directory): Array<{ name: string; uri: string }> => {
-    if (!directory.exists) return [];
-    return directory
-        .list()
-        .map((entry) => {
-            const uri = String(entry.uri || '');
-            const name = uri.split('/').pop() || '';
-            const match = name.match(SNAPSHOT_FILE_PATTERN);
-            if (!match) return null;
-            return {
-                name,
-                uri,
-                timestampKey: `${match[1]}.${match[2] ?? '000'}`,
-                collisionIndex: Number(match[3] ?? 0),
-            };
-        })
-        .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
-        .sort((left, right) =>
-            right.timestampKey.localeCompare(left.timestampKey)
-            || right.collisionIndex - left.collisionIndex
-        )
-        .map(({ name, uri }) => ({ name, uri }));
-};
 
-const pruneSnapshots = (directory: Directory): void => {
-    const entries = listSnapshotEntries(directory);
-    entries.slice(MAX_LOCAL_SNAPSHOTS).forEach((entry) => {
-        try {
-            const file = new File(entry.uri);
-            if (file.exists) {
-                file.delete();
-            }
-        } catch {
-            // Ignore best-effort cleanup failures.
-        }
-    });
-};
 
 const readTextFile = async (fileUri: string): Promise<string> => {
     if (fileUri.startsWith('content://')) {
@@ -209,57 +148,6 @@ const pickDocument = async (type: string | string[]): Promise<TransferDocument |
     };
 };
 
-const saveCurrentDataSnapshot = async (data: AppData): Promise<string> => {
-    void logInfo('Recovery snapshot started', {
-        scope: 'transfer',
-        extra: {
-            operation: 'snapshot',
-            source: 'local',
-        },
-    });
-    const directory = getSnapshotDirectory();
-    if (!directory) {
-        throw new Error('Snapshot storage is unavailable on this device.');
-    }
-    directory.create({ intermediates: true, idempotent: true });
-    const snapshotAt = new Date();
-    let collisionIndex = 0;
-    let fileName = buildSnapshotFileName(snapshotAt);
-    let file = new File(`${directory.uri}/${fileName}`);
-    while (file.exists) {
-        collisionIndex += 1;
-        if (collisionIndex > MAX_SNAPSHOT_NAME_COLLISIONS) {
-            throw new Error('Snapshot storage already holds too many snapshots from this instant.');
-        }
-        fileName = buildSnapshotFileName(snapshotAt, collisionIndex);
-        file = new File(`${directory.uri}/${fileName}`);
-    }
-    const pending = new File(`${directory.uri}/${SNAPSHOT_PENDING_FILE_NAME}`);
-    try {
-        pending.create({ intermediates: true, overwrite: true });
-        pending.write(serializeBackupData(data));
-        pending.move(file);
-    } catch (error) {
-        try {
-            if (pending.exists) {
-                pending.delete();
-            }
-        } catch {
-            // Ignore best-effort cleanup failures.
-        }
-        throw error;
-    }
-    pruneSnapshots(directory);
-    void logInfo('Recovery snapshot complete', {
-        scope: 'transfer',
-        extra: {
-            operation: 'snapshot',
-            source: 'local',
-            ...toCountExtra(data),
-        },
-    });
-    return fileName;
-};
 
 const logStaleDataTransfer = ({
     operation,
@@ -300,19 +188,6 @@ const mobileBoundaries: DataTransferBoundaries = {
 
 const mobileLog = { logInfo, logError };
 
-export const createMobileRecoverySnapshot = async (): Promise<string> => {
-    await flushPendingSave();
-    const localSnapshotChangeAt = getLocalChangeAt();
-    const currentData = await mobileStorage.getData();
-    if (getLocalChangeAt() !== localSnapshotChangeAt) {
-        throw new Error('Local data changed while creating the recovery snapshot. Try again.');
-    }
-    const snapshotName = await saveCurrentDataSnapshot(currentData);
-    if (getLocalChangeAt() !== localSnapshotChangeAt) {
-        throw new Error('Local data changed while creating the recovery snapshot. Try again.');
-    }
-    return snapshotName;
-};
 
 const runMobileDataTransferWithoutSnapshot = async (
     operation: string,
@@ -616,3 +491,6 @@ export const exportCurrentDataBackup = async (data: AppData, format: 'json' | 'c
         throw error;
     }
 };
+
+// Settings-side callers keep importing this from data-transfer.
+export { createMobileRecoverySnapshot } from './recovery-snapshot';
