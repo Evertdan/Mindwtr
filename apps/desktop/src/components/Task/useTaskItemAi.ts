@@ -107,6 +107,7 @@ export function useTaskItemAi({
         const input = [title, description].filter(Boolean).join('\n');
         if (input.length < 4) {
             setCopilotSuggestion(null);
+            copilotInputRef.current = '';
             return;
         }
         const signature = JSON.stringify({

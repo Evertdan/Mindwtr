@@ -208,6 +208,44 @@ describe('useTaskItemAi copilot parts', () => {
 
         expect(predictMetadata).toHaveBeenCalledTimes(2);
     });
+
+    it('fires again when the title is retyped to the same text after dropping below the length floor (N4)', async () => {
+        const setField = vi.fn();
+        const { rerender } = renderHook(
+            (props: { editTitle: string }) => useTaskItemAi({
+                taskId: 'task-1',
+                settings,
+                t: (key: string) => key,
+                editTitle: props.editTitle,
+                editDescription: '',
+                editContexts: '',
+                editTags: '',
+                editStartTime: '',
+                editDueDate: '',
+                editReviewAt: '',
+                contextOptions: ['@phone'],
+                tagOptions: ['#health'],
+                projectContext: null,
+                timeEstimatesEnabled: true,
+                setField,
+            }),
+            { initialProps: { editTitle: 'Book the dentist' } },
+        );
+        await settleSuggestion();
+        expect(predictMetadata).toHaveBeenCalledTimes(1);
+
+        // Title shrinks below the 4-char floor: no suggestion, but the
+        // dispatched signature must not linger.
+        rerender({ editTitle: 'Boo' });
+        await settleSuggestion();
+        expect(predictMetadata).toHaveBeenCalledTimes(1);
+
+        // Retyped back to the exact same text as the original suggestion.
+        rerender({ editTitle: 'Book the dentist' });
+        await settleSuggestion();
+
+        expect(predictMetadata).toHaveBeenCalledTimes(2);
+    });
 });
 
 describe('TaskItem copilot wiring', () => {
