@@ -357,6 +357,8 @@ export function useSyncSettingsBackupActions({
                 message: tr('settings.backupMobile.backupRestoredWithSnapshot', { snapshotName }),
                 tone: 'success',
                 durationMs: 5000,
+                actionLabel: tr('settings.undoImport'),
+                onAction: () => handleRestoreRecoverySnapshot(snapshotName, true),
             });
         } catch (error) {
             logSettingsError(error);
@@ -364,7 +366,7 @@ export function useSyncSettingsBackupActions({
         } finally {
             setBackupAction(null);
         }
-    }, [tr, refreshRecoverySnapshots, setBackupAction, showSettingsErrorToast, showToast]);
+    }, [handleRestoreRecoverySnapshot, tr, refreshRecoverySnapshots, setBackupAction, showSettingsErrorToast, showToast]);
 
     const handleRestoreBackup = useCallback(async () => {
         setBackupAction('restore');

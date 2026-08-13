@@ -240,6 +240,37 @@ describe('useSyncSettingsBackupActions', () => {
         expect(dataTransfer.exportCurrentDataBackup).toHaveBeenCalledWith(expect.anything(), 'csv');
     });
 
+    // D3: restore shipped without the undo action every other result path got, while the
+    // release note already promised it.
+    it('offers Undo on a restore result too', async () => {
+        vi.mocked(dataTransfer.pickBackupDocument).mockResolvedValue({ uri: 'file://backup.json', fileName: 'backup.json' });
+        vi.mocked(dataTransfer.inspectBackupDocument).mockResolvedValue({
+            valid: true,
+            data: { tasks: [], projects: [], sections: [], areas: [], people: [], settings: {} },
+            errors: [],
+            warnings: [],
+            metadata: { taskCount: 0, projectCount: 0, sectionCount: 0, areaCount: 0 },
+        } as never);
+        vi.mocked(dataTransfer.restoreDataFromBackup).mockResolvedValue({
+            snapshotName: 'data.2026-08-13T10-00-00.000.snapshot.json',
+        } as never);
+
+        await act(async () => { create(<Harness />); });
+        await latest?.handleRestoreBackup();
+        const [, , buttons] = vi.mocked(Alert.alert).mock.calls[0] as [string, string, Array<{ onPress?: () => void }>];
+        await act(async () => { buttons[1].onPress?.(); });
+
+        const toast = showToast.mock.calls[showToast.mock.calls.length - 1]?.[0];
+        expect(toast.actionLabel).toBe('settings.undoImport');
+
+        vi.mocked(Alert.alert).mockClear();
+        await act(async () => { await toast.onAction?.(); });
+        const [, , undoButtons] = vi.mocked(Alert.alert).mock.calls[0] as [string, string, Array<{ onPress?: () => void }>];
+        await act(async () => { await undoButtons[1].onPress?.(); });
+
+        expect(dataTransfer.restoreLocalDataSnapshot).toHaveBeenCalledWith('data.2026-08-13T10-00-00.000.snapshot.json');
+    });
+
     // #Q-03: the result toast carries the rollback, so it dies with the message
     // instead of leaving a persistent affordance.
     it('offers Undo import on the result and restores that exact snapshot', async () => {
