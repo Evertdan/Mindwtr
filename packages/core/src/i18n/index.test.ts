@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { formatI18nTemplate, getEnglishI18nValue, getI18nKeyForEnglishText, getLocaleCoverageTier, resolveI18nText } from './index';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { formatI18nTemplate, getEnglishI18nValue, getI18nKeyForEnglishText, getLocaleCoverageTier, getTranslator, resolveI18nText } from './index';
+import { loadTranslations } from './i18n-loader';
 
 describe('formatI18nTemplate', () => {
     it('replaces repeated named placeholders wherever translators place them', () => {
@@ -86,5 +87,30 @@ describe('resolveI18nText', () => {
         expect(resolveI18nText(t, 'bulk.applied', { values: { count: 3 } })).toBe('3 ausgewählt');
         expect(resolveI18nText(miss, 'bulk.applied', { fallback: '{{count}} selected', values: { count: 3 } }))
             .toBe('3 selected');
+    });
+});
+
+describe('getTranslator', () => {
+    // getTranslationsSync serves from the loader cache and falls back to English until the
+    // locale is loaded, so warm it the way every real caller does.
+    beforeAll(async () => {
+        await loadTranslations('nl');
+    });
+
+    // digest.focus is deliberately absent from nl and it — its translation equals English, and
+    // copying it in trips the mirrored-English gate. A raw dict[key] read renders that as
+    // "undefined" in a notification title; through the seam it must be the English string.
+    it('falls back to English for a key an override locale omits', () => {
+        expect(getTranslator('nl')('digest.focus')).toBe('Focus');
+        expect(resolveI18nText(getTranslator('nl'), 'digest.focus', { fallback: 'Focus' })).toBe('Focus');
+    });
+
+    it('uses the locale translation when it has one', () => {
+        expect(getTranslator('nl')('digest.overdue')).toBe('Te laat');
+    });
+
+    it('never returns undefined, for any key or any language', () => {
+        expect(getTranslator('nl')('totally.unknown.key')).toBe('totally.unknown.key');
+        expect(getTranslator('not-a-language')('digest.overdue')).toBe('Overdue');
     });
 });

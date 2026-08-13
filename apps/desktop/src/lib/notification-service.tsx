@@ -11,6 +11,8 @@ import {
     type NotificationSettings,
     type Task,
     getTranslationsSync,
+    getTranslator,
+    resolveI18nText,
     loadTranslations,
     loadStoredLanguageSync,
     getSystemDefaultLanguage,
@@ -238,6 +240,11 @@ function checkDueAndNotify() {
     const lang = getCurrentLanguage();
     void loadTranslations(lang);
     const tr = getTranslationsSync(lang);
+    // resolveI18nText, not a raw `tr[key]`: an override locale legitimately omits any key whose
+    // translation equals English (digest.focus in nl and it), and the raw read renders those as
+    // "undefined" in the notification title.
+    const translator = getTranslator(lang);
+    const text = (key: string, fallback: string) => resolveI18nText(translator, key, { fallback });
 
     // How much of the past this poll is answerable for. Anchoring the reminder lookup at that
     // moment instead of `now` is what keeps a just-missed reminder visible. notifiedAtByTask/
@@ -297,14 +304,14 @@ function checkDueAndNotify() {
 
             const body = hasAny
                 ? [
-                    `${tr['digest.dueToday']}: ${summary.dueToday}`,
-                    `${tr['digest.overdue']}: ${summary.overdue}`,
-                    `${tr['digest.focus']}: ${summary.focusToday}`,
-                    `${tr['digest.reviewDue']}: ${reviewDue}`,
+                    `${text('digest.dueToday', 'Due today')}: ${summary.dueToday}`,
+                    `${text('digest.overdue', 'Overdue')}: ${summary.overdue}`,
+                    `${text('digest.focus', 'Focus')}: ${summary.focusToday}`,
+                    `${text('digest.reviewDue', 'Review due')}: ${reviewDue}`,
                 ].join(' • ')
-                : tr['digest.noItems'];
+                : text('digest.noItems', 'No urgent items today.');
 
-            void sendNotification(tr['digest.morningTitle'], body);
+            void sendNotification(text('digest.morningTitle', 'Morning briefing'), body);
             digestSentOnByKind.set('morning', dateKey);
         }
     }
@@ -312,7 +319,7 @@ function checkDueAndNotify() {
     if (gates.eveningDigestEnabled) {
         const target = digest.evening.hour * 60 + digest.evening.minute;
         if (nowMinutes >= target && digestSentOnByKind.get('evening') !== dateKey) {
-            void sendNotification(tr['digest.eveningTitle'], tr['digest.eveningBody']);
+            void sendNotification(text('digest.eveningTitle', 'Evening review'), text('digest.eveningBody', 'Open Mindwtr to review and wrap up.'));
             digestSentOnByKind.set('evening', dateKey);
         }
     }
@@ -320,7 +327,7 @@ function checkDueAndNotify() {
     if (gates.weeklyReviewEnabled) {
         const target = digest.weekly.hour * 60 + digest.weekly.minute;
         if (now.getDay() === digest.weekly.day && nowMinutes >= target && weeklyReviewSentOnDate !== dateKey) {
-            void sendNotification(tr['digest.weeklyReviewTitle'], tr['digest.weeklyReviewBody']);
+            void sendNotification(text('digest.weeklyReviewTitle', 'Weekly review'), text('digest.weeklyReviewBody', 'Open Mindwtr to review and reset your week.'));
             weeklyReviewSentOnDate = dateKey;
         }
     }

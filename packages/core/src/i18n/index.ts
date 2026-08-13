@@ -1,6 +1,8 @@
 export type { Language } from './i18n-types';
 import { en } from './locales/en';
 import { LOCALES, MIXED_ENGLISH_COVERAGE_CEILING, type LocaleDescriptor } from './i18n-locales';
+import { getTranslationsSync } from './i18n-loader';
+import { isSupportedLanguage } from './i18n-constants';
 
 export type TranslateFn = (key: string) => string;
 
@@ -15,6 +17,19 @@ export function getI18nKeyForEnglishText(text: string): string | undefined {
         }
     }
     return englishTextToKey.get(text);
+}
+
+/**
+ * A TranslateFn for one language, with the English dictionary behind it. Non-React callers
+ * (notification schedulers, sync, stores) used to hand-roll this and read `dict[key]` raw,
+ * which returns undefined for any key an override dictionary correctly omits.
+ *
+ * Returning the key on a miss is what makes this composable: resolveI18nText already treats
+ * "value === key" as the miss signal, so the miss policy stays in one place.
+ */
+export function getTranslator(language: string): TranslateFn {
+    const translations = isSupportedLanguage(language) ? getTranslationsSync(language) : {};
+    return (key: string) => translations[key] ?? en[key] ?? key;
 }
 
 export function getEnglishI18nValue(key: string): string | undefined {
