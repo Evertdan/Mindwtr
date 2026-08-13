@@ -2715,6 +2715,10 @@ pub(crate) fn set_sync_path(
     #[cfg(target_os = "macos")]
     let bookmark = create_sync_path_bookmark(&sanitized_path);
 
+    // Held across the whole read+mutate+write (B3, same pattern as
+    // clear_sync_path) — closes the pre-existing race this command shared
+    // with clear_sync_path before B2 fixed that one.
+    let _config_guard = lock_config_read_modify_write()?;
     let mut config = read_config(&app);
     config.sync_path = Some(sync_dir_to_display_string(&sanitized_path));
     #[cfg(target_os = "macos")]
@@ -4213,6 +4217,17 @@ mod tests {
                 "discard_staged_dropbox_credentials",
                 "only mutates an in-memory Mutex-guarded staged-credential map",
             ),
+            (
+                "acknowledge_close_request",
+                "shutdown ordering outranks responsiveness here; the log-append is a \
+                 bounded single-line file write, and making quit racy with teardown \
+                 (via the async thread pool) risks losing the close acknowledgment (B3)",
+            ),
+            (
+                "quit_app",
+                "same shutdown-ordering rationale as acknowledge_close_request — \
+                 app.exit(0) must not race a backgrounded caller (B3)",
+            ),
         ];
 
         // Known-unfixed debt this inversion uncovered beyond R-01's five
@@ -4223,35 +4238,13 @@ mod tests {
         // entry. Remove an entry in the same commit that fixes it; the test
         // below fails if an entry here is no longer a plain command, so a fix
         // that forgets to remove its own baseline line doesn't silently pass.
-        const KNOWN_BLOCKING_COMMANDS: &[&str] = &[
-            // config.rs — every getter/setter round-trips fs::read_to_string
-            // of config.toml/secrets.toml; writes are atomic temp+fsync+
-            // rename. Several also hit the OS keyring (Secret Service/
-            // Keychain/Credential Manager IPC).
-            "get_ai_key",
-            "set_ai_key",
-            "get_sync_backend",
-            "get_sync_cloud_provider",
-            "get_sync_cloud_provider_state",
-            "get_sync_configuration_snapshot",
-            "set_sync_backend",
-            "set_sync_cloud_provider",
-            "get_obsidian_config",
-            "set_obsidian_config",
-            "expand_obsidian_vault_scope",
-            "get_webdav_config",
-            "set_webdav_config",
-            "get_webdav_password",
-            "get_cloud_config",
-            "set_cloud_config",
-            "set_network_proxy",
-            "get_external_calendars",
-            "set_external_calendars",
-            // ui.rs — acknowledge_close_request/quit_app both call the
-            // synchronous native-log file-append path.
-            "acknowledge_close_request",
-            "quit_app",
-        ];
+        // B3 emptied this baseline: config.rs's 19 getters/setters are now
+        // (async), each either behind lock_config_read_modify_write, already
+        // covered by an internal lock_dropbox_credential_state hold, or a
+        // pure read with no write branch; ui.rs's two shutdown commands moved
+        // to ALLOWED_MAIN_THREAD_COMMANDS above with a documented rationale.
+        // Stays empty — see the comment above this const for what refills it.
+        const KNOWN_BLOCKING_COMMANDS: &[&str] = &[];
 
         let sources: &[(&str, &str)] = &[
             ("audio.rs", include_str!("audio.rs")),

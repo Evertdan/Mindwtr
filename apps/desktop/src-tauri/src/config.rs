@@ -1144,13 +1144,25 @@ fn lock_dropbox_credential_state() -> Result<std::sync::MutexGuard<'static, ()>,
 // file operations for microseconds each (read_config/write_config_files each
 // take-and-release it internally). This one is held by a CALLER across a
 // whole read-config-mutate-write span (e.g. write_local_api_config,
-// clear_sync_path, set_desktop_rendering_config) — those commands now run
-// off the main thread (B2), and each's read_config()+write_config_files()
-// pair used to be serialized only by accident, by never actually running
-// concurrently. Never call this while already holding it (or while inside a
-// read_config()/write_config_files() call, which lock the other mutex) —
-// that's two different objects, so nesting them is fine; nesting this one
-// inside itself is not.
+// clear_sync_path, set_desktop_rendering_config, and B3's config.rs setters)
+// — those commands now run off the main thread, and each's
+// read_config()+write_config_files() pair used to be serialized only by
+// accident, by never actually running concurrently. Never call this while
+// already holding it — that's the only illegal nesting.
+//
+// LOCK ORDERING: this mutex may always be taken around a call to
+// read_config()/write_config_files()/read_bound_credential()/
+// update_bound_credential()/read_dropbox_credential_state()/
+// update_dropbox_credential_state()/read_sync_backend_publication_state()/
+// publish_sync_backend_paths_with()/read_sync_configuration_pair() — all of
+// those internally take-and-release lock_dropbox_credential_state, a
+// different mutex, so this one nests around them safely (including through
+// read_config()'s own conditional migrate_legacy_secrets() call, which
+// itself calls write_config_files() — nesting the SAME mutex there would
+// deadlock, which is why this is a second, distinct lock rather than reusing
+// lock_dropbox_credential_state). Never acquire lock_dropbox_credential_state
+// directly and then try to also take this one inside that scope — always the
+// other order (this one outermost, if both are needed).
 fn config_read_modify_write_lock() -> &'static std::sync::Mutex<()> {
     static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
     LOCK.get_or_init(|| std::sync::Mutex::new(()))
@@ -1944,8 +1956,17 @@ pub(crate) fn set_keyring_secret(
     }
 }
 
-#[tauri::command]
+// Held across the whole read+possible-migrate-write (B3): the legacy-key
+// migration branch below writes config.toml, and read_config/write_config_files
+// only lock/unlock lock_dropbox_credential_state briefly on their own — a
+// different, DISTINCT mutex from this one (nesting the same mutex here would
+// deadlock the moment read_config's own migrate_legacy_secrets fires; see
+// lock_config_read_modify_write's definition).
+#[tauri::command(async)]
 pub(crate) fn get_ai_key(app: tauri::AppHandle, provider: String) -> Option<String> {
+    let Ok(_config_guard) = lock_config_read_modify_write() else {
+        return None;
+    };
     let mut config = read_config(&app);
     let (key_name, legacy_value) = match provider.as_str() {
         "openai" => (KEYRING_AI_OPENAI, config.ai_key_openai.clone()),
@@ -1971,12 +1992,14 @@ pub(crate) fn get_ai_key(app: tauri::AppHandle, provider: String) -> Option<Stri
     None
 }
 
-#[tauri::command]
+// Held across the whole read+mutate+write (B3) — see lock_config_read_modify_write.
+#[tauri::command(async)]
 pub(crate) fn set_ai_key(
     app: tauri::AppHandle,
     provider: String,
     value: Option<String>,
 ) -> Result<(), String> {
+    let _config_guard = lock_config_read_modify_write()?;
     let next_value = value.and_then(|v| {
         let trimmed = v.trim().to_string();
         if trimmed.is_empty() {
@@ -2476,7 +2499,9 @@ fn expand_obsidian_payload_scope(app: &tauri::AppHandle, payload: &ObsidianConfi
     expand_tauri_fs_scope(app, &PathBuf::from(vault_path));
 }
 
-#[tauri::command]
+// read_sync_backend_publication_state already holds lock_dropbox_credential_state
+// across its whole read + torn-publication repair write (B3) — safe as-is.
+#[tauri::command(async)]
 pub(crate) fn get_sync_backend(app: tauri::AppHandle) -> Result<String, String> {
     let (raw, state) = read_sync_backend_publication_state(&app)?;
     let marker = normalize_backend(state.sync_backend_marker.trim())
@@ -2487,12 +2512,15 @@ pub(crate) fn get_sync_backend(app: tauri::AppHandle) -> Result<String, String> 
     Ok(marker.to_string())
 }
 
-#[tauri::command]
+// read_dropbox_credential_state already holds lock_dropbox_credential_state
+// across its whole read + migration write (B3) — safe as-is.
+#[tauri::command(async)]
 pub(crate) fn get_sync_cloud_provider(app: tauri::AppHandle) -> Result<String, String> {
     Ok(read_dropbox_credential_state(&app)?.cloud_provider)
 }
 
-#[tauri::command]
+// Same as get_sync_cloud_provider above (B3) — safe as-is.
+#[tauri::command(async)]
 pub(crate) fn get_sync_cloud_provider_state(app: tauri::AppHandle) -> Result<Value, String> {
     let state = read_dropbox_credential_state(&app)?;
     Ok(serde_json::json!({
@@ -2501,7 +2529,10 @@ pub(crate) fn get_sync_cloud_provider_state(app: tauri::AppHandle) -> Result<Val
     }))
 }
 
-#[tauri::command]
+// read_sync_configuration_pair already holds lock_dropbox_credential_state
+// across its whole span (B3) — pure read despite touching several files;
+// safe as-is.
+#[tauri::command(async)]
 pub(crate) fn get_sync_configuration_snapshot(
     app: tauri::AppHandle,
     require_webdav_password: Option<bool>,
@@ -2526,7 +2557,9 @@ pub(crate) fn get_sync_configuration_snapshot(
     ))
 }
 
-#[tauri::command]
+// publish_sync_backend_paths_with already holds lock_dropbox_credential_state
+// across its whole read+mutate+write (B3) — safe as-is.
+#[tauri::command(async)]
 pub(crate) fn set_sync_backend(app: tauri::AppHandle, backend: String) -> Result<bool, String> {
     let Some(normalized) = normalize_backend(backend.trim()) else {
         return Err("Invalid sync backend".to_string());
@@ -2541,11 +2574,19 @@ pub(crate) fn set_sync_backend(app: tauri::AppHandle, backend: String) -> Result
     Ok(true)
 }
 
-#[tauri::command]
+// update_dropbox_credential_state/read_dropbox_credential_state each hold
+// lock_dropbox_credential_state internally for their own file, but the tail
+// config.sync_cloud_provider write below is a separate file with no lock of
+// its own — held across the WHOLE body (B3) so no other config.rs setter can
+// interleave. Different mutex from lock_dropbox_credential_state, so nesting
+// it around calls that take that one internally is deadlock-safe (see
+// lock_config_read_modify_write's definition).
+#[tauri::command(async)]
 pub(crate) fn set_sync_cloud_provider(
     app: tauri::AppHandle,
     provider: String,
 ) -> Result<bool, String> {
+    let _config_guard = lock_config_read_modify_write()?;
     let Some(normalized) = normalize_sync_cloud_provider(provider.trim()) else {
         return Err("Invalid cloud sync provider".to_string());
     };
@@ -2568,14 +2609,17 @@ pub(crate) fn set_sync_cloud_provider(
     Ok(true)
 }
 
-#[tauri::command]
+// Pure read, no write branch (B3) — no lock needed.
+#[tauri::command(async)]
 pub(crate) fn get_obsidian_config(app: tauri::AppHandle) -> Result<Value, String> {
     let config = read_config(&app);
     serde_json::to_value(read_obsidian_config_payload(&config)).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+// Held across the whole read+mutate+write (B3) — see lock_config_read_modify_write.
+#[tauri::command(async)]
 pub(crate) fn set_obsidian_config(app: tauri::AppHandle, config: Value) -> Result<Value, String> {
+    let _config_guard = lock_config_read_modify_write()?;
     let payload = serde_json::from_value::<ObsidianConfigPayload>(config)
         .map(normalize_obsidian_config_payload)
         .map_err(|e| format!("Invalid Obsidian config: {e}"))?;
@@ -2590,7 +2634,8 @@ pub(crate) fn set_obsidian_config(app: tauri::AppHandle, config: Value) -> Resul
     serde_json::to_value(payload).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+// No config.toml I/O at all — just a Tauri fs-scope grant (B3) — no lock needed.
+#[tauri::command(async)]
 pub(crate) fn expand_obsidian_vault_scope(
     app: tauri::AppHandle,
     vault_path: String,
@@ -2690,7 +2735,9 @@ pub(crate) fn check_obsidian_vault_marker(vault_path: String) -> Result<bool, St
     }
 }
 
-#[tauri::command]
+// read_bound_credential already holds lock_dropbox_credential_state across
+// its whole span (B3) — safe as-is.
+#[tauri::command(async)]
 pub(crate) fn get_webdav_config(app: tauri::AppHandle) -> Result<Value, String> {
     let (config, password) = read_bound_credential(&app, CredentialService::Webdav)?;
     Ok(serde_json::json!({
@@ -2709,7 +2756,9 @@ fn validate_webdav_config_url(url: &str, allow_insecure_http: bool) -> Result<()
     crate::sync::assert_webdav_url_allowed(url, allow_insecure_http)
 }
 
-#[tauri::command]
+// update_bound_credential already holds lock_dropbox_credential_state across
+// its whole read+mutate+write transaction (B3) — safe as-is.
+#[tauri::command(async)]
 pub(crate) fn set_webdav_config(
     app: tauri::AppHandle,
     url: String,
@@ -2766,13 +2815,15 @@ pub(crate) fn set_webdav_config(
     Ok(true)
 }
 
-#[tauri::command]
+// Same as get_webdav_config above (B3) — safe as-is.
+#[tauri::command(async)]
 pub(crate) fn get_webdav_password(app: tauri::AppHandle) -> Result<String, String> {
     let (_, password) = read_bound_credential(&app, CredentialService::Webdav)?;
     Ok(password.unwrap_or_default())
 }
 
-#[tauri::command]
+// Same as get_webdav_config above (B3) — safe as-is.
+#[tauri::command(async)]
 pub(crate) fn get_cloud_config(app: tauri::AppHandle) -> Result<Value, String> {
     let (config, token) = read_bound_credential(&app, CredentialService::Cloud)?;
     Ok(serde_json::json!({
@@ -2782,7 +2833,8 @@ pub(crate) fn get_cloud_config(app: tauri::AppHandle) -> Result<Value, String> {
     }))
 }
 
-#[tauri::command]
+// Same as set_webdav_config above (B3) — safe as-is.
+#[tauri::command(async)]
 pub(crate) fn set_cloud_config(
     app: tauri::AppHandle,
     url: String,
@@ -2828,8 +2880,10 @@ pub(crate) fn set_cloud_config(
     Ok(true)
 }
 
-#[tauri::command]
+// Held across the whole read+mutate+write (B3) — see lock_config_read_modify_write.
+#[tauri::command(async)]
 pub(crate) fn set_network_proxy(app: tauri::AppHandle, proxy_url: String) -> Result<bool, String> {
+    let _config_guard = lock_config_read_modify_write()?;
     let trimmed = proxy_url.trim().to_string();
     if !trimmed.is_empty() {
         let parsed =
@@ -2853,7 +2907,8 @@ pub(crate) fn set_network_proxy(app: tauri::AppHandle, proxy_url: String) -> Res
     Ok(true)
 }
 
-#[tauri::command]
+// Pure read, no write branch (B3) — no lock needed.
+#[tauri::command(async)]
 pub(crate) fn get_external_calendars(
     app: tauri::AppHandle,
 ) -> Result<Vec<ExternalCalendarSubscription>, String> {
@@ -2876,11 +2931,13 @@ pub(crate) fn get_external_calendars(
         .collect())
 }
 
-#[tauri::command]
+// Held across the whole read+mutate+write (B3) — see lock_config_read_modify_write.
+#[tauri::command(async)]
 pub(crate) fn set_external_calendars(
     app: tauri::AppHandle,
     calendars: Vec<ExternalCalendarSubscription>,
 ) -> Result<bool, String> {
+    let _config_guard = lock_config_read_modify_write()?;
     let config_path = get_config_path(&app);
     let mut config = read_config(&app);
     let sanitized: Vec<ExternalCalendarSubscription> = calendars
