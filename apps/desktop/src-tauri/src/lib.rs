@@ -127,8 +127,9 @@ use ui::{
 #[cfg(any(target_os = "windows", target_os = "linux", test))]
 use config::read_config_toml;
 pub(crate) use config::{
-    emit_keyring_fallback_warning, parse_toml_string_value, read_bound_credential, read_config,
-    update_bound_credential, write_config_files, CredentialSecretUpdate, CredentialService,
+    emit_keyring_fallback_warning, lock_config_read_modify_write, parse_toml_string_value,
+    read_bound_credential, read_config, update_bound_credential, write_config_files,
+    CredentialSecretUpdate, CredentialService,
 };
 #[cfg(test)]
 use install::parse_flatpak_install_channel;
@@ -817,16 +818,21 @@ fn desktop_rendering_config_from(config: &AppConfigToml) -> DesktopRenderingConf
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn get_desktop_rendering_config(app: tauri::AppHandle) -> DesktopRenderingConfig {
     desktop_rendering_config_from(&read_config(&app))
 }
 
-#[tauri::command]
+// Held across the whole read+mutate+write (B2): read_config/write_config_files
+// each only lock/unlock config.toml briefly on their own, so without this a
+// concurrent config writer (e.g. write_local_api_config, clear_sync_path)
+// could land between this read and write and lose its own change.
+#[tauri::command(async)]
 fn set_desktop_rendering_config(
     app: tauri::AppHandle,
     disable_hardware_acceleration: bool,
 ) -> Result<DesktopRenderingConfig, String> {
+    let _config_guard = lock_config_read_modify_write()?;
     let mut config = read_config(&app);
     config.disable_hardware_acceleration = Some(
         if disable_hardware_acceleration {

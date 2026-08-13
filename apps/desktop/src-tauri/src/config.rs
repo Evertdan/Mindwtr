@@ -1140,6 +1140,29 @@ fn lock_dropbox_credential_state() -> Result<std::sync::MutexGuard<'static, ()>,
         .map_err(|_| "Dropbox credential state lock is unavailable".to_string())
 }
 
+// Distinct from lock_dropbox_credential_state: that one guards individual
+// file operations for microseconds each (read_config/write_config_files each
+// take-and-release it internally). This one is held by a CALLER across a
+// whole read-config-mutate-write span (e.g. write_local_api_config,
+// clear_sync_path, set_desktop_rendering_config) — those commands now run
+// off the main thread (B2), and each's read_config()+write_config_files()
+// pair used to be serialized only by accident, by never actually running
+// concurrently. Never call this while already holding it (or while inside a
+// read_config()/write_config_files() call, which lock the other mutex) —
+// that's two different objects, so nesting them is fine; nesting this one
+// inside itself is not.
+fn config_read_modify_write_lock() -> &'static std::sync::Mutex<()> {
+    static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+    LOCK.get_or_init(|| std::sync::Mutex::new(()))
+}
+
+pub(crate) fn lock_config_read_modify_write() -> Result<std::sync::MutexGuard<'static, ()>, String>
+{
+    config_read_modify_write_lock()
+        .lock()
+        .map_err(|error| format!("Failed to lock config read-modify-write: {error}"))
+}
+
 pub(crate) fn write_config_files(
     config_path: &Path,
     secrets_path: &Path,

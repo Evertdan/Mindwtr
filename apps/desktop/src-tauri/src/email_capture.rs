@@ -457,7 +457,9 @@ fn email_capture_status(
     Ok(status)
 }
 
-#[tauri::command]
+// read_bound_credential holds lock_dropbox_credential_state across its whole
+// read (and possible first-binding write) already — safe as-is (B2).
+#[tauri::command(async)]
 pub(crate) fn get_email_capture_config(app: tauri::AppHandle) -> Result<Value, String> {
     let (config, password) = read_bound_credential(&app, CredentialService::Email)?;
     let payload = read_email_capture_payload(&config);

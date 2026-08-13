@@ -21,8 +21,9 @@ use tauri::Manager;
 use tauri_plugin_fs::FsExt;
 
 use crate::config::{
-    get_keyring_secret, read_bound_credential, read_config, read_dropbox_credential_state,
-    set_keyring_secret, update_dropbox_credential_state, write_config_files, CredentialService,
+    get_keyring_secret, lock_config_read_modify_write, read_bound_credential, read_config,
+    read_dropbox_credential_state, set_keyring_secret, update_dropbox_credential_state,
+    write_config_files, CredentialService,
 };
 use crate::storage::{get_config_path, get_secrets_path, read_json_with_retries_validated};
 #[cfg(target_os = "macos")]
@@ -2671,15 +2672,18 @@ pub(crate) fn expand_tauri_fs_scope(app: &tauri::AppHandle, dir: &Path) {
     }
 }
 
-#[tauri::command]
+// Single locked read (configured_sync_dir -> read_config), no write (B2).
+#[tauri::command(async)]
 pub(crate) fn get_sync_path(app: tauri::AppHandle) -> Result<String, String> {
     Ok(configured_sync_dir(&app)?
         .map(|path| sync_dir_to_display_string(&path))
         .unwrap_or_default())
 }
 
-#[tauri::command]
+// Held across the whole read+mutate+write (B2) — see lock_config_read_modify_write.
+#[tauri::command(async)]
 pub(crate) fn clear_sync_path(app: tauri::AppHandle) -> Result<bool, String> {
+    let _config_guard = lock_config_read_modify_write()?;
     let config_path = get_config_path(&app);
     let mut config = read_config(&app);
     config.sync_path = None;
@@ -4243,26 +4247,6 @@ mod tests {
             "set_network_proxy",
             "get_external_calendars",
             "set_external_calendars",
-            // email_capture.rs — routes through the same config.rs credential
-            // helpers as the config.rs group above (first-binding write on
-            // the common path, not just a migration edge case) — not a pure
-            // read despite the name; verified by reading the full call graph.
-            "get_email_capture_config",
-            // lib.rs — config file read/write.
-            "get_desktop_rendering_config",
-            "set_desktop_rendering_config",
-            // local_api.rs — config file read/write; port change also does a
-            // blocking TCP bind and joins the server thread.
-            "get_local_api_server_status",
-            "set_local_api_server_config",
-            // sync.rs — config file + Dropbox credential-state file +
-            // keyring I/O; the already-async siblings (connect_dropbox,
-            // get_dropbox_access_token, disconnect_dropbox) do the same work.
-            "get_sync_path",
-            "clear_sync_path",
-            "is_dropbox_connected",
-            "recover_dropbox_credentials_before_sync_configuration",
-            "finalize_staged_dropbox_credentials",
             // ui.rs — acknowledge_close_request/quit_app both call the
             // synchronous native-log file-append path.
             "acknowledge_close_request",
@@ -7338,7 +7322,9 @@ pub(crate) fn get_dropbox_redirect_uri() -> String {
     dropbox_redirect_uri()
 }
 
-#[tauri::command]
+// Already holds state.inner across its whole body, same convention every
+// caller of recover_dropbox_credentials follows (B2).
+#[tauri::command(async)]
 pub(crate) fn is_dropbox_connected(
     app: tauri::AppHandle,
     state: tauri::State<'_, DropboxStagedCredentialState>,
@@ -7510,7 +7496,8 @@ where
     Ok(true)
 }
 
-#[tauri::command]
+// Already holds state.inner across its whole body (B2).
+#[tauri::command(async)]
 pub(crate) fn recover_dropbox_credentials_before_sync_configuration(
     app: tauri::AppHandle,
     state: tauri::State<'_, DropboxStagedCredentialState>,
@@ -7606,7 +7593,8 @@ pub(crate) async fn rollback_staged_dropbox_credentials(
     .map_err(|error| format!("Dropbox credential rollback task failed: {error}"))?
 }
 
-#[tauri::command]
+// Already holds state.inner across its whole body (B2).
+#[tauri::command(async)]
 pub(crate) fn finalize_staged_dropbox_credentials(
     app: tauri::AppHandle,
     state: tauri::State<'_, DropboxStagedCredentialState>,

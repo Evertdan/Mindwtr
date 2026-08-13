@@ -2,7 +2,10 @@ use crate::storage::{
     ensure_data_file, load_data_snapshot, mutate_task_rows_with_retries, TaskMutationReadScope,
     TASK_MUTATION_FOCUSED_COUNT_KEY, TASK_MUTATION_PROJECT_NEXT_ORDERS_KEY,
 };
-use crate::{get_config_path, get_secrets_path, read_config, write_config_files, AppConfigToml};
+use crate::{
+    get_config_path, get_secrets_path, lock_config_read_modify_write, read_config,
+    write_config_files, AppConfigToml,
+};
 use rand::RngCore;
 use serde::Serialize;
 use serde_json::{json, Map, Value};
@@ -184,7 +187,15 @@ fn read_local_api_config(app: &tauri::AppHandle) -> LocalApiConfig {
     }
 }
 
+// Sole chokepoint for local-API config writes (ensure_local_api_token and
+// set_local_api_server_config both route through here) — one held lock
+// across the whole read+mutate+write closes the race now that callers run
+// off the main thread (B2): two concurrent writers here (or in
+// clear_sync_path/set_desktop_rendering_config, which share the lock) could
+// otherwise each read the same base config and the second write clobbers the
+// first's unrelated field changes.
 fn write_local_api_config(app: &tauri::AppHandle, next: LocalApiConfig) -> Result<(), String> {
+    let _config_guard = lock_config_read_modify_write()?;
     let mut config: AppConfigToml = read_config(app);
     config.local_api_enabled = Some(if next.enabled { "true" } else { "false" }.to_string());
     config.local_api_port = Some(next.port.to_string());
@@ -309,7 +320,7 @@ pub(crate) fn start_configured_local_api_server(
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn get_local_api_server_status(
     app: tauri::AppHandle,
     state: tauri::State<'_, LocalApiServerState>,
@@ -320,7 +331,7 @@ pub(crate) fn get_local_api_server_status(
     Ok(status_from_runtime(config, &runtime))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn set_local_api_server_config(
     app: tauri::AppHandle,
     state: tauri::State<'_, LocalApiServerState>,
