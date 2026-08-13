@@ -3725,6 +3725,53 @@ describe('TaskStore', () => {
         expect(savedData.tasks).toHaveLength(2);
     });
 
+    it('keeps both edits when two concurrent incremental saves fail in dispatch order (C1)', async () => {
+        const task1 = createStoreTask('concurrent-a');
+        const task2 = createStoreTask('concurrent-b');
+        useTaskStore.setState({
+            tasks: [task1, task2],
+            _allTasks: [task1, task2],
+            _tasksById: buildEntityMap([task1, task2]),
+        });
+
+        const rejectors: Array<(reason?: unknown) => void> = [];
+        mockStorage.saveTask = vi.fn(() => new Promise<void>((_, reject) => {
+            rejectors.push(reject);
+        }));
+        setStorageAdapter(mockStorage);
+
+        // Dispatch A then B: both incremental saves are in flight together,
+        // each capturing its own retry snapshot from the store's cumulative
+        // state at its own dispatch time.
+        void useTaskStore.getState().updateTask(task1.id, { title: 'A edit' });
+        void useTaskStore.getState().updateTask(task2.id, { title: 'B edit' });
+        expect(rejectors).toHaveLength(2);
+
+        // Both fail, in dispatch order (A's write settles first). Each
+        // rejection's catch chain (trackImmediateSave's internal .catch()
+        // .finally(), then store-tasks.ts's outer .catch()) needs a couple of
+        // microtask hops to fully settle; ticking between them (and after)
+        // avoids a harness-only unhandled-rejection false positive from
+        // firing both synchronously back to back.
+        rejectors[0]?.(new Error('A write failed'));
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        rejectors[1]?.(new Error('B write failed'));
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+
+        await flushPendingSave();
+
+        expect(mockStorage.saveData).toHaveBeenCalledTimes(1);
+        const savedData = (mockStorage.saveData as unknown as { mock: { calls: any[][] } }).mock.calls[0][0] as AppData;
+        const savedTask1 = savedData.tasks.find((t) => t.id === task1.id);
+        const savedTask2 = savedData.tasks.find((t) => t.id === task2.id);
+        expect(savedTask1?.title).toBe('A edit');
+        expect(savedTask2?.title).toBe('B edit');
+    });
+
     it('keeps a failed incremental snapshot pending so fetch cannot replace it with stale storage', async () => {
         const task = createStoreTask('incremental-fetch-race');
         useTaskStore.setState({

@@ -369,17 +369,22 @@ const enqueuePendingSave = (
     data: AppData,
     onError?: (msg: string) => void,
     schedule = true,
+    // Immediate-save retries pass their own dispatch-time ordinal (reserved
+    // below) instead of drawing a fresh one — the version must reflect when
+    // the snapshot's data was captured, not when its failed write settled.
+    explicitVersion?: number,
 ) => {
-    pendingVersion += 1;
+    if (explicitVersion === undefined) pendingVersion += 1;
+    const version = explicitVersion ?? pendingVersion;
     pendingSaves.push({
-        version: pendingVersion,
+        version,
         data: sanitizeAppDataForStorage(data),
         onErrorCallbacks: onError ? [onError] : [],
         attempts: 0,
     });
     enforcePendingSaveCap();
     markCoreStartupPhase('core.debounced_save.enqueued', {
-        version: pendingVersion,
+        version,
         queueLen: pendingSaves.length,
         caller: getDebouncedSaveCaller(),
     });
@@ -387,16 +392,25 @@ const enqueuePendingSave = (
 };
 
 const trackImmediateSave = (save: Promise<void>, retrySnapshot?: AppData): Promise<void> => {
+    // Draw a real ordinal from the same counter debounced enqueues use, so
+    // concurrent immediate dispatches (which never enqueue on their own) are
+    // still ordered against each other and against debounced snapshots.
+    pendingVersion += 1;
     const dispatchVersion = pendingVersion;
     let trackedSave: Promise<void>;
     trackedSave = save
         .catch((error) => {
-            // Only enqueue the retry snapshot if no newer snapshot has been queued
-            // since dispatch — a newer one already contains this mutation, since
-            // store state is cumulative. Enqueuing the stale one would let it
-            // outrank the newer entry at flush (last-entry coalescing).
-            if (retrySnapshot && pendingVersion === dispatchVersion) {
-                enqueuePendingSave(retrySnapshot, undefined, false);
+            // Enqueue the retry snapshot unless a strictly newer snapshot is
+            // already pending — cumulative store state means it already
+            // contains this mutation. Check the queue itself, not the shared
+            // counter: another concurrent immediate save may have reserved a
+            // later ordinal without having enqueued (or failed) yet, and
+            // skipping on that basis alone would drop this edit.
+            if (retrySnapshot) {
+                const hasNewerPending = pendingSaves.some((item) => item.version > dispatchVersion);
+                if (!hasNewerPending) {
+                    enqueuePendingSave(retrySnapshot, undefined, false, dispatchVersion);
+                }
             }
             recordPersistenceFailure(toSaveErrorMessage(error));
             throw error;
