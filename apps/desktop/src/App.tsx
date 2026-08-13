@@ -34,6 +34,7 @@ import {
     summarizeMergeStats,
     translateWithFallback,
     useTaskStore,
+    resolveFeatureFlags,
     resolveI18nText,
     type AppAnnouncement,
     type AppAnnouncementAction,
@@ -548,7 +549,7 @@ function App() {
         // while the app was closed credits its minutes without opening Agenda.
         if (!hasHydratedSettings || isLoading) return;
         const { settings: currentSettings } = useTaskStore.getState();
-        if (currentSettings.features?.pomodoro !== true) return;
+        if (!resolveFeatureFlags(currentSettings).pomodoro) return;
         const pomodoroState = usePomodoroStore.getState();
         if (pomodoroState.hasHydrated) return;
         pomodoroState.hydratePomodoro({

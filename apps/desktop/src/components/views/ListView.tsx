@@ -17,6 +17,7 @@ import { buildProjectOrderMap,
     getDefaultTaskAreaMode,
     getPersonOptionNames,
     resolveDefaultNewTaskAreaId,
+    resolveFeatureFlags,
     shallow,
     shouldShowTaskForStart,
     sortTasksBy,
@@ -212,8 +213,7 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
         getListViewStateStorageKey(statusFilter),
         LIST_AXES,
     );
-    const prioritiesEnabled = settings?.features?.priorities !== false;
-    const timeEstimatesEnabled = settings?.features?.timeEstimates !== false;
+    const { priorities: prioritiesEnabled, timeEstimates: timeEstimatesEnabled } = resolveFeatureFlags(settings);
     const undoNotificationsEnabled = settings?.undoNotificationsEnabled !== false;
     const showQuickDone = statusFilter !== 'done' && statusFilter !== 'archived';
     const readOnly = statusFilter === 'done';

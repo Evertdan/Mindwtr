@@ -12,6 +12,7 @@ import {
     type RangeSelectionOptions,
     normalizeClockTimeInput,
     normalizeFocusTaskLimit,
+    resolveFeatureFlags,
     tFallback,
     collectFocusEligibilityTasks,
     getFocusStarBlockedText,
@@ -237,8 +238,9 @@ export const TaskItem = memo(function TaskItem({
     const [completedAtPrompt, setCompletedAtPrompt] = useState<null | 'complete' | 'editor-complete' | 'edit'>(null);
     const [projectNextActionPrompt, setProjectNextActionPrompt] = useState<ProjectNextActionPromptState | null>(null);
     const [projectNextActionTitle, setProjectNextActionTitle] = useState('');
-    const prioritiesEnabled = settings?.features?.priorities !== false;
-    const timeEstimatesEnabled = settings?.features?.timeEstimates !== false;
+    const resolvedFeatureFlags = resolveFeatureFlags(settings);
+    const prioritiesEnabled = resolvedFeatureFlags.priorities;
+    const timeEstimatesEnabled = resolvedFeatureFlags.timeEstimates;
     const undoNotificationsEnabled = settings?.undoNotificationsEnabled !== false;
     const showTaskAge = settings?.appearance?.showTaskAge === true;
     const focusTaskLimit = normalizeFocusTaskLimit(settings?.gtd?.focusTaskLimit);
@@ -255,7 +257,7 @@ export const TaskItem = memo(function TaskItem({
     // Time tracking is opt-in: every time-spent surface (editor field, badge,
     // quick-start) stays hidden unless the Pomodoro timer and its task linking
     // are both enabled, so the default GTD experience is unchanged.
-    const timeSpentEnabled = settings?.features?.pomodoro === true
+    const timeSpentEnabled = resolvedFeatureFlags.pomodoro
         && settings?.gtd?.pomodoro?.linkTask === true;
     // Task-row entry point into the shared pomodoro store: link this task and
     // start a focus session (never a free-running clock), then show the timer.

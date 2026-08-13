@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { translateWithFallback, useTaskStore, type PomodoroAutoStartOptions, type PomodoroEvent } from '@mindwtr/core';
+import { resolveFeatureFlags, translateWithFallback, useTaskStore, type PomodoroAutoStartOptions, type PomodoroEvent } from '@mindwtr/core';
 import { useLanguage } from '../contexts/language-context';
 import { sendDesktopPomodoroCompletionAlert } from '../lib/pomodoro-alert';
 import { reconcilePomodoroSnapshot, usePomodoroStore } from '../store/pomodoro-store';
@@ -18,7 +18,7 @@ import { reconcilePomodoroSnapshot, usePomodoroStore } from '../store/pomodoro-s
  * once the break is actually running (auto-start breaks, or Start pressed).
  */
 export function usePomodoroAlerts(): void {
-    const pomodoroEnabled = useTaskStore((state) => state.settings.features?.pomodoro === true);
+    const pomodoroEnabled = useTaskStore((state) => resolveFeatureFlags(state.settings).pomodoro);
     const notificationsEnabled = useTaskStore((state) => state.settings.notificationsEnabled !== false);
     const autoStartBreaks = useTaskStore((state) => state.settings.gtd?.pomodoro?.autoStartBreaks === true);
     const autoStartFocus = useTaskStore((state) => state.settings.gtd?.pomodoro?.autoStartFocus === true);

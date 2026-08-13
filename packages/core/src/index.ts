@@ -21,6 +21,7 @@ export * from './async-utils';
 export * from './storage';
 export * from './range-selection';
 export * from './task-metadata-filter-visibility';
+export * from './resolve-feature-flags';
 export * from './bulk-organize';
 export * from './announcements';
 export * from './user-prompts';

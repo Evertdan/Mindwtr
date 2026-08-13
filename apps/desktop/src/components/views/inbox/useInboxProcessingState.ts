@@ -8,6 +8,7 @@ import {
     getProjectChoiceState,
     normalizeClockTimeInput,
     openProcessInboxTask,
+    resolveFeatureFlags,
     selectProcessInboxCandidates,
     setTaskDraftField,
     type AppData,
@@ -104,8 +105,7 @@ export function useInboxProcessingState({
     const contextStepEnabled = inboxProcessing.contextStepEnabled !== false;
     const scheduleEnabled = inboxProcessing.scheduleEnabled === true;
     const referenceEnabled = true;
-    const prioritiesEnabled = settings?.features?.priorities !== false;
-    const timeEstimatesEnabled = settings?.features?.timeEstimates !== false;
+    const { priorities: prioritiesEnabled, timeEstimates: timeEstimatesEnabled } = resolveFeatureFlags(settings);
     const defaultHiddenTaskEditorFields = useMemo(() => {
         const featureHiddenFields = new Set<TaskEditorFieldId>();
         if (!prioritiesEnabled) featureHiddenFields.add('priority');

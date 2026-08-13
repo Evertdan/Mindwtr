@@ -6,6 +6,7 @@ import {
     normalizeFocusTaskLimit,
     getDefaultTaskAreaMode,
     resolveDefaultNewTaskAreaId,
+    resolveFeatureFlags,
     sanitizePomodoroDurations,
 } from '@mindwtr/core';
 
@@ -185,11 +186,12 @@ export function SettingsGtdPage({
         if (days <= 0) return t.autoArchiveNever;
         return `${days} ${t.autoArchiveDayUnit}`;
     };
+    const resolvedFeatureFlags = resolveFeatureFlags(safeSettings);
     const featureHiddenFields = new Set<TaskEditorFieldId>();
-    if (safeSettings.features?.priorities === false) {
+    if (!resolvedFeatureFlags.priorities) {
         featureHiddenFields.add('priority');
     }
-    if (safeSettings.features?.timeEstimates === false) {
+    if (!resolvedFeatureFlags.timeEstimates) {
         featureHiddenFields.add('timeEstimate');
     }
 
@@ -237,11 +239,11 @@ export function SettingsGtdPage({
     const defaultProjectFlowMode: DefaultProjectFlowMode = safeSettings.gtd?.defaultProjectFlowMode === 'sequential'
         ? 'sequential'
         : 'parallel';
-    const timeEstimatesEnabled = safeSettings.features?.timeEstimates !== false;
+    const timeEstimatesEnabled = resolvedFeatureFlags.timeEstimates;
     const timeEstimatePresets: TimeEstimate[] = (safeSettings.gtd?.timeEstimatePresets?.length
         ? safeSettings.gtd.timeEstimatePresets
         : DEFAULT_TIME_ESTIMATE_PRESETS) as TimeEstimate[];
-    const pomodoroEnabled = safeSettings.features?.pomodoro === true;
+    const pomodoroEnabled = resolvedFeatureFlags.pomodoro;
     const pomodoroCustomDurations = sanitizePomodoroDurations(safeSettings.gtd?.pomodoro?.customDurations);
     const pomodoroLinkTask = safeSettings.gtd?.pomodoro?.linkTask === true;
     const pomodoroAutoStartBreaks = safeSettings.gtd?.pomodoro?.autoStartBreaks === true;

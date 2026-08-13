@@ -7,6 +7,7 @@ import {
     getTaskMetadataFilterVisibility,
     hasActiveFilterCriteria,
     projectMatchesAreaFilterSelection,
+    resolveFeatureFlags,
     safeFormatDate,
     shallow,
     sortDoneTasksForListView,
@@ -200,8 +201,7 @@ export function ArchiveView() {
         [_allTasks, areaById, projectById, resolvedAreaFilter]
     );
 
-    const prioritiesEnabled = settings?.features?.priorities !== false;
-    const timeEstimatesEnabled = settings?.features?.timeEstimates !== false;
+    const { priorities: prioritiesEnabled, timeEstimates: timeEstimatesEnabled } = resolveFeatureFlags(settings);
     const metadataFilterVisibility = useMemo(
         () => getTaskMetadataFilterVisibility(archivedBaseTasks, { prioritiesEnabled, timeEstimatesEnabled }),
         [archivedBaseTasks, prioritiesEnabled, timeEstimatesEnabled]

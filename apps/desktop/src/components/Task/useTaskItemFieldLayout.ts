@@ -74,10 +74,10 @@ export function useTaskItemFieldLayout({
     const hiddenSet = useMemo(() => {
         const known = new Set(taskEditorOrder);
         const next = new Set(savedHidden.filter((id) => known.has(id)));
-        if (settings?.features?.priorities === false) next.add('priority');
-        if (settings?.features?.timeEstimates === false) next.add('timeEstimate');
+        if (!prioritiesEnabled) next.add('priority');
+        if (!timeEstimatesEnabled) next.add('timeEstimate');
         return next;
-    }, [savedHidden, settings?.features?.priorities, settings?.features?.timeEstimates, taskEditorOrder]);
+    }, [savedHidden, prioritiesEnabled, timeEstimatesEnabled, taskEditorOrder]);
     const isReference = editStatus === 'reference';
     const referenceHiddenFields = useMemo(() => new Set<TaskEditorFieldId>([
         'startTime',
