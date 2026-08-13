@@ -561,8 +561,8 @@ export function Layout({ children, currentView, onViewChange, onOpenSyncSettings
         const stored = settings?.filters;
         const next = areaFilterSelectionToFilters(resolvedAreaFilter);
         if (stored?.areaId === next.areaId
-            && (stored?.areaIds ?? []).join(' ') === next.areaIds.join(' ')
-            && (stored?.excludedAreaIds ?? []).join(' ') === next.excludedAreaIds.join(' ')) return;
+            && (stored?.areaIds ?? []).join('\0') === next.areaIds.join('\0')
+            && (stored?.excludedAreaIds ?? []).join('\0') === next.excludedAreaIds.join('\0')) return;
         updateSettings({ filters: { ...(stored ?? {}), ...next } })
             .catch((error) => reportError('Failed to update area filter', error));
     }, [areas.length, resolvedAreaFilter, settings?.filters, updateSettings]);
