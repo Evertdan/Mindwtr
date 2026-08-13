@@ -88,6 +88,23 @@
   <url type="bugtracker">https://github.com/dongdongbh/Mindwtr/issues</url>
   <url type="vcs-browser">https://github.com/dongdongbh/Mindwtr</url>
   <releases>
+    <release version="1.2.0-rc.3" date="2026-08-13">
+      <url type="details">https://github.com/dongdongbh/Mindwtr/releases/tag/v1.2.0-rc.3</url>
+      <description>
+        <p>Mindwtr 1.2.0-rc.3 fixes persistence and sync blockers and improves quick capture, project views, data transfer, and desktop responsiveness.</p>
+        <p xml:lang="de">Mindwtr 1.2.0-rc.3 behebt Speicher- und Synchronisationsfehler und verbessert Schnellerfassung, Projektansichten, Datenuebertragung und Reaktionsfaehigkeit.</p>
+        <ul>
+          <li>New projects created during Inbox processing now persist before their first task, preventing a first-save failure.</li>
+          <li xml:lang="de">Beim Verarbeiten der Inbox werden neue Projekte jetzt vor ihrer ersten Aufgabe gespeichert, sodass der erste Speicherversuch nicht mehr fehlschlaegt.</li>
+          <li>Desktop sync preserves device-local setting changes made during a sync cycle and queues a clean follow-up pass.</li>
+          <li xml:lang="de">Die Desktop-Synchronisierung behaelt Aenderungen an lokalen Einstellungen waehrend eines Durchlaufs bei und startet danach einen sauberen weiteren Durchlauf.</li>
+          <li>Project sections can appear as optional columns, while Quick Add previews recognized task details as you type.</li>
+          <li xml:lang="de">Projektabschnitte koennen optional als Spalten erscheinen, waehrend die Schnellerfassung erkannte Aufgabendetails schon beim Tippen anzeigt.</li>
+          <li>Mindwtr CSV export, safe re-import, and one-step undo make data transfer easier to verify and reverse.</li>
+          <li xml:lang="de">Mindwtr-CSV-Export, sicherer Wiederimport und Rueckgaengigmachen in einem Schritt machen Datenuebertragungen leichter pruefbar und umkehrbar.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.2.0-rc.1" date="2026-08-03">
       <url type="details">https://github.com/dongdongbh/Mindwtr/releases/tag/v1.2.0-rc.1</url>
       <description>
