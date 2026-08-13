@@ -154,18 +154,24 @@ describe('i18n fallback idiom ratchet', () => {
         // Reading getTranslationsSync twice in one module is the signature of a
         // hand-rolled "locale dictionary, else English dictionary" lookup. Core's
         // getTranslator() owns that chain and resolveI18nText() owns what to show when
-        // both miss; the six copies this replaced (sync-service, obsidian-store,
-        // undo-registry, and the three mobile trash-restore labels) all indexed the raw
-        // dictionary instead, so any key a locale correctly omits came back undefined —
-        // that shipped an "undefined" digest notification title to Dutch users.
+        // both miss. Five modules spelled it themselves before the seam landed:
+        // sync-service, obsidian-store, and the three mobile trash-restore labels
+        // (notification-service was a fourth long-standing copy in the same family,
+        // but it read the dictionary only once — see below).
         //
         // Counted per FILE rather than per function on purpose: sync-service hoisted its
         // English dictionary into a module-level const, so a per-function scan would have
         // walked straight past it.
         //
-        // One call per file is the legitimate loader read (language-context seeding its
-        // English map, widget-data building a payload) — those hold the dictionary itself,
-        // not a fallback policy.
+        // What this does NOT catch: a single raw read with no fallback at all —
+        // `getTranslationsSync(lang)['digest.focus']`, which is undefined for any key
+        // that locale omits and shipped an "undefined" digest title to Dutch users.
+        // One read is indistinguishable here from a legitimate one, so the fix for that
+        // bug class is the getTranslator seam itself (92e5d9c28), not this predicate.
+        //
+        // One call per file is therefore still allowed, and three files rely on it:
+        // language-context seeding its English map, widget-data building a payload, and
+        // notification-service holding a dictionary for two Record-typed helpers.
         const violations: string[] = [];
         for (const { path, sourceFile } of collectSourceFiles()) {
             let calls = 0;
