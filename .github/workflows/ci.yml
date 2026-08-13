@@ -527,7 +527,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Check for lint errors (core)
-        run: cd packages/core && bun run tsc --noEmit
+        run: bun run --filter @mindwtr/core lint
 
       - name: Check for lint errors (desktop)
         run: cd apps/desktop && bun run lint
