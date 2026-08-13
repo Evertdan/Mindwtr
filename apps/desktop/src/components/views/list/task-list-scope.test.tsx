@@ -244,10 +244,8 @@ describe.each(SCOPE_CASES)('createTaskListScope — $name', ({ extraDeps }) => {
             'Task 1 ERLEDIGT',
             'info',
             5000,
-            // The "Undo" label comes from showUndoToast's own translation lookup
-            // (undo-registry.ts), not from this test's injected `translate` -
-            // it always reflects the real current-language cache, same as
-            // production, so this stand-in locale can't influence it (C2).
+            // The "Undo" label resolves through the caller's translator, so the
+            // injected stand-in locale governs it like every other string here.
             expect.objectContaining({ label: 'RUECKGAENGIG' }),
         );
         expect(takeUndoableAction()).toEqual(expect.any(Function));
