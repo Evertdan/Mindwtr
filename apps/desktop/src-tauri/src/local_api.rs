@@ -13,10 +13,10 @@ use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use time::format_description::well_known::Rfc3339;
 use time::{Date, Month, OffsetDateTime};
 
@@ -26,6 +26,14 @@ const MIN_LOCAL_API_PORT: u16 = 1024;
 const MAX_LOCAL_API_PORT: u16 = u16::MAX;
 const REQUEST_HEADER_LIMIT_BYTES: usize = 16 * 1024;
 const REQUEST_BODY_LIMIT_BYTES: usize = 1_000_000;
+// Generous for one desktop user's local integrations (a few concurrent
+// MCP/automation clients), small enough that an unbounded slow-drip flood
+// can't pin the whole thread pool (R-04).
+const MAX_LOCAL_API_CONNECTIONS: usize = 32;
+// Bounds total per-request wall time across every read, not just a single
+// read() syscall the way set_read_timeout does - closes the slow-drip gap
+// where a peer sends a few bytes just under that timeout, forever (R-04).
+const REQUEST_DEADLINE: Duration = Duration::from_secs(10);
 const LOCAL_API_TOKEN_BYTES: usize = 32;
 const LOCAL_API_REV_BY: &str = "desktop-local-api";
 const MAX_SYNC_REVISION: i64 = 2_147_483_647;
@@ -254,14 +262,22 @@ fn start_runtime(
 
     let shutdown = Arc::new(AtomicBool::new(false));
     let thread_shutdown = shutdown.clone();
+    let active_connections = Arc::new(AtomicUsize::new(0));
     let join = thread::spawn(move || {
         while !thread_shutdown.load(Ordering::SeqCst) {
             match listener.accept() {
                 Ok((stream, _)) => {
+                    let Some(stream) = accept_or_reject(stream, &active_connections) else {
+                        continue;
+                    };
                     let app = app.clone();
                     let token = token.clone();
                     let write_lock = write_lock.clone();
-                    thread::spawn(move || handle_connection(app, token, write_lock, stream));
+                    let active_connections = active_connections.clone();
+                    thread::spawn(move || {
+                        let _slot_guard = ConnectionSlotGuard(active_connections);
+                        handle_connection(app, token, write_lock, stream);
+                    });
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                     thread::sleep(Duration::from_millis(50));
@@ -394,6 +410,33 @@ pub(crate) fn set_local_api_server_config(
     Ok(status_from_runtime(config, &runtime))
 }
 
+// Decrements the shared counter on drop, so a panic inside handle_connection
+// (unwinding through this guard) can't leak a permit the way a plain
+// fetch_sub call at the end of the function would (R-04).
+struct ConnectionSlotGuard(Arc<AtomicUsize>);
+
+impl Drop for ConnectionSlotGuard {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+// Lifted out of the accept loop so the cap can be exercised with a real
+// loopback socket in tests, without a tauri::AppHandle (R-04, same pattern as
+// apply_task_action). The accept loop is the only incrementer (this function
+// only ever runs on that one thread), so a plain load-then-add has no TOCTOU
+// window that could let the count exceed the cap - a concurrent decrement
+// from a finishing handler can only make a borderline request wait, never
+// let the count overshoot.
+fn accept_or_reject(mut stream: TcpStream, active_connections: &Arc<AtomicUsize>) -> Option<TcpStream> {
+    if active_connections.load(Ordering::SeqCst) >= MAX_LOCAL_API_CONNECTIONS {
+        let _ = write_response(&mut stream, ApiResponse::error(503, "Local API server is busy"));
+        return None;
+    }
+    active_connections.fetch_add(1, Ordering::SeqCst);
+    Some(stream)
+}
+
 fn handle_connection(
     app: tauri::AppHandle,
     token: String,
@@ -401,7 +444,8 @@ fn handle_connection(
     mut stream: TcpStream,
 ) {
     let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
-    let response = match read_request(&mut stream) {
+    let deadline = Instant::now() + REQUEST_DEADLINE;
+    let response = match read_request(&mut stream, deadline) {
         Ok(Some(request)) => handle_api_request(&app, &token, &write_lock, request),
         Ok(None) => return,
         Err(error) => ApiResponse::error(400, error),
@@ -409,10 +453,13 @@ fn handle_connection(
     let _ = write_response(&mut stream, response);
 }
 
-fn read_request(stream: &mut TcpStream) -> Result<Option<ApiRequest>, String> {
+fn read_request(stream: &mut TcpStream, deadline: Instant) -> Result<Option<ApiRequest>, String> {
     let mut buffer: Vec<u8> = Vec::new();
     let mut temp = [0_u8; 1024];
     let header_end = loop {
+        if Instant::now() > deadline {
+            return Err("Request timed out".to_string());
+        }
         let read = stream.read(&mut temp).map_err(|e| e.to_string())?;
         if read == 0 {
             if buffer.is_empty() {
@@ -471,6 +518,9 @@ fn read_request(stream: &mut TcpStream) -> Result<Option<ApiRequest>, String> {
 
     let body_start = header_end + 4;
     while buffer.len().saturating_sub(body_start) < content_length {
+        if Instant::now() > deadline {
+            return Err("Request timed out".to_string());
+        }
         let read = stream.read(&mut temp).map_err(|e| e.to_string())?;
         if read == 0 {
             return Err("Incomplete HTTP request body".to_string());
@@ -3225,6 +3275,71 @@ mod tests {
         assert_eq!(path, "/tasks");
         assert_eq!(query.get("query").map(String::as_str), Some("call mom"));
         assert_eq!(query.get("status").map(String::as_str), Some("next"));
+    }
+
+    // R-04: without the deadline check, a client that sends a partial
+    // request and then goes silent would block read_request on read()
+    // forever (nothing here ever closes the socket or sends more data). An
+    // already-expired deadline must be caught at the top of the loop before
+    // that blocking read is attempted at all.
+    #[test]
+    fn read_request_aborts_a_slow_drip_connection_once_the_deadline_passes() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let addr = listener.local_addr().unwrap();
+        let mut client = TcpStream::connect(addr).unwrap();
+        client.write_all(b"GET / HTTP/1.1\r\n").unwrap();
+
+        let (mut stream, _) = listener.accept().unwrap();
+        let deadline = Instant::now() - Duration::from_millis(1);
+        let started = Instant::now();
+        let result = read_request(&mut stream, deadline);
+        assert_eq!(result.unwrap_err(), "Request timed out");
+        assert!(
+            started.elapsed() < Duration::from_millis(500),
+            "the deadline check must short-circuit before blocking on read(), took {:?}",
+            started.elapsed()
+        );
+    }
+
+    #[test]
+    fn accept_or_reject_allows_connections_under_the_cap() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let addr = listener.local_addr().unwrap();
+        let _client = TcpStream::connect(addr).unwrap();
+        let (stream, _) = listener.accept().unwrap();
+
+        let active_connections = Arc::new(AtomicUsize::new(MAX_LOCAL_API_CONNECTIONS - 1));
+        assert!(accept_or_reject(stream, &active_connections).is_some());
+        assert_eq!(
+            active_connections.load(Ordering::SeqCst),
+            MAX_LOCAL_API_CONNECTIONS
+        );
+    }
+
+    // R-04: the 33rd concurrent connection (cap already at 32) gets a 503
+    // instead of a thread.
+    #[test]
+    fn accept_or_reject_serves_503_once_the_connection_cap_is_reached() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let addr = listener.local_addr().unwrap();
+        let mut client = TcpStream::connect(addr).unwrap();
+        let (stream, _) = listener.accept().unwrap();
+
+        let active_connections = Arc::new(AtomicUsize::new(MAX_LOCAL_API_CONNECTIONS));
+        assert!(accept_or_reject(stream, &active_connections).is_none());
+        assert_eq!(
+            active_connections.load(Ordering::SeqCst),
+            MAX_LOCAL_API_CONNECTIONS,
+            "a rejected connection must not consume a slot"
+        );
+
+        client
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        let mut response = String::new();
+        client.read_to_string(&mut response).unwrap();
+        assert!(response.starts_with("HTTP/1.1 503"), "got: {response}");
+        assert!(response.contains("Local API server is busy"));
     }
 
     #[test]
