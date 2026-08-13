@@ -4,6 +4,10 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 
 import { createService } from './service.js';
+import { parseQuickAdd } from '@mindwtr/core';
+import { runCoreService } from './core-adapter.js';
+import * as mcpDb from './db.js';
+import * as mcpQueries from './queries.js';
 
 const tempDirs: string[] = [];
 
@@ -609,6 +613,60 @@ describe('mcp service', () => {
     expect(receivedAreaUpdate.updates.icon).toBe('briefcase');
     expect(Object.prototype.hasOwnProperty.call(receivedAreaUpdate.updates, 'color')).toBe(true);
     expect(receivedAreaUpdate.updates.color).toBeUndefined();
+  });
+
+  // R-08's executable guard for the invariants documented at runCoreWriteWithRetries: every
+  // core write flushes before returning, and the retried callback re-reads storage. Together
+  // they make a two-write quickAdd capture (addProject then addTask) safe to retry whole.
+  //
+  // Real database, real core adapter, real parser — only addTask is wrapped, to fail once
+  // between the two writes. The project assertion doubles as the harness control: an earlier
+  // attempt spread `...queries` into deps and silently swapped in queries.ts's same-named
+  // parseQuickAdd (it drops projectTitle), so no project was created at all and the run looked
+  // like a persistence bug. If the harness breaks capture again, projects is 0 and this fails.
+  //
+  // ONE case on purpose: core-adapter holds module-level singletons (coreService/coreQueue),
+  // so a second case in this process runs against the previous case's store and reports
+  // duplicates that are test-isolation artifacts, not product behaviour.
+  test('a retried quickAdd capture leaves one project and one task', async () => {
+    const dir = createTempDir();
+    writeFileSync(
+      join(dir, 'data.json'),
+      JSON.stringify({ tasks: [], projects: [], sections: [], areas: [], people: [], settings: {} })
+    );
+
+    let addTaskAttempts = 0;
+    const deps = {
+      ...mcpDb,
+      ...mcpQueries,
+      // The core parser, NOT queries.ts's narrowing wrapper of the same name.
+      parseQuickAdd,
+      runCoreService: (options: any, fn: any) => runCoreService(options, (core: any) => fn(
+        new Proxy(core, {
+          get: (target, prop, receiver) => (prop === 'addTask'
+            ? async (input: any) => {
+              addTaskAttempts += 1;
+              if (addTaskAttempts === 1) throw new Error('SQLITE_BUSY: database is locked');
+              return (target as any).addTask(input);
+            }
+            : Reflect.get(target, prop, receiver)),
+        }),
+      )),
+    };
+
+    const service = createService({ dbPath: join(dir, 'mindwtr.db'), readonly: false }, deps as any);
+    try {
+      await service.addTask({ quickAdd: 'Ship it +Launch' });
+
+      const projects = await service.listProjects();
+      const tasks = await service.listTasks({});
+      expect(addTaskAttempts).toBe(2);
+      expect(projects.filter((project) => project.title === 'Launch')).toHaveLength(1);
+      expect(tasks.filter((task) => task.title === 'Ship it')).toHaveLength(1);
+      expect(tasks[0]?.projectId).toBe(projects[0]?.id);
+    } finally {
+      await service.close();
+    }
   });
 
   test('persists write operations to a real sqlite database', async () => {
