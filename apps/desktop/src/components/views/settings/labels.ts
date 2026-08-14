@@ -546,6 +546,7 @@ export const SETTINGS_LABEL_KEYS = [
     'website',
     'github',
     'documentation',
+    'privacy',
     'sponsorProject',
     'license',
     'feedback',

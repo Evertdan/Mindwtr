@@ -1,0 +1,5 @@
+- Quick Add previews recognized task details while you type.
+- Export Mindwtr CSV or TaskNotes ZIP files and safely undo imports.
+- Group mobile lists by context and sync through installed private certificate authorities.
+- Faster large libraries, steadier storage recovery, and more reliable sync.
+- Optional Android system search indexes titles only, never notes or attachments.

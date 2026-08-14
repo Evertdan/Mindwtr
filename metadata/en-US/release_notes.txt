@@ -1,4 +1,4 @@
-- Repeating tasks now show every occurrence across the visible calendar range.
-- Focus and Next hide a timed-start task until its exact start time.
-- Search labels completed and due dates, and project search covers every project.
-- Sync setup validates remote data and attachments before switching; AI model pickers can load the provider's current models.
+- Quick Add previews recognized dates, projects, areas, contexts, and tags as you type.
+- Export tasks as Mindwtr CSV or a TaskNotes-ready ZIP, with safer import undo.
+- Repeating tasks show every visible calendar occurrence; timed work stays hidden until it starts.
+- Sync, storage recovery, reminders, and large-library performance are more reliable.

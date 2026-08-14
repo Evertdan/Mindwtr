@@ -1,4 +1,4 @@
-- Las tareas repetidas muestran todas sus apariciones en el intervalo visible del calendario.
-- Enfoque y Siguiente ocultan una tarea hasta su hora exacta de inicio.
-- La búsqueda etiqueta fechas completadas y de vencimiento y encuentra todos los proyectos.
-- La sincronización valida datos y adjuntos antes de cambiar; los selectores de IA pueden cargar los modelos actuales del proveedor.
+- Captura rápida muestra fechas, proyectos, áreas, contextos y etiquetas reconocidos mientras escribes.
+- Exporta tareas como CSV de Mindwtr o ZIP para TaskNotes y deshaz importaciones con seguridad.
+- Las repeticiones aparecen en el calendario visible; las tareas con hora se ocultan hasta que empiezan.
+- Mejoras de sincronización, recuperación, recordatorios y rendimiento con bibliotecas grandes.

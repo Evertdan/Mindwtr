@@ -1,4 +1,4 @@
-- Les tâches répétées affichent toutes leurs occurrences dans la période visible du calendrier.
-- Focus et Suivant masquent une tâche jusqu’à son heure de début exacte.
-- La recherche étiquette les dates de fin et d’échéance et trouve tous les projets.
-- La synchro valide données et pièces jointes avant le changement; les sélecteurs IA chargent les modèles actuels du fournisseur.
+- La capture rapide affiche les dates, projets, domaines, contextes et tags reconnus pendant la saisie.
+- Exportez en CSV Mindwtr ou ZIP TaskNotes et annulez les imports en toute sécurité.
+- Les répétitions apparaissent dans le calendrier visible; les tâches horaires restent masquées jusqu’au début.
+- Synchronisation, récupération, rappels et grandes bibliothèques sont plus fiables.

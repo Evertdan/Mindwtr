@@ -1,0 +1,35 @@
+<en-US>
+- Quick Add previews recognized task details while you type.
+- Export Mindwtr CSV or TaskNotes ZIP files and safely undo imports.
+- Group mobile lists by context and sync through installed private certificate authorities.
+- Faster large libraries, steadier storage recovery, and more reliable sync.
+- Optional Android system search indexes titles only, never notes or attachments.
+</en-US>
+<de-DE>
+- Die Schnellerfassung zeigt erkannte Aufgabendetails beim Tippen.
+- Mindwtr-CSV oder TaskNotes-ZIP exportieren und Importe sicher rückgängig machen.
+- Mobile Listen nach Kontext gruppieren und mit installierten privaten Zertifikaten synchronisieren.
+- Große Bibliotheken, Wiederherstellung und Sync laufen zuverlässiger.
+- Optionale Android-Systemsuche indexiert nur Titel, nie Notizen oder Anhänge.
+</de-DE>
+<es-ES>
+- Captura rápida muestra los detalles reconocidos mientras escribes.
+- Exporta CSV de Mindwtr o ZIP de TaskNotes y deshaz importaciones.
+- Agrupa listas móviles por contexto y sincroniza con certificados privados instalados.
+- Mejor rendimiento en bibliotecas grandes, recuperación y sincronización.
+- La búsqueda opcional de Android solo indexa títulos, nunca notas ni adjuntos.
+</es-ES>
+<fr-FR>
+- La capture rapide affiche les détails reconnus pendant la saisie.
+- Exportez en CSV Mindwtr ou ZIP TaskNotes et annulez les imports.
+- Groupez les listes mobiles par contexte et synchronisez avec les certificats privés installés.
+- Grandes bibliothèques, récupération et synchronisation plus fiables.
+- La recherche Android optionnelle indexe les titres, jamais les notes ni pièces jointes.
+</fr-FR>
+<zh-CN>
+- 快速添加会在输入时预览识别到的任务详情。
+- 可导出 Mindwtr CSV 或 TaskNotes ZIP，并可撤销导入。
+- 移动端列表可按情境分组，并支持已安装的私有证书同步。
+- 大型任务库、存储恢复和同步更加快速可靠。
+- 可选的 Android 系统搜索只索引标题，不索引备注或附件。
+</zh-CN>

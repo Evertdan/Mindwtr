@@ -1,0 +1,5 @@
+- Captura rápida muestra los detalles reconocidos mientras escribes.
+- Exporta CSV de Mindwtr o ZIP de TaskNotes y deshaz importaciones.
+- Agrupa listas móviles por contexto y sincroniza con certificados privados instalados.
+- Mejor rendimiento en bibliotecas grandes, recuperación y sincronización.
+- La búsqueda opcional de Android solo indexa títulos, nunca notas ni adjuntos.

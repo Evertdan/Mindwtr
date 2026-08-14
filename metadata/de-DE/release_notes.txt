@@ -1,4 +1,4 @@
-- Wiederholende Aufgaben erscheinen jetzt über den gesamten sichtbaren Kalenderbereich.
-- Fokus und Nächste blenden Aufgaben bis zu ihrer genauen Startzeit aus.
-- Die Suche kennzeichnet Erledigt- und Fälligkeitsdaten; die Projektsuche umfasst alle Projekte.
-- Sync-Ziele werden vor dem Wechsel samt Anhängen geprüft; KI-Modelllisten können direkt vom Anbieter geladen werden.
+- Die Schnellerfassung zeigt erkannte Daten, Projekte, Bereiche, Kontexte und Tags schon beim Tippen.
+- Aufgaben lassen sich als Mindwtr-CSV oder TaskNotes-ZIP exportieren; Importe können sicher rückgängig gemacht werden.
+- Wiederholungen erscheinen im sichtbaren Kalender; Aufgaben mit Startzeit bleiben bis dahin verborgen.
+- Sync, Speicherwiederherstellung, Erinnerungen und große Bibliotheken laufen zuverlässiger.

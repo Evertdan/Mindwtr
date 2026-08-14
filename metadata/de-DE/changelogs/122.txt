@@ -1,0 +1,5 @@
+- Die Schnellerfassung zeigt erkannte Aufgabendetails beim Tippen.
+- Mindwtr-CSV oder TaskNotes-ZIP exportieren und Importe sicher rückgängig machen.
+- Mobile Listen nach Kontext gruppieren und mit installierten privaten Zertifikaten synchronisieren.
+- Große Bibliotheken, Wiederherstellung und Sync laufen zuverlässiger.
+- Optionale Android-Systemsuche indexiert nur Titel, nie Notizen oder Anhänge.

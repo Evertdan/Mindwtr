@@ -88,6 +88,23 @@
   <url type="bugtracker">https://github.com/dongdongbh/Mindwtr/issues</url>
   <url type="vcs-browser">https://github.com/dongdongbh/Mindwtr</url>
   <releases>
+    <release version="1.2.0" date="2026-08-14">
+      <url type="details">https://github.com/dongdongbh/Mindwtr/releases/tag/v1.2.0</url>
+      <description>
+        <p>Mindwtr 1.2.0 improves capture, data transfer, sync reliability, scheduling, themes, search, and large-library performance.</p>
+        <p xml:lang="de">Mindwtr 1.2.0 verbessert Erfassung, Datenuebertragung, Sync-Zuverlaessigkeit, Terminplanung, Designs, Suche und grosse Bibliotheken.</p>
+        <ul>
+          <li>Quick Add previews recognized task details, while CSV and TaskNotes exports make data easier to inspect and move.</li>
+          <li xml:lang="de">Die Schnellerfassung zeigt erkannte Aufgabendetails; CSV- und TaskNotes-Exporte machen Daten leichter lesbar und uebertragbar.</li>
+          <li>Sync and storage stay responsive and converge reliably on large libraries, slow drives, and virtual mounts.</li>
+          <li xml:lang="de">Sync und Speicherung bleiben bei grossen Bibliotheken, langsamen Laufwerken und virtuellen Mounts reaktionsfaehig und stabil.</li>
+          <li>Recurring tasks fill the visible calendar, timed work stays hidden until it starts, and search opens completed work reliably.</li>
+          <li xml:lang="de">Wiederholungen fuellen den sichtbaren Kalender, Aufgaben mit Startzeit bleiben bis dahin verborgen und die Suche oeffnet Erledigtes zuverlaessig.</li>
+          <li>Project columns, OLED, Catppuccin, Dracula, multi-area filters, and updated AI integrations expand focused workflows.</li>
+          <li xml:lang="de">Projektspalten, OLED, Catppuccin, Dracula, Mehrfach-Bereichsfilter und aktualisierte KI-Integrationen erweitern fokussierte Arbeitsablaeufe.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.2.0-rc.4" date="2026-08-13">
       <url type="details">https://github.com/dongdongbh/Mindwtr/releases/tag/v1.2.0-rc.4</url>
       <description>

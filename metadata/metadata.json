@@ -30,7 +30,7 @@
           "列表、日历与看板视图，支持提醒与重复任务",
           "免费开源、无广告"
         ],
-        "ReleaseNotes": "• 重复任务会在可见日历范围内显示每一次发生，定时开始的任务会隐藏到准确时间。\n• 搜索会标记完成和截止日期，并能可靠打开已完成或已归档的任务。\n• 切换同步目标前会验证远端数据和附件；AI 模型选择器可加载服务商的当前模型。\n• Windows 证书同步和更安全的凭据文件提升桌面可靠性。",
+        "ReleaseNotes": "• 快速添加会在输入时预览识别到的任务详情。\n• 可导出 Mindwtr CSV 或 TaskNotes ZIP，并可安全撤销导入。\n• 项目分栏、OLED 主题和更完整的搜索让任务整理更顺手。\n• 大型任务库、存储恢复、同步和虚拟磁盘支持更加快速可靠。",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -82,7 +82,7 @@
           "List, calendar, and kanban views with reminders and repeating tasks",
           "Free and open source, no ads"
         ],
-        "ReleaseNotes": "• Repeating tasks show every occurrence in the visible calendar; timed-start tasks stay hidden until the exact time.\n• Search labels completed and due dates and reliably opens finished or archived tasks.\n• Sync setup validates remote data and attachments before switching; AI model pickers can load current provider models.\n• Windows certificate sync and tighter credential-file permissions improve desktop reliability.",
+        "ReleaseNotes": "• Quick Add previews recognized task details while you type.\n• Export Mindwtr CSV or TaskNotes ZIP files and safely undo imports.\n• Project columns, OLED mode, and richer search make organizing work easier.\n• Faster large libraries, steadier storage recovery, reliable sync, and better virtual-drive support.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -131,7 +131,7 @@
           "Listen-, Kalender- und Kanban-Ansichten mit Erinnerungen und Wiederholungen",
           "Kostenlos und Open Source, ohne Werbung"
         ],
-        "ReleaseNotes": "• Wiederholende Aufgaben erscheinen im sichtbaren Kalender; Aufgaben mit Startzeit bleiben bis dahin ausgeblendet.\n• Die Suche kennzeichnet Erledigt- und Fälligkeitsdaten und öffnet fertige oder archivierte Aufgaben zuverlässig.\n• Sync-Ziele werden vor dem Wechsel samt Daten und Anhängen geprüft; KI-Modelllisten kommen direkt vom Anbieter.\n• Windows-Zertifikatssync und strengere Dateirechte erhöhen die Zuverlässigkeit.",
+        "ReleaseNotes": "• Die Schnellerfassung zeigt erkannte Aufgabendetails schon beim Tippen.\n• Mindwtr-CSV oder TaskNotes-ZIP exportieren und Importe sicher rückgängig machen.\n• Projektspalten, OLED-Design und eine bessere Suche erleichtern die Organisation.\n• Große Bibliotheken, Wiederherstellung, Sync und virtuelle Laufwerke laufen zuverlässiger.",
         "Images": [],
         "RecommendedHardware": [],
         "MinimumHardware": [],
@@ -161,7 +161,7 @@
           "Vues liste, calendrier et kanban, rappels et tâches répétées",
           "Gratuit et open source, sans publicité"
         ],
-        "ReleaseNotes": "• Les tâches répétées affichent toutes leurs occurrences; celles avec une heure de début restent masquées jusqu’au moment exact.\n• La recherche étiquette les dates de fin et d’échéance et ouvre bien les tâches finies ou archivées.\n• La synchro valide données et pièces jointes avant le changement; les listes de modèles IA viennent du fournisseur.\n• Les certificats Windows et des droits de fichier renforcés améliorent la fiabilité.",
+        "ReleaseNotes": "• La capture rapide affiche les détails reconnus pendant la saisie.\n• Exportez en CSV Mindwtr ou ZIP TaskNotes et annulez les imports.\n• Colonnes de projet, thème OLED et recherche enrichie facilitent l’organisation.\n• Grandes bibliothèques, récupération, synchro et disques virtuels sont plus fiables.",
         "Images": [],
         "RecommendedHardware": [],
         "MinimumHardware": [],
@@ -190,7 +190,7 @@
           "Vistas de lista, calendario y kanban, con recordatorios y tareas repetidas",
           "Gratis y de código abierto, sin anuncios"
         ],
-        "ReleaseNotes": "• Las tareas repetidas muestran todas sus apariciones; las que tienen hora de inicio se ocultan hasta el momento exacto.\n• La búsqueda etiqueta fechas completadas y de vencimiento y abre bien tareas terminadas o archivadas.\n• La sincronización valida datos y adjuntos antes de cambiar; las listas de modelos de IA vienen del proveedor.\n• Los certificados de Windows y permisos de archivo más estrictos mejoran la fiabilidad.",
+        "ReleaseNotes": "• Captura rápida muestra los detalles reconocidos mientras escribes.\n• Exporta CSV de Mindwtr o ZIP de TaskNotes y deshaz importaciones.\n• Columnas de proyecto, tema OLED y búsqueda mejorada facilitan la organización.\n• Bibliotecas grandes, recuperación, sincronización y unidades virtuales son más fiables.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",

@@ -1,0 +1,5 @@
+- La capture rapide affiche les détails reconnus pendant la saisie.
+- Exportez en CSV Mindwtr ou ZIP TaskNotes et annulez les imports.
+- Groupez les listes mobiles par contexte et synchronisez avec les certificats privés installés.
+- Grandes bibliothèques, récupération et synchronisation plus fiables.
+- La recherche Android optionnelle indexe les titres, jamais les notes ni pièces jointes.
