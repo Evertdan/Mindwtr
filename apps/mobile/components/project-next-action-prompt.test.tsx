@@ -243,6 +243,51 @@ describe('ProjectNextActionPromptProvider', () => {
         }));
     });
 
+    it('keeps the prompt open and reports a synchronously thrown next-action update', async () => {
+        updateTask.mockImplementationOnce(() => {
+            throw new Error('Adapter failed immediately');
+        });
+
+        function Trigger() {
+            return (
+                <Text
+                    accessibilityLabel="Open next action prompt"
+                    onPress={() => presentProjectNextActionPrompt({ ...currentTask, status: 'done' } as any)}
+                >
+                    Open
+                </Text>
+            );
+        }
+
+        let tree!: renderer.ReactTestRenderer;
+        await renderer.act(async () => {
+            tree = renderer.create(
+                <ProjectNextActionPromptProvider>
+                    <Trigger />
+                </ProjectNextActionPromptProvider>,
+            );
+            await Promise.resolve();
+        });
+
+        const trigger = tree.root.find((node) => node.props.accessibilityLabel === 'Open next action prompt');
+        await renderer.act(async () => {
+            trigger.props.onPress();
+            await Promise.resolve();
+        });
+
+        const candidate = tree.root.find((node) => node.props.accessibilityLabel === 'Draft follow-up');
+        await renderer.act(async () => {
+            candidate.props.onPress();
+            await Promise.resolve();
+        });
+
+        expect(hasText(tree, "What's the next action?")).toBe(true);
+        expect(showToast).toHaveBeenCalledWith(expect.objectContaining({
+            message: 'Adapter failed immediately',
+            tone: 'error',
+        }));
+    });
+
     it('archives the project when the complete action is chosen', async () => {
         function Trigger() {
             return (
