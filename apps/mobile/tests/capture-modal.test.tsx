@@ -696,7 +696,9 @@ describe('CaptureScreen', () => {
       status: 'next',
       projectId: 'project-1',
     });
-    expect(openTaskScreen).toHaveBeenCalledWith('task-new', 'project-1', 'task');
+    // replace, not push: the capture route must leave the stack when it hands
+    // off to the editor, or backing out reopens it pre-filled (#1029).
+    expect(openTaskScreen).toHaveBeenCalledWith('task-new', 'project-1', 'task', { replace: true });
     expect(routerMocks.replace).not.toHaveBeenCalledWith('/inbox');
   });
 

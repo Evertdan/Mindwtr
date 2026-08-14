@@ -530,7 +530,11 @@ export default function CaptureScreen() {
     }
     const createdTaskId = result.createdTaskId;
     if (openAfterSave && createdTaskId) {
-      openTaskScreen(createdTaskId, result.props.projectId, 'task');
+      // Replace, don't push: this capture screen must not stay on the stack
+      // holding the saved text, or backing out of the editor reopens it
+      // pre-filled (#1029). The in-place sheet closes itself before this
+      // call; a route can only swap itself out.
+      openTaskScreen(createdTaskId, result.props.projectId, 'task', { replace: true });
       return false;
     }
     return true;

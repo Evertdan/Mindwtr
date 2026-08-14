@@ -24,18 +24,28 @@ export function openContextsScreen(token: string) {
     navigateToTaskMetaScreen('/contexts', { token });
 }
 
-export function openTaskScreen(taskId: string, projectId?: string, taskTab: TaskOpenTab = 'view') {
+export function openTaskScreen(
+    taskId: string,
+    projectId?: string,
+    taskTab: TaskOpenTab = 'view',
+    options?: {
+        /**
+         * Swap the current route for the task screen instead of stacking on
+         * top of it. The capture route's "Save & edit" needs this: a push
+         * leaves the filled capture form underneath, so backing out of the
+         * editor lands on it again (#1029).
+         */
+        replace?: boolean;
+    },
+) {
     if (!taskId) return;
     const openToken = String(Date.now());
-    if (projectId) {
-        router.push({
-            pathname: '/projects-screen',
-            params: { projectId, taskId, openToken, taskTab },
-        });
+    const target = projectId
+        ? { pathname: '/projects-screen' as const, params: { projectId, taskId, openToken, taskTab } }
+        : { pathname: '/focus' as const, params: { taskId, openToken, taskTab } };
+    if (options?.replace) {
+        router.replace(target);
         return;
     }
-    router.push({
-        pathname: '/focus',
-        params: { taskId, openToken, taskTab },
-    });
+    router.push(target);
 }
