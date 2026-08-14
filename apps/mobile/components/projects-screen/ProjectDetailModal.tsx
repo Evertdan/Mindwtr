@@ -32,6 +32,7 @@ import {
     useTaskStore,
 } from '@mindwtr/core';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeColors, type ThemeColors } from '@/hooks/use-theme-colors';
 import { useFilledButtonColors } from '@/hooks/use-filled-button-colors';
 import { useLanguage } from '../../contexts/language-context';
@@ -53,6 +54,7 @@ import type { useProjectNotesEditor } from './use-project-notes-editor';
 import { getAndroidKeyboardFrame } from '../../lib/android-keyboard-frame';
 
 const PROJECT_TASK_SORT_OPTIONS: TaskSortBy[] = ['default', 'due', 'start', 'review', 'title', 'created', 'created-desc'];
+const PROJECT_SHOW_COMPLETED_STORAGE_KEY = 'mindwtr:view:project-detail:show-completed:v1';
 
 type ProjectDetailPresentationStyle = 'pageSheet' | 'fullScreen';
 
@@ -564,7 +566,30 @@ export function ProjectDetailModal({
     const [showStatusMenu, setShowStatusMenu] = React.useState(false);
     const [showDueDatePicker, setShowDueDatePicker] = React.useState(false);
     const [showReviewPicker, setShowReviewPicker] = React.useState(false);
-    const [showCompletedTasks, setShowCompletedTasks] = React.useState(false);
+    // Persisted device-locally so the choice survives app restarts, matching
+    // desktop's localStorage-backed toggle (#1030). Global, like desktop —
+    // per-project memory stays a possible follow-up.
+    const [showCompletedTasks, setShowCompletedTasksState] = React.useState(false);
+    const showCompletedTouchedRef = React.useRef(false);
+    React.useEffect(() => {
+        let active = true;
+        void AsyncStorage.getItem(PROJECT_SHOW_COMPLETED_STORAGE_KEY).then((raw) => {
+            if (active && !showCompletedTouchedRef.current && raw === 'true') {
+                setShowCompletedTasksState(true);
+            }
+        }).catch(() => undefined);
+        return () => {
+            active = false;
+        };
+    }, []);
+    const setShowCompletedTasks = React.useCallback((value: React.SetStateAction<boolean>) => {
+        showCompletedTouchedRef.current = true;
+        setShowCompletedTasksState((current) => {
+            const next = typeof value === 'function' ? value(current) : value;
+            void AsyncStorage.setItem(PROJECT_SHOW_COMPLETED_STORAGE_KEY, String(next)).catch(() => undefined);
+            return next;
+        });
+    }, []);
     const [projectTaskReorderMode, setProjectTaskReorderMode] = React.useState(false);
     const [projectTaskFilterOpenSignal, setProjectTaskFilterOpenSignal] = React.useState(0);
     const [projectTaskFilterActiveCount, setProjectTaskFilterActiveCount] = React.useState(0);
