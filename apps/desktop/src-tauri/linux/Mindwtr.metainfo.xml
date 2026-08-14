@@ -88,6 +88,21 @@
   <url type="bugtracker">https://github.com/dongdongbh/Mindwtr/issues</url>
   <url type="vcs-browser">https://github.com/dongdongbh/Mindwtr</url>
   <releases>
+    <release version="1.2.0-rc.4" date="2026-08-13">
+      <url type="details">https://github.com/dongdongbh/Mindwtr/releases/tag/v1.2.0-rc.4</url>
+      <description>
+        <p>Mindwtr 1.2.0-rc.4 fixes sync convergence and improves delegation and narrow task rows on desktop.</p>
+        <p xml:lang="de">Mindwtr 1.2.0-rc.4 verbessert die Sync-Konvergenz sowie Delegation und schmale Aufgabenzeilen auf dem Desktop.</p>
+        <ul>
+          <li>SQLite-loaded deletion markers keep a stable revision, so an aligned sync no longer rewrites every purged task or queues another cycle.</li>
+          <li xml:lang="de">Aus SQLite geladene Loeschmarkierungen behalten ihre Revision, sodass ein abgeglichener Sync nicht mehr jede geloeschte Aufgabe neu schreibt oder einen weiteren Durchlauf startet.</li>
+          <li>Process Inbox opens a saved delegate email in the mail app and otherwise copies the request for pasting.</li>
+          <li xml:lang="de">Inbox verarbeiten oeffnet eine gespeicherte Delegationsadresse im Mailprogramm oder kopiert die Anfrage zum Einfuegen.</li>
+          <li>Checklist boxes retain their square shape when task rows become narrow.</li>
+          <li xml:lang="de">Kontrollkaestchen bleiben auch in schmalen Aufgabenzeilen quadratisch.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.2.0-rc.3" date="2026-08-13">
       <url type="details">https://github.com/dongdongbh/Mindwtr/releases/tag/v1.2.0-rc.3</url>
       <description>
