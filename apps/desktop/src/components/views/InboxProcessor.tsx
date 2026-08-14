@@ -119,7 +119,10 @@ export function InboxProcessor({
             {quickPanelProps ? (
                 <InboxProcessingQuickPanel {...quickPanelProps} />
             ) : (
-                <InboxProcessingWizard {...wizardProps} />
+                <InboxProcessingWizard
+                    key={wizardProps.processingTask?.id ?? 'idle'}
+                    {...wizardProps}
+                />
             )}
         </>
     );

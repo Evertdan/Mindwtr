@@ -1,13 +1,20 @@
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { AppData, Area, Project, Task } from '@mindwtr/core';
+import type { AppData, Area, ClarifyResponse, Project, Task } from '@mindwtr/core';
 
 import { LanguageProvider } from '../../contexts/language-context';
 import { InboxProcessor } from './InboxProcessor';
 import { reportError } from '../../lib/report-error';
 import { useUiStore } from '../../store/ui-store';
+
+const clarifyTask = vi.hoisted(() => vi.fn());
+
+vi.mock('@mindwtr/core', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@mindwtr/core')>();
+    return { ...actual, createAIProvider: () => ({ clarifyTask }) };
+});
 
 vi.mock('../../lib/report-error', () => ({
     reportError: vi.fn(),
@@ -1077,6 +1084,44 @@ describe('InboxProcessor', () => {
         fireEvent.click(getByRole('button', { name: /process\.btn/i }));
 
         expect(getByRole('button', { name: 'taskEdit.aiClarify' })).toBeInTheDocument();
+    });
+
+    it('does not show a delayed AI clarify response on the next inbox task', async () => {
+        let resolveClarify!: (response: ClarifyResponse) => void;
+        const delayedResponse = new Promise<ClarifyResponse>((resolve) => {
+            resolveClarify = resolve;
+        });
+        clarifyTask.mockReturnValueOnce(delayedResponse);
+        const { getByRole, getByText, queryByText } = renderInboxProcessor({
+            settings: {
+                ai: {
+                    enabled: true,
+                    provider: 'openai',
+                    baseUrl: 'http://localhost:11434/v1',
+                },
+            },
+            tasks: [inboxTask, inboxTaskTwo],
+        });
+
+        fireEvent.click(getByRole('button', { name: /process\.btn/i }));
+        fireEvent.click(getByRole('button', { name: 'taskEdit.aiClarify' }));
+        await waitFor(() => {
+            expect(clarifyTask).toHaveBeenCalledWith(expect.objectContaining({ title: 'Plan launch' }));
+        });
+
+        fireEvent.click(getByRole('button', { name: 'inbox.skip' }));
+        expect(getByText('Follow up with Casey')).toBeInTheDocument();
+
+        await act(async () => {
+            resolveClarify({
+                question: 'Which launch?',
+                options: [{ label: 'Launch website', action: 'Launch website' }],
+            });
+            await delayedResponse;
+        });
+
+        expect(queryByText('Which launch?')).not.toBeInTheDocument();
+        expect(queryByText('Launch website')).not.toBeInTheDocument();
     });
 
     it('leaves the refine step free of AI actions when AI is off', () => {
