@@ -5,10 +5,11 @@ import { Alert } from 'react-native';
 
 import { SwipeableTaskItem, readTaskRowRenderCount, type TaskRowActions } from './swipeable-task-item';
 
-const { addTask, updateTask, restoreTask, showToast, getChecklistProgress, getTaskAgeLabel, getTaskStaleness, safeFormatDate, safeParseDate, storeState } = vi.hoisted(() => ({
+const { addTask, updateTask, restoreTask, undoTaskCompletion, showToast, getChecklistProgress, getTaskAgeLabel, getTaskStaleness, safeFormatDate, safeParseDate, storeState } = vi.hoisted(() => ({
   addTask: vi.fn(),
   updateTask: vi.fn(),
   restoreTask: vi.fn(),
+  undoTaskCompletion: vi.fn(),
   showToast: vi.fn(),
   getChecklistProgress: vi.fn((_value: any): any => null),
   getTaskAgeLabel: vi.fn(() => '3 weeks old'),
@@ -109,6 +110,7 @@ vi.mock('@mindwtr/core', async (importOriginal) => {
     getTaskStaleness,
     safeFormatDate,
     safeParseDate,
+    undoTaskCompletion,
   });
 });
 
@@ -239,6 +241,7 @@ describe('SwipeableTaskItem', () => {
     addTask.mockResolvedValue({ success: true, id: 'created-task' });
     updateTask.mockResolvedValue({ success: true });
     restoreTask.mockResolvedValue({ success: true });
+    undoTaskCompletion.mockResolvedValue(undefined);
     getTaskAgeLabel.mockReturnValue('3 weeks old');
     getTaskStaleness.mockReturnValue('stale');
     getChecklistProgress.mockReturnValue(null);
@@ -1632,6 +1635,62 @@ it('can keep the focus star without adding a redundant focus outline', () => {
     expect(hasText(tree, "What's the next action?")).toBe(false);
     expect(showToast).toHaveBeenCalledWith(expect.objectContaining({
       message: 'Maximum focus limit reached',
+      tone: 'error',
+    }));
+  });
+
+  it('reports a failed completion undo', async () => {
+    undoTaskCompletion.mockRejectedValueOnce(new Error('Could not restore status'));
+    const task = {
+      id: 'task-undo',
+      title: 'Finish current step',
+      status: 'next',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    } as any;
+
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(
+        <SwipeableTaskItem
+          task={task}
+          isDark={false}
+          tc={{
+            taskItemBg: '#111111',
+            border: '#222222',
+            text: '#ffffff',
+            secondaryText: '#999999',
+            tint: '#3b82f6',
+            warning: '#f59e0b',
+          } as any}
+          onPress={vi.fn()}
+          onStatusChange={vi.fn().mockResolvedValue({ success: true })}
+          onDelete={vi.fn()}
+        />
+      );
+    });
+
+    const doneAction = tree.root.find(
+      (node) => node.props.accessibilityLabel === 'Done action' && typeof node.props.onPress === 'function'
+    );
+    await renderer.act(async () => {
+      doneAction.props.onPress();
+      await Promise.resolve();
+    });
+
+    const undoToast = showToast.mock.calls
+      .map(([options]) => options)
+      .find((options) => options?.actionLabel === 'Undo');
+    expect(undoToast).toBeDefined();
+
+    await renderer.act(async () => {
+      undoToast.onAction();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(showToast).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'Could not restore status',
       tone: 'error',
     }));
   });

@@ -338,8 +338,11 @@ function SwipeableTaskItemInner({
                         tone: 'info',
                         actionLabel: tFallback(t, 'common.undo', 'Undo'),
                         onAction: () => {
-                            void undoTaskCompletion(task.id, previousStatus, wasFocusedToday)
-                                .catch(() => undefined);
+                            void settleStoreAction(() => (
+                                undoTaskCompletion(task.id, previousStatus, wasFocusedToday)
+                            )).then((outcome) => {
+                                if (!outcome.ok) showActionFailure(outcome.message);
+                            });
                         },
                         durationMs: 5200,
                     });

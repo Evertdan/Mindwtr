@@ -12,11 +12,16 @@ export async function undoTaskCompletion(
 ): Promise<void> {
     const state = useTaskStore.getState();
     const moveResult = await Promise.resolve(state.moveTask(taskId, previousStatus));
-    if (moveResult && moveResult.success === false) return;
+    if (!moveResult.success) {
+        throw new Error(moveResult.error || 'Failed to restore task status');
+    }
     if (!wasFocusedToday) return;
 
     const current = useTaskStore.getState();
     const focusTaskLimit = normalizeFocusTaskLimit(current.settings.gtd?.focusTaskLimit);
     if (current.getDerivedState().focusedCount >= focusTaskLimit) return;
-    await Promise.resolve(current.updateTask(taskId, { isFocusedToday: true }));
+    const focusResult = await Promise.resolve(current.updateTask(taskId, { isFocusedToday: true }));
+    if (!focusResult.success) {
+        throw new Error(focusResult.error || 'Failed to restore task focus');
+    }
 }

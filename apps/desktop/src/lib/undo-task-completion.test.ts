@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTaskStore, type Task } from '@mindwtr/core';
 
 import { undoTaskCompletion } from './undo-task-completion';
@@ -80,5 +80,40 @@ describe('undoTaskCompletion', () => {
 
         expect(getTask('t3')?.status).toBe('next');
         expect(getTask('t3')?.isFocusedToday ?? false).toBe(false);
+    });
+
+    it('rejects when restoring the previous status returns a failure', async () => {
+        const moveTask = vi.spyOn(useTaskStore.getState(), 'moveTask').mockResolvedValue({
+            success: false,
+            error: 'Could not restore status',
+        });
+
+        try {
+            await expect(undoTaskCompletion('t4', 'next', false)).rejects.toThrow('Could not restore status');
+        } finally {
+            moveTask.mockRestore();
+        }
+    });
+
+    it('rejects when restoring the Today star returns a failure', async () => {
+        useTaskStore.setState({
+            _allTasks: [makeTask('t5', { status: 'done' })],
+            settings: { gtd: { focusTaskLimit: 3 } },
+        });
+        const state = useTaskStore.getState();
+        const moveTask = vi.spyOn(state, 'moveTask').mockResolvedValue({ success: true });
+        const updateTask = vi.spyOn(state, 'updateTask').mockResolvedValue({
+            success: false,
+            error: 'Could not restore focus',
+        });
+
+        try {
+            await expect(undoTaskCompletion('t5', 'next', true)).rejects.toThrow('Could not restore focus');
+            expect(moveTask).toHaveBeenCalledWith('t5', 'next');
+            expect(updateTask).toHaveBeenCalledWith('t5', { isFocusedToday: true });
+        } finally {
+            moveTask.mockRestore();
+            updateTask.mockRestore();
+        }
     });
 });
