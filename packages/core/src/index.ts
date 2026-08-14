@@ -133,6 +133,7 @@ export * from './dgt-import';
 export * from './omnifocus-import';
 export * from './mindwtr-csv-import';
 export * from './mindwtr-csv-export';
+export * from './tasknotes-export';
 export * from './mind-sweep';
 export * from './focus-star';
 export * from './focus-grouping';

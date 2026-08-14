@@ -63,6 +63,7 @@ describe('useSettingsDataPage', () => {
                 transferAction: null,
                 onExportBackup: vi.fn(),
             onExportCsv: vi.fn(),
+            onExportTaskNotes: vi.fn(),
                 onRestoreBackup: vi.fn(),
                 onMergeBackup: vi.fn(),
                 onImportTodoist: vi.fn(),

@@ -29,6 +29,7 @@ const baseProps = {
   handleAddGettingStartedContent: noop,
   handleBackup: noop,
   handleExportCsv: noop,
+  handleExportTaskNotes: noop,
   handleImportDgt: noop,
   handleImportMindwtrCsv: noop,
   handleImportOmniFocus: noop,

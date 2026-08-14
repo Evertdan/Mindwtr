@@ -30,6 +30,7 @@
     "./omnifocus-import": "./src/omnifocus-import.ts",
     "./mindwtr-csv-import": "./src/mindwtr-csv-import.ts",
     "./mindwtr-csv-export": "./src/mindwtr-csv-export.ts",
+    "./tasknotes-export": "./src/tasknotes-export.ts",
     "./import-runner": "./src/import-runner.ts",
     "./whisper-models": "./src/whisper-models.ts"
   },

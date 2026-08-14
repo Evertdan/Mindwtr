@@ -313,6 +313,8 @@ export const SETTINGS_LABEL_KEYS = [
     'exportBackup',
     'exportCsv',
     'exportCsvDesc',
+    'exportTaskNotes',
+    'exportTaskNotesDesc',
     'exportBackupDesc',
     'restoreBackup',
     'restoreBackupDesc',

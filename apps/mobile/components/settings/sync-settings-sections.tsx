@@ -132,6 +132,7 @@ type SyncBackupSectionProps = {
   handleAddGettingStartedContent: () => void;
   handleBackup: () => void;
   handleExportCsv: () => void;
+  handleExportTaskNotes: () => void;
   handleImportDgt: () => void;
   handleImportMindwtrCsv: () => void;
   handleImportOmniFocus: () => void;
@@ -160,6 +161,7 @@ export function SyncBackupSection({
   handleAddGettingStartedContent,
   handleBackup,
   handleExportCsv,
+  handleExportTaskNotes,
   handleImportDgt,
   handleImportMindwtrCsv,
   handleImportOmniFocus,
@@ -238,6 +240,22 @@ export function SyncBackupSection({
               <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>{t('settings.exportCsvDesc')}</Text>
             </View>
             {backupAction === 'export:csv' && renderDecorativeActivityIndicator(tc.tint)}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}
+            onPress={handleExportTaskNotes}
+            disabled={isSyncing || isBackupBusy}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.exportTaskNotes')}
+            accessibilityHint={t('settings.exportTaskNotesDesc')}
+            accessibilityState={{ busy: backupAction === 'export:tasknotes', disabled: isSyncing || isBackupBusy }}
+            testID="data-transfer-export-tasknotes"
+          >
+            <View style={styles.settingInfo}>
+              <Text style={[styles.settingLabel, { color: '#3B82F6' }]}>{t('settings.exportTaskNotes')}</Text>
+              <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>{t('settings.exportTaskNotesDesc')}</Text>
+            </View>
+            {backupAction === 'export:tasknotes' && renderDecorativeActivityIndicator(tc.tint)}
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}

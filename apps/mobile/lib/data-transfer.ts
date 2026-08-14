@@ -47,6 +47,7 @@ import {
 } from '@mindwtr/core/mindwtr-csv-import';
 
 import { serializeMindwtrCsv } from '@mindwtr/core/mindwtr-csv-export';
+import { buildTaskNotesExportZip } from '@mindwtr/core/tasknotes-export';
 import { logError, logInfo } from './app-log';
 import {
     createMobileRecoverySnapshot,
@@ -426,12 +427,22 @@ export const restoreLocalDataSnapshot = async (snapshotName: string): Promise<vo
 
 // One export path for both formats: the SAF/sharing dance below is identical,
 // only the filename, body and mime type differ.
-export const exportCurrentDataBackup = async (data: AppData, format: 'json' | 'csv' = 'json'): Promise<void> => {
+export const exportCurrentDataBackup = async (data: AppData, format: 'json' | 'csv' | 'tasknotes' = 'json'): Promise<void> => {
     addBreadcrumb('transfer:export');
     const isCsv = format === 'csv';
-    const snapshotName = isCsv ? createBackupFileName().replace(/\.json$/u, '.csv') : createBackupFileName();
-    const jsonContent = isCsv ? serializeMindwtrCsv(data) : serializeBackupData(data);
-    const mimeType = isCsv ? 'text/csv' : 'application/json';
+    const isTaskNotes = format === 'tasknotes';
+    const snapshotName = isTaskNotes
+        ? createBackupFileName().replace(/\.json$/u, '-tasknotes.zip')
+        : isCsv
+            ? createBackupFileName().replace(/\.json$/u, '.csv')
+            : createBackupFileName();
+    // The TaskNotes export is a ZIP, written and shared as base64 bytes; the
+    // other formats stay plain text.
+    const base64Content = isTaskNotes
+        ? Buffer.from(buildTaskNotesExportZip(data).zip).toString('base64')
+        : null;
+    const jsonContent = isTaskNotes ? '' : isCsv ? serializeMindwtrCsv(data) : serializeBackupData(data);
+    const mimeType = isTaskNotes ? 'application/zip' : isCsv ? 'text/csv' : 'application/json';
     void logInfo('Backup export started', {
         scope: 'transfer',
         extra: {
@@ -451,7 +462,13 @@ export const exportCurrentDataBackup = async (data: AppData, format: 'json' | 'c
                         snapshotName,
                         mimeType
                     );
-                    await StorageAccessFramework.writeAsStringAsync(fileUri, jsonContent);
+                    if (base64Content !== null) {
+                        await StorageAccessFramework.writeAsStringAsync(fileUri, base64Content, {
+                            encoding: FileSystem.EncodingType.Base64,
+                        });
+                    } else {
+                        await StorageAccessFramework.writeAsStringAsync(fileUri, jsonContent);
+                    }
                     void logInfo('Backup export complete', {
                         scope: 'transfer',
                         extra: {
@@ -468,13 +485,19 @@ export const exportCurrentDataBackup = async (data: AppData, format: 'json' | 'c
         }
 
         const fileUri = `${FileSystem.cacheDirectory}${snapshotName}`;
-        await FileSystem.writeAsStringAsync(fileUri, jsonContent);
+        if (base64Content !== null) {
+            await FileSystem.writeAsStringAsync(fileUri, base64Content, {
+                encoding: FileSystem.EncodingType.Base64,
+            });
+        } else {
+            await FileSystem.writeAsStringAsync(fileUri, jsonContent);
+        }
         const Sharing = await import('expo-sharing');
         if (!(await Sharing.isAvailableAsync())) {
             throw new Error('Sharing is not available on this device.');
         }
         await Sharing.shareAsync(fileUri, {
-            UTI: isCsv ? 'public.comma-separated-values-text' : 'public.json',
+            UTI: isTaskNotes ? 'public.zip-archive' : isCsv ? 'public.comma-separated-values-text' : 'public.json',
             mimeType,
             dialogTitle: 'Export Mindwtr Backup',
         });

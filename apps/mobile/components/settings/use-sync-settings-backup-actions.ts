@@ -55,6 +55,7 @@ export type BackupAction =
     | null
     | 'export'
     | 'export:csv'
+    | 'export:tasknotes'
     | 'restore'
     | 'merge'
     | 'import:todoist'
@@ -311,6 +312,18 @@ export function useSyncSettingsBackupActions({
 
     // `undo` only swaps the copy: an undo IS a snapshot restore, so it keeps the
     // same destructive-confirmation weight and the same restore path.
+    const handleExportTaskNotes = useCallback(async () => {
+        setBackupAction('export:tasknotes');
+        try {
+            await exportCurrentDataBackup(getInMemoryAppDataSnapshot(), 'tasknotes');
+        } catch (error) {
+            logSettingsError(error);
+            showSettingsErrorToast(tr('settings.syncMobile.error'), tr('settings.exportTaskNotesFailed'));
+        } finally {
+            setBackupAction(null);
+        }
+    }, [tr, setBackupAction, showSettingsErrorToast]);
+
     const handleRestoreRecoverySnapshot = useCallback(async (snapshotName: string, undo = false) => {
         Alert.alert(
             undo
@@ -855,6 +868,7 @@ export function useSyncSettingsBackupActions({
         formatRecoverySnapshotLabel,
         handleBackup,
         handleExportCsv,
+        handleExportTaskNotes,
         handleClearLog,
         handleImportDgt,
         handleImportMindwtrCsv,

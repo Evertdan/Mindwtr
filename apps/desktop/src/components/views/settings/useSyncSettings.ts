@@ -31,6 +31,7 @@ import {
     importDesktopDgtData,
     exportDesktopBackup,
     exportDesktopCsv,
+    exportDesktopTaskNotes,
     importDesktopMindwtrCsvData,
     importDesktopOmniFocusData,
     importDesktopTickTickData,
@@ -1263,6 +1264,19 @@ export const useSyncSettings = ({
         }
     }, [resolveText, showToast, toErrorMessage]);
 
+    const handleExportTaskNotes = useCallback(async () => {
+        addBreadcrumb('transfer:export');
+        setTransferAction('export:tasknotes');
+        try {
+            await exportDesktopTaskNotes(getInMemoryAppDataSnapshot());
+            showToast(resolveText('settings.exportTaskNotesSuccess', 'TaskNotes files exported successfully!'), 'success');
+        } catch (error) {
+            showToast(toErrorMessage(error, resolveText('settings.exportTaskNotesFailed', 'Failed to export TaskNotes files')), 'error');
+        } finally {
+            setTransferAction(null);
+        }
+    }, [resolveText, showToast, toErrorMessage]);
+
     const handleRestoreBackup = useCallback(async () => {
         addBreadcrumb('transfer:restore');
         setTransferAction('restore');
@@ -1776,6 +1790,7 @@ export const useSyncSettings = ({
             transferAction,
             onExportBackup: handleExportBackup,
             onExportCsv: handleExportCsv,
+            onExportTaskNotes: handleExportTaskNotes,
             onRestoreBackup: handleRestoreBackup,
             onMergeBackup: handleMergeBackup,
             onImportTodoist: handleImportTodoist,

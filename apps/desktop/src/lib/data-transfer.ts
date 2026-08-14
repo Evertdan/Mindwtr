@@ -38,6 +38,7 @@ import {
     type ParsedMindwtrCsvImportData,
 } from '@mindwtr/core/mindwtr-csv-import';
 import { serializeMindwtrCsv } from '@mindwtr/core/mindwtr-csv-export';
+import { buildTaskNotesExportZip } from '@mindwtr/core/tasknotes-export';
 
 import { SyncService } from './sync-service';
 import { tauriStorage } from './storage-adapter';
@@ -256,6 +257,64 @@ export const exportDesktopCsv = async (data: AppData): Promise<void> => {
         });
     } catch (error) {
         void logError(error, { scope: 'transfer', extra: { operation: 'exportCsv' } });
+        throw error;
+    }
+};
+
+const downloadBinaryFile = async (
+    fileName: string,
+    bytes: Uint8Array,
+    format: { name: string; extension: string; mimeType: string },
+): Promise<void> => {
+    if (isTauriRuntime()) {
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        const selected = await save({
+            defaultPath: fileName,
+            filters: [{ name: format.name, extensions: [format.extension] }],
+            title: 'Export backup',
+        });
+        if (!selected || typeof selected !== 'string') return;
+        const { writeFile } = await import('@tauri-apps/plugin-fs');
+        await writeFile(selected, bytes);
+        return;
+    }
+
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+        throw new Error('Browser download is unavailable in this environment.');
+    }
+
+    const blob = new Blob([bytes as BlobPart], { type: format.mimeType });
+    const url = window.URL.createObjectURL(blob);
+    try {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        link.click();
+    } finally {
+        window.URL.revokeObjectURL(url);
+    }
+};
+
+export const exportDesktopTaskNotes = async (data: AppData): Promise<void> => {
+    addBreadcrumb('transfer:export');
+    void logInfo('TaskNotes export started', {
+        scope: 'transfer',
+        extra: { operation: 'exportTaskNotes', source: 'local' },
+    });
+    try {
+        await flushPendingSave();
+        const { zip, fileCount } = buildTaskNotesExportZip(data);
+        await downloadBinaryFile(
+            createBackupFileName().replace(/\.json$/u, '-tasknotes.zip'),
+            zip,
+            { name: 'ZIP', extension: 'zip', mimeType: 'application/zip' },
+        );
+        void logInfo('TaskNotes export complete', {
+            scope: 'transfer',
+            extra: { operation: 'exportTaskNotes', source: 'local', fileCount: String(fileCount) },
+        });
+    } catch (error) {
+        void logError(error, { scope: 'transfer', extra: { operation: 'exportTaskNotes' } });
         throw error;
     }
 };

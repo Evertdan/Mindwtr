@@ -118,6 +118,7 @@ export const SETTINGS_SEARCH_PAGE_KEYS: Record<SettingsSearchPageId, readonly Se
         'backup',
         { key: 'exportBackup', section: 'backup' },
         { key: 'exportCsv', section: 'backup' },
+        { key: 'exportTaskNotes', section: 'backup' },
         { key: 'restoreBackup', section: 'backup' },
         { key: 'mergeBackup', section: 'backup' },
         'importData',

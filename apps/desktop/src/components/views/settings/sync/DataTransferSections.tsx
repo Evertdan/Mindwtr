@@ -9,6 +9,7 @@ type BackupSectionProps = Pick<
     | 'transferAction'
     | 'onExportBackup'
     | 'onExportCsv'
+    | 'onExportTaskNotes'
     | 'onRestoreBackup'
     | 'onMergeBackup'
     | 'onAddGettingStartedContent'
@@ -63,6 +64,7 @@ function TransferActionButton({
 export function BackupSection({
     onExportBackup,
     onExportCsv,
+    onExportTaskNotes,
     onMergeBackup,
     onRestoreBackup,
     onAddGettingStartedContent,
@@ -95,6 +97,14 @@ export function BackupSection({
                 description={t.exportCsvDesc}
                 statusText={transferAction === 'export:csv' ? t.syncing : null}
                 onClick={() => void onExportCsv()}
+            />
+            <TransferActionButton
+                disabled={disabled}
+                settingsKey="exportTaskNotes"
+                label={t.exportTaskNotes}
+                description={t.exportTaskNotesDesc}
+                statusText={transferAction === 'export:tasknotes' ? t.syncing : null}
+                onClick={() => void onExportTaskNotes()}
             />
             <TransferActionButton
                 disabled={disabled}

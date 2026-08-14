@@ -423,6 +423,7 @@ function SyncSettingsView({
         formatRecoverySnapshotLabel,
         handleBackup,
         handleExportCsv,
+        handleExportTaskNotes,
         handleClearLog,
         handleImportDgt,
         handleImportMindwtrCsv,
@@ -863,6 +864,7 @@ function SyncSettingsView({
                             handleAddGettingStartedContent={() => handleAddGettingStartedContent()}
                             handleBackup={() => void handleBackup()}
                             handleExportCsv={() => void handleExportCsv()}
+                            handleExportTaskNotes={() => void handleExportTaskNotes()}
                             handleImportDgt={() => void handleImportDgt()}
                             handleImportMindwtrCsv={() => void handleImportMindwtrCsv()}
                             handleImportOmniFocus={() => void handleImportOmniFocus()}
