@@ -142,6 +142,21 @@ describe('covered local snapshot', () => {
         expect(covered).toBe(false);
     });
 
+    it('rejects coverage when the proxy changed mid-cycle', () => {
+        __syncServiceTestUtils.setDependenciesForTests({
+            getStoreState: () => ({ lastDataChangeAt: 5 }) as any,
+            getInMemoryAppDataSnapshot: () => dataWithSettings({
+                network: { proxyUrl: 'http://proxy-two.local:8080' },
+            }),
+        });
+
+        const covered = (SyncService as any).isCoveredLocalSnapshot(
+            dataWithSettings({ network: { proxyUrl: 'http://proxy-one.local:8080' } }),
+        );
+
+        expect(covered).toBe(false);
+    });
+
     it('accepts coverage when the mid-cycle change left settings identical', () => {
         __syncServiceTestUtils.setDependenciesForTests({
             getStoreState: () => ({ lastDataChangeAt: 5 }) as any,

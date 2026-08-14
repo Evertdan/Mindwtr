@@ -631,6 +631,16 @@ describe('sync-helpers computeCoveredSettingsFingerprint', () => {
         } as AppData['settings']);
         expect(after).toBe(before);
     });
+
+    it('changes when the device proxy changes during a sync cycle', () => {
+        const before = computeCoveredSettingsFingerprint({
+            network: { proxyUrl: 'http://proxy-one.local:8080' },
+        } as AppData['settings']);
+        const after = computeCoveredSettingsFingerprint({
+            network: { proxyUrl: 'http://proxy-two.local:8080' },
+        } as AppData['settings']);
+        expect(after).not.toBe(before);
+    });
 });
 
 describe('sync-helpers computeSyncPayloadFingerprint', () => {

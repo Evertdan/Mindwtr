@@ -318,7 +318,6 @@ export const computeSyncPayloadFingerprint = (data: AppData): string =>
  * itself rewrites them while it runs.
  */
 export const SYNC_STATUS_BOOKKEEPING_SETTINGS_KEYS = [
-    'network',
     'lastSyncAt',
     'lastSyncStatus',
     'lastSyncError',

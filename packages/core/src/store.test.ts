@@ -1533,6 +1533,19 @@ describe('TaskStore', () => {
         expect(state.lastDataChangeAt).toBe(new Date('2026-03-21T12:00:00.000Z').getTime());
     });
 
+    it('tracks proxy changes as local data mutations', async () => {
+        vi.setSystemTime(new Date('2026-03-21T12:00:00.000Z'));
+        useTaskStore.setState({ settings: { deviceId: 'device-a' }, lastDataChangeAt: 0 });
+
+        await useTaskStore.getState().updateSettings({
+            network: { proxyUrl: 'http://proxy.local:8080' },
+        });
+
+        const state = useTaskStore.getState();
+        expect(state.settings.network?.proxyUrl).toBe('http://proxy.local:8080');
+        expect(state.lastDataChangeAt).toBe(new Date('2026-03-21T12:00:00.000Z').getTime());
+    });
+
     it('merges appearance updates so density changes keep text size and task age', async () => {
         await useTaskStore.getState().updateSettings({
             appearance: {
