@@ -18,6 +18,11 @@ permissions:
   contents: read
 
 env:
+  APPIMAGETOOL_VERSION: "1.9.1"
+  APPIMAGETOOL_X86_64_SHA256: "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0"
+  APPIMAGE_RUNTIME_COMMIT: "75849dce7cc37e4319b633df1f116ca895c71a12"
+  APPIMAGE_RUNTIME_ASSET_ID: "456065460"
+  APPIMAGE_RUNTIME_X86_64_SHA256: "1cc49bcf1e2ccd593c379adb17c9f85a36d619088296504de95b1d06215aebbf"
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 concurrency:
@@ -118,11 +123,32 @@ jobs:
             arm64) RUNNER_ARCH="aarch64" ;;
           esac
 
-          TOOL_URL="https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+          TOOL_URL="https://github.com/AppImage/appimagetool/releases/download/${APPIMAGETOOL_VERSION}/appimagetool-x86_64.AppImage"
+          RUNTIME_URL="https://api.github.com/repos/AppImage/type2-runtime/releases/assets/${APPIMAGE_RUNTIME_ASSET_ID}"
           TOOL_WORKDIR="$(mktemp -d)"
+          TOOL_PATH="$TOOL_WORKDIR/appimagetool.AppImage"
+          RUNTIME_PATH="$TOOL_WORKDIR/runtime-x86_64"
           METAINFO_SOURCE="$GITHUB_WORKSPACE/apps/desktop/src-tauri/linux/Mindwtr.metainfo.xml"
-          curl -fsSL "$TOOL_URL" -o "$TOOL_WORKDIR/appimagetool.AppImage"
-          chmod +x "$TOOL_WORKDIR/appimagetool.AppImage"
+          curl -fsSL "$TOOL_URL" -o "$TOOL_PATH"
+          printf '%s  appimagetool.AppImage\n' "$APPIMAGETOOL_X86_64_SHA256" \
+            > "$TOOL_WORKDIR/appimagetool.sha256"
+          (
+            cd "$TOOL_WORKDIR"
+            sha256sum --check --strict appimagetool.sha256
+          )
+          echo "Downloading AppImage type2 runtime from release commit ${APPIMAGE_RUNTIME_COMMIT} (asset ${APPIMAGE_RUNTIME_ASSET_ID})"
+          curl -fsSL \
+            -H "Accept: application/octet-stream" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "$RUNTIME_URL" \
+            -o "$RUNTIME_PATH"
+          printf '%s  runtime-x86_64\n' "$APPIMAGE_RUNTIME_X86_64_SHA256" \
+            > "$TOOL_WORKDIR/runtime.sha256"
+          (
+            cd "$TOOL_WORKDIR"
+            sha256sum --check --strict runtime.sha256
+          )
+          chmod +x "$TOOL_PATH"
           (
             cd "$TOOL_WORKDIR"
             ./appimagetool.AppImage --appimage-extract >/dev/null
@@ -199,7 +225,9 @@ jobs:
                 chmod 0755 appdir/AppRun.wrapped
               fi
 
-              ARCH="$RUNNER_ARCH" "$APPIMAGETOOL" appdir fixed.AppImage
+              ARCH="$RUNNER_ARCH" "$APPIMAGETOOL" \
+                --runtime-file "$RUNTIME_PATH" \
+                appdir fixed.AppImage
             )
 
             cp "$APP_WORKDIR/fixed.AppImage" "$APPIMAGE_PATH"

@@ -23,6 +23,60 @@ test("MCP publisher is versioned and checksum-verified before credentials are us
   expect(loginIndex).toBeGreaterThan(installIndex);
 });
 
+test("Linux AppImage repair pins and verifies appimagetool and its runtime", () => {
+  const workflow = read(".github/workflows/release-linux.yml");
+
+  expect(workflow).toContain('APPIMAGETOOL_VERSION: "1.9.1"');
+  expect(workflow).toContain(
+    'APPIMAGETOOL_X86_64_SHA256: "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0"',
+  );
+  expect(workflow).toContain(
+    "releases/download/${APPIMAGETOOL_VERSION}/appimagetool-x86_64.AppImage",
+  );
+  expect(workflow).toContain(
+    "printf '%s  appimagetool.AppImage\\n' \"$APPIMAGETOOL_X86_64_SHA256\"",
+  );
+  expect(workflow).toContain(
+    'sha256sum --check --strict appimagetool.sha256',
+  );
+  expect(workflow).not.toContain("releases/download/continuous/");
+  expect(workflow).toContain(
+    'APPIMAGE_RUNTIME_COMMIT: "75849dce7cc37e4319b633df1f116ca895c71a12"',
+  );
+  expect(workflow).toContain('APPIMAGE_RUNTIME_ASSET_ID: "456065460"');
+  expect(workflow).toContain(
+    'APPIMAGE_RUNTIME_X86_64_SHA256: "1cc49bcf1e2ccd593c379adb17c9f85a36d619088296504de95b1d06215aebbf"',
+  );
+  expect(workflow).toContain(
+    "api.github.com/repos/AppImage/type2-runtime/releases/assets/${APPIMAGE_RUNTIME_ASSET_ID}",
+  );
+  expect(workflow).toContain('-H "Accept: application/octet-stream"');
+  expect(workflow).toContain(
+    "printf '%s  runtime-x86_64\\n' \"$APPIMAGE_RUNTIME_X86_64_SHA256\"",
+  );
+  expect(workflow).toContain("sha256sum --check --strict runtime.sha256");
+
+  const downloadIndex = workflow.indexOf('curl -fsSL "$TOOL_URL"');
+  const checksumIndex = workflow.indexOf("sha256sum --check --strict");
+  const chmodIndex = workflow.indexOf('chmod +x "$TOOL_PATH"');
+  const executionIndex = workflow.indexOf("./appimagetool.AppImage --appimage-extract");
+
+  expect(downloadIndex).toBeGreaterThanOrEqual(0);
+  expect(checksumIndex).toBeGreaterThan(downloadIndex);
+  expect(chmodIndex).toBeGreaterThan(checksumIndex);
+  expect(executionIndex).toBeGreaterThan(checksumIndex);
+
+  const runtimeDownloadIndex = workflow.indexOf('"$RUNTIME_URL"');
+  const runtimeChecksumIndex = workflow.indexOf(
+    "sha256sum --check --strict runtime.sha256",
+  );
+  const runtimeUseIndex = workflow.indexOf('--runtime-file "$RUNTIME_PATH"');
+
+  expect(runtimeDownloadIndex).toBeGreaterThanOrEqual(0);
+  expect(runtimeChecksumIndex).toBeGreaterThan(runtimeDownloadIndex);
+  expect(runtimeUseIndex).toBeGreaterThan(runtimeChecksumIndex);
+});
+
 test("Android releases use the isolated, repository-locked EAS CLI", () => {
   const manifest = JSON.parse(read("tools/eas-cli/package.json"));
   const lock = JSON.parse(read("tools/eas-cli/package-lock.json"));
