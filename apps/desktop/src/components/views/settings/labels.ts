@@ -614,6 +614,7 @@ export const SETTINGS_LABEL_KEYS = [
     'catppuccinMacchiato',
     'dracula',
     'sepia',
+    'oled',
     'close',
 ] as const;
 

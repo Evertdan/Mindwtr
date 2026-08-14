@@ -378,6 +378,63 @@
     --badge-info-fg: 60 30% 96.1%;
   }
 
+  /* OLED / Midnight. The dark theme's hues on pure-black surfaces — matches the
+     mobile `oled` preset (#000000 ground and cards, #1F2937 borders carrying the
+     separation, #4F9DFF accent). Status colors stay the dark set, mirroring
+     core's theme-scheme where oled derives from dark rather than a bespoke
+     palette. */
+  :root.theme-oled {
+    color-scheme: dark;
+    --background: 0 0% 0%;
+    --foreground: 220 13% 91%;
+    --card: 0 0% 0%;
+    --card-foreground: 220 13% 91%;
+    --popover: 0 0% 4%;
+    --popover-foreground: 220 13% 91%;
+    --primary: 213 100% 65%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 8%;
+    --secondary-foreground: 220 13% 88%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 218 11% 65%;
+    --accent: 0 0% 12%;
+    --accent-foreground: 220 13% 91%;
+    --destructive: 0 91% 71%;
+    --destructive-foreground: 0 0% 0%;
+    --success: 156 64% 52%;
+    --success-foreground: 0 0% 0%;
+    --warning: 43 96% 56%;
+    --warning-foreground: 0 0% 0%;
+    --focus-star: 45 96% 65%;
+    --focus-star-outline: 40 90% 45%;
+    --info: 213 100% 65%;
+    --info-foreground: 0 0% 0%;
+    --border: 215 28% 17%;
+    --input: 215 28% 17%;
+    --ring: 213 100% 65%;
+    --status-inbox: 217 91% 65%;
+    --status-next: 142 60% 50%;
+    --status-waiting: 45 90% 55%;
+    --status-someday: 270 65% 70%;
+    --status-reference: 199 75% 60%;
+    --status-done: 220 10% 60%;
+    --status-archived: 217 91% 65%;
+    --badge-project-bg: 220 18% 12%;
+    --badge-project-fg: 210 40% 90%;
+    --badge-context-bg: 270 20% 13%;
+    --badge-context-fg: 270 40% 85%;
+    --badge-tag-bg: 0 0% 10%;
+    --badge-tag-fg: 220 10% 85%;
+    --badge-priority-bg: 30 40% 13%;
+    --badge-priority-fg: 35 85% 80%;
+    --badge-estimate-bg: 140 30% 12%;
+    --badge-estimate-fg: 140 50% 85%;
+    --badge-age-bg: 35 25% 12%;
+    --badge-age-fg: 35 70% 80%;
+    --badge-info-bg: 0 0% 10%;
+    --badge-info-fg: 220 13% 88%;
+  }
+
   :root.theme-sepia {
     color-scheme: light;
     --background: 42.9 56% 90.2%;

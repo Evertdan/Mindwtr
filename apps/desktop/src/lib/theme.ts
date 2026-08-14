@@ -3,7 +3,7 @@ import { resolveThemeColorScheme } from '@mindwtr/core';
 
 import { invokeNative } from './tauri-invoke';
 
-export type DesktopThemeMode = 'system' | 'light' | 'dark' | 'eink' | 'nord' | 'sepia' | 'catppuccin-macchiato' | 'dracula';
+export type DesktopThemeMode = 'system' | 'light' | 'dark' | 'eink' | 'nord' | 'sepia' | 'oled' | 'catppuccin-macchiato' | 'dracula';
 export type SystemThemePreference = 'light' | 'dark' | null;
 type NativeThemePreference = Exclude<SystemThemePreference, null>;
 type NativeThemeSetter = (theme?: NativeThemePreference | null) => Promise<void>;
@@ -33,15 +33,16 @@ const isDesktopThemeMode = (value: string | null | undefined): value is DesktopT
     || value === 'eink'
     || value === 'nord'
     || value === 'sepia'
+    || value === 'oled'
     || value === 'catppuccin-macchiato'
     || value === 'dracula'
 );
 
-// Desktop has no material3-* or oled theme of its own; collapse those into the
+// Desktop has no material3-* theme of its own; collapse those into the
 // plain light/dark mode they render as. Classification comes from core so this
 // stays in lockstep with mobile and the iOS widget.
 const collapseUnsupportedDesktopTheme = (value: string): DesktopThemeMode | null => {
-    if (value !== 'material3-dark' && value !== 'material3-light' && value !== 'oled') return null;
+    if (value !== 'material3-dark' && value !== 'material3-light') return null;
     return resolveThemeColorScheme(value as AppTheme, 'light');
 };
 
@@ -223,6 +224,7 @@ const THEME_MODE_CLASSES = {
     eink: 'theme-eink',
     nord: 'theme-nord',
     sepia: 'theme-sepia',
+    oled: 'theme-oled',
     'catppuccin-macchiato': 'theme-catppuccin-macchiato',
     dracula: 'theme-dracula',
 } as const satisfies Partial<Record<DesktopThemeMode, string>>;

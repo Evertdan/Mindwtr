@@ -70,6 +70,7 @@ describe('applyThemeMode', () => {
         ['nord', 'theme-nord'],
         ['catppuccin-macchiato', 'theme-catppuccin-macchiato'],
         ['dracula', 'theme-dracula'],
+        ['oled', 'theme-oled'],
     ] as const)('marks %s as a dark theme and applies its class', (mode, className) => {
         applyThemeMode(mode, 'light');
 
@@ -116,18 +117,19 @@ describe('resolveDesktopThemeMode', () => {
         expect(resolveDesktopThemeMode('system', 'dark')).toBe('system');
     });
 
-    it('collapses unsupported material3/oled theme values to the scheme they render as', () => {
+    it('collapses unsupported material3 theme values to the scheme they render as', () => {
         expect(resolveDesktopThemeMode('material3-dark', null)).toBe('dark');
         expect(resolveDesktopThemeMode('material3-light', null)).toBe('light');
-        expect(resolveDesktopThemeMode('oled', null)).toBe('dark');
         expect(resolveDesktopThemeMode(undefined, 'material3-light')).toBe('light');
     });
 
     it('carries the new preset themes through sync and local storage untouched', () => {
         expect(resolveDesktopThemeMode('catppuccin-macchiato', null)).toBe('catppuccin-macchiato');
         expect(resolveDesktopThemeMode('dracula', null)).toBe('dracula');
+        expect(resolveDesktopThemeMode('oled', null)).toBe('oled');
         expect(resolveDesktopThemeMode(undefined, 'catppuccin-macchiato')).toBe('catppuccin-macchiato');
         expect(resolveDesktopThemeMode(undefined, 'dracula')).toBe('dracula');
+        expect(resolveDesktopThemeMode(undefined, 'oled')).toBe('oled');
     });
 });
 

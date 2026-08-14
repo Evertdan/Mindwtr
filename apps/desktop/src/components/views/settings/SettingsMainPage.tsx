@@ -10,7 +10,7 @@ import { SettingRow, SettingsCard, SettingsSectionHeader } from './SettingRow';
 
 const FLATPAK_QUICK_ADD_COMMAND = 'flatpak run tech.dongdongbh.mindwtr --quick-add';
 
-type ThemeMode = 'system' | 'light' | 'dark' | 'eink' | 'nord' | 'sepia' | 'catppuccin-macchiato' | 'dracula';
+type ThemeMode = 'system' | 'light' | 'dark' | 'eink' | 'nord' | 'sepia' | 'oled' | 'catppuccin-macchiato' | 'dracula';
 type DensityMode = 'comfortable' | 'compact' | 'condensed';
 type TextSizeMode = 'small' | 'default' | 'large' | 'extra-large';
 type WeekStart = 'system' | 'sunday' | 'monday' | 'saturday';
@@ -45,6 +45,7 @@ type Labels = {
     catppuccinMacchiato: string;
     dracula: string;
     sepia: string;
+    oled: string;
     language: string;
     languagePartlyTranslated: string;
     weekStart: string;
@@ -216,7 +217,7 @@ export function SettingsMainPage({
                 <SettingRow padded
                     settingsKey="appearance"
                     title={t.appearance}
-                    description={`${t.system} / ${t.light} / ${t.dark} / ${t.eink} / ${t.nord} / ${t.catppuccinMacchiato} / ${t.dracula} / ${t.sepia}`}
+                    description={`${t.system} / ${t.light} / ${t.dark} / ${t.eink} / ${t.nord} / ${t.catppuccinMacchiato} / ${t.dracula} / ${t.sepia} / ${t.oled}`}
                 >
                     <select
                         aria-label={t.appearance}
@@ -232,6 +233,7 @@ export function SettingsMainPage({
                         <option value="catppuccin-macchiato">{t.catppuccinMacchiato}</option>
                         <option value="dracula">{t.dracula}</option>
                         <option value="sepia">{t.sepia}</option>
+                        <option value="oled">{t.oled}</option>
                     </select>
                 </SettingRow>
                 <SettingRow padded settingsKey="density" title={t.density} description={t.densityDesc}>
