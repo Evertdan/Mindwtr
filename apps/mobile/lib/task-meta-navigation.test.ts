@@ -1,42 +1,112 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const routerMock = vi.hoisted(() => ({
-  navigate: vi.fn(),
-  push: vi.fn(),
-  replace: vi.fn(),
+const routerMocks = vi.hoisted(() => ({
+    navigate: vi.fn(),
+    push: vi.fn(),
+    replace: vi.fn(),
 }));
 
-vi.mock('expo-router', () => ({ router: routerMock }));
+vi.mock('expo-router', () => ({
+    router: routerMocks,
+}));
 
-import { openTaskScreen } from './task-meta-navigation';
+let openContextsScreen: typeof import('./task-meta-navigation').openContextsScreen;
+let openProjectScreen: typeof import('./task-meta-navigation').openProjectScreen;
+let openTaskScreen: typeof import('./task-meta-navigation').openTaskScreen;
 
-describe('openTaskScreen', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+describe('task-meta-navigation', () => {
+    beforeAll(async () => {
+        ({ openContextsScreen, openProjectScreen, openTaskScreen } = await import('./task-meta-navigation'));
+    });
 
-  it('pushes the task screen by default', () => {
-    openTaskScreen('t1', 'p1', 'task');
-    expect(routerMock.push).toHaveBeenCalledWith(expect.objectContaining({
-      pathname: '/projects-screen',
-      params: expect.objectContaining({ projectId: 'p1', taskId: 't1', taskTab: 'task' }),
-    }));
-    expect(routerMock.replace).not.toHaveBeenCalled();
-  });
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
 
-  // #1029: the capture route's Save & edit swaps itself out — a push left the
-  // filled capture form on the stack, so backing out of the editor reopened it.
-  it('replaces the current route when asked', () => {
-    openTaskScreen('t1', 'p1', 'task', { replace: true });
-    expect(routerMock.replace).toHaveBeenCalledWith(expect.objectContaining({
-      pathname: '/projects-screen',
-      params: expect.objectContaining({ taskId: 't1' }),
-    }));
-    expect(routerMock.push).not.toHaveBeenCalled();
-  });
+    it('navigates to the project screen with a fresh open token', () => {
+        vi.spyOn(Date, 'now').mockReturnValueOnce(24680);
 
-  it('replaces to the focus screen when the task has no project', () => {
-    openTaskScreen('t1', undefined, 'task', { replace: true });
-    expect(routerMock.replace).toHaveBeenCalledWith(expect.objectContaining({ pathname: '/focus' }));
-  });
+        openProjectScreen('project-1');
+
+        expect(routerMocks.navigate).toHaveBeenCalledWith({
+            pathname: '/projects-screen',
+            params: { projectId: 'project-1', openToken: '24680' },
+        });
+    });
+
+    it('navigates to the contexts screen', () => {
+        openContextsScreen('@health');
+
+        expect(routerMocks.navigate).toHaveBeenCalledWith({
+            pathname: '/contexts',
+            params: { token: '@health' },
+        });
+    });
+
+    it('opens a project task on the project screen', () => {
+        vi.spyOn(Date, 'now').mockReturnValueOnce(12345);
+
+        openTaskScreen('task-1', 'project-1');
+
+        expect(routerMocks.push).toHaveBeenCalledWith({
+            pathname: '/projects-screen',
+            params: { projectId: 'project-1', taskId: 'task-1', openToken: '12345', taskTab: 'view' },
+        });
+    });
+
+    it('can open a task directly on the task edit tab', () => {
+        vi.spyOn(Date, 'now').mockReturnValueOnce(67890);
+
+        openTaskScreen('task-2', 'project-2', 'task');
+
+        expect(routerMocks.push).toHaveBeenCalledWith({
+            pathname: '/projects-screen',
+            params: { projectId: 'project-2', taskId: 'task-2', openToken: '67890', taskTab: 'task' },
+        });
+    });
+
+    it('opens an unprojected task on the focus screen', () => {
+        vi.spyOn(Date, 'now').mockReturnValueOnce(98765);
+
+        openTaskScreen('task-9');
+
+        expect(routerMocks.push).toHaveBeenCalledWith({
+            pathname: '/focus',
+            params: { taskId: 'task-9', openToken: '98765', taskTab: 'view' },
+        });
+    });
+
+    // #1029: the capture route's Save & edit swaps itself out — a push left the
+    // filled capture form on the stack, so backing out of the editor reopened it.
+    it('replaces the current route instead of pushing when asked', () => {
+        vi.spyOn(Date, 'now').mockReturnValueOnce(13579);
+
+        openTaskScreen('task-3', 'project-3', 'task', { replace: true });
+
+        expect(routerMocks.replace).toHaveBeenCalledWith({
+            pathname: '/projects-screen',
+            params: { projectId: 'project-3', taskId: 'task-3', openToken: '13579', taskTab: 'task' },
+        });
+        expect(routerMocks.push).not.toHaveBeenCalled();
+    });
+
+    it('replaces to the focus screen when the task has no project', () => {
+        vi.spyOn(Date, 'now').mockReturnValueOnce(11111);
+
+        openTaskScreen('task-4', undefined, 'task', { replace: true });
+
+        expect(routerMocks.replace).toHaveBeenCalledWith({
+            pathname: '/focus',
+            params: { taskId: 'task-4', openToken: '11111', taskTab: 'task' },
+        });
+    });
+
+    it('ignores empty navigation inputs', () => {
+        openProjectScreen('');
+        openContextsScreen('');
+        openTaskScreen('');
+
+        expect(routerMocks.navigate).not.toHaveBeenCalled();
+        expect(routerMocks.push).not.toHaveBeenCalled();
+    });
 });
