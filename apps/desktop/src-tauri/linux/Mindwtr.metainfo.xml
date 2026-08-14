@@ -105,57 +105,6 @@
         </ul>
       </description>
     </release>
-    <release version="1.2.0-rc.4" date="2026-08-13">
-      <url type="details">https://github.com/dongdongbh/Mindwtr/releases/tag/v1.2.0-rc.4</url>
-      <description>
-        <p>Mindwtr 1.2.0-rc.4 fixes sync convergence and improves delegation and narrow task rows on desktop.</p>
-        <p xml:lang="de">Mindwtr 1.2.0-rc.4 verbessert die Sync-Konvergenz sowie Delegation und schmale Aufgabenzeilen auf dem Desktop.</p>
-        <ul>
-          <li>SQLite-loaded deletion markers keep a stable revision, so an aligned sync no longer rewrites every purged task or queues another cycle.</li>
-          <li xml:lang="de">Aus SQLite geladene Loeschmarkierungen behalten ihre Revision, sodass ein abgeglichener Sync nicht mehr jede geloeschte Aufgabe neu schreibt oder einen weiteren Durchlauf startet.</li>
-          <li>Process Inbox opens a saved delegate email in the mail app and otherwise copies the request for pasting.</li>
-          <li xml:lang="de">Inbox verarbeiten oeffnet eine gespeicherte Delegationsadresse im Mailprogramm oder kopiert die Anfrage zum Einfuegen.</li>
-          <li>Checklist boxes retain their square shape when task rows become narrow.</li>
-          <li xml:lang="de">Kontrollkaestchen bleiben auch in schmalen Aufgabenzeilen quadratisch.</li>
-        </ul>
-      </description>
-    </release>
-    <release version="1.2.0-rc.3" date="2026-08-13">
-      <url type="details">https://github.com/dongdongbh/Mindwtr/releases/tag/v1.2.0-rc.3</url>
-      <description>
-        <p>Mindwtr 1.2.0-rc.3 fixes persistence and sync blockers and improves quick capture, project views, data transfer, and desktop responsiveness.</p>
-        <p xml:lang="de">Mindwtr 1.2.0-rc.3 behebt Speicher- und Synchronisationsfehler und verbessert Schnellerfassung, Projektansichten, Datenuebertragung und Reaktionsfaehigkeit.</p>
-        <ul>
-          <li>New projects created during Inbox processing now persist before their first task, preventing a first-save failure.</li>
-          <li xml:lang="de">Beim Verarbeiten der Inbox werden neue Projekte jetzt vor ihrer ersten Aufgabe gespeichert, sodass der erste Speicherversuch nicht mehr fehlschlaegt.</li>
-          <li>Desktop sync preserves device-local setting changes made during a sync cycle and queues a clean follow-up pass.</li>
-          <li xml:lang="de">Die Desktop-Synchronisierung behaelt Aenderungen an lokalen Einstellungen waehrend eines Durchlaufs bei und startet danach einen sauberen weiteren Durchlauf.</li>
-          <li>Project sections can appear as optional columns, while Quick Add previews recognized task details as you type.</li>
-          <li xml:lang="de">Projektabschnitte koennen optional als Spalten erscheinen, waehrend die Schnellerfassung erkannte Aufgabendetails schon beim Tippen anzeigt.</li>
-          <li>Mindwtr CSV export, safe re-import, and one-step undo make data transfer easier to verify and reverse.</li>
-          <li xml:lang="de">Mindwtr-CSV-Export, sicherer Wiederimport und Rueckgaengigmachen in einem Schritt machen Datenuebertragungen leichter pruefbar und umkehrbar.</li>
-        </ul>
-      </description>
-    </release>
-    <release version="1.2.0-rc.1" date="2026-08-03">
-      <url type="details">https://github.com/dongdongbh/Mindwtr/releases/tag/v1.2.0-rc.1</url>
-      <description>
-        <p>Mindwtr 1.2.0-rc.1 improves calendar planning, sync setup, search, scheduling, and Linux desktop integration.</p>
-        <p xml:lang="de">Mindwtr 1.2.0-rc.1 verbessert Kalenderplanung, Sync-Einrichtung, Suche, Terminplanung und Linux-Desktop-Integration.</p>
-        <ul>
-          <li>Recurring tasks project every occurrence across the visible calendar range, and timed-start tasks stay out of Focus and Next until their exact start time.</li>
-          <li xml:lang="de">Wiederholende Aufgaben erscheinen im gesamten sichtbaren Kalenderbereich; Aufgaben mit Startzeit bleiben bis dahin aus Fokus und Nächste ausgeblendet.</li>
-          <li>Search labels completed and due dates, opens finished tasks reliably, and scheduling controls use quieter summaries and keyboard-friendly quick panels.</li>
-          <li xml:lang="de">Die Suche kennzeichnet Erledigt- und Fälligkeitsdaten, öffnet fertige Aufgaben zuverlässig und die Terminplanung nutzt ruhigere Zusammenfassungen und tastaturfreundliche Schnellfelder.</li>
-          <li>Sync destinations are validated with their data and attachments before activation, and desktop credential files are restricted to the current user.</li>
-          <li xml:lang="de">Sync-Ziele werden vor der Aktivierung samt Daten und Anhängen geprüft; Desktop-Zugangsdaten sind nur für den aktuellen Benutzer lesbar.</li>
-          <li>Flatpak system calendars load reliably, while KDE Wayland gains correct system themes, responsive titlebar controls, and a proper deb/rpm alt-tab icon.</li>
-          <li xml:lang="de">Flatpak-Systemkalender laden zuverlässig; KDE Wayland erhält korrekte Systemthemen, reagierende Titelleistenknöpfe und ein passendes deb/rpm-Alt-Tab-Symbol.</li>
-          <li>Swedish joins the interface, and Nord context and calendar accents use a matching palette.</li>
-          <li xml:lang="de">Schwedisch ergänzt die Oberfläche; Kontext- und Kalenderakzente im Nord-Design nutzen eine passende Palette.</li>
-        </ul>
-      </description>
-    </release>
     <release version="1.1.6" date="2026-07-31">
       <url type="details">https://github.com/dongdongbh/Mindwtr/releases/tag/v1.1.6</url>
       <description>

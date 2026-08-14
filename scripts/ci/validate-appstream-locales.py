@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -11,6 +12,10 @@ from pathlib import Path
 XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 METADATA_PATH = REPO_ROOT / "apps/desktop/src-tauri/linux/Mindwtr.metainfo.xml"
+PRERELEASE_VERSION = re.compile(
+    r"^(?P<base>[0-9]+\.[0-9]+\.[0-9]+)-(?:rc|beta|alpha|pre|preview)(?:[.-]|$)",
+    re.IGNORECASE,
+)
 
 
 def normalized_text(element: ET.Element | None) -> str:
@@ -162,7 +167,8 @@ def main(argv: list[str] | None = None) -> int:
             elif german_text == default_text:
                 errors.append(f"Screenshot {index} German caption duplicates English.")
 
-    latest_release = root.find("./releases/release")
+    release_entries = root.findall("./releases/release")
+    latest_release = release_entries[0] if release_entries else None
     if latest_release is None:
         errors.append("Missing AppStream releases.")
     else:
@@ -175,6 +181,18 @@ def main(argv: list[str] | None = None) -> int:
                 f"Top AppStream release entry is {version}, expected {args.expected_version} "
                 f"({METADATA_PATH.name}'s top <release> was not updated for this release)."
             )
+        if PRERELEASE_VERSION.match(version) is None:
+            same_version_prereleases = [
+                release.attrib.get("version", "")
+                for release in release_entries[1:]
+                if (match := PRERELEASE_VERSION.match(release.attrib.get("version", "")))
+                and match.group("base") == version
+            ]
+            if same_version_prereleases:
+                errors.append(
+                    f"Stable AppStream release {version} must replace its prerelease entries; "
+                    f"Flathub sorts these after the stable version: {', '.join(same_version_prereleases)}."
+                )
 
     if errors:
         print("AppStream German locale validation failed:", file=sys.stderr)
