@@ -44,7 +44,7 @@ import { PullSyncIndicator } from '@/components/PullSyncIndicator';
 import { useManualPullSync } from '@/hooks/use-manual-pull-sync';
 import { taskMatchesAreaFilterSelection } from '@mindwtr/core';
 import { openContextsScreen, openProjectScreen } from '@/lib/task-meta-navigation';
-import { logError } from '../lib/app-log';
+import { logError, logInfo } from '../lib/app-log';
 import {
   beginMobilePerformanceDiagnostic,
   finishMobilePerformanceDiagnostic,
@@ -543,6 +543,27 @@ function TaskListComponent({
     }
     return sortTasksBy(filteredTasks, sortBy);
   }, [enableProjectReorder, filteredTasks, projectId, sortBy, statusFilter]);
+  // #784 next-round evidence: the visible order at Task-order enter/exit. An
+  // exit digest that differs from what the list later shows — with no Drop
+  // line between — proves the order changed after the write, and the id:order
+  // pairs name the field. Only logs on mode transitions.
+  const previousReorderModeRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (!projectId) return;
+    if (previousReorderModeRef.current === projectReorderMode) return;
+    const isFirstObservation = previousReorderModeRef.current === null;
+    previousReorderModeRef.current = projectReorderMode;
+    if (isFirstObservation && !projectReorderMode) return;
+    const digest = orderedTasks
+      .slice(0, 200)
+      .map((task) => `${task.id.slice(0, 8)}:${String(task.order ?? task.orderNum ?? '-')}`)
+      .join(' ');
+    void logInfo(`[Reorder] Task order mode ${projectReorderMode ? 'entered' : 'exited'}`, {
+      scope: 'project',
+      extra: { projectId, taskCount: String(orderedTasks.length), digest },
+    });
+  }, [orderedTasks, projectId, projectReorderMode]);
+
   const { activeTasks: orderedActiveTasks, completedTasks: orderedCompletedTasks } = useMemo(() => {
     if (!shouldGroupCompletedTasks) {
       return { activeTasks: orderedTasks, completedTasks: [] as Task[] };
@@ -914,6 +935,20 @@ function TaskListComponent({
     if (!moved || moved.type !== 'task') return;
     const plan = resolveProjectReorderDropPlan(params.data, moved.task.id);
     if (!plan) return;
+    // #784 next-round evidence: what the drop asked for, so a later mismatch
+    // separates "wrong write" from "write lost afterwards".
+    const movedAt = plan.orderedIds.indexOf(moved.task.id);
+    void logInfo('[Reorder] Drop', {
+      scope: 'project',
+      extra: {
+        taskId: moved.task.id,
+        from: String(params.from),
+        to: String(params.to),
+        sectionId: plan.sectionId ?? '',
+        prevId: plan.orderedIds[movedAt - 1] ?? '',
+        nextId: plan.orderedIds[movedAt + 1] ?? '',
+      },
+    });
     const reportFailure = (error: unknown) => {
       void logError(error, { scope: 'project', extra: { message: 'Failed to reorder project tasks' } });
       showToast({

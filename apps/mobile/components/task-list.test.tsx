@@ -271,6 +271,7 @@ vi.mock('@/lib/task-meta-navigation', () => ({
 
 vi.mock('../lib/app-log', () => ({
   logError: vi.fn(),
+  logInfo: vi.fn(),
 }));
 
 vi.mock('./use-task-list-selection', () => ({
