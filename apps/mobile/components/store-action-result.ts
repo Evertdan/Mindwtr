@@ -30,3 +30,22 @@ export function getUnknownErrorMessage(error: unknown): string | undefined {
     if (typeof error === 'string' && error.trim().length > 0) return error.trim();
     return undefined;
 }
+
+export type StoreActionOutcome<T> =
+    | { ok: true; result: T }
+    | { ok: false; message?: string; cause?: unknown };
+
+/** Settle every store action failure channel without discarding successful payloads. */
+export async function settleStoreAction<T>(
+    action: () => T | Promise<T>,
+): Promise<StoreActionOutcome<T>> {
+    try {
+        const result = await action();
+        if (isActionFailure(result)) {
+            return { ok: false, message: getActionFailureMessage(result) };
+        }
+        return { ok: true, result };
+    } catch (cause) {
+        return { ok: false, message: getUnknownErrorMessage(cause), cause };
+    }
+}

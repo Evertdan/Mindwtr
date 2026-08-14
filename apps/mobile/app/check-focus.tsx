@@ -8,11 +8,7 @@ import { Check, Trash2, Plus } from 'lucide-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../contexts/language-context';
 import { useToast } from '../contexts/toast-context';
-import {
-    getActionFailureMessage,
-    getUnknownErrorMessage,
-    isActionFailure,
-} from '../components/store-action-result';
+import { settleStoreAction } from '../components/store-action-result';
 
 export default function FocusChecklistPage() {
     const { id } = useLocalSearchParams();
@@ -54,15 +50,11 @@ export default function FocusChecklistPage() {
         if (!task) return;
         const previous = checklist;
         setChecklist(newList);
-        void Promise.resolve(updateTask(task.id, { checklist: newList }))
-            .then((result) => {
-                if (!isActionFailure(result)) return;
+        void settleStoreAction(() => updateTask(task.id, { checklist: newList }))
+            .then((outcome) => {
+                if (outcome.ok) return;
                 setChecklist(previous);
-                showChecklistError(getActionFailureMessage(result));
-            })
-            .catch((error) => {
-                setChecklist(previous);
-                showChecklistError(getUnknownErrorMessage(error));
+                showChecklistError(outcome.message);
             });
     };
 

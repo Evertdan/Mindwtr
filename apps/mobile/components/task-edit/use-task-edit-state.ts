@@ -135,6 +135,8 @@ export function useTaskEditState({
     }, []);
 
     const writePatch = React.useCallback((taskId: string, updates: Partial<Task>): boolean | Promise<boolean> => {
+        // This prop boundary intentionally retains its synchronous branch:
+        // void-returning modal callbacks must close in the same tick.
         const settle = (result: unknown) => {
             if (!isActionFailure(result)) return true;
             onSaveError(getActionFailureMessage(result));

@@ -6,7 +6,7 @@ import { useLanguage } from '../contexts/language-context';
 import { useToast } from '../contexts/toast-context';
 import { useThemeColors } from '../hooks/use-theme-colors';
 import { ProjectNextActionPromptModal } from './swipeable-task-item/ProjectNextActionPromptModal';
-import { getActionFailureMessage, getUnknownErrorMessage, isActionFailure } from './store-action-result';
+import { settleStoreAction } from './store-action-result';
 
 type ProjectNextActionPromptState = {
     candidates: Task[];
@@ -114,13 +114,13 @@ export function ProjectNextActionPromptProvider({ children }: { children: React.
     const handleChooseTask = useCallback((taskId: string) => {
         if (isSubmitting) return;
         setIsSubmitting(true);
-        void Promise.resolve(updateTask(taskId, { status: 'next' }))
-            .then((result) => {
-                if (isActionFailure(result)) throw new Error(getActionFailureMessage(result) ?? '');
+        void settleStoreAction(() => updateTask(taskId, { status: 'next' }))
+            .then((outcome) => {
+                if (!outcome.ok) {
+                    showActionFailure(outcome.message);
+                    return;
+                }
                 closePrompt();
-            })
-            .catch((error) => {
-                showActionFailure(getUnknownErrorMessage(error));
             })
             .finally(() => setIsSubmitting(false));
     }, [closePrompt, isSubmitting, showActionFailure, updateTask]);
@@ -132,13 +132,13 @@ export function ProjectNextActionPromptProvider({ children }: { children: React.
         // Archiving completes the project's remaining tasks in core and is
         // reversible from the editor (Reactivate); no confirmation, matching
         // the Archive button.
-        void Promise.resolve(useTaskStore.getState().updateProject(projectId, { status: 'archived' }))
-            .then((result) => {
-                if (isActionFailure(result)) throw new Error(getActionFailureMessage(result) ?? '');
+        void settleStoreAction(() => useTaskStore.getState().updateProject(projectId, { status: 'archived' }))
+            .then((outcome) => {
+                if (!outcome.ok) {
+                    showActionFailure(outcome.message);
+                    return;
+                }
                 closePrompt();
-            })
-            .catch((error) => {
-                showActionFailure(getUnknownErrorMessage(error));
             })
             .finally(() => setIsSubmitting(false));
     }, [closePrompt, isSubmitting, prompt, showActionFailure]);
@@ -162,13 +162,13 @@ export function ProjectNextActionPromptProvider({ children }: { children: React.
                 naturalLanguageDates: isNaturalLanguageDatesEnabled(state.settings),
             },
         });
-        void Promise.resolve(addTask(title, props))
-            .then((result) => {
-                if (isActionFailure(result)) throw new Error(getActionFailureMessage(result) ?? '');
+        void settleStoreAction(() => addTask(title, props))
+            .then((outcome) => {
+                if (!outcome.ok) {
+                    showActionFailure(outcome.message);
+                    return;
+                }
                 closePrompt();
-            })
-            .catch((error) => {
-                showActionFailure(getUnknownErrorMessage(error));
             })
             .finally(() => setIsSubmitting(false));
     }, [addTask, closePrompt, isSubmitting, newTitle, prompt, showActionFailure]);

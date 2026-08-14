@@ -17,11 +17,7 @@ import type { AIResponseAction } from '../ai-response-modal';
 import { buildAIConfig, isAIKeyRequired, loadAIKey } from '../../lib/ai-config';
 import { logTaskError, logTaskWarn } from './task-edit-modal.utils';
 import { openProjectScreen, openTaskScreen } from '../../lib/task-meta-navigation';
-import {
-    getActionFailureMessage,
-    getUnknownErrorMessage,
-    isActionFailure,
-} from '../store-action-result';
+import { settleStoreAction } from '../store-action-result';
 import { type TaskDraftSetter } from '@mindwtr/core/task-draft';
 import {
     type TaskEditDraft,
@@ -122,14 +118,12 @@ export function useTaskEditActions({
         action: () => Promise<StoreActionResult>,
         logMessage: string,
     ): Promise<boolean> => {
-        try {
-            const result = await action();
-            if (!isActionFailure(result)) return true;
-            showTaskWriteError(getActionFailureMessage(result));
-        } catch (error) {
-            logTaskError(logMessage, error);
-            showTaskWriteError(getUnknownErrorMessage(error));
+        const outcome = await settleStoreAction(action);
+        if (outcome.ok) return true;
+        if ('cause' in outcome) {
+            logTaskError(logMessage, outcome.cause);
         }
+        showTaskWriteError(outcome.message);
         return false;
     }, [showTaskWriteError]);
 

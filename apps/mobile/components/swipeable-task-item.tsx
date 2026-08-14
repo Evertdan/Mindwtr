@@ -34,7 +34,7 @@ import { CompletedAtPicker } from './completed-at-picker';
 import { styles } from './swipeable-task-item/swipeable-task-item.styles';
 import { CompactText } from '@/components/compact-text';
 import { useSwipeableChecklist } from './swipeable-task-item/useSwipeableChecklist';
-import { getActionFailureMessage, getUnknownErrorMessage, isActionFailure } from './store-action-result';
+import { settleStoreAction } from './store-action-result';
 
 /**
  * Everything a row can mutate, on one object whose identity never changes
@@ -323,17 +323,10 @@ function SwipeableTaskItemInner({
     const handleStatusChange = useCallback((status: TaskStatus) => {
         const previousStatus = task.status;
         const wasFocusedToday = task.isFocusedToday === true;
-        let result: void | Promise<unknown>;
-        try {
-            result = onStatusChange(status);
-        } catch (error) {
-            showActionFailure(getUnknownErrorMessage(error));
-            return;
-        }
-        void Promise.resolve(result)
-            .then((actionResult) => {
-                if (isActionFailure(actionResult)) {
-                    showActionFailure(getActionFailureMessage(actionResult));
+        void settleStoreAction(() => onStatusChange(status))
+            .then((outcome) => {
+                if (!outcome.ok) {
+                    showActionFailure(outcome.message);
                     return;
                 }
                 if (status === 'done' && previousStatus !== 'done') {
@@ -352,9 +345,6 @@ function SwipeableTaskItemInner({
                     });
                     openProjectNextActionPromptIfNeeded(task.id);
                 }
-            })
-            .catch((error) => {
-                showActionFailure(getUnknownErrorMessage(error));
             });
     }, [onStatusChange, openProjectNextActionPromptIfNeeded, showActionFailure, showToast, t, task.id, task.isFocusedToday, task.status, task.title]);
 
@@ -369,31 +359,28 @@ function SwipeableTaskItemInner({
         if (mode === 'complete' && timeSpentEnabled) {
             updates.timeSpentMinutes = timeSpentMinutes;
         }
-        void Promise.resolve(updateTask(task.id, updates))
-            .then((result) => {
-                if (isActionFailure(result)) {
-                    showActionFailure(getActionFailureMessage(result));
+        void settleStoreAction(() => updateTask(task.id, updates))
+            .then((outcome) => {
+                if (!outcome.ok) {
+                    showActionFailure(outcome.message);
                     return;
                 }
                 if (mode === 'complete' && task.status !== 'done') {
                     openProjectNextActionPromptIfNeeded(task.id);
                 }
-            })
-            .catch((error) => {
-                showActionFailure(getUnknownErrorMessage(error));
             });
     }, [completedAtPicker, openProjectNextActionPromptIfNeeded, showActionFailure, task.id, task.status, timeSpentEnabled, updateTask]);
 
     const handlePromoteProjectNextAction = useCallback((nextTaskId: string) => {
         if (isProjectNextActionSubmitting) return;
         setIsProjectNextActionSubmitting(true);
-        void Promise.resolve(updateTask(nextTaskId, { status: 'next' }))
-            .then((result) => {
-                if (isActionFailure(result)) throw new Error(getActionFailureMessage(result) ?? '');
+        void settleStoreAction(() => updateTask(nextTaskId, { status: 'next' }))
+            .then((outcome) => {
+                if (!outcome.ok) {
+                    showActionFailure(outcome.message);
+                    return;
+                }
                 closeProjectNextActionPrompt();
-            })
-            .catch((error) => {
-                showActionFailure(getUnknownErrorMessage(error));
             })
             .finally(() => setIsProjectNextActionSubmitting(false));
     }, [closeProjectNextActionPrompt, isProjectNextActionSubmitting, showActionFailure, updateTask]);
@@ -404,13 +391,13 @@ function SwipeableTaskItemInner({
         setIsProjectNextActionSubmitting(true);
         // Archiving completes the project's remaining tasks in core and is
         // reversible (Reactivate); no confirmation, matching the Archive button.
-        void Promise.resolve(useTaskStore.getState().updateProject(projectId, { status: 'archived' }))
-            .then((result) => {
-                if (isActionFailure(result)) throw new Error(getActionFailureMessage(result) ?? '');
+        void settleStoreAction(() => useTaskStore.getState().updateProject(projectId, { status: 'archived' }))
+            .then((outcome) => {
+                if (!outcome.ok) {
+                    showActionFailure(outcome.message);
+                    return;
+                }
                 closeProjectNextActionPrompt();
-            })
-            .catch((error) => {
-                showActionFailure(getUnknownErrorMessage(error));
             })
             .finally(() => setIsProjectNextActionSubmitting(false));
     }, [closeProjectNextActionPrompt, isProjectNextActionSubmitting, projectNextActionPrompt, showActionFailure]);
@@ -420,17 +407,17 @@ function SwipeableTaskItemInner({
         const title = projectNextActionTitle.trim();
         if (!title) return;
         setIsProjectNextActionSubmitting(true);
-        void Promise.resolve(addTask(title, {
+        void settleStoreAction(() => addTask(title, {
             status: 'next',
             projectId: projectNextActionPrompt.projectId,
             sectionId: projectNextActionPrompt.sectionId,
         }))
-            .then((result) => {
-                if (isActionFailure(result)) throw new Error(getActionFailureMessage(result) ?? '');
+            .then((outcome) => {
+                if (!outcome.ok) {
+                    showActionFailure(outcome.message);
+                    return;
+                }
                 closeProjectNextActionPrompt();
-            })
-            .catch((error) => {
-                showActionFailure(getUnknownErrorMessage(error));
             })
             .finally(() => setIsProjectNextActionSubmitting(false));
     }, [
@@ -458,19 +445,12 @@ function SwipeableTaskItemInner({
             }
             return;
         }
-        let updatePromise: Promise<unknown>;
-        try {
-            updatePromise = Promise.resolve(updateTask(task.id, action.patch));
-        } catch (error) {
-            updatePromise = Promise.reject(error);
-        }
-        void updatePromise
-            .then((result) => {
-                if (isActionFailure(result)) {
-                    showActionFailure(getActionFailureMessage(result));
+        void settleStoreAction(() => updateTask(task.id, action.patch))
+            .then((outcome) => {
+                if (!outcome.ok) {
+                    showActionFailure(outcome.message);
                 }
-            })
-            .catch((error) => showActionFailure(getUnknownErrorMessage(error)));
+            });
     };
 
     // Status-aware left swipe action
@@ -587,16 +567,10 @@ function SwipeableTaskItemInner({
     const handleDelete = () => {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
         cancelPendingChecklist();
-        let deletePromise: Promise<unknown>;
-        try {
-            deletePromise = Promise.resolve(onDelete());
-        } catch (error) {
-            deletePromise = Promise.reject(error);
-        }
-        void deletePromise
-            .then((result) => {
-                if (isActionFailure(result)) {
-                    showActionFailure(getActionFailureMessage(result));
+        void settleStoreAction(() => onDelete())
+            .then((outcome) => {
+                if (!outcome.ok) {
+                    showActionFailure(outcome.message);
                     return;
                 }
                 showToast({
@@ -605,24 +579,16 @@ function SwipeableTaskItemInner({
                     tone: 'info',
                     actionLabel: tFallback(t, 'common.undo', 'Undo'),
                     onAction: () => {
-                        let restorePromise: Promise<unknown>;
-                        try {
-                            restorePromise = Promise.resolve(restoreTask(task.id));
-                        } catch (error) {
-                            restorePromise = Promise.reject(error);
-                        }
-                        void restorePromise
-                            .then((restoreResult) => {
-                                if (isActionFailure(restoreResult)) {
-                                    showActionFailure(getActionFailureMessage(restoreResult));
+                        void settleStoreAction(() => restoreTask(task.id))
+                            .then((restoreOutcome) => {
+                                if (!restoreOutcome.ok) {
+                                    showActionFailure(restoreOutcome.message);
                                 }
-                            })
-                            .catch((error) => showActionFailure(getUnknownErrorMessage(error)));
+                            });
                     },
                     durationMs: 5200,
                 });
-            })
-            .catch((error) => showActionFailure(getUnknownErrorMessage(error)));
+            });
     };
 
     const handleLongPress = () => {

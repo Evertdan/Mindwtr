@@ -18,6 +18,7 @@
 - **Depends on**: none
 - **Category**: tech-debt
 - **Planned at**: commit `feecbb40a`, 2026-08-14
+- **Completed**: 2026-08-14
 
 ## Why this matters
 
@@ -183,15 +184,21 @@ normalization themselves.
 
 ## Done criteria
 
-- [ ] The six settlement cases pass.
-- [ ] Successful payload fields remain available through `outcome.result`.
-- [ ] The seven direct-action consumer modules use the shared settlement boundary.
-- [ ] Inbox embedded-result inspection remains unchanged.
-- [ ] No toast copy, logging scope, undo behavior, callback order, or busy-state behavior changes.
-- [ ] Focused caller suites pass.
-- [ ] `bun run typecheck:mobile`, `bun run lint:mobile`, and `bun run verify` exit 0.
-- [ ] `git diff --check` exits 0 and no out-of-scope file is modified.
-- [ ] Exactly one implementation commit exists and nothing is pushed.
+- [x] The six settlement cases pass.
+- [x] Successful payload fields remain available through `outcome.result`.
+- [x] The six compatible direct-action consumer modules use the shared settlement boundary.
+- [x] Inbox embedded-result inspection remains unchanged.
+- [x] No toast copy, logging scope, undo behavior, callback order, or busy-state behavior changes.
+- [x] Focused caller suites pass.
+- [x] `bun run typecheck:mobile`, `bun run lint:mobile`, and `bun run verify` exit 0.
+- [x] `git diff --check` exits 0 and no out-of-scope file is modified.
+- [x] Exactly one implementation commit exists and nothing is pushed.
+
+Plan deviation resolved during verification: `use-task-edit-state.ts` keeps its
+bespoke sync/thenable settlement path because six full-suite tests proved that
+void-returning modal saves must close in the same tick. The implementation
+adds a comment documenting that constraint; making the shared helper hybrid
+would leak the very sync/async distinction this boundary is meant to hide.
 
 ## STOP conditions
 

@@ -62,11 +62,7 @@ import {
   type ProjectDeadlineBoost,
 } from '@mindwtr/core';
 import { SwipeableTaskItem, type TaskRowActions } from '@/components/swipeable-task-item';
-import {
-  getActionFailureMessage,
-  getUnknownErrorMessage,
-  isActionFailure,
-} from '@/components/store-action-result';
+import { settleStoreAction } from '@/components/store-action-result';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { useFilledButtonColors } from '@/hooks/use-filled-button-colors';
 import { useAndroidKeyboardInset } from '@/lib/use-android-keyboard-inset';
@@ -135,7 +131,6 @@ function animateFocusReorderLayout() {
   if (preset) LayoutAnimation.configureNext(preset);
 }
 
-type TaskActionResult = { success?: boolean; error?: unknown } | void;
 type FocusExpandedSections = typeof DEFAULT_EXPANDED_SECTIONS;
 
 type FocusFilterChip = {
@@ -422,10 +417,10 @@ export default function FocusScreen() {
       ...(previousFocused ? { isFocusedToday: false } : {}),
     };
 
-    void Promise.resolve(updateTask(task.id, deferUpdates))
-      .then((result: TaskActionResult) => {
-        if (isActionFailure(result)) {
-          showTaskUpdateError(getActionFailureMessage(result));
+    void settleStoreAction(() => updateTask(task.id, deferUpdates))
+      .then((outcome) => {
+        if (!outcome.ok) {
+          showTaskUpdateError(outcome.message);
           return;
         }
         showToast({
@@ -438,21 +433,23 @@ export default function FocusScreen() {
               startTime: previousStartTime,
               ...(previousFocused ? { isFocusedToday: true } : {}),
             };
-            const undoResult = await updateTask(task.id, undoUpdates);
-            if (isActionFailure(undoResult)) throw new Error(getActionFailureMessage(undoResult) ?? '');
+            const undoOutcome = await settleStoreAction(() => updateTask(task.id, undoUpdates));
+            if (!undoOutcome.ok) {
+              if ('cause' in undoOutcome) throw undoOutcome.cause;
+              throw new Error(undoOutcome.message ?? '');
+            }
           },
           durationMs: 5200,
         });
-      })
-      .catch((error) => showTaskUpdateError(getUnknownErrorMessage(error)));
+      });
   }, [resolveText, showTaskUpdateError, showToast, updateTask]);
   const markTaskReviewed = useCallback((task: Task) => {
     const previousReviewAt = task.reviewAt;
 
-    void Promise.resolve(updateTask(task.id, { reviewAt: undefined }))
-      .then((result: TaskActionResult) => {
-        if (isActionFailure(result)) {
-          showTaskUpdateError(getActionFailureMessage(result));
+    void settleStoreAction(() => updateTask(task.id, { reviewAt: undefined }))
+      .then((outcome) => {
+        if (!outcome.ok) {
+          showTaskUpdateError(outcome.message);
           return;
         }
         showToast({
@@ -461,21 +458,23 @@ export default function FocusScreen() {
           tone: 'success',
           actionLabel: resolveText('common.undo', 'Undo'),
           onAction: async () => {
-            const undoResult = await updateTask(task.id, { reviewAt: previousReviewAt });
-            if (isActionFailure(undoResult)) throw new Error(getActionFailureMessage(undoResult) ?? '');
+            const undoOutcome = await settleStoreAction(() => updateTask(task.id, { reviewAt: previousReviewAt }));
+            if (!undoOutcome.ok) {
+              if ('cause' in undoOutcome) throw undoOutcome.cause;
+              throw new Error(undoOutcome.message ?? '');
+            }
           },
           durationMs: 5200,
         });
-      })
-      .catch((error) => showTaskUpdateError(getUnknownErrorMessage(error)));
+      });
   }, [resolveText, showTaskUpdateError, showToast, updateTask]);
   const advanceTaskReview = useCallback((task: Task) => {
     const previousReviewAt = task.reviewAt;
 
-    void Promise.resolve(updateTask(task.id, { reviewAt: getAdvancedReviewDate(task.reviewAt) }))
-      .then((result: TaskActionResult) => {
-        if (isActionFailure(result)) {
-          showTaskUpdateError(getActionFailureMessage(result));
+    void settleStoreAction(() => updateTask(task.id, { reviewAt: getAdvancedReviewDate(task.reviewAt) }))
+      .then((outcome) => {
+        if (!outcome.ok) {
+          showTaskUpdateError(outcome.message);
           return;
         }
         showToast({
@@ -484,13 +483,15 @@ export default function FocusScreen() {
           tone: 'success',
           actionLabel: resolveText('common.undo', 'Undo'),
           onAction: async () => {
-            const undoResult = await updateTask(task.id, { reviewAt: previousReviewAt });
-            if (isActionFailure(undoResult)) throw new Error(getActionFailureMessage(undoResult) ?? '');
+            const undoOutcome = await settleStoreAction(() => updateTask(task.id, { reviewAt: previousReviewAt }));
+            if (!undoOutcome.ok) {
+              if ('cause' in undoOutcome) throw undoOutcome.cause;
+              throw new Error(undoOutcome.message ?? '');
+            }
           },
           durationMs: 5200,
         });
-      })
-      .catch((error) => showTaskUpdateError(getUnknownErrorMessage(error)));
+      });
   }, [resolveText, showTaskUpdateError, showToast, updateTask]);
   const openReviewMenu = useCallback((task: Task) => {
     Alert.alert(
