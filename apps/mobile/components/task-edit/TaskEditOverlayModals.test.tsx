@@ -2,6 +2,11 @@ import React from 'react';
 import renderer from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
+vi.mock('expo-sharing', () => ({
+  isAvailableAsync: vi.fn(async () => true),
+  shareAsync: vi.fn(async () => undefined),
+}));
+
 import { TaskEditAudioModal } from './TaskEditOverlayModals';
 
 describe('TaskEditAudioModal', () => {

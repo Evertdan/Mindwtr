@@ -1,9 +1,11 @@
 import React from 'react';
 import { Image, Modal, Pressable, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import * as Sharing from 'expo-sharing';
 
 import { translateWithFallback, type Attachment } from '@mindwtr/core';
 
 import { styles } from './task-edit-modal.styles';
+import { logTaskError } from './task-edit-modal.utils';
 
 type ThemeColors = {
     cardBg: string;
@@ -313,6 +315,19 @@ export const TaskEditImagePreviewModal = ({
                     >
                         {imagePreviewAttachment?.title || t('attachments.title')}
                     </Text>
+                    {imagePreviewAttachment?.uri ? (
+                        <TouchableOpacity
+                            onPress={() => {
+                                // The OS handler (gallery, photo viewer) zooms; the
+                                // in-app preview deliberately stays simple (#1026).
+                                Sharing.shareAsync(imagePreviewAttachment.uri).catch((error) =>
+                                    logTaskError('Failed to share attachment', error));
+                            }}
+                            style={styles.modalButton}
+                        >
+                            <Text style={[styles.modalButtonText, { color: tc.tint }]}>{t('common.share')}</Text>
+                        </TouchableOpacity>
+                    ) : null}
                     <TouchableOpacity onPress={onClose} style={styles.modalButton}>
                         <Text style={[styles.modalButtonText, { color: tc.secondaryText }]}>{t('common.close')}</Text>
                     </TouchableOpacity>

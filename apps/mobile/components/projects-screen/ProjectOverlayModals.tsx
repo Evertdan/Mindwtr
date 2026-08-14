@@ -1,6 +1,8 @@
 import React from 'react';
 import { Image, Modal, Pressable, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import * as Sharing from 'expo-sharing';
 import { type Attachment } from '@mindwtr/core';
+import { logError } from '../../lib/app-log';
 
 import { projectsScreenStyles as styles } from '@/components/projects-screen/projects-screen.styles';
 import { useAndroidKeyboardInset } from '../../lib/use-android-keyboard-inset';
@@ -119,6 +121,22 @@ export function ProjectImagePreviewModal({
                         <Text style={[styles.previewTitle, { color: tc.text }]} numberOfLines={1}>
                             {attachment?.title || t('attachments.title')}
                         </Text>
+                        {attachment?.uri ? (
+                            <TouchableOpacity
+                                onPress={() => {
+                                    // The OS handler (gallery, photo viewer) zooms; the
+                                    // in-app preview deliberately stays simple (#1026).
+                                    Sharing.shareAsync(attachment.uri).catch((error) => {
+                                        void logError(error, { scope: 'project', extra: { message: 'Failed to share attachment' } });
+                                    });
+                                }}
+                                style={styles.smallButton}
+                            >
+                                <Text style={[styles.smallButtonText, { color: tc.tint }]}>
+                                    {t('common.share')}
+                                </Text>
+                            </TouchableOpacity>
+                        ) : null}
                         <TouchableOpacity onPress={onClose} style={styles.smallButton}>
                             <Text style={[styles.smallButtonText, { color: tc.secondaryText }]}>
                                 {t('common.close')}
