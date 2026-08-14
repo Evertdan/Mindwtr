@@ -4,7 +4,7 @@ import { DONE_TASK_LIST_SORT_OPTIONS } from '@/lib/task-list-sort';
 export const ARCHIVED_LIST_VIEW_STATE_STORAGE_KEY = 'mindwtr:view:archived:v1';
 // Same axes as Done: everything filed in Archive is finished work, so
 // completion date is the axis that means something here.
-export const ARCHIVED_LIST_GROUP_OPTIONS = ['none', 'completedDate', 'area', 'project', 'tag'] as const;
+export const ARCHIVED_LIST_GROUP_OPTIONS = ['none', 'completedDate', 'context', 'area', 'project', 'tag'] as const;
 export type ArchivedListGroupBy = typeof ARCHIVED_LIST_GROUP_OPTIONS[number];
 
 export type ArchivedListViewState = {

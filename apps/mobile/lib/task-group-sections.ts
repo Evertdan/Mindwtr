@@ -19,7 +19,7 @@ import {
  * other screen has sections to group by.
  */
 
-export type TaskGroupBy = 'none' | 'area' | 'project' | 'tag' | 'completedDate';
+export type TaskGroupBy = 'none' | 'context' | 'area' | 'project' | 'tag' | 'completedDate';
 
 export type TaskGroupSectionItem = {
   type: 'section';
@@ -45,6 +45,8 @@ export function getTaskGroupByLabel(groupBy: TaskGroupBy, t: (key: string) => st
   switch (groupBy) {
     case 'none':
       return tFallback(t, 'list.groupByNone', 'No grouping');
+    case 'context':
+      return tFallback(t, 'list.groupByContext', 'Context');
     case 'area':
       return tFallback(t, 'list.groupByArea', 'Area');
     case 'project':
@@ -151,6 +153,35 @@ export function buildTaskGroupSections({
     buildCompletionDateSections({ tasks, t, now }).forEach((section) => {
       appendSection(items, section.id, section.title, section.tasks, section.muted);
     });
+    return items;
+  }
+
+  if (groupBy === 'context') {
+    // Mirrors desktop's groupTasksByContext (next-grouping.ts): a task with
+    // several contexts appears under each of them, catch-all last.
+    const grouped = new Map<string, Task[]>();
+    const noContextTasks: Task[] = [];
+
+    tasks.forEach((task) => {
+      const contexts = (task.contexts ?? [])
+        .map((context) => context.trim())
+        .filter((context) => context.length > 0);
+      if (contexts.length === 0) {
+        noContextTasks.push(task);
+        return;
+      }
+      Array.from(new Set(contexts)).forEach((context) => {
+        const items = grouped.get(context) ?? [];
+        items.push(task);
+        grouped.set(context, items);
+      });
+    });
+
+    const items: TaskGroupItem[] = [];
+    [...grouped.keys()]
+      .sort((a, b) => baseTextCollator.compare(a, b))
+      .forEach((context) => appendSection(items, `context:${context}`, context, grouped.get(context) ?? []));
+    appendSection(items, 'context:none', tFallback(t, 'contexts.none', 'No context'), noContextTasks, true);
     return items;
   }
 

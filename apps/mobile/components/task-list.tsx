@@ -726,7 +726,7 @@ function TaskListComponent({
   // Done gets the extra axis rather than every list growing it (#945).
   const groupByOptions: readonly TaskListGroupBy[] = statusFilter === 'done'
     ? DONE_LIST_GROUP_OPTIONS
-    : ['none', 'area', 'project', 'tag'];
+    : ['none', 'context', 'area', 'project', 'tag'];
   const getGroupByLabel = useCallback((groupBy: TaskListGroupBy) => getTaskGroupByLabel(groupBy, t), [t]);
   const groupByLabel = getGroupByLabel(activeGroupBy);
   const groupLabel = tFallback(t, 'list.groupBy', 'Group');

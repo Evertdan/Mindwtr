@@ -99,6 +99,25 @@ describe('buildTaskGroupSections', () => {
     ]);
   });
 
+  // Desktop's References/Done/Archive lists group by context; the mobile axis
+  // mirrors groupTasksByContext's semantics exactly (#1027).
+  it('lists a multi-context task under each of its contexts', () => {
+    const items = buildTaskGroupSections({
+      groupBy: 'context',
+      tasks: [task('both', { contexts: ['@office', '@calls'] }), task('none')],
+      areas: [],
+      projectById: new Map(),
+      t,
+    });
+
+    expect(layout(items)).toEqual([
+      { section: '@calls', count: 1, ids: ['both'] },
+      { section: '@office', count: 1, ids: ['both'] },
+      { section: 'No context', count: 1, ids: ['none'] },
+    ]);
+    expect(getTaskGroupByLabel('context', t)).toBe('Context');
+  });
+
   it('groups by area, falling back to the project area and then to General', () => {
     const items = buildTaskGroupSections({
       groupBy: 'area',
