@@ -384,7 +384,19 @@ function attachNativeEventListeners(): void {
   openSubscription?.remove();
   openSubscription = emitter.addListener('OnNotificationOpened', (payload: unknown) => {
     const data = parseEventPayload(payload);
-    if (!data) return;
+    if (!data) {
+      logNotificationWarn('Notification event payload was unreadable');
+      return;
+    }
+    // Receipt evidence for #1028: every tap that reaches JS is logged, so a
+    // dead action button with no line here means the tap died in the native
+    // layer (receiver never ran, or the alarm row it looks up is gone).
+    logNotificationInfo('Notification opened event', {
+      action: data.actionIdentifier || 'open',
+      alarmKey: data.alarmKey || data.id || '',
+      taskId: data.taskId || '',
+      handlerAttached: String(Boolean(notificationOpenHandler)),
+    });
     if (data.kind === 'pomodoro') {
       // Presentation evidence for #888: a tap proves iOS actually showed it.
       logNotificationInfo('Pomodoro notification opened', { id: data.alarmKey || data.id || '' });
@@ -410,6 +422,10 @@ function attachNativeEventListeners(): void {
   dismissSubscription?.remove();
   dismissSubscription = emitter.addListener('OnNotificationDismissed', (payload: unknown) => {
     const data = parseEventPayload(payload);
+    logNotificationInfo('Notification dismissed event', {
+      alarmKey: data?.alarmKey || data?.id || '',
+      taskId: data?.taskId || '',
+    });
     if (data?.kind === 'pomodoro') {
       logNotificationInfo('Pomodoro notification dismissed', { id: data.alarmKey || data.id || '' });
     }

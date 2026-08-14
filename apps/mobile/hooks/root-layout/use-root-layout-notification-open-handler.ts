@@ -2,8 +2,15 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { isTaskActionable, useTaskStore } from '@mindwtr/core';
 
+import { logInfo } from '@/lib/app-log';
 import { setNotificationOpenHandler } from '@/lib/notification-service';
 import { consumePendingNotificationOpenPayload } from '@/modules/notification-open-intents';
+
+// Outcome evidence for #1028: a received action that changes nothing must say
+// why, or the log can't separate a lost tap from a deliberately ignored one.
+const logNotificationOutcome = (message: string, extra: Record<string, string>) => {
+    void logInfo(`[Local Notifications] ${message}`, { scope: 'notifications', extra });
+};
 
 type RouterLike = {
     push: (...args: any[]) => void;
@@ -66,12 +73,22 @@ export function useRootLayoutNotificationOpenHandler({
         }
         if ((normalizedAction === 'complete' || normalizedAction === 'complete_action') && taskId) {
             const actionKey = `${openToken}:${taskId}:complete`;
-            if (handledCompleteActionsRef.current.has(actionKey)) return;
+            if (handledCompleteActionsRef.current.has(actionKey)) {
+                logNotificationOutcome('Complete action ignored as duplicate', { taskId });
+                return;
+            }
             handledCompleteActionsRef.current.add(actionKey);
 
             const state = useTaskStore.getState();
             const task = state._tasksById?.get(taskId) ?? state.tasks?.find((item) => item.id === taskId);
-            if (!task || task.deletedAt || !isTaskActionable(task)) return;
+            if (!task || task.deletedAt || !isTaskActionable(task)) {
+                logNotificationOutcome('Complete action dropped', {
+                    taskId,
+                    reason: !task ? 'task-not-found' : task.deletedAt ? 'task-deleted' : 'not-actionable',
+                });
+                return;
+            }
+            logNotificationOutcome('Complete action applied', { taskId });
             state.updateTask(taskId, { status: 'done', isFocusedToday: false }).catch(() => undefined);
             return;
         }
@@ -119,6 +136,10 @@ export function useRootLayoutNotificationOpenHandler({
         kind?: string;
     }) => {
         if (!canNavigate) {
+            logNotificationOutcome('Notification action deferred until app is ready', {
+                action: payload?.actionIdentifier || 'open',
+                taskId: payload?.taskId || '',
+            });
             pendingPayloadRef.current = payload;
             return;
         }
@@ -129,6 +150,10 @@ export function useRootLayoutNotificationOpenHandler({
         setNotificationOpenHandler(handleNotificationOpen);
         void consumePendingNotificationOpenPayload().then((payload) => {
             if (!payload) return;
+            logNotificationOutcome('Cold-start notification payload consumed', {
+                action: payload.actionIdentifier || 'open',
+                taskId: payload.taskId || '',
+            });
             handleNotificationOpen(payload);
         });
         return () => {
