@@ -23,6 +23,7 @@ Written by the 2026-08-13 improve audit (Phase 2 of the review-improve loop), st
 | 015 | core-lint-ci | DX-03 | S | DONE |
 | 016 | desktop-flat-eslint | DX-06 | S-M | DONE |
 | 017 | adr-encryption-at-rest | DOCS-01 | S | DONE |
+| 018 | mobile-store-action-settlement | ARCH-01 | M | TODO |
 
 Dependencies: 015 before 016 (both touch lint wiring; 015 is upstream in CI). 001's commit 2 depends on its commit 1. 006 commit 2 depends on commit 1 only for merge cleanliness. Everything else independent.
 
@@ -43,6 +44,8 @@ Dependencies: 015 before 016 (both touch lint wiring; 015 is upstream in CI). 00
 - native-schema job off macOS: needs xcrun swiftc, verified.
 - testing-strategy.md command additions: 6-locale parity cost for info one click away.
 - MCP/cloud auth helper sharing: deliberate workspace independence, recorded in file headers.
+- Global Android user-CA trust: deliberately restores OS trust-store parity for arbitrary self-hosted URLs; scoping it requires a separate native HTTP stack, and the device owner or administrator must explicitly install the CA. The low-leverage L/HIGH-risk migration is rejected unless the product threat model changes.
+- Mobile task-field renderer mega-interface: real coupling, but current performance gates are green and the refactor crosses keyboard, recurrence, attachment, audio, and progressive-disclosure behavior. Keep as Worth exploring until a measured regression or a narrower slice justifies it.
 
 ## Legacy plans (2026-08-09 files, reconciled 2026-08-13)
 
