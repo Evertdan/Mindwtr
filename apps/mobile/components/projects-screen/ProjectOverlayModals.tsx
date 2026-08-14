@@ -1,8 +1,8 @@
 import React from 'react';
 import { Image, Modal, Pressable, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import * as Sharing from 'expo-sharing';
 import { type Attachment } from '@mindwtr/core';
 import { logError } from '../../lib/app-log';
+import { shareFileWithFeedback } from '../../lib/share-file-with-feedback';
 
 import { projectsScreenStyles as styles } from '@/components/projects-screen/projects-screen.styles';
 import { useAndroidKeyboardInset } from '../../lib/use-android-keyboard-inset';
@@ -126,7 +126,7 @@ export function ProjectImagePreviewModal({
                                 onPress={() => {
                                     // The OS handler (gallery, photo viewer) zooms; the
                                     // in-app preview deliberately stays simple (#1026).
-                                    Sharing.shareAsync(attachment.uri).catch((error) => {
+                                    void shareFileWithFeedback(attachment.uri, t, (error) => {
                                         void logError(error, { scope: 'project', extra: { message: 'Failed to share attachment' } });
                                     });
                                 }}

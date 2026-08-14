@@ -1,11 +1,11 @@
 import React from 'react';
 import { Image, Modal, Pressable, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import * as Sharing from 'expo-sharing';
 
 import { translateWithFallback, type Attachment } from '@mindwtr/core';
 
 import { styles } from './task-edit-modal.styles';
 import { logTaskError } from './task-edit-modal.utils';
+import { shareFileWithFeedback } from '../../lib/share-file-with-feedback';
 
 type ThemeColors = {
     cardBg: string;
@@ -320,7 +320,7 @@ export const TaskEditImagePreviewModal = ({
                             onPress={() => {
                                 // The OS handler (gallery, photo viewer) zooms; the
                                 // in-app preview deliberately stays simple (#1026).
-                                Sharing.shareAsync(imagePreviewAttachment.uri).catch((error) =>
+                                void shareFileWithFeedback(imagePreviewAttachment.uri, t, (error) =>
                                     logTaskError('Failed to share attachment', error));
                             }}
                             style={styles.modalButton}
