@@ -1047,10 +1047,17 @@ export const useSyncSettings = ({
                     if (probeResult.error) {
                         void logError(new Error(probeResult.error), { scope: 'sync', step: 'activationProbe' });
                     }
-                    showToast(resolveText(
+                    const verificationMessage = resolveText(
                         'settings.sync.verificationFailed',
                         'Sync setup could not be verified. Your previous sync settings are still active.',
-                    ), 'error');
+                    );
+                    // Without the underlying reason the toast reads as "saving is
+                    // broken" when the target simply refused one sync (#1001).
+                    const probeReason = probeResult.error?.trim().slice(0, 200);
+                    const verificationToast = probeReason
+                        ? [verificationMessage, probeReason].join('\n')
+                        : verificationMessage;
+                    showToast(verificationToast, 'error', 6000);
                     return;
                 }
                 if (syncConfigurationGeneration.current !== activationGeneration) {
