@@ -771,7 +771,7 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
                                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                                             {imageAttachments.map((attachment) => {
                                                 const displayTitle = getAttachmentDisplayTitle(attachment);
-                                                const fullTitle = attachment.kind === 'link' ? attachment.uri : attachment.title;
+                                                const fullTitle = attachment.uri || attachment.title;
                                                 const isDownloading = attachment.localStatus === 'downloading';
                                                 return (
                                                     <button
@@ -808,7 +808,7 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
                                     {otherAttachments.map((attachment) => {
                                         const displayTitle = getAttachmentDisplayTitle(attachment);
                                         const isPointer = attachment.kind === 'link' || isBareFileReference(attachment);
-                                        const fullTitle = isPointer ? attachment.uri : attachment.title;
+                                        const fullTitle = attachment.uri || attachment.title;
                                         return (
                                             <div key={attachment.id} className="flex items-center gap-2">
                                                 {isPointer && <Link2 className="w-3 h-3 shrink-0" aria-hidden="true" />}

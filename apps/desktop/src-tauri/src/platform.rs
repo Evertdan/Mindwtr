@@ -90,7 +90,9 @@ fn normalize_open_path(raw: &str) -> Result<PathBuf, String> {
     }
     candidate
         .canonicalize()
-        .map_err(|_| "File does not exist or cannot be accessed.".to_string())
+        // The path is the one clue a user has for repairing a broken
+        // reference (moved file, relocated portable profile) — name it (#1001).
+        .map_err(|_| format!("File does not exist or cannot be accessed: {}", candidate.display()))
 }
 
 fn path_is_under_allowed_root(path: &Path, allowed_roots: &[PathBuf]) -> bool {
