@@ -49,7 +49,7 @@ export function buildProjectQuickCaptureReturnTo(projectId: string) {
 }
 
 /** Inverse of buildProjectQuickCaptureReturnTo: the project the capture route was opened from. */
-export function getProjectQuickCaptureReturnToProjectId(returnTo: string | undefined): string | null {
+export function getProjectQuickCaptureReturnToProjectId(returnTo: string | null | undefined): string | null {
     if (!returnTo) return null;
     const match = returnTo.match(/^\/projects-screen\?projectId=([^&]+)$/);
     return match ? decodeURIComponent(match[1]) : null;
