@@ -33,11 +33,17 @@ import { useFutureStartRevealTick, useLocalDayKey } from '../hooks/useLocalDayKe
 
 interface GlobalSearchProps {
     onNavigate: (view: string, itemId?: string) => void;
+    /**
+     * Start with "Include Done and Archived tasks" already on. Passed when the
+     * search opens over the Done or Archived view — searching there and not
+     * finding the finished task you are looking at reads as broken.
+     */
+    defaultIncludeCompleted?: boolean;
 }
 
 export const resolveGlobalSearchTaskView = resolveTaskNavigationView;
 
-export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
+export function GlobalSearch({ onNavigate, defaultIncludeCompleted = false }: GlobalSearchProps) {
     const dialogTitleId = useId();
     const [isOpen, setIsOpen] = useState(false);
     const [query, setQuery] = useState('');
@@ -136,7 +142,7 @@ export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
             setSearchQuery('');
             setSelectedIndex(0);
             setShowSavePrompt(false);
-            setIncludeCompleted(false);
+            setIncludeCompleted(defaultIncludeCompleted);
             setIncludeReference(true);
             setHideFutureTasks(false);
             setFiltersOpen(false);

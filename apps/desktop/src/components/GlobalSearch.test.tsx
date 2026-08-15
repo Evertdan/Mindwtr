@@ -276,6 +276,32 @@ describe('GlobalSearch', () => {
         expect(screen.queryByText('Type to search')).not.toBeInTheDocument();
     });
 
+    // Opened over the Done or Archived view, search must find the finished
+    // tasks the user is looking at — hiding them there read as broken (#1019).
+    it('includes finished tasks from the start when opened with that default', async () => {
+        render(
+            <LanguageProvider>
+                <GlobalSearch onNavigate={vi.fn()} defaultIncludeCompleted />
+            </LanguageProvider>
+        );
+
+        await act(async () => {
+            window.dispatchEvent(new Event('mindwtr:open-search'));
+            await vi.advanceTimersByTimeAsync(50);
+        });
+
+        await act(async () => {
+            fireEvent.change(screen.getByRole('textbox'), {
+                target: { value: 'report' },
+            });
+            await vi.advanceTimersByTimeAsync(300);
+            await Promise.resolve();
+        });
+
+        expect(screen.getByText((_, element) => element?.textContent === 'Completed report')).toBeInTheDocument();
+        expect(screen.getByText((_, element) => element?.textContent === 'Archived report')).toBeInTheDocument();
+    });
+
     // A project workspace never lists archived tasks and hides done ones unless
     // that project has them switched on, so routing a finished task there sent
     // the user to a page that could not show it (#991).

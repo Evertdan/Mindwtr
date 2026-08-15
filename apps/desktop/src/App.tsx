@@ -1599,7 +1599,10 @@ function App() {
                             renderView()
                         )}
                     </Suspense>
-                    <GlobalSearch onNavigate={(view, _id) => handleViewChange(view)} />
+                    <GlobalSearch
+                        onNavigate={(view, _id) => handleViewChange(view)}
+                        defaultIncludeCompleted={currentView === 'done' || currentView === 'archived'}
+                    />
                     <QuickAddModal />
                     {confirmModal}
                     <CloseBehaviorModal
