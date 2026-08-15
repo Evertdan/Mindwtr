@@ -607,6 +607,78 @@ describe('SyncService testability hooks', () => {
         expect(localStorage.getItem(CLOUD_PROVIDER_KEY)).toBe('selfhosted');
     });
 
+    it('migrates File sync without consulting an unavailable dormant Cloud authority (#1035, #1036)', async () => {
+        localStorage.setItem(SYNC_BACKEND_KEY, 'file');
+        localStorage.setItem(WEBDAV_URL_KEY, 'https://legacy-webdav.example.com');
+        localStorage.setItem(WEBDAV_USERNAME_KEY, 'legacy-user');
+        sessionStorage.setItem(WEBDAV_PASSWORD_KEY, 'legacy-password');
+        let nativeWebdav = {
+            url: '',
+            username: '',
+            password: '',
+            hasPassword: false,
+            allowInsecureHttp: false,
+            allowWeakFingerprint: true,
+        };
+        const nativeSnapshot = () => ({
+            backend: 'file' as const,
+            syncPath: '/home/alice/Sync/Mindwtr',
+            cloudProvider: 'selfhosted' as const,
+            cloudProviderAuthority: 'uninitialized' as const,
+            webdav: {
+                ...nativeWebdav,
+                password: nativeWebdav.hasPassword ? nativeWebdav.password : null,
+                passwordAuthority: nativeWebdav.hasPassword ? 'known' as const : 'opaque' as const,
+                hasPassword: nativeWebdav.hasPassword ? true : null,
+            },
+            cloud: {
+                url: '',
+                token: null,
+                tokenAuthority: 'opaque' as const,
+                allowInsecureHttp: false,
+                rememberToken: false,
+            },
+        });
+        const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
+            if (command === 'recover_dropbox_credentials_before_sync_configuration') return true;
+            if (command === 'get_sync_configuration_snapshot') return nativeSnapshot();
+            if (command === 'set_webdav_config') {
+                nativeWebdav = {
+                    url: String(args?.url ?? ''),
+                    username: String(args?.username ?? ''),
+                    password: String(args?.password ?? ''),
+                    hasPassword: Boolean(args?.password),
+                    allowInsecureHttp: args?.allowInsecureHttp === true,
+                    allowWeakFingerprint: args?.allowWeakFingerprint !== false,
+                };
+                return undefined;
+            }
+            if (command === 'get_webdav_config') return nativeWebdav;
+            if (command === 'get_cloud_config') {
+                throw new Error('cloud credential authority is unavailable');
+            }
+            throw new Error(`Unexpected command: ${command}`);
+        });
+        __syncServiceTestUtils.setDependenciesForTests({
+            isTauriRuntime: () => true,
+            invoke: invoke as unknown as <T>(command: string, args?: Record<string, unknown>) => Promise<T>,
+        });
+
+        await expect(SyncService.getPersistedSyncConfigurationSnapshot()).resolves.toMatchObject({
+            backend: 'file',
+            syncPath: '/home/alice/Sync/Mindwtr',
+        });
+        expect(invoke.mock.calls.some(([command]) => command === 'get_cloud_config')).toBe(false);
+        expect(nativeWebdav).toMatchObject({
+            url: 'https://legacy-webdav.example.com',
+            username: 'legacy-user',
+            password: 'legacy-password',
+        });
+        expect(localStorage.getItem(SYNC_BACKEND_KEY)).toBeNull();
+        expect(localStorage.getItem(WEBDAV_URL_KEY)).toBeNull();
+        expect(sessionStorage.getItem(WEBDAV_PASSWORD_KEY)).toBeNull();
+    });
+
     it('finishes provider-only legacy migration before returning the native configuration snapshot', async () => {
         let nativeProvider: 'selfhosted' | 'dropbox' = 'selfhosted';
         let providerAuthority: 'uninitialized' | 'native' = 'uninitialized';
@@ -667,7 +739,7 @@ describe('SyncService testability hooks', () => {
 
         const snapshotPromise = SyncService.getPersistedSyncConfigurationSnapshot();
         await waitForAssertion(() => expect(events).toContain('set_sync_cloud_provider'));
-        expect(events).not.toContain('get_sync_configuration_snapshot');
+        expect(events.filter((event) => event === 'get_sync_configuration_snapshot')).toHaveLength(1);
 
         releaseProviderWrite();
         await expect(snapshotPromise).resolves.toMatchObject({
@@ -680,8 +752,9 @@ describe('SyncService testability hooks', () => {
             events.indexOf('set_sync_cloud_provider'),
         );
         expect(events.indexOf('set_sync_cloud_provider')).toBeLessThan(
-            events.indexOf('get_sync_configuration_snapshot'),
+            events.lastIndexOf('get_sync_configuration_snapshot'),
         );
+        expect(events.filter((event) => event === 'get_sync_configuration_snapshot')).toHaveLength(2);
     });
 
     it('does not read or write native configuration when the migration recovery barrier fails', async () => {
@@ -716,9 +789,32 @@ describe('SyncService testability hooks', () => {
         let backendResolved = false;
         let providerResolved = false;
         localStorage.setItem(CLOUD_PROVIDER_KEY, 'dropbox');
+        const nativeSnapshot = () => ({
+            backend: 'cloud' as const,
+            syncPath: '',
+            cloudProvider: nativeProvider,
+            cloudProviderAuthority: providerAuthority,
+            webdav: {
+                url: '',
+                username: '',
+                password: null,
+                passwordAuthority: 'opaque' as const,
+                hasPassword: null,
+                allowInsecureHttp: false,
+                allowWeakFingerprint: true,
+            },
+            cloud: {
+                url: '',
+                token: null,
+                tokenAuthority: 'opaque' as const,
+                allowInsecureHttp: false,
+                rememberToken: false,
+            },
+        });
 
         const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
             if (command === 'recover_dropbox_credentials_before_sync_configuration') return true;
+            if (command === 'get_sync_configuration_snapshot') return nativeSnapshot();
             if (command === 'get_sync_backend') return 'cloud';
             if (command === 'get_webdav_config') {
                 return { url: '', username: '', hasPassword: false, allowInsecureHttp: false };
@@ -827,7 +923,7 @@ describe('SyncService testability hooks', () => {
             'native provider unavailable',
         );
         expect(localStorage.getItem(CLOUD_PROVIDER_KEY)).toBe('dropbox');
-        expect(events).not.toContain('get_sync_configuration_snapshot');
+        expect(events.filter((event) => event === 'get_sync_configuration_snapshot')).toHaveLength(1);
         expect(reportError).toHaveBeenCalledTimes(1);
 
         shouldFail = false;
@@ -918,6 +1014,7 @@ describe('SyncService testability hooks', () => {
             backend: 'cloud' as const,
             syncPath: '',
             cloudProvider: 'selfhosted' as const,
+            cloudProviderAuthority: 'native' as const,
             webdav: {
                 url: 'https://native-webdav.example.com',
                 username: 'native-user',
@@ -984,6 +1081,30 @@ describe('SyncService testability hooks', () => {
 
         const invoke = vi.fn(async (command: string) => {
             if (command === 'recover_dropbox_credentials_before_sync_configuration') return true;
+            if (command === 'get_sync_configuration_snapshot') {
+                return {
+                    backend: 'cloud',
+                    syncPath: '',
+                    cloudProvider: 'selfhosted',
+                    cloudProviderAuthority: 'uninitialized',
+                    webdav: {
+                        url: '',
+                        username: '',
+                        password: null,
+                        passwordAuthority: 'opaque',
+                        hasPassword: null,
+                        allowInsecureHttp: false,
+                        allowWeakFingerprint: true,
+                    },
+                    cloud: {
+                        url: 'https://native-cloud.example.com',
+                        token: 'native-token',
+                        tokenAuthority: 'known',
+                        allowInsecureHttp: false,
+                        rememberToken: false,
+                    },
+                };
+            }
             if (command === 'get_sync_backend') return 'cloud';
             if (command === 'get_webdav_config') {
                 return { url: '', username: '', hasPassword: false, allowInsecureHttp: false, allowWeakFingerprint: true };

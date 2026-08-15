@@ -1507,6 +1507,29 @@ fn resolve_bound_credential_unlocked(
     Ok(effective)
 }
 
+fn resolve_sync_snapshot_secret_unlocked(
+    config_path: &Path,
+    secrets_path: &Path,
+    config: &AppConfigToml,
+    service: CredentialService,
+    keyring: Result<Option<String>, String>,
+) -> Result<SyncSnapshotSecret, String> {
+    match resolve_bound_credential_unlocked(config_path, secrets_path, config, service, keyring) {
+        Ok(secret) => Ok(SyncSnapshotSecret::Known(secret.unwrap_or_default())),
+        Err(error)
+            if error
+                == format!(
+                    "{} credential authority is unavailable",
+                    service.state_key()
+                )
+                || error == "Credential binding does not match any available secret authority" =>
+        {
+            Ok(SyncSnapshotSecret::Opaque)
+        }
+        Err(error) => Err(error),
+    }
+}
+
 fn read_bound_credential_paths_with<ReadSecret>(
     config_path: &Path,
     secrets_path: &Path,
@@ -2241,26 +2264,21 @@ fn read_sync_configuration_pair(
             .expect("validated Dropbox backend marker")
             .to_string(),
     );
-    let webdav_password = resolve_bound_credential_unlocked(
+    let webdav_password = resolve_sync_snapshot_secret_unlocked(
         &config_path,
         &secrets_path,
         &config,
         CredentialService::Webdav,
         get_keyring_secret(app, KEYRING_WEB_DAV_PASSWORD),
     )?;
-    let cloud_token = resolve_bound_credential_unlocked(
+    let cloud_token = resolve_sync_snapshot_secret_unlocked(
         &config_path,
         &secrets_path,
         &config,
         CredentialService::Cloud,
         get_keyring_secret(app, KEYRING_CLOUD_TOKEN),
     )?;
-    Ok((
-        config,
-        SyncSnapshotSecret::Known(webdav_password.unwrap_or_default()),
-        SyncSnapshotSecret::Known(cloud_token.unwrap_or_default()),
-        provider_state,
-    ))
+    Ok((config, webdav_password, cloud_token, provider_state))
 }
 
 fn read_raw_sync_backend_path_unlocked(config_path: &Path) -> Result<String, String> {
@@ -3280,6 +3298,70 @@ mod tests {
         assert!(snapshot["cloud"]["token"].is_null());
         assert_eq!(snapshot["cloud"]["tokenAuthority"], "opaque");
         assert_eq!(snapshot["cloudProvider"], "dropbox");
+    }
+
+    #[test]
+    fn sync_snapshot_tolerates_unavailable_authorities_but_not_endpoint_mismatches() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.toml");
+        let secrets_path = dir.path().join("secrets.toml");
+        write_config_files(&config_path, &secrets_path, &AppConfigToml::default())
+            .expect("seed config");
+        let initial =
+            read_config_files_verified(&config_path, &secrets_path).expect("read initial config");
+
+        assert_eq!(
+            resolve_sync_snapshot_secret_unlocked(
+                &config_path,
+                &secrets_path,
+                &initial,
+                CredentialService::Cloud,
+                Err("keyring unavailable".to_string()),
+            )
+            .expect("an unrelated unavailable authority stays opaque"),
+            SyncSnapshotSecret::Opaque,
+        );
+
+        let keyring = std::cell::RefCell::new(None::<String>);
+        let committed = update_bound_credential_paths_with(
+            &config_path,
+            &secrets_path,
+            CredentialService::Cloud,
+            CredentialSecretUpdate::Replace(Some("cloud-token".to_string())),
+            |config| config.cloud_url = Some("https://trusted.example".to_string()),
+            || Ok(keyring.borrow().clone()),
+            |secret| {
+                *keyring.borrow_mut() = secret;
+                Ok(())
+            },
+            |_| Ok(()),
+        )
+        .expect("commit bound cloud credential");
+        assert_eq!(
+            resolve_sync_snapshot_secret_unlocked(
+                &config_path,
+                &secrets_path,
+                &committed,
+                CredentialService::Cloud,
+                Err("keyring unavailable".to_string()),
+            )
+            .expect("a matching but unavailable bound authority stays opaque"),
+            SyncSnapshotSecret::Opaque,
+        );
+
+        let mut changed_endpoint = committed;
+        changed_endpoint.cloud_url = Some("https://wrong.example".to_string());
+        write_config_files(&config_path, &secrets_path, &changed_endpoint)
+            .expect("publish changed endpoint");
+        let error = resolve_sync_snapshot_secret_unlocked(
+            &config_path,
+            &secrets_path,
+            &changed_endpoint,
+            CredentialService::Cloud,
+            Err("keyring unavailable".to_string()),
+        )
+        .expect_err("an endpoint mismatch must remain fail-closed");
+        assert!(error.contains("endpoint does not match"));
     }
 
     #[test]

@@ -1204,16 +1204,23 @@ export class SyncService {
             // settling any crash-left Dropbox journal before config writes.
             await recoverDropboxCredentialsBeforeConfigurationDirect();
 
-            const [currentBackend, currentWebdav, currentCloud, currentCloudProviderState] = await Promise.all([
-                invokeSyncNative<string>('get_sync_backend'),
-                invokeSyncNative<WebDavConfig>('get_webdav_config'),
-                invokeSyncNative<CloudConfig>('get_cloud_config'),
-                rawLegacyCloudProvider !== null
-                    ? invokeSyncNative<{ provider: string; authority: string }>('get_sync_cloud_provider_state')
-                    : Promise.resolve<{ provider: string; authority: string } | null>(null),
-            ]);
+            // Read one tolerant native snapshot instead of consulting each
+            // secret authority. A dormant WebDAV or Cloud credential can be
+            // opaque in a sandboxed package without blocking File sync.
+            const current = await invokeSyncNative<
+                PersistedDesktopSyncConfiguration & { cloudProviderAuthority: string }
+            >('get_sync_configuration_snapshot', {
+                requireWebdavPassword: false,
+                requireCloudToken: false,
+            });
 
-            if (hasLegacyWebdav && !currentWebdav.url) {
+            if (hasLegacyWebdav && !current.webdav.url) {
+                if (
+                    current.webdav.passwordAuthority === 'opaque'
+                    && !legacyWebdav.password
+                ) {
+                    throw new Error('WebDAV password authority is unavailable for legacy migration');
+                }
                 await invokeSyncNative('set_webdav_config', legacyWebdav);
                 const persistedWebdav = await invokeSyncNative<WebDavConfig>('get_webdav_config');
                 if (
@@ -1227,19 +1234,29 @@ export class SyncService {
                 }
             }
 
-            if (hasLegacyCloud && !currentCloud.url && !currentCloud.token) {
-                await invokeSyncNative('set_cloud_config', {
-                    url: legacyCloud.url,
-                    token: legacyCloud.token,
-                    allowInsecureHttp: legacyCloud.allowInsecureHttp === true,
-                });
-                const persistedCloud = await invokeSyncNative<CloudConfig>('get_cloud_config');
+            if (hasLegacyCloud && !current.cloud.url) {
                 if (
-                    persistedCloud.url !== legacyCloud.url
-                    || persistedCloud.token !== legacyCloud.token
-                    || persistedCloud.allowInsecureHttp !== legacyCloud.allowInsecureHttp
+                    current.cloud.tokenAuthority === 'opaque'
+                    && !legacyCloud.token
                 ) {
-                    throw new Error('Legacy self-hosted sync configuration did not persist correctly');
+                    throw new Error('Self-hosted cloud token authority is unavailable for legacy migration');
+                }
+                const hasKnownNativeCloudToken = current.cloud.tokenAuthority === 'known'
+                    && Boolean(current.cloud.token);
+                if (!hasKnownNativeCloudToken) {
+                    await invokeSyncNative('set_cloud_config', {
+                        url: legacyCloud.url,
+                        token: legacyCloud.token,
+                        allowInsecureHttp: legacyCloud.allowInsecureHttp === true,
+                    });
+                    const persistedCloud = await invokeSyncNative<CloudConfig>('get_cloud_config');
+                    if (
+                        persistedCloud.url !== legacyCloud.url
+                        || persistedCloud.token !== legacyCloud.token
+                        || persistedCloud.allowInsecureHttp !== legacyCloud.allowInsecureHttp
+                    ) {
+                        throw new Error('Legacy self-hosted sync configuration did not persist correctly');
+                    }
                 }
             }
 
@@ -1247,15 +1264,14 @@ export class SyncService {
             // verify it before a legacy cloud backend can be activated.
             if (rawLegacyCloudProvider !== null) {
                 if (
-                    !currentCloudProviderState
-                    || (currentCloudProviderState.provider !== 'selfhosted'
-                        && currentCloudProviderState.provider !== 'dropbox')
-                    || (currentCloudProviderState.authority !== 'uninitialized'
-                        && currentCloudProviderState.authority !== 'native')
+                    (current.cloudProvider !== 'selfhosted'
+                        && current.cloudProvider !== 'dropbox')
+                    || (current.cloudProviderAuthority !== 'uninitialized'
+                        && current.cloudProviderAuthority !== 'native')
                 ) {
                     throw new Error('Invalid persisted cloud provider state');
                 }
-                if (legacyCloudProvider && currentCloudProviderState.authority === 'uninitialized') {
+                if (legacyCloudProvider && current.cloudProviderAuthority === 'uninitialized') {
                     await invokeSyncNative('set_sync_cloud_provider', { provider: legacyCloudProvider });
                     const persistedState = await invokeSyncNative<{ provider: string; authority: string }>(
                         'get_sync_cloud_provider_state',
@@ -1269,7 +1285,7 @@ export class SyncService {
                 }
             }
 
-            if (hasLegacyBackend && normalizeSyncBackend(currentBackend) === 'file') {
+            if (hasLegacyBackend && current.backend === 'file') {
                 await invokeSyncNative('set_sync_backend', { backend: legacyBackend });
                 const persistedBackend = normalizeSyncBackend(
                     await invokeSyncNative<string>('get_sync_backend'),
