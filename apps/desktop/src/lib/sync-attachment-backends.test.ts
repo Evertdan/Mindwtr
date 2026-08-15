@@ -330,6 +330,49 @@ describe('desktop sync attachment backends', () => {
         expect(appData.tasks[0].attachments?.[0]?.cloudKey).toBe('attachments/attachment-1.txt');
     });
 
+    it('re-copies a locally available attachment into a sync folder that is missing it on a regular sync', async () => {
+        // #1001: switching the File Sync folder outside the settings UI left
+        // attachments/ empty forever — the recorded cloudKey pointed at the
+        // old folder and nothing re-verified presence in the current one.
+        const bytes = new Uint8Array([1, 2, 3]);
+        const appData = createCandidateAttachmentData();
+        const deps: AttachmentBackendDeps = {
+            getTauriFetch: vi.fn(),
+            isTauriRuntimeEnv: () => true,
+            logSyncInfo: vi.fn(),
+            logSyncWarning: vi.fn(),
+            resolveWebdavPassword: vi.fn(),
+        };
+        fsMocks.exists.mockImplementation(async (path: string) => !String(path).startsWith('/candidate-sync/'));
+        fsMocks.readFile.mockResolvedValue(bytes);
+
+        const mutated = await syncFileAttachments(appData, '/candidate-sync', deps);
+
+        expect(fsMocks.rename).toHaveBeenCalledWith(
+            expect.stringMatching(/^\/candidate-sync\/attachments\/attachment-1\.txt\.tmp-/),
+            '/candidate-sync/attachments/attachment-1.txt',
+        );
+        expect(appData.tasks[0].attachments?.[0]?.cloudKey).toBe('attachments/attachment-1.txt');
+        expect(mutated).toBe(true);
+    });
+
+    it('keeps an attachment cloud key when its local copy is missing, even if the sync folder lacks the file', async () => {
+        const appData = createCandidateAttachmentData();
+        const deps: AttachmentBackendDeps = {
+            getTauriFetch: vi.fn(),
+            isTauriRuntimeEnv: () => true,
+            logSyncInfo: vi.fn(),
+            logSyncWarning: vi.fn(),
+            resolveWebdavPassword: vi.fn(),
+        };
+        fsMocks.exists.mockResolvedValue(false);
+
+        await syncFileAttachments(appData, '/candidate-sync', deps);
+
+        expect(appData.tasks[0].attachments?.[0]?.cloudKey).toBe('attachments/attachment-1.txt');
+        expect(fsMocks.writeFile).not.toHaveBeenCalled();
+    });
+
     it('keeps WebDAV attachment sync in cooldown across repeated sync runs after rate limiting', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-06-12T00:00:00.000Z'));

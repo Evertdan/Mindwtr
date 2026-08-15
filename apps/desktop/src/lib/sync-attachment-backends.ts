@@ -1010,7 +1010,28 @@ export async function syncFileAttachments(
         readFile,
     });
 
-    return await syncBasicRemoteAttachments({
+    // Mirror the WebDAV presence pre-pass: a cloudKey recorded against a
+    // previous sync folder (or a file deleted from this one) must not stop
+    // the copy into the current folder. Clearing it lets the lifecycle below
+    // re-upload; only cleared when a local copy exists to upload from (#1001).
+    let preMutated = false;
+    for (const attachment of attachmentsById.values()) {
+        if (attachment.kind !== 'file' || attachment.deletedAt || !attachment.cloudKey) continue;
+        const rawUri = attachment.uri ? stripFileScheme(attachment.uri) : '';
+        if (!rawUri || /^https?:\/\//i.test(rawUri)) continue;
+        if (!(await localFileExists(rawUri))) continue;
+        try {
+            const remotePath = await resolveFileBackendPath(join, baseSyncDir, attachment.cloudKey);
+            if (!(await exists(remotePath))) {
+                attachment.cloudKey = undefined;
+                preMutated = true;
+            }
+        } catch (error) {
+            deps.logSyncWarning('Failed to check sync-folder attachment presence', error);
+        }
+    }
+
+    const syncMutated = await syncBasicRemoteAttachments({
         attachmentsById,
         forceUploadExistingLocal: helpers?.activationProbe === true,
         localFileExists,
@@ -1067,4 +1088,5 @@ export async function syncFileAttachments(
             deps.logSyncWarning(`Failed to copy attachment ${attachment.title} from sync folder`, error);
         },
     });
+    return preMutated || syncMutated;
 }
