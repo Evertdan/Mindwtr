@@ -162,9 +162,7 @@ fn read_gsettings_value(_schema: &str, _key: &str) -> Option<String> {
 }
 
 // KDE never writes GNOME's gsettings keys, so `color-scheme` reads 'default'
-// and this probe reports "light" on a dark Plasma desktop. KDE syncs the GTK
-// dark preference itself (kde-gtk-config), so the native GTK theme channel is
-// the reliable signal there and this probe must stay silent (#989).
+// and this probe reports "light" on a dark Plasma desktop (#989).
 fn is_kde_desktop_value(value: &str) -> bool {
     value
         .to_ascii_lowercase()
@@ -178,12 +176,124 @@ fn is_kde_desktop() -> bool {
         .any(|var| std::env::var(var).is_ok_and(|value| is_kde_desktop_value(&value)))
 }
 
-// Spawns and waits on `gsettings` (up to twice) — real process I/O, no
-// shared state to race (B1).
+// The XDG desktop portal's appearance setting is the one cross-desktop dark
+// signal (1 = prefer dark, 2 = prefer light, 0 = no preference). Silencing
+// this probe on KDE and trusting WebKitGTK's own media query was not enough:
+// kde-gtk-config does not reliably propagate Plasma's dark scheme into the
+// GTK settings WebKitGTK reads, so the app still started light on a dark
+// Plasma desktop (#989).
+fn parse_portal_color_scheme(output: &str) -> Option<&'static str> {
+    // gdbus prints `(<uint32 1>,)` for ReadOne and `(<<uint32 1>>,)` for Read.
+    let rest = output.split("uint32").nth(1)?;
+    let digits: String = rest
+        .trim_start()
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .collect();
+    match digits.parse::<u32>().ok()? {
+        1 => Some("dark"),
+        2 => Some("light"),
+        _ => None,
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn read_portal_color_scheme() -> Option<&'static str> {
+    // ReadOne first (current portals), Read as the legacy spelling.
+    for method in ["ReadOne", "Read"] {
+        let output = Command::new("gdbus")
+            .args([
+                "call",
+                "--session",
+                "--dest",
+                "org.freedesktop.portal.Desktop",
+                "--object-path",
+                "/org/freedesktop/portal/desktop",
+                "--method",
+                &format!("org.freedesktop.portal.Settings.{method}"),
+                "org.freedesktop.appearance",
+                "color-scheme",
+            ])
+            .output();
+        let Ok(output) = output else { return None };
+        if !output.status.success() {
+            continue;
+        }
+        if let Some(preference) =
+            std::str::from_utf8(&output.stdout).ok().and_then(parse_portal_color_scheme)
+        {
+            return Some(preference);
+        }
+    }
+    None
+}
+
+#[cfg(not(target_os = "linux"))]
+fn read_portal_color_scheme() -> Option<&'static str> {
+    None
+}
+
+// Fallback for KDE sessions without a working settings portal: Plasma writes
+// the active color scheme's name into kdeglobals. Only a "dark"-named scheme
+// is trusted — a name without "dark" proves nothing, and forcing light from a
+// name heuristic is exactly the failure mode this probe once had on GNOME.
+fn parse_kde_color_scheme(contents: &str) -> Option<String> {
+    let mut in_general = false;
+    for line in contents.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            in_general = line == "[General]";
+            continue;
+        }
+        if !in_general {
+            continue;
+        }
+        if let Some(value) = line.strip_prefix("ColorScheme=") {
+            let value = value.trim();
+            if !value.is_empty() {
+                return Some(value.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn kde_dark_hint_from_scheme(scheme: Option<&str>) -> Option<&'static str> {
+    scheme
+        .filter(|value| value.to_ascii_lowercase().contains("dark"))
+        .map(|_| "dark")
+}
+
+#[cfg(target_os = "linux")]
+fn read_kde_color_scheme_preference() -> Option<&'static str> {
+    let config_dir = std::env::var("XDG_CONFIG_HOME")
+        .ok()
+        .filter(|value| !value.is_empty())
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            std::env::var("HOME")
+                .ok()
+                .filter(|value| !value.is_empty())
+                .map(|home| std::path::PathBuf::from(home).join(".config"))
+        })?;
+    let contents = std::fs::read_to_string(config_dir.join("kdeglobals")).ok()?;
+    kde_dark_hint_from_scheme(parse_kde_color_scheme(&contents).as_deref())
+}
+
+#[cfg(not(target_os = "linux"))]
+fn read_kde_color_scheme_preference() -> Option<&'static str> {
+    None
+}
+
+// Spawns and waits on `gdbus`/`gsettings` and may read kdeglobals — real
+// process and file I/O, no shared state to race (B1).
 #[tauri::command(async)]
 pub(crate) fn get_system_theme_preference() -> Option<String> {
+    if let Some(preference) = read_portal_color_scheme() {
+        return Some(preference.to_string());
+    }
     if is_kde_desktop() {
-        return None;
+        return read_kde_color_scheme_preference().map(str::to_string);
     }
     let color_scheme = read_gsettings_value(GNOME_INTERFACE_SCHEMA, GNOME_COLOR_SCHEME_KEY);
     let gtk_theme = read_gsettings_value(GNOME_INTERFACE_SCHEMA, GNOME_GTK_THEME_KEY);
@@ -704,6 +814,36 @@ mod tests {
         assert!(!is_kde_desktop_value("niri"));
         assert!(!is_kde_desktop_value("kde-something"));
         assert!(!is_kde_desktop_value(""));
+    }
+
+    #[test]
+    fn parses_portal_color_scheme_replies() {
+        assert_eq!(parse_portal_color_scheme("(<uint32 1>,)"), Some("dark"));
+        assert_eq!(parse_portal_color_scheme("(<<uint32 1>>,)"), Some("dark"));
+        assert_eq!(parse_portal_color_scheme("(<uint32 2>,)"), Some("light"));
+        assert_eq!(parse_portal_color_scheme("(<uint32 0>,)"), None);
+        assert_eq!(parse_portal_color_scheme("(<uint32 7>,)"), None);
+        assert_eq!(parse_portal_color_scheme(""), None);
+        assert_eq!(parse_portal_color_scheme("uint32"), None);
+    }
+
+    #[test]
+    fn parses_kde_color_scheme_from_kdeglobals() {
+        let contents = "[Icons]\nTheme=breeze\n\n[General]\nColorScheme=BreezeDark\nName=x\n";
+        assert_eq!(parse_kde_color_scheme(contents).as_deref(), Some("BreezeDark"));
+        // The key outside [General] must not match.
+        let misplaced = "[KDE]\nColorScheme=BreezeDark\n[General]\nName=x\n";
+        assert_eq!(parse_kde_color_scheme(misplaced), None);
+        assert_eq!(parse_kde_color_scheme(""), None);
+    }
+
+    #[test]
+    fn kde_scheme_names_only_ever_report_dark() {
+        assert_eq!(kde_dark_hint_from_scheme(Some("BreezeDark")), Some("dark"));
+        assert_eq!(kde_dark_hint_from_scheme(Some("Fedora Dark")), Some("dark"));
+        // A non-dark name proves nothing; never force light from a name.
+        assert_eq!(kde_dark_hint_from_scheme(Some("Breeze")), None);
+        assert_eq!(kde_dark_hint_from_scheme(None), None);
     }
 
     #[test]
