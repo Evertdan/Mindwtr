@@ -389,17 +389,30 @@ test("update-aur and update-aur-beta publish directly with a pre-push ownership 
     ).toBe(false);
   }
 
-  // mindwtr (the source package) is unchanged: still a reviewed proposal.
+  // mindwtr (the source package) publishes directly too now that dongdongbh
+  // co-maintains it: same validate/audit gates before the push, and the exact
+  // published tree is still uploaded under the artifact name the manual
+  // publish-aur.yml fallback consumes.
   const sourceSteps = stable.jobs["update-aur-source"].steps;
-  expect(
-    sourceSteps.some((step) => step.name === "Prepare immutable AUR proposal"),
-  ).toBe(true);
-  expect(
-    sourceSteps.some(
-      (step) =>
-        step.name === "Preserve exact AUR proposal for reviewed publication",
-    ),
-  ).toBe(true);
+  const sourceValidateIndex = sourceSteps.findIndex(
+    (step) => step.name === "Validate AUR package contents",
+  );
+  const sourceAuditIndex = sourceSteps.findIndex(
+    (step) => step.name === "Verify AUR package ownership before push",
+  );
+  const sourceRecordIndex = sourceSteps.findIndex(
+    (step) => step.name === "Preserve exact published tree as an artifact",
+  );
+  const sourcePushIndex = sourceSteps.findIndex((step) =>
+    step.name.startsWith("Commit and push"),
+  );
+  expect(sourceValidateIndex).toBeGreaterThan(-1);
+  expect(sourceAuditIndex).toBeGreaterThan(-1);
+  expect(sourceRecordIndex).toBeGreaterThan(-1);
+  expect(sourcePushIndex).toBeGreaterThan(sourceValidateIndex);
+  expect(sourcePushIndex).toBeGreaterThan(sourceAuditIndex);
+  expect(sourcePushIndex).toBeGreaterThan(sourceRecordIndex);
+  expect(stableText).toContain("aur-proposal-mindwtr-");
 
   expect(stable.jobs["update-aur-bin-beta"].name).toContain(
     "Update AUR Beta",
