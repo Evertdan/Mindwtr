@@ -42,7 +42,7 @@ sha256sum --check SHA256SUMS
 
 ## Publishing policy
 
-`mindwtr-bin` and `mindwtr-bin-beta` publish directly from release jobs:
+All three packages publish directly from release jobs:
 
 1. Generate the package's `PKGBUILD` and `.SRCINFO` from the release tag.
 2. Reject unexpected files, owners, sources, commands, or skipped checksums (`scripts/ci/validate-aur-package.mjs`).
@@ -52,9 +52,9 @@ sha256sum --check SHA256SUMS
 
 A recognized AUR maintenance response (pushes disabled) marks the channel delayed rather than failing the job; an unexpected rejection fails it.
 
-`mindwtr` (the source package) still goes through the reviewed-proposal path: its release job validates and builds the package the same way, then saves the exact files, base commit, all-package ownership/history snapshot, review diff, and diff checksum as a 90-day workflow artifact instead of pushing.
+`mindwtr` (the source package, co-maintained with `yochananmarqos`) additionally runs a full clean-container build of the package before pushing, and its release job still saves the exact published files, base commit, all-package ownership/history snapshot, review diff, and diff checksum as a 90-day workflow artifact — now as a publish record rather than a pending proposal.
 
-The manual `Publish reviewed AUR proposal` workflow (`publish-aur.yml`), protected by the `aur-publish` GitHub Environment, publishes that saved proposal and remains available as an incident-mode fallback for `mindwtr-bin` and `mindwtr-bin-beta` too, for out-of-band publication when direct pushes are unavailable or extra review is warranted.
+The manual `Publish reviewed AUR proposal` workflow (`publish-aur.yml`), protected by the `aur-publish` GitHub Environment, publishes such a saved artifact and remains available as an incident-mode fallback for all three packages, for out-of-band publication when direct pushes are unavailable or extra review is warranted.
 
 ## Maintainer security
 
