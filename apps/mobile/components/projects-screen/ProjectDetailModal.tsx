@@ -854,15 +854,18 @@ export function ProjectDetailModal({
         setTimeout(retry, 250);
     }, []);
 
-    // Exiting reorder mode swaps the reorder list back to the task FlatList,
-    // which mounts at offset 0 (#784). Queue a restore so the list comes back
-    // at the position the user left it.
+    // Exiting reorder mode is handled inside TaskList: it scrolls the
+    // remounted task FlatList to the region the reorder view was showing.
+    // Restoring the pre-reorder offset here instead yanked the viewport away
+    // from where the dragged task just landed (#784). Only the saved offset is
+    // reset — the list mounts at 0 and mounting fires no scroll event, so a
+    // stale value would leak into the next bulk-bar restore.
     const prevProjectReorderOwnsScrollRef = React.useRef(projectReorderOwnsScroll);
     React.useLayoutEffect(() => {
         const wasReordering = prevProjectReorderOwnsScrollRef.current;
         prevProjectReorderOwnsScrollRef.current = projectReorderOwnsScroll;
-        if (wasReordering && !projectReorderOwnsScroll && projectDetailScrollOffsetRef.current > 0) {
-            pendingProjectDetailScrollRestoreRef.current = projectDetailScrollOffsetRef.current;
+        if (wasReordering && !projectReorderOwnsScroll) {
+            projectDetailScrollOffsetRef.current = 0;
         }
     }, [projectReorderOwnsScroll]);
 

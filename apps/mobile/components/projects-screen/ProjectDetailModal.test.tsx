@@ -873,7 +873,11 @@ describe('ProjectDetailModal project task scrolling', () => {
     });
 
 
-    it('restores the project task scroll offset after exiting reorder mode', () => {
+    // #784: exiting reorder mode must NOT restore the pre-reorder offset —
+    // TaskList scrolls to the region the reorder view was showing instead, and
+    // a restore here would yank the viewport away from the dropped task. The
+    // saved offset is reset so it cannot leak into a later bulk-bar restore.
+    it('drops the pre-reorder scroll offset when exiting reorder mode', () => {
         act(() => {
             create(<ProjectDetailModal {...createProjectDetailModalProps()} />);
         });
@@ -895,7 +899,27 @@ describe('ProjectDetailModal project task scrolling', () => {
             taskListPropsSpy.mock.calls.at(-1)?.[0].project.onReorderModeChange(false);
         });
 
-        expect(mockScrollToOffset).toHaveBeenCalledWith({ offset: 480, animated: false });
+        expect(mockScrollToOffset).not.toHaveBeenCalled();
+
+        const taskListProps = taskListPropsSpy.mock.calls.at(-1)?.[0];
+        act(() => {
+            taskListProps.onBulkBarPropsChange({
+                bulkActionLabel: '',
+                bulkActionLoading: false,
+                handleBatchDelete: vi.fn(),
+                handleBatchMove: vi.fn(),
+                hasSelection: true,
+                onExitSelectionMode: vi.fn(),
+                onOpenTagModal: vi.fn(),
+                onToggleRangeSelectMode: vi.fn(),
+                rangeSelectMode: false,
+                selectedCount: 1,
+                t: translate,
+                themeColors,
+            });
+        });
+
+        expect(mockScrollToOffset).not.toHaveBeenCalledWith({ offset: 480, animated: false });
     });
 
     it('restores the project task scroll offset when the external bulk bar appears', () => {

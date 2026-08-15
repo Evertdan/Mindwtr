@@ -820,6 +820,53 @@ describe('TaskList', () => {
     });
   });
 
+  // #784: exiting Task order lands the normal list on the region the reorder
+  // view was showing — not the pre-reorder offset, which yanked the viewport
+  // away from where the dragged task had just been dropped.
+  it('returns the normal list to the reorder viewport region on exit', async () => {
+    const longTaskList = Array.from({ length: 30 }, (_, index) => makeTask(
+      `task-${index}`,
+      `Task ${index}`,
+      { order: index },
+    ));
+    const propsFor = (reorderMode: boolean) => (
+      <TaskList
+        project={{ id: project.id, enableReorder: true, reorderMode }}
+        showHeader={false}
+        statusFilter="all"
+        taskSource={longTaskList}
+        title={project.title}
+      />
+    );
+    let tree!: ReturnType<typeof create>;
+
+    await act(async () => {
+      tree = create(propsFor(true));
+    });
+
+    const draggableList = tree.root.findByType('DraggableFlatList' as unknown as React.ElementType);
+    act(() => {
+      draggableList.props.onScrollOffsetChange(800);
+    });
+
+    flatListScrollToIndexMock.mockClear();
+    await act(async () => {
+      tree.update(propsFor(false));
+    });
+
+    const call = flatListScrollToIndexMock.mock.calls.at(-1)?.[0];
+    expect(call).toBeTruthy();
+    expect(call.viewPosition).toBe(0);
+    // 800px over 80px reorder rows = the task at reorder index 10.
+    const data = flatListPropsSpy.mock.calls.at(-1)?.[0].data;
+    expect(data[call.index]).toEqual(expect.objectContaining({ type: 'task' }));
+    expect(data[call.index].task.id).toBe('task-10');
+
+    act(() => {
+      tree.unmount();
+    });
+  });
+
   it('uses a single self-scrolling draggable list when a section-less project owns the scroll', async () => {
     const longTaskList = Array.from({ length: 130 }, (_, index) => makeTask(
       `task-${index}`,

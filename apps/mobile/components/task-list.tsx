@@ -877,6 +877,45 @@ function TaskListComponent({
     };
   }, [canUseProjectReorder, projectReorderMode]);
 
+  // Exiting Task order returns the normal list to the region the REORDER view
+  // was showing, not the pre-reorder offset — after dragging a task to the
+  // top, restoring the old offset yanked the viewport away from where the
+  // task just landed, which read as the reorder not sticking (#784). Anchor
+  // on the first task in the reorder viewport (fixed-height rows make that a
+  // plain division) and scroll the remounted normal list to it; offset ~0
+  // needs nothing, since the list mounts at the top.
+  const prevProjectReorderExitRef = useRef(projectReorderMode);
+  useEffect(() => {
+    const wasReordering = prevProjectReorderExitRef.current;
+    prevProjectReorderExitRef.current = projectReorderMode;
+    if (!wasReordering || projectReorderMode) return;
+    const offset = projectReorderScrollOffsetRef.current;
+    projectReorderScrollOffsetRef.current = 0;
+    if (offset <= 1) return;
+    const reorderItems = projectReorderFlatItemsRef.current;
+    if (reorderItems.length === 0) return;
+    const approxIndex = Math.min(
+      reorderItems.length - 1,
+      Math.max(0, Math.round(offset / PROJECT_REORDER_ITEM_HEIGHT)),
+    );
+    let anchorTaskId: string | null = null;
+    for (let i = approxIndex; i < reorderItems.length; i += 1) {
+      const item = reorderItems[i];
+      if (item.type === 'task') {
+        anchorTaskId = item.task.id;
+        break;
+      }
+    }
+    if (!anchorTaskId) return;
+    const index = listItems.findIndex(
+      (item) => item.type === 'task' && item.task.id === anchorTaskId,
+    );
+    if (index < 0) return;
+    // In-bounds index: an unmeasured row reports through onScrollToIndexFailed,
+    // which runs the estimate-then-retry path below.
+    internalListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0 });
+  }, [listItems, projectReorderMode]);
+
   // FlatList row heights vary, so a scrollToIndex to an unmeasured row reports
   // failure via this callback; estimate the offset, jump there, then retry the
   // exact index once rows near the target have mounted (mirrors the
