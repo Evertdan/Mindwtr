@@ -45,7 +45,7 @@ import { useFilledButtonColors } from '@/hooks/use-filled-button-colors';
 import { ListSectionHeader, defaultListContentStyle } from '@/components/list-layout';
 import { logError, logWarn } from '../../lib/app-log';
 import { AREA_FILTER_ALL, AREA_FILTER_NONE, areaFilterSelectionToValue } from '@mindwtr/core';
-import { openContextsScreen, openProjectScreen } from '@/lib/task-meta-navigation';
+import { consumePendingCaptureTaskOpen, openContextsScreen, openProjectScreen } from '@/lib/task-meta-navigation';
 import { CompactText, CompactTextInput } from '@/components/compact-text';
 
 type ProjectTaskSortBy = TaskSortBy;
@@ -669,14 +669,34 @@ export default function ProjectsScreen() {
   openProjectRef.current = openProject;
   const projectsRef = useRef(projects);
   projectsRef.current = projects;
+  const tasksRef = useRef(tasks);
+  tasksRef.current = tasks;
+  const routeProjectIdRef = useRef(typeof projectId === 'string' ? projectId : undefined);
+  routeProjectIdRef.current = typeof projectId === 'string' ? projectId : undefined;
 
   useFocusEffect(
     useCallback(() => {
       const pendingId = reopenProjectIdAfterCaptureRef.current;
-      if (!pendingId) return;
-      reopenProjectIdAfterCaptureRef.current = null;
-      const project = projectsRef.current.find((item) => item.id === pendingId && !item.deletedAt);
-      if (project) openProjectRef.current(project);
+      if (pendingId) {
+        reopenProjectIdAfterCaptureRef.current = null;
+        const project = projectsRef.current.find((item) => item.id === pendingId && !item.deletedAt);
+        if (project) openProjectRef.current(project);
+      }
+      // Save & edit from this project's capture: open the editor on THIS
+      // screen instance. The capture route cannot navigate here — any
+      // navigation to a screen that is already on top stacks a duplicate of
+      // it, so leaving the project would take an extra back tap (#1029).
+      const pendingTask = consumePendingCaptureTaskOpen(pendingId ?? routeProjectIdRef.current);
+      if (!pendingTask) return;
+      const task = tasksRef.current.find((item) => item.id === pendingTask.taskId && !item.deletedAt);
+      if (!task) return;
+      setHighlightTask(task.id);
+      setTaskModalDefaultTab(pendingTask.taskTab);
+      setTaskModalOpenKey(`capture:${pendingTask.taskId}`);
+      setEditingTask(task);
+      // setHighlightTask (zustand) and the useState setters are stable; data
+      // is read through refs so this callback never changes identity.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   );
 

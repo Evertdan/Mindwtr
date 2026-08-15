@@ -47,3 +47,10 @@ export function normalizeProjectTag(value: string) {
 export function buildProjectQuickCaptureReturnTo(projectId: string) {
     return `/projects-screen?projectId=${encodeURIComponent(projectId)}`;
 }
+
+/** Inverse of buildProjectQuickCaptureReturnTo: the project the capture route was opened from. */
+export function getProjectQuickCaptureReturnToProjectId(returnTo: string | undefined): string | null {
+    if (!returnTo) return null;
+    const match = returnTo.match(/^\/projects-screen\?projectId=([^&]+)$/);
+    return match ? decodeURIComponent(match[1]) : null;
+}

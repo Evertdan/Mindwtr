@@ -14,7 +14,7 @@ import { createAIProvider } from '@mindwtr/core';
 
 import CaptureScreen, { sanitizeCaptureReturnToParam } from '@/app/capture-modal';
 
-const { hardwareBack, openTaskScreen, parseQuickAdd, routerMocks, routeParams, storeState } = vi.hoisted(() => {
+const { hardwareBack, openTaskScreen, parseQuickAdd, routerMocks, routeParams, stashPendingCaptureTaskOpen, storeState } = vi.hoisted(() => {
   const parseQuickAdd = vi.fn<(value: string) => any>((value: string) => ({ title: value, props: {}, invalidDateCommands: [] }));
   return {
     hardwareBack: {
@@ -22,6 +22,7 @@ const { hardwareBack, openTaskScreen, parseQuickAdd, routerMocks, routeParams, s
       remove: vi.fn(),
     },
     openTaskScreen: vi.fn(),
+    stashPendingCaptureTaskOpen: vi.fn(),
     parseQuickAdd,
     routerMocks: {
       back: vi.fn(),
@@ -160,6 +161,7 @@ vi.mock('@/lib/hardware-back', () => ({
 
 vi.mock('@/lib/task-meta-navigation', () => ({
   openTaskScreen,
+  stashPendingCaptureTaskOpen,
 }));
 
 vi.mock('@/lib/attachment-sync-utils', () => ({
@@ -700,6 +702,47 @@ describe('CaptureScreen', () => {
     // off to the editor, or backing out reopens it pre-filled (#1029).
     expect(openTaskScreen).toHaveBeenCalledWith('task-new', 'project-1', 'task', { replace: true });
     expect(routerMocks.replace).not.toHaveBeenCalledWith('/inbox');
+  });
+
+  it('stashes the editor open and pops when save and edit came from the project screen', async () => {
+    routeParams.current = {
+      initialValue: encodeURIComponent('Project task'),
+      initialProps: encodeURIComponent(JSON.stringify({
+        projectId: 'project-1',
+        status: 'next',
+      })),
+      returnTo: encodeURIComponent('/projects-screen?projectId=project-1'),
+    };
+    storeState.projects = [{
+      id: 'project-1',
+      title: 'Launch',
+      status: 'active',
+    }];
+    storeState.addTask.mockResolvedValueOnce({ success: true, id: 'task-new' });
+    routerMocks.canGoBack.mockReturnValue(true);
+
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<CaptureScreen />);
+    });
+
+    const saveAndEditButton = findTouchableByText(tree, 'Save & edit');
+
+    await act(async () => {
+      await saveAndEditButton.props.onPress();
+    });
+
+    // The project screen is directly underneath: navigating to it would stack
+    // a duplicate of it, so the editor request is stashed for its focus
+    // effect and the capture closes exactly like a plain save (#1029).
+    expect(stashPendingCaptureTaskOpen).toHaveBeenCalledWith({
+      taskId: 'task-new',
+      projectId: 'project-1',
+      taskTab: 'task',
+    });
+    expect(openTaskScreen).not.toHaveBeenCalled();
+    expect(routerMocks.back).toHaveBeenCalled();
   });
 
   describe('copilot suggestion chips (#1022)', () => {

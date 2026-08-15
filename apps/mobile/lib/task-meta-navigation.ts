@@ -2,6 +2,26 @@ import { router } from 'expo-router';
 
 type TaskOpenTab = 'view' | 'task';
 
+type PendingCaptureTaskOpen = { taskId: string; projectId: string; taskTab: TaskOpenTab };
+
+// Save & edit from a project's own capture cannot navigate at all: any
+// navigation to /projects-screen while it is already the screen underneath
+// stacks a duplicate of it, costing an extra back tap through an identical
+// page (#1029, the #938 trap). Instead the capture route stashes the editor
+// request here and simply pops; the project screen consumes it on refocus.
+let pendingCaptureTaskOpen: PendingCaptureTaskOpen | null = null;
+
+export function stashPendingCaptureTaskOpen(pending: PendingCaptureTaskOpen) {
+    pendingCaptureTaskOpen = pending;
+}
+
+export function consumePendingCaptureTaskOpen(projectId: string | undefined): PendingCaptureTaskOpen | null {
+    const pending = pendingCaptureTaskOpen;
+    if (!pending || !projectId || pending.projectId !== projectId) return null;
+    pendingCaptureTaskOpen = null;
+    return pending;
+}
+
 const navigateToTaskMetaScreen = (
     pathname: '/projects-screen' | '/contexts',
     params: { projectId?: string; token?: string; openToken?: string }
@@ -30,10 +50,13 @@ export function openTaskScreen(
     taskTab: TaskOpenTab = 'view',
     options?: {
         /**
-         * Swap the current route for the task screen instead of stacking on
-         * top of it. The capture route's "Save & edit" needs this: a push
-         * leaves the filled capture form underneath, so backing out of the
-         * editor lands on it again (#1029).
+         * Leave the current route and open the task on the target screen.
+         * The capture route's "Save & edit" needs this: a push leaves the
+         * filled capture form underneath, so backing out of the editor lands
+         * on it again (#1029). Only for targets that are NOT the screen
+         * directly underneath — for those, use the pending-capture-task-open
+         * stash instead (navigating to an already-top screen stacks a
+         * duplicate of it, the #938 trap).
          */
         replace?: boolean;
     },
@@ -44,7 +67,14 @@ export function openTaskScreen(
         ? { pathname: '/projects-screen' as const, params: { projectId, taskId, openToken, taskTab } }
         : { pathname: '/focus' as const, params: { taskId, openToken, taskTab } };
     if (options?.replace) {
-        router.replace(target);
+        if (router.canGoBack()) {
+            router.back();
+            router.navigate(target);
+        } else {
+            // Nothing behind this route (restored session straight into
+            // capture): swapping in place is the only option.
+            router.replace(target);
+        }
         return;
     }
     router.push(target);

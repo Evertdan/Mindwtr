@@ -4,6 +4,8 @@ const routerMocks = vi.hoisted(() => ({
     navigate: vi.fn(),
     push: vi.fn(),
     replace: vi.fn(),
+    back: vi.fn(),
+    canGoBack: vi.fn(() => true),
 }));
 
 vi.mock('expo-router', () => ({
@@ -13,10 +15,18 @@ vi.mock('expo-router', () => ({
 let openContextsScreen: typeof import('./task-meta-navigation').openContextsScreen;
 let openProjectScreen: typeof import('./task-meta-navigation').openProjectScreen;
 let openTaskScreen: typeof import('./task-meta-navigation').openTaskScreen;
+let stashPendingCaptureTaskOpen: typeof import('./task-meta-navigation').stashPendingCaptureTaskOpen;
+let consumePendingCaptureTaskOpen: typeof import('./task-meta-navigation').consumePendingCaptureTaskOpen;
 
 describe('task-meta-navigation', () => {
     beforeAll(async () => {
-        ({ openContextsScreen, openProjectScreen, openTaskScreen } = await import('./task-meta-navigation'));
+        ({
+            openContextsScreen,
+            openProjectScreen,
+            openTaskScreen,
+            stashPendingCaptureTaskOpen,
+            consumePendingCaptureTaskOpen,
+        } = await import('./task-meta-navigation'));
     });
 
     beforeEach(() => {
@@ -76,29 +86,61 @@ describe('task-meta-navigation', () => {
         });
     });
 
-    // #1029: the capture route's Save & edit swaps itself out — a push left the
-    // filled capture form on the stack, so backing out of the editor reopened it.
-    it('replaces the current route instead of pushing when asked', () => {
+    // #1029: the capture route's Save & edit leaves itself and opens the task
+    // on the screen underneath. A push left the filled capture form on the
+    // stack; a replace stacked a duplicate of the target screen (#938 trap),
+    // costing an extra back tap through an identical page. Pop + navigate
+    // updates the mounted screen's params without adding an entry.
+    it('pops the current route and navigates in place when asked to replace', () => {
         vi.spyOn(Date, 'now').mockReturnValueOnce(13579);
 
         openTaskScreen('task-3', 'project-3', 'task', { replace: true });
 
-        expect(routerMocks.replace).toHaveBeenCalledWith({
+        expect(routerMocks.back).toHaveBeenCalled();
+        expect(routerMocks.navigate).toHaveBeenCalledWith({
             pathname: '/projects-screen',
             params: { projectId: 'project-3', taskId: 'task-3', openToken: '13579', taskTab: 'task' },
         });
         expect(routerMocks.push).not.toHaveBeenCalled();
+        expect(routerMocks.replace).not.toHaveBeenCalled();
     });
 
-    it('replaces to the focus screen when the task has no project', () => {
+    it('pops and navigates to the focus screen when the task has no project', () => {
         vi.spyOn(Date, 'now').mockReturnValueOnce(11111);
 
         openTaskScreen('task-4', undefined, 'task', { replace: true });
 
-        expect(routerMocks.replace).toHaveBeenCalledWith({
+        expect(routerMocks.back).toHaveBeenCalled();
+        expect(routerMocks.navigate).toHaveBeenCalledWith({
             pathname: '/focus',
             params: { taskId: 'task-4', openToken: '11111', taskTab: 'task' },
         });
+    });
+
+    it('falls back to replacing in place when there is no back entry', () => {
+        vi.spyOn(Date, 'now').mockReturnValueOnce(22222);
+        routerMocks.canGoBack.mockReturnValueOnce(false);
+
+        openTaskScreen('task-5', 'project-5', 'task', { replace: true });
+
+        expect(routerMocks.back).not.toHaveBeenCalled();
+        expect(routerMocks.replace).toHaveBeenCalledWith({
+            pathname: '/projects-screen',
+            params: { projectId: 'project-5', taskId: 'task-5', openToken: '22222', taskTab: 'task' },
+        });
+    });
+
+    // #1029: Save & edit from a project's own capture stashes the editor
+    // request instead of navigating — navigating to the screen already
+    // underneath stacks a duplicate of it (#938 trap).
+    it('hands a stashed capture task open to its project exactly once', () => {
+        stashPendingCaptureTaskOpen({ taskId: 'task-7', projectId: 'project-7', taskTab: 'task' });
+
+        expect(consumePendingCaptureTaskOpen('other-project')).toBeNull();
+        expect(consumePendingCaptureTaskOpen(undefined)).toBeNull();
+        expect(consumePendingCaptureTaskOpen('project-7'))
+            .toEqual({ taskId: 'task-7', projectId: 'project-7', taskTab: 'task' });
+        expect(consumePendingCaptureTaskOpen('project-7')).toBeNull();
     });
 
     it('ignores empty navigation inputs', () => {

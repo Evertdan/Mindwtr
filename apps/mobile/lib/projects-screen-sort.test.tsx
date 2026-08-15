@@ -253,6 +253,7 @@ vi.mock('@/components/projects-screen/ProjectRow', () => ({
 vi.mock('@/lib/task-meta-navigation', () => ({
   openContextsScreen: vi.fn(),
   openProjectScreen: vi.fn(),
+  consumePendingCaptureTaskOpen: vi.fn(() => null),
 }));
 vi.mock('../lib/app-log', () => ({
   logError: vi.fn(),

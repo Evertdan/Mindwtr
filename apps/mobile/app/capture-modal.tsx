@@ -47,7 +47,8 @@ import { showInvalidDateCommandToast } from '@/lib/quick-add-toast';
 import { ThemedAlertHost } from '@/components/themed-alert';
 import { QuickAddPreview } from '@/components/QuickAddPreview';
 import type { CopilotPart } from '@/components/task-edit/use-task-edit-copilot';
-import { openTaskScreen } from '@/lib/task-meta-navigation';
+import { openTaskScreen, stashPendingCaptureTaskOpen } from '@/lib/task-meta-navigation';
+import { getProjectQuickCaptureReturnToProjectId } from '@/components/projects-screen/projects-screen.utils';
 
 type CaptureSearchParams = {
   initialProps?: string;
@@ -530,11 +531,21 @@ export default function CaptureScreen() {
     }
     const createdTaskId = result.createdTaskId;
     if (openAfterSave && createdTaskId) {
-      // Replace, don't push: this capture screen must not stay on the stack
-      // holding the saved text, or backing out of the editor reopens it
-      // pre-filled (#1029). The in-place sheet closes itself before this
-      // call; a route can only swap itself out.
-      openTaskScreen(createdTaskId, result.props.projectId, 'task', { replace: true });
+      // Leave this route, don't push over it: the capture screen must not
+      // stay on the stack holding the saved text, or backing out of the
+      // editor reopens it pre-filled (#1029).
+      const returnToProjectId = getProjectQuickCaptureReturnToProjectId(returnTo);
+      if (returnToProjectId && result.props.projectId === returnToProjectId) {
+        // Opened from this project's own + button, so the project screen is
+        // what capture closes back to. Navigating to it would stack a
+        // duplicate of it (#938 trap — an extra back tap through an
+        // identical page); stash the editor request for the screen's focus
+        // effect and close exactly like a plain save.
+        stashPendingCaptureTaskOpen({ taskId: createdTaskId, projectId: returnToProjectId, taskTab: 'task' });
+        closeCapture();
+      } else {
+        openTaskScreen(createdTaskId, result.props.projectId, 'task', { replace: true });
+      }
       return false;
     }
     return true;
