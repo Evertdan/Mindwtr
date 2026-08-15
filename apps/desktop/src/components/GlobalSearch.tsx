@@ -41,6 +41,13 @@ export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
     const dialogTitleId = useId();
     const [isOpen, setIsOpen] = useState(false);
     const [query, setQuery] = useState('');
+    // The query that drives searching. While an IME composition is in
+    // progress (Chinese/Japanese/Korean input), `query` holds the raw
+    // composition text (e.g. the pinyin "niu nai") — searching it flashed
+    // "no results" between every committed character. Search sticks with the
+    // last committed text until the composition ends.
+    const [searchQuery, setSearchQuery] = useState('');
+    const isComposingRef = useRef(false);
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [showSavePrompt, setShowSavePrompt] = useState(false);
     const [savePromptDefault, setSavePromptDefault] = useState('');
@@ -55,6 +62,10 @@ export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
     const [duePreset, setDuePreset] = useState<DuePreset>('any');
     const [scope, setScope] = useState<GlobalSearchScope>('all');
     const [ftsResults, setFtsResults] = useState<SearchResults | null>(null);
+    // Which query the current ftsResults answer. FTS answers arrive debounced
+    // and async; merging an answer for an older query in front of the fresh
+    // in-memory results reshuffled the list on every keystroke.
+    const [ftsQuery, setFtsQuery] = useState('');
     const [ftsLoading, setFtsLoading] = useState(false);
     const [debouncedQuery, setDebouncedQuery] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
@@ -122,6 +133,7 @@ export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
             inputRef.current?.focus();
             setTimeout(() => inputRef.current?.focus(), 50);
             setQuery('');
+            setSearchQuery('');
             setSelectedIndex(0);
             setShowSavePrompt(false);
             setIncludeCompleted(false);
@@ -137,7 +149,7 @@ export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
         }
     }, [isOpen]);
 
-    const trimmedQuery = query.trim();
+    const trimmedQuery = searchQuery.trim();
     const highlightQuery = trimmedQuery && !/\b\w+:/i.test(trimmedQuery) ? trimmedQuery : '';
     const highlightRegex = useMemo(() => {
         if (!highlightQuery) return null;
@@ -169,7 +181,10 @@ export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
         setFtsLoading(true);
         adapter.searchAll(debouncedQuery)
             .then((results) => {
-                if (!cancelled) setFtsResults(results);
+                if (!cancelled) {
+                    setFtsResults(results);
+                    setFtsQuery(debouncedQuery);
+                }
             })
             .catch(() => {
                 if (!cancelled) setFtsResults(null);
@@ -198,7 +213,7 @@ export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
         ? 'Hide future tasks'
         : hideFutureTasksLabel;
     const { totalResultsLabel, results, isTruncated, hasActiveSearch } = useMemo(() => computeGlobalSearchResults({
-        query,
+        query: searchQuery,
         tasks: _allTasks,
         projects,
         areas,
@@ -213,8 +228,9 @@ export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
         scope,
         weekStart: normalizeWeekStartSetting(settings?.weekStart),
         ftsResults,
+        ftsQuery,
     }), [
-        query,
+        searchQuery,
         _allTasks,
         projects,
         areas,
@@ -229,6 +245,7 @@ export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
         scope,
         settings?.weekStart,
         ftsResults,
+        ftsQuery,
         futureStartDayKey,
         futureStartRevealTick,
     ]);
@@ -492,6 +509,20 @@ export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
                     value={query}
                     onChange={e => {
                         setQuery(e.target.value);
+                        // During an IME composition the value is provisional
+                        // (raw pinyin/kana); search keeps the last committed
+                        // text so the result list doesn't flash empty.
+                        if (!isComposingRef.current) {
+                            setSearchQuery(e.target.value);
+                            setSelectedIndex(0);
+                        }
+                    }}
+                    onCompositionStart={() => {
+                        isComposingRef.current = true;
+                    }}
+                    onCompositionEnd={(e) => {
+                        isComposingRef.current = false;
+                        setSearchQuery(e.currentTarget.value);
                         setSelectedIndex(0);
                     }}
                     onKeyDown={handleListKeyDown}

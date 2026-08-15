@@ -95,6 +95,37 @@ describe('computeGlobalSearchResults', () => {
         ]);
     });
 
+    // FTS answers arrive debounced and async, so mid-typing they describe an
+    // older query; merging them first made the visible list reshuffle on every
+    // keystroke.
+    it('ignores full-text results fetched for a different query', () => {
+        const result = run({
+            query: 'Needle work',
+            tasks: [task('task-work', 'Needle work task')],
+            ftsResults: {
+                tasks: [task('task-stale', 'Needle stale hit')],
+                projects: [],
+            },
+            ftsQuery: 'Needle',
+        });
+
+        expect(result.results.map((item) => item.item.id)).toEqual(['task-work']);
+    });
+
+    it('merges full-text results once they answer the current query', () => {
+        const result = run({
+            query: 'Needle',
+            tasks: [task('task-work', 'Needle work task')],
+            ftsResults: {
+                tasks: [task('task-fts', 'Needle fts task')],
+                projects: [],
+            },
+            ftsQuery: 'Needle',
+        });
+
+        expect(result.results.map((item) => item.item.id)).toEqual(['task-fts', 'task-work']);
+    });
+
     it('surfaces source result limits in the truncation label', () => {
         const result = run({
             tasks: [task('task-work', 'Needle work task')],

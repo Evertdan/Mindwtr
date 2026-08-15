@@ -74,6 +74,9 @@ export default function SearchScreen() {
   const requestedQuery = decodeSearchParam(params.q);
   const [query, setQuery] = useState(requestedQuery);
   const [ftsResults, setFtsResults] = useState<SearchResults | null>(null);
+  // Which query the current ftsResults answer — stale answers must not merge
+  // in front of fresh in-memory results while the user is still typing.
+  const [ftsQuery, setFtsQuery] = useState('');
   const [ftsLoading, setFtsLoading] = useState(false);
   const [debouncedQuery, setDebouncedQuery] = useState('');
     const [showSaveModal, setShowSaveModal] = useState(false);
@@ -128,7 +131,10 @@ export default function SearchScreen() {
     setFtsLoading(true);
     adapter.searchAll(debouncedQuery)
       .then((results) => {
-        if (!cancelled) setFtsResults(results);
+        if (!cancelled) {
+          setFtsResults(results);
+          setFtsQuery(debouncedQuery);
+        }
       })
       .catch(() => {
         if (!cancelled) setFtsResults(null);
@@ -170,6 +176,7 @@ export default function SearchScreen() {
                 scope,
                 weekStart: settings?.weekStart,
                 ftsResults,
+                ftsQuery,
             });
         },
         [
@@ -188,6 +195,7 @@ export default function SearchScreen() {
             scope,
             settings?.weekStart,
             ftsResults,
+            ftsQuery,
             futureStartDayKey,
             futureStartRevealTick,
         ]

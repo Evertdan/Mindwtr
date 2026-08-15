@@ -26,6 +26,14 @@ export type ComputeGlobalSearchResultsInput = {
     /** Raw or normalized week-start setting; resolved via getWeekStartsOnIndex. */
     weekStart?: string | null;
     ftsResults?: SearchResults | null;
+    /**
+     * The query string the ftsResults were fetched for. FTS answers arrive
+     * debounced and async, so while the user is typing they describe an OLDER
+     * query; merging them in front of the fresh in-memory results made the
+     * list reshuffle on every keystroke. When provided and different from
+     * `query`, ftsResults are ignored until a matching answer arrives.
+     */
+    ftsQuery?: string | null;
 };
 
 const buildDueMatcher = (duePreset: DuePreset, weekStart: number) => {
@@ -112,6 +120,7 @@ export const computeGlobalSearchResults = ({
     scope,
     weekStart,
     ftsResults,
+    ftsQuery,
 }: ComputeGlobalSearchResultsInput) => {
     const trimmedQuery = query.trim();
     const hasTaskOnlyFilters = (
@@ -140,8 +149,10 @@ export const computeGlobalSearchResults = ({
     const fallbackResults = trimmedQuery === ''
         ? filterOnlyResults
         : searchAll(tasks, projects, trimmedQuery);
+    const ftsResultsAreCurrent = ftsQuery === undefined || ftsQuery === null || ftsQuery.trim() === trimmedQuery;
     const effectiveResults = trimmedQuery !== ''
         && ftsResults
+        && ftsResultsAreCurrent
         && (ftsResults.tasks.length + ftsResults.projects.length) > 0
         ? mergeSearchResults(ftsResults, fallbackResults)
         : fallbackResults;
