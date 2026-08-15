@@ -5,6 +5,7 @@
  */
 import { safeParseDate, safeParseDueDate } from './date';
 import type { ExternalCalendarEvent } from './ics';
+import { isProjectedRecurringTask } from './recurrence';
 import { isTaskActionable } from './task-status';
 import type { Task } from './types';
 
@@ -106,6 +107,32 @@ export function buildCalendarDayItems({ completed = [], deadlines, events, sched
         if (aTime !== bTime) return aTime - bTime;
         return a.title.localeCompare(b.title);
     });
+}
+
+type LimitedSlotCalendarItem = {
+    kind: 'scheduled' | 'deadline' | 'completed' | 'event';
+    task?: Task;
+};
+
+/**
+ * Priority order for surfaces with a fixed number of visible rows — the month
+ * grid cell and the week view's all-day lane. Projected recurring occurrences
+ * repeat on every matching day, so in time order they crowd one-off items out
+ * of the few visible rows; here real tasks and events keep their existing
+ * order first and projections fill whatever rows remain. Unlimited surfaces
+ * (day view, the selected-day list) keep pure time order.
+ */
+export function orderCalendarDayItemsForLimitedSlots<T extends LimitedSlotCalendarItem>(
+    items: readonly T[]
+): T[] {
+    const real: T[] = [];
+    const projected: T[] = [];
+    for (const item of items) {
+        const isProjection = (item.kind === 'scheduled' || item.kind === 'deadline')
+            && isProjectedRecurringTask(item.task);
+        (isProjection ? projected : real).push(item);
+    }
+    return projected.length === 0 ? [...items] : [...real, ...projected];
 }
 
 export type CalendarTimedLayoutInput = {

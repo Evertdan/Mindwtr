@@ -9,6 +9,7 @@ import {
     getTaskCalendarOccurrenceDate,
     hasTimeComponent,
     isProjectedRecurringTask,
+    orderCalendarDayItemsForLimitedSlots,
     isSameCalendarMonth,
     safeFormatDate,
     tFallback,
@@ -522,7 +523,10 @@ export function CalendarView() {
 
                     {days.map((day, _dayIdx) => {
                         const cellItems = getCalendarItemsForDate(day);
-                        const visibleItems = cellItems.slice(0, 3);
+                        // One-off items claim the cell's three visible rows
+                        // before projected recurring occurrences, which repeat
+                        // on every matching day.
+                        const visibleItems = orderCalendarDayItemsForLimitedSlots(cellItems).slice(0, 3);
                         const overflowCount = Math.max(0, cellItems.length - visibleItems.length);
                         const isSelected = selectedDate && isSameDay(day, selectedDate);
                         const todayMarkerStyle = isToday(day)
@@ -710,7 +714,7 @@ export function CalendarView() {
                                 {t('calendar.allDay')}
                             </div>
                             {timelineDays.map((day) => {
-                                const allDayItems = getAllDayItemsForDay(day).slice(0, 4);
+                                const allDayItems = orderCalendarDayItemsForLimitedSlots(getAllDayItemsForDay(day)).slice(0, 4);
                                 return (
                                     <div
                                         key={dayKey(day)}

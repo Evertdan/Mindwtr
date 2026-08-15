@@ -27,6 +27,7 @@ import { openContextsScreen, openProjectScreen } from '@/lib/task-meta-navigatio
 import { useAndroidKeyboardInset } from '@/lib/use-android-keyboard-inset';
 import {
   buildTimedCalendarLayouts,
+  orderCalendarDayItemsForLimitedSlots,
   type CalendarTimedLayout,
   type CalendarTimedLayoutInput,
 } from '@mindwtr/core/calendar-day-items';
@@ -1805,7 +1806,10 @@ export function CalendarView() {
               const taskCount = getTaskCountForDate(date);
               const eventCount = getExternalEventsForDate(date).length;
               const calendarItems = getCalendarItemsForDate(date);
-              const visibleItems = calendarItems.slice(0, calendarItems.length >= 6 ? 0 : 2);
+              // One-off items claim the cell's few visible rows before
+              // projected recurring occurrences, which repeat every day.
+              const visibleItems = orderCalendarDayItemsForLimitedSlots(calendarItems)
+                .slice(0, calendarItems.length >= 6 ? 0 : 2);
               const showOverflowIndicator = calendarItems.length > visibleItems.length;
               const isSelected = selectedDate && isSameDay(date, selectedDate);
               const todayCellBg = toRgba(tc.tint, isDark ? 0.12 : 0.08);

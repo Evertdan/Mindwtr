@@ -6,6 +6,7 @@ import {
     getTaskCompletionInstant,
     isCompletedCalendarTask,
     isSchedulableCalendarTask,
+    orderCalendarDayItemsForLimitedSlots,
 } from './calendar-day-items';
 import type { ExternalCalendarEvent, Task } from './index';
 
@@ -129,6 +130,40 @@ describe('buildCalendarDayItems', () => {
         });
 
         expect(items.map((item) => item.id)).toEqual(['scheduled-alpha', 'scheduled-zulu', 'scheduled-undated']);
+    });
+});
+
+describe('orderCalendarDayItemsForLimitedSlots', () => {
+    const projectedTask = (id: string): Task => ({
+        ...task({ id }),
+        isProjectedRecurringTask: true,
+        sourceTaskId: 'source-1',
+    } as Task);
+
+    it('moves projected recurring occurrences behind one-off items', () => {
+        const items = buildCalendarDayItems({
+            deadlines: [],
+            events: [event({ id: 'meeting', start: '2026-05-04T15:00:00' })],
+            scheduled: [
+                { ...projectedTask('sleep'), startTime: '2026-05-04T08:00:00.000Z' },
+                task({ id: 'dentist', startTime: '2026-05-04T10:00:00.000Z' }),
+            ],
+        });
+
+        expect(items.map((item) => item.id)).toEqual(['scheduled-sleep', 'scheduled-dentist', 'event-meeting']);
+        expect(orderCalendarDayItemsForLimitedSlots(items).map((item) => item.id))
+            .toEqual(['scheduled-dentist', 'event-meeting', 'scheduled-sleep']);
+    });
+
+    it('keeps pure time order when nothing is projected', () => {
+        const items = buildCalendarDayItems({
+            deadlines: [task({ id: 'due', dueDate: '2026-05-04T12:00:00.000Z' })],
+            events: [],
+            scheduled: [task({ id: 'early', startTime: '2026-05-04T08:00:00.000Z' })],
+        });
+
+        expect(orderCalendarDayItemsForLimitedSlots(items).map((item) => item.id))
+            .toEqual(items.map((item) => item.id));
     });
 });
 
