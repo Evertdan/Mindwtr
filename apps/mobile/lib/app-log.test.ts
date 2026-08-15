@@ -128,6 +128,46 @@ describe('app-log', () => {
     );
   });
 
+  it('serializes overlapping log writes so adjacent diagnostic events are not lost', async () => {
+    let releaseFirstWrite: (() => void) | undefined;
+    let markFirstWriteStarted: (() => void) | undefined;
+    const firstWriteStarted = new Promise<void>((resolve) => {
+      markFirstWriteStarted = resolve;
+    });
+    const firstWriteReleased = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+    const writeOrder: string[] = [];
+    setLogBackend({
+      appendLogLine: vi.fn(async (entry) => {
+        writeOrder.push(`start:${entry.message}`);
+        if (entry.message === 'Notification opened event') {
+          markFirstWriteStarted?.();
+          await firstWriteReleased;
+        }
+        writeOrder.push(`finish:${entry.message}`);
+        return 'file://test.log';
+      }),
+    });
+
+    const receiptWrite = logInfo('Notification opened event', { scope: 'notifications' });
+    await firstWriteStarted;
+    const outcomeWrite = logInfo('Complete action applied', { scope: 'notifications' });
+    await Promise.resolve();
+
+    expect(writeOrder).toEqual(['start:Notification opened event']);
+
+    releaseFirstWrite?.();
+    await Promise.all([receiptWrite, outcomeWrite]);
+
+    expect(writeOrder).toEqual([
+      'start:Notification opened event',
+      'finish:Notification opened event',
+      'start:Complete action applied',
+      'finish:Complete action applied',
+    ]);
+  });
+
   it('preserves the logging-enabled guard when a custom backend is installed', async () => {
     storeState.settings = {
       diagnostics: {

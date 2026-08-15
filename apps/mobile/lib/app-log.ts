@@ -158,6 +158,7 @@ export type LogBackend = {
 };
 
 let customLogBackend: LogBackend | null = null;
+let logWriteQueue: Promise<void> = Promise.resolve();
 
 export function setLogBackend(backend: LogBackend | null): void {
   customLogBackend = backend;
@@ -296,50 +297,58 @@ function appendWithFileHandle(line: string): boolean {
 
 async function appendLogLine(entry: LogEntry, options?: { force?: boolean }): Promise<string | null> {
   if (!options?.force && !isLoggingEnabled()) return null;
-  if (customLogBackend?.appendLogLine) {
-    return customLogBackend.appendLogLine(entry, options);
-  }
+  const backend = customLogBackend;
   const line = `${JSON.stringify(entry)}\n`;
-  try {
-    await ensureLogDir();
-    if (!await ensureLogFile()) throw new Error('primary log file unavailable');
-    if (!LOG_FILE) return null;
-    await rotateLogIfNeeded();
-    if (appendWithFileHandle(line)) {
-      logWriteCount += 1;
-      await rotateLogIfNeeded(true);
-      return LOG_FILE.uri;
+  const pendingWrite = logWriteQueue.then(async () => {
+    if (backend?.appendLogLine) {
+      return backend.appendLogLine(entry, options);
     }
-    const current = fileExists(LOG_FILE) ? await LOG_FILE.text().catch(() => '') : '';
-    let next = current + line;
-    if (next.length > MAX_LOG_FILE_BYTES) {
-      next = next.slice(-ROTATED_LOG_RETAIN_CHARS);
-    }
-    LOG_FILE.write(next, { encoding: UTF8_ENCODING });
-    logWriteCount += 1;
-    return LOG_FILE.uri;
-  } catch (error) {
     try {
-      const fs = await getLegacyFileSystem();
-      const path = await ensureLegacyLogFilePath();
-      if (!fs || !path) {
-        logEntryToDevConsole(entry);
-        return null;
+      await ensureLogDir();
+      if (!await ensureLogFile()) throw new Error('primary log file unavailable');
+      if (!LOG_FILE) return null;
+      await rotateLogIfNeeded();
+      if (appendWithFileHandle(line)) {
+        logWriteCount += 1;
+        await rotateLogIfNeeded(true);
+        return LOG_FILE.uri;
       }
-      const info = await fs.getInfoAsync(path);
-      const current = info.exists ? await fs.readAsStringAsync(path, { encoding: UTF8_ENCODING }).catch(() => '') : '';
+      const current = fileExists(LOG_FILE) ? await LOG_FILE.text().catch(() => '') : '';
       let next = current + line;
       if (next.length > MAX_LOG_FILE_BYTES) {
         next = next.slice(-ROTATED_LOG_RETAIN_CHARS);
       }
-      await fs.writeAsStringAsync(path, next, { encoding: UTF8_ENCODING });
+      LOG_FILE.write(next, { encoding: UTF8_ENCODING });
       logWriteCount += 1;
-      return path;
-    } catch {
-      logEntryToDevConsole(entry);
-      return null;
+      return LOG_FILE.uri;
+    } catch (error) {
+      try {
+        const fs = await getLegacyFileSystem();
+        const path = await ensureLegacyLogFilePath();
+        if (!fs || !path) {
+          logEntryToDevConsole(entry);
+          return null;
+        }
+        const info = await fs.getInfoAsync(path);
+        const current = info.exists ? await fs.readAsStringAsync(path, { encoding: UTF8_ENCODING }).catch(() => '') : '';
+        let next = current + line;
+        if (next.length > MAX_LOG_FILE_BYTES) {
+          next = next.slice(-ROTATED_LOG_RETAIN_CHARS);
+        }
+        await fs.writeAsStringAsync(path, next, { encoding: UTF8_ENCODING });
+        logWriteCount += 1;
+        return path;
+      } catch {
+        logEntryToDevConsole(entry);
+        return null;
+      }
     }
-  }
+  });
+  // Several notification-path callers intentionally do not await diagnostics.
+  // Keep their file-handle offsets and read-modify-write fallbacks ordered so
+  // adjacent receipt/outcome evidence cannot overwrite an earlier line (#1028).
+  logWriteQueue = pendingWrite.then(() => undefined, () => undefined);
+  return pendingWrite;
 }
 
 export async function getLogPath(): Promise<string | null> {
@@ -370,6 +379,7 @@ export async function ensureLogFilePath(): Promise<string | null> {
 }
 
 export async function clearLog(): Promise<void> {
+  await logWriteQueue;
   if (customLogBackend?.clearLog) {
     await customLogBackend.clearLog();
     return;
@@ -403,6 +413,7 @@ export async function clearLog(): Promise<void> {
 }
 
 export async function readRecentLogText(maxChars = RECENT_LOG_MAX_CHARS): Promise<string | null> {
+  await logWriteQueue;
   await ensureLogTargets();
   try {
     if (!LOG_FILE || !fileExists(LOG_FILE)) throw new Error('primary log file unavailable');
