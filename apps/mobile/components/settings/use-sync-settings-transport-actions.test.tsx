@@ -633,6 +633,41 @@ describe('useSyncSettingsTransportActions', () => {
         expect(mocked.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ tone: 'success' }));
     });
 
+    it('activates Dropbox sync on connect without a manual Sync now tap', async () => {
+        // #1033: Android's OAuth redirect deep link can unmount the settings
+        // screen, so connect itself must probe and commit — a fresh install
+        // must end up with a persisted, enabled Dropbox backend.
+        await renderHarness({ dropboxConfigured: true });
+
+        await act(async () => {
+            await latestHookResult?.handleConnectDropbox();
+        });
+
+        expect(mocked.performMobileSync).toHaveBeenNthCalledWith(1, undefined, {
+            activationProbe: true,
+            manual: true,
+            configOverride: {
+                backend: 'cloud',
+                cloudProvider: 'dropbox',
+                dropbox: {
+                    tokens: {
+                        accessToken: 'candidate-access-token',
+                        refreshToken: 'candidate-refresh-token',
+                        expiresAt: 4_102_444_800_000,
+                    },
+                },
+            },
+        });
+        expect(mocked.storageValues.get(SYNC_BACKEND_KEY)).toBe('cloud');
+        expect(mocked.storageValues.get(CLOUD_PROVIDER_KEY)).toBe('dropbox');
+        expect(storedDropboxTokens).toEqual({
+            accessToken: 'candidate-access-token',
+            refreshToken: 'candidate-refresh-token',
+            expiresAt: 4_102_444_800_000,
+        });
+        expect(latestHookResult?.syncBackend).toBe('cloud');
+    });
+
     it('proves a reconnected Dropbox account with staged tokens before promoting them', async () => {
         const candidateTokens = {
             accessToken: 'candidate-access-token',
@@ -651,15 +686,6 @@ describe('useSyncSettingsTransportActions', () => {
 
         await act(async () => {
             await latestHookResult?.handleConnectDropbox();
-        });
-
-        expect(mocked.saveDropboxTokens).not.toHaveBeenCalled();
-
-        await act(async () => {
-            await latestHookResult?.handleSync({
-                backend: 'cloud',
-                cloudProvider: 'dropbox',
-            });
         });
 
         expect(mocked.performMobileSync).toHaveBeenNthCalledWith(1, undefined, {
@@ -703,10 +729,6 @@ describe('useSyncSettingsTransportActions', () => {
         mocked.isDropboxConnected.mockResolvedValue(true);
         mocked.authorizeDropbox.mockResolvedValue(candidateTokens);
         await renderHarness({ dropboxConfigured: true });
-        await act(async () => {
-            await latestHookResult?.handleConnectDropbox();
-        });
-        expect(mocked.saveDropboxTokens).not.toHaveBeenCalled();
 
         let probeAccessToken: string | undefined;
         mocked.performMobileSync.mockImplementationOnce(async (
@@ -721,10 +743,7 @@ describe('useSyncSettingsTransportActions', () => {
         });
 
         await act(async () => {
-            await latestHookResult?.handleSync({
-                backend: 'cloud',
-                cloudProvider: 'dropbox',
-            });
+            await latestHookResult?.handleConnectDropbox();
         });
 
         expect(probeAccessToken).toBe('candidate-access-token');
@@ -750,10 +769,6 @@ describe('useSyncSettingsTransportActions', () => {
 
         await act(async () => {
             await latestHookResult?.handleConnectDropbox();
-            await latestHookResult?.handleSync({
-                backend: 'cloud',
-                cloudProvider: 'dropbox',
-            });
         });
 
         expect(mocked.performMobileSync).toHaveBeenCalledWith(undefined, {
@@ -795,12 +810,33 @@ describe('useSyncSettingsTransportActions', () => {
         expect(mocked.clearMobileSyncConfigCache.mock.invocationCallOrder[0]).toBeLessThan(
             mocked.disconnectDropbox.mock.invocationCallOrder[0],
         );
+        // Connect promoted the staged tokens into the durable bundle, so the
+        // staged-revoke path is empty; disconnectDropbox owns revocation.
+        expect(mocked.revokeDropboxTokens).not.toHaveBeenCalled();
+        expect(mocked.disconnectDropbox).toHaveBeenCalledWith('dropbox-app-key');
+        expect(latestHookResult?.syncBackend).toBe('off');
+    });
+
+    it('keeps staged Dropbox tokens revocable when disconnecting after a failed activation', async () => {
+        seedStorage([
+            [SYNC_BACKEND_KEY, 'cloud'],
+            [CLOUD_PROVIDER_KEY, 'dropbox'],
+        ]);
+        mocked.isDropboxConnected.mockResolvedValue(true);
+        mocked.performMobileSync.mockResolvedValue({ success: false, error: 'activation rejected' });
+        await renderHarness({ dropboxConfigured: true });
+        await act(async () => {
+            await latestHookResult?.handleConnectDropbox();
+        });
+        mocked.revokeDropboxTokens.mockClear();
+
+        await act(async () => {
+            await latestHookResult?.handleDisconnectDropbox();
+        });
+
         expect(mocked.revokeDropboxTokens).toHaveBeenCalledWith(
             'dropbox-app-key',
             expect.objectContaining({ accessToken: 'candidate-access-token' }),
-        );
-        expect(mocked.asyncStorage.setItem.mock.invocationCallOrder[0]).toBeLessThan(
-            mocked.revokeDropboxTokens.mock.invocationCallOrder[0],
         );
         expect(mocked.revokeDropboxTokens.mock.invocationCallOrder[0]).toBeLessThan(
             mocked.disconnectDropbox.mock.invocationCallOrder[0],

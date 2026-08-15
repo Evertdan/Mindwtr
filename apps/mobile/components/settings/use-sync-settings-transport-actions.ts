@@ -450,62 +450,6 @@ export function useSyncSettingsTransportActions({
         showSettingsWarning,
     ]);
 
-    const handleConnectDropbox = useCallback(async () => {
-        if (isFossBuild) {
-            showSettingsWarning(tr('settings.syncMobile.dropboxUnavailable'), tr('settings.syncMobile.dropboxIsDisabledInFossBuilds'));
-            return;
-        }
-        if (!dropboxConfigured) {
-            showSettingsWarning(tr('settings.syncMobile.dropboxUnavailable'), tr('settings.syncMobile.dropboxAppKeyIsNotConfiguredInThisBuild'));
-            return;
-        }
-        if (isExpoGo) {
-            showSettingsWarning(
-                tr('settings.syncMobile.dropboxUnavailableInExpoGo'),
-                `${tr('settings.syncMobile.dropboxOauthRequiresADevelopmentReleaseBuildExpoGoUses')}\n\n${tr('settings.syncMobile.useRedirectUri')}: ${getDropboxRedirectUri()}`,
-                6000
-            );
-            return;
-        }
-        setDropboxBusy(true);
-        try {
-            const tokens = await authorizeDropbox(dropboxAppKey);
-            stagedDropboxCredentialsRef.current = { tokens };
-            hasPendingSyncConfiguration.current = true;
-            setCloudProvider('dropbox');
-            addBreadcrumb('settings:syncBackend:cloud');
-            setSyncBackend('cloud');
-            setDropboxConnected(true);
-            showToast({
-                title: tr('common.success'),
-                message: tr('settings.syncMobile.connectedToDropbox'),
-                tone: 'success',
-            });
-        } catch (error) {
-            const message = String(error);
-            if (/redirect[_\s-]?uri/i.test(message)) {
-                showSettingsWarning(
-                    tr('settings.syncMobile.invalidRedirectUri'),
-                    `${tr('settings.syncMobile.addThisExactRedirectUriInDropboxOauthSettings')}\n\n${getDropboxRedirectUri()}`,
-                    6000
-                );
-            } else {
-                showSettingsErrorToast(tr('settings.syncMobile.connectionFailed'), formatError(error), 5200);
-            }
-        } finally {
-            setDropboxBusy(false);
-        }
-    }, [
-        dropboxAppKey,
-        dropboxConfigured,
-        isExpoGo,
-        isFossBuild,
-        tr,
-        showSettingsErrorToast,
-        showSettingsWarning,
-        showToast,
-    ]);
-
     const handleDisconnectDropbox = useCallback(async () => {
         setDropboxBusy(true);
         try {
@@ -930,6 +874,68 @@ export function useSyncSettingsTransportActions({
         webdavPassword,
         webdavUrl,
         webdavUsername,
+    ]);
+
+    const handleConnectDropbox = useCallback(async () => {
+        if (isFossBuild) {
+            showSettingsWarning(tr('settings.syncMobile.dropboxUnavailable'), tr('settings.syncMobile.dropboxIsDisabledInFossBuilds'));
+            return;
+        }
+        if (!dropboxConfigured) {
+            showSettingsWarning(tr('settings.syncMobile.dropboxUnavailable'), tr('settings.syncMobile.dropboxAppKeyIsNotConfiguredInThisBuild'));
+            return;
+        }
+        if (isExpoGo) {
+            showSettingsWarning(
+                tr('settings.syncMobile.dropboxUnavailableInExpoGo'),
+                `${tr('settings.syncMobile.dropboxOauthRequiresADevelopmentReleaseBuildExpoGoUses')}\n\n${tr('settings.syncMobile.useRedirectUri')}: ${getDropboxRedirectUri()}`,
+                6000
+            );
+            return;
+        }
+        setDropboxBusy(true);
+        try {
+            const tokens = await authorizeDropbox(dropboxAppKey);
+            stagedDropboxCredentialsRef.current = { tokens };
+            hasPendingSyncConfiguration.current = true;
+            setCloudProvider('dropbox');
+            addBreadcrumb('settings:syncBackend:cloud');
+            setSyncBackend('cloud');
+            setDropboxConnected(true);
+            showToast({
+                title: tr('common.success'),
+                message: tr('settings.syncMobile.connectedToDropbox'),
+                tone: 'success',
+            });
+            // Android's OAuth redirect deep link can navigate away and unmount
+            // this screen, destroying the staged tokens before any manual
+            // "Sync now" tap. Activation must finish inside this continuation,
+            // which still owns the staged credentials (#1033).
+            await handleSync({ backend: 'cloud', cloudProvider: 'dropbox' });
+        } catch (error) {
+            const message = String(error);
+            if (/redirect[_\s-]?uri/i.test(message)) {
+                showSettingsWarning(
+                    tr('settings.syncMobile.invalidRedirectUri'),
+                    `${tr('settings.syncMobile.addThisExactRedirectUriInDropboxOauthSettings')}\n\n${getDropboxRedirectUri()}`,
+                    6000
+                );
+            } else {
+                showSettingsErrorToast(tr('settings.syncMobile.connectionFailed'), formatError(error), 5200);
+            }
+        } finally {
+            setDropboxBusy(false);
+        }
+    }, [
+        dropboxAppKey,
+        dropboxConfigured,
+        handleSync,
+        isExpoGo,
+        isFossBuild,
+        tr,
+        showSettingsErrorToast,
+        showSettingsWarning,
+        showToast,
     ]);
 
     const handleTestConnection = useCallback(async (backend: 'webdav' | 'cloud', options?: Omit<SyncActionOptions, 'backend'>) => {
