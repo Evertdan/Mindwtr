@@ -27,7 +27,7 @@ export function resolveAttachmentOpenTarget(uri: string): string {
 // profile's attachments dir. The recorded path always wins while it resolves;
 // only once it is gone do we retry the same file name in the current managed
 // attachments dir, so the stored URI format never changes (#1038).
-export async function resolveAttachmentReadPath(uri: string): Promise<string> {
+export async function resolveAttachmentReadPath(uri: string, attachmentId: string): Promise<string> {
     const target = resolveAttachmentOpenTarget(uri);
     if (!target || !isLocalAttachmentPath(target)) return target;
     const { exists } = await import('@tauri-apps/plugin-fs');
@@ -41,7 +41,10 @@ export async function resolveAttachmentReadPath(uri: string): Promise<string> {
     };
     if (await readable(target)) return target;
     const fileName = normalizeAttachmentPathForUrl(target).split('/').pop();
-    if (!fileName) return target;
+    if (
+        !fileName
+        || (fileName !== attachmentId && !fileName.startsWith(`${attachmentId}.`))
+    ) return target;
     const { getManagedPath } = await import('./managed-paths');
     const fallback = await getManagedPath(ATTACHMENTS_DIR_NAME, fileName);
     return (await readable(fallback)) ? fallback : target;

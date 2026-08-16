@@ -78,7 +78,11 @@ fn allowed_open_roots(app: &tauri::AppHandle) -> Vec<PathBuf> {
     )
 }
 
-fn normalize_open_path(raw: &str, managed_attachments_dir: Option<&Path>) -> Result<PathBuf, String> {
+fn normalize_open_path(
+    raw: &str,
+    managed_attachments_dir: Option<&Path>,
+    attachment_id: Option<&str>,
+) -> Result<PathBuf, String> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return Err("Path is empty".to_string());
@@ -95,7 +99,18 @@ fn normalize_open_path(raw: &str, managed_attachments_dir: Option<&Path>) -> Res
     // at the previous location is stale even though the file moved along inside
     // the profile's attachments dir. Retry the same file name there before
     // giving up — the recorded path always wins when it still resolves (#1038).
-    managed_attachments_dir
+    let file_name_matches_attachment = candidate.file_name().is_some_and(|name| {
+        attachment_id.is_some_and(|attachment_id| {
+            let name = name.to_string_lossy();
+            name == attachment_id
+                || name
+                    .strip_prefix(attachment_id)
+                    .is_some_and(|suffix| suffix.starts_with('.'))
+        })
+    });
+    file_name_matches_attachment
+        .then_some(())
+        .and(managed_attachments_dir)
         .zip(candidate.file_name())
         .map(|(dir, name)| dir.join(name))
         .and_then(|fallback| fallback.canonicalize().ok())
@@ -791,9 +806,17 @@ pub(crate) fn migrate_portable_attachments(
 // Stateless: canonicalizes the path and spawns the OS file-open shell
 // command, no shared state to race (B1).
 #[tauri::command(async)]
-pub(crate) fn open_path(app: tauri::AppHandle, path: String) -> Result<bool, String> {
+pub(crate) fn open_path(
+    app: tauri::AppHandle,
+    path: String,
+    attachment_id: Option<String>,
+) -> Result<bool, String> {
     let managed_attachments_dir = get_data_dir(&app).join("attachments");
-    let normalized = normalize_open_path(&path, Some(&managed_attachments_dir))?;
+    let normalized = normalize_open_path(
+        &path,
+        Some(&managed_attachments_dir),
+        attachment_id.as_deref(),
+    )?;
     let allowed_roots = allowed_open_roots(&app);
     if !path_is_openable(&normalized, &allowed_roots) {
         return Err("Path does not exist or cannot be opened.".to_string());
@@ -808,8 +831,8 @@ mod tests {
 
     #[test]
     fn normalize_open_path_rejects_urls_and_relative_paths() {
-        assert!(normalize_open_path("https://example.com/file.txt", None).is_err());
-        assert!(normalize_open_path("../notes.txt", None).is_err());
+        assert!(normalize_open_path("https://example.com/file.txt", None, None).is_err());
+        assert!(normalize_open_path("../notes.txt", None, None).is_err());
     }
 
     #[test]
@@ -827,16 +850,39 @@ mod tests {
             .join("attachments")
             .join("id-1.txt");
 
-        let resolved = normalize_open_path(&stale.to_string_lossy(), Some(&managed_dir))
+        let resolved = normalize_open_path(
+            &stale.to_string_lossy(),
+            Some(&managed_dir),
+            Some("id-1"),
+        )
             .expect("stale portable path resolves against the current profile");
         assert_eq!(resolved, managed_file.canonicalize().expect("canonicalize"));
 
         // A path with no counterpart in the managed dir still fails, and names
         // the recorded path so the user can repair the reference (#1001).
         let missing = dir.path().join("elsewhere").join("report.pdf");
-        let error = normalize_open_path(&missing.to_string_lossy(), Some(&managed_dir))
+        let error = normalize_open_path(
+            &missing.to_string_lossy(),
+            Some(&managed_dir),
+            Some("id-1"),
+        )
             .expect_err("unrelated missing file must not resolve");
         assert!(error.contains(&missing.display().to_string()), "{error}");
+
+        let mismatched = normalize_open_path(
+            &stale.to_string_lossy(),
+            Some(&managed_dir),
+            Some("different-id"),
+        )
+        .expect_err("fallback must stay bound to its attachment id");
+        assert!(mismatched.contains(&stale.display().to_string()), "{mismatched}");
+
+        assert!(normalize_open_path(
+            &stale.to_string_lossy(),
+            Some(&managed_dir),
+            None,
+        )
+        .is_err());
     }
 
     #[test]

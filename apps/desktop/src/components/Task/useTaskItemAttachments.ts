@@ -98,7 +98,7 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
 
     const resolveAudioBlobSource = useCallback(async (attachment: Attachment) => {
         if (!isTauriRuntime()) return null;
-        const uri = await resolveAttachmentReadPath(attachment.uri);
+        const uri = await resolveAttachmentReadPath(attachment.uri, attachment.id);
         try {
             // Blob playback is limited to app-managed files (attachments and
             // audio captures under the managed data dir, portable-aware).
@@ -124,7 +124,7 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
         if (!isTauriRuntime()) {
             throw new Error(resolveText('attachments.fileNotSupported', 'File not supported.'));
         }
-        const uri = await resolveAttachmentReadPath(attachment.uri);
+        const uri = await resolveAttachmentReadPath(attachment.uri, attachment.id);
         if (/^https?:\/\//i.test(uri)) {
             throw new Error(resolveText('attachments.fileNotSupported', 'File not supported.'));
         }
@@ -150,7 +150,7 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
         if (!isTauriRuntime()) {
             throw new Error(t('attachments.fileNotSupported'));
         }
-        const uri = await resolveAttachmentReadPath(attachment.uri);
+        const uri = await resolveAttachmentReadPath(attachment.uri, attachment.id);
         if (/^https?:\/\//i.test(uri)) {
             throw new Error(t('attachments.fileNotSupported'));
         }
@@ -164,10 +164,13 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
         return await readTextFile(uri);
     }, [t]);
 
-    const openExternal = useCallback(async (uri: string) => {
+    const openExternal = useCallback(async (attachment: Attachment) => {
         setAttachmentError(null);
         try {
-            await openAttachmentTarget(uri);
+            await openAttachmentTarget(
+                attachment.uri,
+                attachment.kind === 'file' ? attachment.id : undefined,
+            );
         } catch (error) {
             void logWarn('Failed to open attachment', {
                 scope: 'attachment',
@@ -209,7 +212,7 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
 
     const openAudioExternally = useCallback(() => {
         if (!audioAttachment) return;
-        void openExternal(audioAttachment.uri);
+        void openExternal(audioAttachment);
     }, [audioAttachment, openExternal]);
 
     const handleAudioError = useCallback(() => {
@@ -301,12 +304,12 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
 
     const openTextExternally = useCallback(() => {
         if (!textAttachment) return;
-        void openExternal(textAttachment.uri);
+        void openExternal(textAttachment);
     }, [textAttachment, openExternal]);
 
     const openImageExternally = useCallback(() => {
         if (!imageAttachment) return;
-        void openExternal(imageAttachment.uri);
+        void openExternal(imageAttachment);
     }, [imageAttachment, openExternal]);
 
     useEffect(() => {
@@ -326,7 +329,7 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
 
     const openAttachment = useCallback((attachment: Attachment) => {
         if (attachment.kind === 'link') {
-            void openExternal(attachment.uri);
+            void openExternal(attachment);
             return;
         }
         if (isAudioAttachment(attachment)) {
@@ -382,7 +385,7 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
             setImageSource(resolveAttachmentSource(attachment.uri));
             return;
         }
-        void openExternal(attachment.uri);
+        void openExternal(attachment);
     }, [loadTextAttachment, openExternal, resolveAudioBlobSource, t]);
 
     useEffect(() => {

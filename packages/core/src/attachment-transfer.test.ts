@@ -321,7 +321,10 @@ describe('runAttachmentTransferLifecycle', () => {
             onDownloadError: vi.fn(),
         });
 
-        expect(localFileExists).toHaveBeenCalledWith('/tmp/upload.txt');
+        expect(localFileExists).toHaveBeenCalledWith(
+            '/tmp/upload.txt',
+            expect.objectContaining({ id: 'attachment-1' }),
+        );
     });
 });
 

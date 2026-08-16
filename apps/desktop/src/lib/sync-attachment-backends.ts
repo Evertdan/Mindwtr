@@ -315,7 +315,9 @@ export async function syncWebdavAttachments(
         const isHttp = /^https?:\/\//i.test(rawUri);
         const localPath = isHttp ? '' : rawUri;
         const hasLocalPath = Boolean(localPath);
-        const existsLocally = hasLocalPath ? await localFileExists(localPath) : false;
+        const existsLocally = hasLocalPath
+            ? await localFileExists(localPath, attachment)
+            : false;
         deps.logSyncInfo('WebDAV attachment check', {
             id: attachment.id,
             title: attachment.title || 'attachment',
@@ -406,7 +408,7 @@ export async function syncWebdavAttachments(
         },
         onUpload: async (attachment, localPath) => {
             const cloudKey = buildCloudKey(attachment);
-            const fileData = await readLocalFile(localPath);
+            const fileData = await readLocalFile(localPath, attachment);
             const validation = await validateAttachmentForUpload(attachment, fileData.length);
             if (!validation.valid) {
                 const failure = handleAttachmentValidationFailure(attachment, validation.error);
@@ -596,7 +598,7 @@ export async function syncCloudAttachments(
         localFileExists,
         onUpload: async (attachment, localPath) => {
             const cloudKey = buildCloudKey(attachment);
-            const fileData = await readLocalFile(localPath);
+            const fileData = await readLocalFile(localPath, attachment);
             const validation = await validateAttachmentForUpload(attachment, fileData.length);
             if (!validation.valid) {
                 const failure = handleAttachmentValidationFailure(attachment, validation.error);
@@ -758,7 +760,7 @@ export async function syncDropboxAttachments(
         localFileExists,
         onUpload: async (attachment, localPath) => {
             const cloudKey = buildCloudKey(attachment);
-            const fileData = await readLocalFile(localPath);
+            const fileData = await readLocalFile(localPath, attachment);
             const validation = await validateAttachmentForUpload(attachment, fileData.length);
             if (!validation.valid) {
                 const failure = handleAttachmentValidationFailure(attachment, validation.error);
@@ -910,7 +912,7 @@ export async function syncCloudKitAttachments(
         onUpload: async (attachment, localPath) => {
             const owned = ownedByAttachmentId.get(attachment.id);
             if (!owned) return false;
-            const fileData = await readLocalFile(localPath);
+            const fileData = await readLocalFile(localPath, attachment);
             const validation = await validateAttachmentForUpload(attachment, fileData.length);
             if (!validation.valid) {
                 const failure = handleAttachmentValidationFailure(attachment, validation.error);
@@ -1034,7 +1036,7 @@ export async function syncFileAttachments(
         if (attachment.kind !== 'file' || attachment.deletedAt || !attachment.cloudKey) continue;
         const rawUri = attachment.uri ? stripFileScheme(attachment.uri) : '';
         if (!rawUri || /^https?:\/\//i.test(rawUri)) continue;
-        if (!(await localFileExists(rawUri))) continue;
+        if (!(await localFileExists(rawUri, attachment))) continue;
         try {
             const remotePath = await resolveFileBackendPath(join, baseSyncDir, attachment.cloudKey);
             if (!(await syncFsExists(remotePath))) {
@@ -1052,7 +1054,7 @@ export async function syncFileAttachments(
         localFileExists,
         onUpload: async (attachment, localPath) => {
             const cloudKey = buildCloudKey(attachment);
-            const fileData = await readLocalFile(localPath);
+            const fileData = await readLocalFile(localPath, attachment);
             const validation = await validateAttachmentForUpload(
                 attachment,
                 fileData.length,

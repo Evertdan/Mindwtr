@@ -32,8 +32,9 @@ describe('createLocalAttachmentFs managed-dir fallback', () => {
             managedAttachmentsDir: MANAGED_DIR,
         });
 
-        expect(await fs.localFileExists(STALE_URI)).toBe(true);
-        expect(await fs.readLocalFile(STALE_URI)).toBe(bytes);
+        const attachment = { id: 'a1' };
+        expect(await fs.localFileExists(STALE_URI, attachment)).toBe(true);
+        expect(await fs.readLocalFile(STALE_URI, attachment)).toBe(bytes);
     });
 
     it('still reports a genuinely missing file as missing', async () => {
@@ -46,8 +47,9 @@ describe('createLocalAttachmentFs managed-dir fallback', () => {
             managedAttachmentsDir: MANAGED_DIR,
         });
 
-        expect(await fs.localFileExists('/home/demo/report.pdf')).toBe(false);
-        await expect(fs.readLocalFile('/home/demo/report.pdf')).rejects.toThrow();
+        const attachment = { id: 'report' };
+        expect(await fs.localFileExists('/home/demo/report.pdf', attachment)).toBe(false);
+        await expect(fs.readLocalFile('/home/demo/report.pdf', attachment)).rejects.toThrow();
     });
 
     it('leaves callers without a managed dir on the recorded path only', async () => {
@@ -59,6 +61,21 @@ describe('createLocalAttachmentFs managed-dir fallback', () => {
             readFile,
         });
 
-        expect(await fs.localFileExists(STALE_URI)).toBe(false);
+        expect(await fs.localFileExists(STALE_URI, { id: 'a1' })).toBe(false);
+    });
+
+    it('does not fall back to a managed file owned by a different attachment', async () => {
+        const { exists, readFile } = createFs({ [MANAGED_FILE]: new Uint8Array([1]) });
+        const fs = createLocalAttachmentFs(vi.fn(), {
+            baseDataDir: BASE_DATA_DIR,
+            dataBaseDir: 'data',
+            exists,
+            readFile,
+            managedAttachmentsDir: MANAGED_DIR,
+        });
+
+        expect(await fs.localFileExists(STALE_URI, { id: 'different-id' })).toBe(false);
+        await expect(fs.readLocalFile(STALE_URI, { id: 'different-id' })).rejects.toThrow();
+        expect(exists).not.toHaveBeenCalledWith(MANAGED_FILE);
     });
 });

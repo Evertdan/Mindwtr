@@ -8,6 +8,7 @@ import {
     normalizeSyncBackend,
     sleep,
     toStableJson,
+    type Attachment,
     type SyncBackend,
 } from '@mindwtr/core';
 import { normalizeAttachmentPathForUrl } from './attachment-paths';
@@ -113,38 +114,47 @@ export const createLocalAttachmentFs = (
     },
     warningMessage = 'Failed to check attachment file',
 ): {
-    readLocalFile: (path: string) => Promise<Uint8Array>;
-    localFileExists: (path: string) => Promise<boolean>;
+    readLocalFile: (path: string, attachment: Pick<Attachment, 'id'>) => Promise<Uint8Array>;
+    localFileExists: (path: string, attachment: Pick<Attachment, 'id'>) => Promise<boolean>;
 } => {
     const toRelative = (path: string): string => path.slice(deps.baseDataDir.length).replace(/^[\\/]/, '');
 
     // A portable profile travels with the install, so a URI recorded at its
     // previous location is stale even though the file moved along inside
     // attachments/. Only consulted after the recorded path fails (#1038).
-    const managedFallbackPath = (path: string): string | null => {
+    const managedFallbackPath = (path: string, attachment: Pick<Attachment, 'id'>): string | null => {
         if (!deps.managedAttachmentsDir) return null;
         const normalized = normalizeAttachmentFsPath(path);
         const fileName = normalized.split('/').pop();
-        if (!fileName) return null;
+        if (
+            !fileName
+            || (fileName !== attachment.id && !fileName.startsWith(`${attachment.id}.`))
+        ) return null;
         const dir = normalizeAttachmentFsPath(deps.managedAttachmentsDir).replace(/\/+$/, '');
         const fallback = `${dir}/${fileName}`;
         return fallback === normalized ? null : fallback;
     };
 
-    const readLocalFile = async (path: string): Promise<Uint8Array> => {
+    const readLocalFile = async (
+        path: string,
+        attachment: Pick<Attachment, 'id'>,
+    ): Promise<Uint8Array> => {
         if (path.startsWith(deps.baseDataDir)) {
             return await deps.readFile(toRelative(path), { baseDir: deps.dataBaseDir });
         }
         try {
             return await deps.readFile(normalizeAttachmentFsPath(path));
         } catch (error) {
-            const fallback = managedFallbackPath(path);
+            const fallback = managedFallbackPath(path, attachment);
             if (!fallback) throw error;
             return await deps.readFile(fallback);
         }
     };
 
-    const localFileExists = async (path: string): Promise<boolean> => {
+    const localFileExists = async (
+        path: string,
+        attachment: Pick<Attachment, 'id'>,
+    ): Promise<boolean> => {
         try {
             if (path.startsWith(deps.baseDataDir)) {
                 return await deps.exists(toRelative(path), { baseDir: deps.dataBaseDir });
@@ -153,7 +163,7 @@ export const createLocalAttachmentFs = (
         } catch (error) {
             logSyncWarning(warningMessage, error);
         }
-        const fallback = managedFallbackPath(path);
+        const fallback = managedFallbackPath(path, attachment);
         if (!fallback) return false;
         try {
             return await deps.exists(fallback);

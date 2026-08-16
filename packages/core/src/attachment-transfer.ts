@@ -83,7 +83,7 @@ export const collectAttachmentsById = (appData: AppData): Map<string, Attachment
 
 export type AttachmentTransferLifecycleOptions = {
     attachmentsById: Map<string, Attachment>;
-    localFileExists: (path: string) => Promise<boolean>;
+    localFileExists: (path: string, attachment: Attachment) => Promise<boolean>;
     onUpload: (attachment: Attachment, localPath: string) => Promise<boolean>;
     onUploadError: (attachment: Attachment, error: unknown) => void;
     onDownload: (attachment: Attachment) => Promise<boolean>;
@@ -173,7 +173,9 @@ export async function runAttachmentTransferLifecycle(
         const isHttp = /^https?:\/\//i.test(rawUri);
         const localPath = isHttp ? '' : rawUri;
         const hasLocalPath = Boolean(localPath);
-        const existsLocally = hasLocalPath ? await options.localFileExists(localPath) : false;
+        const existsLocally = hasLocalPath
+            ? await options.localFileExists(localPath, attachment)
+            : false;
 
         const nextStatus: Attachment['localStatus'] = existsLocally ? 'available' : 'missing';
         if (attachment.localStatus !== nextStatus) {

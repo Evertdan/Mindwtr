@@ -3,7 +3,7 @@ import { isLocalAttachmentPath, resolveAttachmentOpenTarget, toAttachmentBrowser
 import { isTauriRuntime } from './runtime';
 import { invokeNative } from './tauri-invoke';
 
-export async function openAttachmentTarget(uri: string): Promise<void> {
+export async function openAttachmentTarget(uri: string, attachmentId?: string): Promise<void> {
     const trimmed = uri.trim();
     if (!trimmed) return;
 
@@ -13,7 +13,10 @@ export async function openAttachmentTarget(uri: string): Promise<void> {
             return;
         }
 
-        await invokeNative('open_path', { path: resolveAttachmentOpenTarget(trimmed) });
+        await invokeNative('open_path', {
+            path: resolveAttachmentOpenTarget(trimmed),
+            attachmentId,
+        });
         return;
     }
 

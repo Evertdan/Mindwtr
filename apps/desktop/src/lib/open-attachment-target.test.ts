@@ -34,9 +34,12 @@ describe('openAttachmentTarget', () => {
     it('opens local paths through the desktop open_path command', async () => {
         (window as any).__TAURI_INTERNALS__ = {};
 
-        await openAttachmentTarget('file:///tmp/My%20Doc.pdf');
+        await openAttachmentTarget('file:///tmp/a1.pdf', 'a1');
 
-        expect(invokeMock).toHaveBeenCalledWith('open_path', { path: '/tmp/My Doc.pdf' });
+        expect(invokeMock).toHaveBeenCalledWith('open_path', {
+            path: '/tmp/a1.pdf',
+            attachmentId: 'a1',
+        });
         expect(openShellMock).not.toHaveBeenCalled();
     });
 

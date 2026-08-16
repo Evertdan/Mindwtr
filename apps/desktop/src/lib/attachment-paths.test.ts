@@ -45,7 +45,7 @@ describe('resolveAttachmentReadPath', () => {
 
     it('keeps the recorded path whenever it still resolves', async () => {
         existsMock.mockResolvedValue(true);
-        expect(await resolveAttachmentReadPath('/old-profile/attachments/a1.pdf'))
+        expect(await resolveAttachmentReadPath('/old-profile/attachments/a1.pdf', 'a1'))
             .toBe('/old-profile/attachments/a1.pdf');
         expect(existsMock).toHaveBeenCalledTimes(1);
     });
@@ -54,7 +54,7 @@ describe('resolveAttachmentReadPath', () => {
         // #1038: a moved portable profile strands every absolute attachment URI
         // even though the file travelled along inside attachments/.
         existsMock.mockImplementation(async (path) => path === '/new-profile/attachments/a1.pdf');
-        expect(await resolveAttachmentReadPath('/old-profile/attachments/a1.pdf'))
+        expect(await resolveAttachmentReadPath('/old-profile/attachments/a1.pdf', 'a1'))
             .toBe('/new-profile/attachments/a1.pdf');
     });
 
@@ -63,16 +63,24 @@ describe('resolveAttachmentReadPath', () => {
             if (path !== '/new-profile/attachments/a1.pdf') throw new Error('forbidden path');
             return true;
         });
-        expect(await resolveAttachmentReadPath('file:///old-profile/attachments/a1.pdf'))
+        expect(await resolveAttachmentReadPath('file:///old-profile/attachments/a1.pdf', 'a1'))
             .toBe('/new-profile/attachments/a1.pdf');
     });
 
     it('leaves a genuinely missing link target alone and never probes remote URLs', async () => {
         existsMock.mockResolvedValue(false);
-        expect(await resolveAttachmentReadPath('/home/demo/report.pdf')).toBe('/home/demo/report.pdf');
+        expect(await resolveAttachmentReadPath('/home/demo/report.pdf', 'report')).toBe('/home/demo/report.pdf');
         existsMock.mockClear();
-        expect(await resolveAttachmentReadPath('https://example.com/file.pdf'))
+        expect(await resolveAttachmentReadPath('https://example.com/file.pdf', 'remote'))
             .toBe('https://example.com/file.pdf');
         expect(existsMock).not.toHaveBeenCalled();
+    });
+
+    it('does not reuse a managed file whose name belongs to another attachment', async () => {
+        existsMock.mockImplementation(async (path) => path === '/new-profile/attachments/a1.pdf');
+
+        expect(await resolveAttachmentReadPath('/old-profile/attachments/a1.pdf', 'different-id'))
+            .toBe('/old-profile/attachments/a1.pdf');
+        expect(existsMock).toHaveBeenCalledTimes(1);
     });
 });

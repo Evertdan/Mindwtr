@@ -26,7 +26,10 @@ export function useProjectAttachmentActions({
 
     const openAttachment = useCallback(async (attachment: Attachment) => {
         try {
-            await openAttachmentTarget(attachment.uri);
+            await openAttachmentTarget(
+                attachment.uri,
+                attachment.kind === 'file' ? attachment.id : undefined,
+            );
         } catch (error) {
             void logWarn('Failed to open attachment', {
                 scope: 'attachment',

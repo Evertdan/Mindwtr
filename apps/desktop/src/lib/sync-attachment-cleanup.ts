@@ -82,7 +82,9 @@ export const deleteAttachmentFile = async (
         // Same fallback the read paths use: a relocated portable profile leaves
         // the recorded path stale, and the copy it names would otherwise stay in
         // the current managed dir forever (#1038).
-        const normalizedRawUri = normalizePath(await resolveAttachmentReadPath(rawUri));
+        const normalizedRawUri = normalizePath(
+            await resolveAttachmentReadPath(rawUri, attachment.id),
+        );
         const normalizedAttachmentsDir = normalizePath(await getManagedPath(ATTACHMENTS_DIR_NAME));
         if (
             normalizedRawUri === normalizedAttachmentsDir
