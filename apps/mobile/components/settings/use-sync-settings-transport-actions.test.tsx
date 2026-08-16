@@ -844,6 +844,29 @@ describe('useSyncSettingsTransportActions', () => {
         expect(latestHookResult?.syncBackend).toBe('off');
     });
 
+    it('restores the proven backend after disconnecting a failed staged Dropbox activation', async () => {
+        seedStorage([
+            [SYNC_BACKEND_KEY, 'off'],
+            [CLOUD_PROVIDER_KEY, 'selfhosted'],
+        ]);
+        mocked.performMobileSync.mockResolvedValue({ success: false, error: 'activation rejected' });
+        await renderHarness({ dropboxConfigured: true });
+
+        await act(async () => {
+            await latestHookResult?.handleConnectDropbox();
+        });
+        expect(latestHookResult?.syncBackend).toBe('cloud');
+        expect(latestHookResult?.cloudProvider).toBe('dropbox');
+
+        await act(async () => {
+            await latestHookResult?.handleDisconnectDropbox();
+        });
+
+        expect(latestHookResult?.syncBackend).toBe('off');
+        expect(latestHookResult?.cloudProvider).toBe('selfhosted');
+        expect(mocked.asyncStorage.setItem).not.toHaveBeenCalledWith(SYNC_BACKEND_KEY, 'off');
+    });
+
     it('clears local Dropbox credentials even when this build cannot revoke them', async () => {
         storedDropboxTokens = {
             accessToken: 'stored-access-token',

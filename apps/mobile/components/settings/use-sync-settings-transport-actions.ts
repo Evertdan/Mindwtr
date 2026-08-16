@@ -454,9 +454,12 @@ export function useSyncSettingsTransportActions({
         setDropboxBusy(true);
         try {
             const stagedCredentials = stagedDropboxCredentialsRef.current;
-            if (
+            const disconnectingProvenDropbox = (
                 provenSyncBackendRef.current === 'cloud'
                 && provenCloudProviderRef.current === 'dropbox'
+            );
+            if (
+                disconnectingProvenDropbox
             ) {
                 await AsyncStorage.setItem(SYNC_BACKEND_KEY, 'off');
                 clearMobileSyncConfigCache();
@@ -480,6 +483,14 @@ export function useSyncSettingsTransportActions({
                 // remote token, but it must still let the user remove local
                 // credentials left by a previously configured build.
                 await clearDropboxTokens();
+            }
+            if (!disconnectingProvenDropbox) {
+                // A failed activation leaves Dropbox selected only in this
+                // screen's staged UI. Disconnect must return to the last
+                // configuration that actually completed its probe.
+                hasPendingSyncConfiguration.current = false;
+                setSyncBackend(provenSyncBackendRef.current);
+                setCloudProvider(provenCloudProviderRef.current);
             }
             setDropboxConnected(false);
             resetSyncStatusForBackendSwitch();
