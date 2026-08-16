@@ -842,38 +842,53 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
                                     className="mt-3 space-y-1 pl-1"
                                     onPointerDown={(e) => e.stopPropagation()}
                                 >
+                                    {/* The row used to be one <button>, which forced links inside
+                                      * item titles to render dead — an anchor nested in a button is
+                                      * invalid and any click toggled the item (#1048). The checkbox
+                                      * button is now the real (keyboard-reachable) toggle, the row is
+                                      * a mouse convenience, and links handle their own clicks with
+                                      * stopPropagation, so a URL click opens instead of toggling. */}
                                     {(task.checklist || []).map((item, index) => (
-                                        <button
+                                        <div
                                             key={item.id || index}
-                                            type="button"
                                             className={cn(
                                                 "w-full flex items-center gap-2 text-left text-xs text-muted-foreground rounded px-1.5 py-1 hover:bg-muted/60 transition-colors",
-                                                readOnly && "hover:bg-transparent cursor-default"
+                                                readOnly ? "hover:bg-transparent" : "cursor-pointer"
                                             )}
                                             onClick={(event) => {
                                                 event.stopPropagation();
                                                 if (readOnly) return;
                                                 onToggleChecklistItem?.(index);
                                             }}
-                                            aria-pressed={item.isCompleted}
-                                            disabled={readOnly || !onToggleChecklistItem}
                                         >
-                                            <span
-                                                className={cn(
-                                                    "w-3 h-3 shrink-0 border rounded flex items-center justify-center",
-                                                    item.isCompleted
-                                                        ? "bg-primary border-primary text-primary-foreground"
-                                                        : "border-muted-foreground"
-                                                )}
+                                            <button
+                                                type="button"
+                                                className="shrink-0 flex items-center justify-center"
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    if (readOnly) return;
+                                                    onToggleChecklistItem?.(index);
+                                                }}
+                                                aria-pressed={item.isCompleted}
+                                                aria-label={item.title}
+                                                disabled={readOnly || !onToggleChecklistItem}
                                             >
-                                                {item.isCompleted && <Check className="w-2 h-2" />}
-                                            </span>
+                                                <span
+                                                    className={cn(
+                                                        "w-3 h-3 shrink-0 border rounded flex items-center justify-center",
+                                                        item.isCompleted
+                                                            ? "bg-primary border-primary text-primary-foreground"
+                                                            : "border-muted-foreground"
+                                                    )}
+                                                >
+                                                    {item.isCompleted && <Check className="w-2 h-2" />}
+                                                </span>
+                                            </button>
                                             <InlineMarkdown
                                                 markdown={item.title}
                                                 className={cn(item.isCompleted && "line-through")}
-                                                interactiveLinks={false}
                                             />
-                                        </button>
+                                        </div>
                                     ))}
                                 </div>
                             )}

@@ -108,6 +108,54 @@ describe('TaskItemDisplay', () => {
         expect(root!.classList.contains('isolate')).toBe(true);
     });
 
+    it('opens a URL in a checklist item instead of toggling it, while row clicks still toggle (#1048)', () => {
+        const onToggleChecklistItem = vi.fn();
+        const openSpy = vi.spyOn(window, 'open').mockReturnValue({} as Window);
+        const { getByRole, getByText } = render(
+            <LanguageProvider>
+                <TaskItemDisplay
+                    task={{
+                        ...baseTask,
+                        checklist: [
+                            { id: 'c1', title: 'Read https://example.com/docs before standup', isCompleted: false },
+                        ],
+                    }}
+                    language="en"
+                    selectionMode={false}
+                    isViewOpen
+                    actions={{
+                        onToggleView: vi.fn(),
+                        onEdit: vi.fn(),
+                        onDelete: vi.fn(),
+                        onDuplicate: vi.fn(),
+                        onStatusChange: vi.fn(),
+                        openAttachment: vi.fn(),
+                        onToggleChecklistItem,
+                    }}
+                    visibleAttachments={[]}
+                    recurrenceRule=""
+                    recurrenceStrategy="strict"
+                    prioritiesEnabled={false}
+                    timeEstimatesEnabled={false}
+                    isStagnant={false}
+                    showQuickDone={false}
+                    readOnly={false}
+                    t={(key: string) => key}
+                />
+            </LanguageProvider>
+        );
+
+        const link = getByRole('link', { name: 'https://example.com/docs' });
+        fireEvent.click(link);
+        expect(openSpy).toHaveBeenCalledWith('https://example.com/docs', '_blank', 'noopener,noreferrer');
+        expect(onToggleChecklistItem).not.toHaveBeenCalled();
+
+        fireEvent.click(getByText(/before standup/));
+        expect(onToggleChecklistItem).toHaveBeenCalledWith(0);
+
+        openSpy.mockRestore();
+    });
+
     const renderWithRename = (props: {
         onRenameTitle: ReturnType<typeof vi.fn>;
         onEdit?: ReturnType<typeof vi.fn>;
@@ -771,7 +819,9 @@ describe('TaskItemDisplay', () => {
             </LanguageProvider>
         );
 
-        expect(queryByRole('link', { name: 'spec' })).toBeNull();
+        // A real anchor since #1048 — checklist links used to render as dead
+        // text because the whole row was one toggle button.
+        expect(queryByRole('link', { name: 'spec' })).toBeInTheDocument();
         expect(container.textContent).toContain('Draft spec');
         expect(container.textContent).not.toContain('**');
         expect(container.textContent).not.toContain('](');
