@@ -1,0 +1,30 @@
+<en-US>
+- Search results stay steady while you type.
+- Save & edit returns to the right project, reorder exits where you dropped the task, and Undo stays above the tab bar.
+- Dropbox runs its first sync after sign-in and restores the last proven setup after a failed attempt.
+- Checklists drop blank rows, Areas gain six colors, and Japanese text is complete.
+</en-US>
+<de-DE>
+- Suchergebnisse bleiben beim Tippen stabil.
+- Speichern & bearbeiten kehrt zum richtigen Projekt zurück, die Sortierung endet am Ablageort und Rückgängig bleibt über der Tableiste.
+- Dropbox startet nach der Anmeldung den ersten Sync und stellt bei Fehlern die letzte geprüfte Einrichtung wieder her.
+- Checklisten verwerfen Leerzeilen, Bereiche erhalten sechs Farben und die japanische Übersetzung ist vollständig.
+</de-DE>
+<es-ES>
+- Los resultados de búsqueda permanecen estables mientras escribes.
+- Guardar y editar vuelve al proyecto correcto, la lista queda donde soltaste la tarea y Deshacer no tapa las pestañas.
+- Dropbox inicia la primera sincronización tras conectar y restaura la configuración verificada si falla.
+- Las listas omiten filas vacías, las áreas suman seis colores y el japonés está completo.
+</es-ES>
+<fr-FR>
+- Les résultats de recherche restent stables pendant la saisie.
+- Enregistrer et modifier revient au bon projet, la liste reste au point de dépôt et Annuler ne couvre plus les onglets.
+- Dropbox lance la première synchronisation après connexion et restaure la dernière configuration validée en cas d'échec.
+- Les listes ignorent les lignes vides, les domaines gagnent six couleurs et le japonais est complet.
+</fr-FR>
+<zh-CN>
+- 搜索结果在输入时保持稳定。
+- “保存并编辑”会返回正确的项目，退出排序后列表停留在放置位置，撤销提示不再遮挡标签栏。
+- 连接 Dropbox 后会立即执行首次同步；若失败，会恢复上次验证通过的配置。
+- 清单会丢弃空白行，领域新增六种颜色，日语翻译更加完整。
+</zh-CN>

@@ -30,7 +30,7 @@
           "列表、日历与看板视图，支持提醒与重复任务",
           "免费开源、无广告"
         ],
-        "ReleaseNotes": "• 快速添加会在输入时预览识别到的任务详情。\n• 可导出 Mindwtr CSV 或 TaskNotes ZIP，并可安全撤销导入。\n• 项目分栏、OLED 主题和更完整的搜索让任务整理更顺手。\n• 大型任务库、存储恢复、同步和虚拟磁盘支持更加快速可靠。",
+        "ReleaseNotes": "• 搜索结果在输入时保持稳定，从“已完成”或“已归档”打开搜索时会包含已完成任务。\n• 文件同步会修复缺失的附件副本，在更新后保留设置，并拦截不安全的路径。\n• 清单会丢弃空白行，打开链接时不再改变完成状态。\n• 单次日历项目优先显示，领域新增六种颜色。",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -82,7 +82,7 @@
           "List, calendar, and kanban views with reminders and repeating tasks",
           "Free and open source, no ads"
         ],
-        "ReleaseNotes": "• Quick Add previews recognized task details while you type.\n• Export Mindwtr CSV or TaskNotes ZIP files and safely undo imports.\n• Project columns, OLED mode, and richer search make organizing work easier.\n• Faster large libraries, steadier storage recovery, reliable sync, and better virtual-drive support.",
+        "ReleaseNotes": "• Search stays steady while you type, and Done or Archive searches include finished tasks.\n• File Sync repairs missing attachment copies, keeps settings through upgrades, and rejects unsafe path traversal.\n• Checklists drop blank rows and open links without changing completion.\n• One-off calendar items get visible space before recurring previews, and Areas gain six colors.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -131,7 +131,7 @@
           "Listen-, Kalender- und Kanban-Ansichten mit Erinnerungen und Wiederholungen",
           "Kostenlos und Open Source, ohne Werbung"
         ],
-        "ReleaseNotes": "• Die Schnellerfassung zeigt erkannte Aufgabendetails schon beim Tippen.\n• Mindwtr-CSV oder TaskNotes-ZIP exportieren und Importe sicher rückgängig machen.\n• Projektspalten, OLED-Design und eine bessere Suche erleichtern die Organisation.\n• Große Bibliotheken, Wiederherstellung, Sync und virtuelle Laufwerke laufen zuverlässiger.",
+        "ReleaseNotes": "• Die Suche bleibt beim Tippen stabil; in Erledigt und Archiv erscheinen abgeschlossene Aufgaben.\n• Die Dateisynchronisierung repariert fehlende Anhangkopien, behält Einstellungen bei Updates und blockiert unsichere Pfade.\n• Checklisten verwerfen Leerzeilen und öffnen Links, ohne den Status zu ändern.\n• Einzelne Kalendereinträge stehen vor Wiederholungsvorschauen; Bereiche erhalten sechs Farben.",
         "Images": [],
         "RecommendedHardware": [],
         "MinimumHardware": [],
@@ -161,7 +161,7 @@
           "Vues liste, calendrier et kanban, rappels et tâches répétées",
           "Gratuit et open source, sans publicité"
         ],
-        "ReleaseNotes": "• La capture rapide affiche les détails reconnus pendant la saisie.\n• Exportez en CSV Mindwtr ou ZIP TaskNotes et annulez les imports.\n• Colonnes de projet, thème OLED et recherche enrichie facilitent l’organisation.\n• Grandes bibliothèques, récupération, synchro et disques virtuels sont plus fiables.",
+        "ReleaseNotes": "• La recherche reste stable pendant la saisie et inclut les tâches terminées depuis Terminé ou Archive.\n• La synchronisation de fichiers répare les copies de pièces jointes, conserve les réglages et bloque les chemins dangereux.\n• Les listes ignorent les lignes vides et ouvrent les liens sans changer leur état.\n• Les éléments uniques du calendrier passent avant les récurrences; les domaines gagnent six couleurs.",
         "Images": [],
         "RecommendedHardware": [],
         "MinimumHardware": [],
@@ -190,7 +190,7 @@
           "Vistas de lista, calendario y kanban, con recordatorios y tareas repetidas",
           "Gratis y de código abierto, sin anuncios"
         ],
-        "ReleaseNotes": "• Captura rápida muestra los detalles reconocidos mientras escribes.\n• Exporta CSV de Mindwtr o ZIP de TaskNotes y deshaz importaciones.\n• Columnas de proyecto, tema OLED y búsqueda mejorada facilitan la organización.\n• Bibliotecas grandes, recuperación, sincronización y unidades virtuales son más fiables.",
+        "ReleaseNotes": "• La búsqueda permanece estable al escribir e incluye tareas terminadas desde Hecho o Archivo.\n• La sincronización de archivos repara copias de adjuntos, conserva los ajustes y bloquea rutas inseguras.\n• Las listas omiten filas vacías y abren enlaces sin cambiar su estado.\n• Los elementos únicos del calendario preceden a las repeticiones; las áreas suman seis colores.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",

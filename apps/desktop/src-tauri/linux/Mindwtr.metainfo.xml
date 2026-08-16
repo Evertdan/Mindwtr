@@ -88,6 +88,23 @@
   <url type="bugtracker">https://github.com/dongdongbh/Mindwtr/issues</url>
   <url type="vcs-browser">https://github.com/dongdongbh/Mindwtr</url>
   <releases>
+    <release version="1.2.1" date="2026-08-16">
+      <url type="details">https://github.com/dongdongbh/Mindwtr/releases/tag/v1.2.1</url>
+      <description>
+        <p>Mindwtr 1.2.1 improves search, File Sync recovery, attachments, checklists, calendars, and desktop integration.</p>
+        <p xml:lang="de">Mindwtr 1.2.1 verbessert Suche, Dateisynchronisierung, Anhaenge, Checklisten, Kalender und Desktop-Integration.</p>
+        <ul>
+          <li>Search stays steady while typing and includes finished tasks when opened from Done or Archive.</li>
+          <li xml:lang="de">Die Suche bleibt beim Tippen stabil und zeigt aus Erledigt oder Archiv auch abgeschlossene Aufgaben.</li>
+          <li>File Sync restores missing attachment copies, preserves verified settings through upgrades, reports probe errors, and rejects unsafe path traversal.</li>
+          <li xml:lang="de">Die Dateisynchronisierung stellt fehlende Anhangkopien wieder her, behaelt gepruefte Einstellungen bei Updates, zeigt Prueffehler und blockiert unsichere Pfade.</li>
+          <li>Checklists discard blank rows and open links without changing completion; one-off calendar items take visible space before recurring previews.</li>
+          <li xml:lang="de">Checklisten verwerfen Leerzeilen und oeffnen Links ohne Statusaenderung; einzelne Kalendereintraege stehen vor Wiederholungsvorschauen.</li>
+          <li>Linux follows the system dark preference, and slow sync-folder attachment work no longer blocks the window.</li>
+          <li xml:lang="de">Linux folgt der dunklen Systemeinstellung, und langsame Anhangarbeiten im Sync-Ordner blockieren das Fenster nicht mehr.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.2.0" date="2026-08-14">
       <url type="details">https://github.com/dongdongbh/Mindwtr/releases/tag/v1.2.0</url>
       <description>
