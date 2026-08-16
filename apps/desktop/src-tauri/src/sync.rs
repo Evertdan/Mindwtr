@@ -2623,6 +2623,20 @@ fn resolve_sync_dir(app: &tauri::AppHandle, path: Option<String>) -> Result<Path
     validate_sync_dir(&candidate)
 }
 
+// A candidate dir reaches the sync-file commands through the activation
+// probe BEFORE set_sync_path has granted it to the webview fs scope, and the
+// probe's attachment step runs through the fs plugin (scope-checked) — without
+// this grant every candidate probe dies on "forbidden path" and a new sync
+// folder can never be verified or saved (#1001).
+fn resolve_sync_dir_granting_scope(
+    app: &tauri::AppHandle,
+    path: String,
+) -> Result<PathBuf, String> {
+    let dir = resolve_sync_dir(app, Some(path))?;
+    expand_tauri_fs_scope(app, &dir);
+    Ok(dir)
+}
+
 fn configured_sync_dir(app: &tauri::AppHandle) -> Result<Option<PathBuf>, String> {
     let config = read_config(app);
     let Some(sync_path) = config
@@ -4167,6 +4181,27 @@ mod tests {
                 "{file}: {name} must hold lock_config_read_modify_write() across its \
                  whole body (I1) — without it, a concurrent RMW-guarded writer can \
                  silently revert this function's change to config.toml"
+            );
+        }
+    }
+
+    // The activation probe hands these commands a candidate dir BEFORE
+    // set_sync_path has granted it to the webview fs scope, while the probe's
+    // attachment step goes through the scope-checked fs plugin. Every
+    // override branch must therefore resolve through the scope-granting
+    // helper, or candidate probes die on "forbidden path" and a new sync
+    // folder can never be saved (#1001). Red-checked by swapping one call
+    // back to plain resolve_sync_dir.
+    #[test]
+    fn sync_file_commands_grant_fs_scope_for_override_paths() {
+        let source = include_str!("sync.rs");
+        for name in ["read_sync_file", "read_sync_file_versioned", "write_sync_file"] {
+            let body = find_function_body(source, name);
+            assert!(
+                body.contains("resolve_sync_dir_granting_scope"),
+                "sync.rs: {name} must resolve its path override via \
+                 resolve_sync_dir_granting_scope so the candidate dir is usable \
+                 by the fs plugin during the activation probe (#1001)"
             );
         }
     }
@@ -8336,7 +8371,7 @@ pub(crate) fn read_sync_file(
     path: Option<String>,
 ) -> Result<serde_json::Value, String> {
     let sync_dir = match path {
-        Some(path) => resolve_sync_dir(&app, Some(path))?,
+        Some(path) => resolve_sync_dir_granting_scope(&app, path)?,
         None => {
             configured_sync_dir(&app)?.ok_or_else(|| "Sync path is not configured".to_string())?
         }
@@ -8350,7 +8385,7 @@ pub(crate) fn read_sync_file_versioned(
     path: Option<String>,
 ) -> Result<SyncFileReadResult, String> {
     let sync_dir = match path {
-        Some(path) => resolve_sync_dir(&app, Some(path))?,
+        Some(path) => resolve_sync_dir_granting_scope(&app, path)?,
         None => {
             configured_sync_dir(&app)?.ok_or_else(|| "Sync path is not configured".to_string())?
         }
@@ -8498,7 +8533,7 @@ pub(crate) fn write_sync_file(
     expected_fingerprint: Option<String>,
 ) -> Result<bool, String> {
     let sync_dir = match path {
-        Some(path) => resolve_sync_dir(&app, Some(path))?,
+        Some(path) => resolve_sync_dir_granting_scope(&app, path)?,
         None => {
             configured_sync_dir(&app)?.ok_or_else(|| "Sync path is not configured".to_string())?
         }
