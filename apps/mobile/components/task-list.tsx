@@ -788,6 +788,7 @@ function TaskListComponent({
   }, [listRef]);
   const projectReorderFlatItemsRef = useRef(projectReorderFlatItems);
   projectReorderFlatItemsRef.current = projectReorderFlatItems;
+  const lastDroppedProjectReorderItemsRef = useRef<ProjectReorderFlatItem<Task>[] | null>(null);
   const projectReorderScrollOffsetRef = useRef(0);
   const listViewabilityConfig = useRef({ itemVisiblePercentThreshold: 10 }).current;
   const handleListViewableItemsChanged = useRef((info: { viewableItems: { item?: unknown }[] }) => {
@@ -891,8 +892,10 @@ function TaskListComponent({
     if (!wasReordering || projectReorderMode) return;
     const offset = projectReorderScrollOffsetRef.current;
     projectReorderScrollOffsetRef.current = 0;
+    const droppedReorderItems = lastDroppedProjectReorderItemsRef.current;
+    lastDroppedProjectReorderItemsRef.current = null;
     if (offset <= 1) return;
-    const reorderItems = projectReorderFlatItemsRef.current;
+    const reorderItems = droppedReorderItems ?? projectReorderFlatItemsRef.current;
     if (reorderItems.length === 0) return;
     const approxIndex = Math.min(
       reorderItems.length - 1,
@@ -974,6 +977,11 @@ function TaskListComponent({
     if (!moved || moved.type !== 'task') return;
     const plan = resolveProjectReorderDropPlan(params.data, moved.task.id);
     if (!plan) return;
+    // DraggableFlatList already renders this order, but the persisted store
+    // update below is asynchronous. Preserve the list the user can currently
+    // see so exiting Task order before the store rerenders anchors to the
+    // post-drop viewport instead of stale props (#784).
+    lastDroppedProjectReorderItemsRef.current = params.data;
     // #784 next-round evidence: what the drop asked for, so a later mismatch
     // separates "wrong write" from "write lost afterwards".
     const movedAt = plan.orderedIds.indexOf(moved.task.id);

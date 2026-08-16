@@ -867,6 +867,52 @@ describe('TaskList', () => {
     });
   });
 
+  it('uses the dropped order as the exit anchor before the store rerenders', async () => {
+    const longTaskList = Array.from({ length: 30 }, (_, index) => makeTask(
+      `task-${index}`,
+      `Task ${index}`,
+      { order: index },
+    ));
+    const propsFor = (reorderMode: boolean) => (
+      <TaskList
+        project={{ id: project.id, enableReorder: true, reorderMode }}
+        showHeader={false}
+        statusFilter="all"
+        taskSource={longTaskList}
+        title={project.title}
+      />
+    );
+    let tree!: ReturnType<typeof create>;
+
+    await act(async () => {
+      tree = create(propsFor(true));
+    });
+
+    const draggableList = tree.root.findByType('DraggableFlatList' as unknown as React.ElementType);
+    const droppedData = [...draggableList.props.data];
+    const [moved] = droppedData.splice(0, 1);
+    droppedData.splice(20, 0, moved);
+    await act(async () => {
+      draggableList.props.onDragEnd({ data: droppedData, from: 0, to: 20 });
+      draggableList.props.onScrollOffsetChange(800);
+    });
+
+    flatListScrollToIndexMock.mockClear();
+    await act(async () => {
+      tree.update(propsFor(false));
+    });
+
+    const call = flatListScrollToIndexMock.mock.calls.at(-1)?.[0];
+    expect(call).toBeTruthy();
+    const normalData = flatListPropsSpy.mock.calls.at(-1)?.[0].data;
+    // Moving task-0 below the viewport shifts task-11 into reorder index 10.
+    expect(normalData[call.index].task.id).toBe('task-11');
+
+    act(() => {
+      tree.unmount();
+    });
+  });
+
   it('uses a single self-scrolling draggable list when a section-less project owns the scroll', async () => {
     const longTaskList = Array.from({ length: 130 }, (_, index) => makeTask(
       `task-${index}`,
