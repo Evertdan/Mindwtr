@@ -219,8 +219,9 @@ fn read_portal_color_scheme() -> Option<&'static str> {
         if !output.status.success() {
             continue;
         }
-        if let Some(preference) =
-            std::str::from_utf8(&output.stdout).ok().and_then(parse_portal_color_scheme)
+        if let Some(preference) = std::str::from_utf8(&output.stdout)
+            .ok()
+            .and_then(parse_portal_color_scheme)
         {
             return Some(preference);
         }
@@ -830,7 +831,10 @@ mod tests {
     #[test]
     fn parses_kde_color_scheme_from_kdeglobals() {
         let contents = "[Icons]\nTheme=breeze\n\n[General]\nColorScheme=BreezeDark\nName=x\n";
-        assert_eq!(parse_kde_color_scheme(contents).as_deref(), Some("BreezeDark"));
+        assert_eq!(
+            parse_kde_color_scheme(contents).as_deref(),
+            Some("BreezeDark")
+        );
         // The key outside [General] must not match.
         let misplaced = "[KDE]\nColorScheme=BreezeDark\n[General]\nName=x\n";
         assert_eq!(parse_kde_color_scheme(misplaced), None);

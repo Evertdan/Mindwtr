@@ -4048,10 +4048,12 @@ mod tests {
         let (rmw_config_path, rmw_secrets_path) = (config_path.clone(), secrets_path.clone());
         let rmw_writer = std::thread::spawn(move || {
             let _guard = lock_config_read_modify_write().expect("rmw lock");
-            let mut config = read_config_files_verified(&rmw_config_path, &rmw_secrets_path)
-                .expect("read");
+            let mut config =
+                read_config_files_verified(&rmw_config_path, &rmw_secrets_path).expect("read");
             read_done_tx.send(()).expect("signal read done");
-            proceed_rx.recv().expect("wait for the cred-only writer to finish");
+            proceed_rx
+                .recv()
+                .expect("wait for the cred-only writer to finish");
             config.proxy_url = Some("https://rmw-writer.example".to_string());
             write_config_files(&rmw_config_path, &rmw_secrets_path, &config).expect("write");
         });
@@ -4102,8 +4104,8 @@ mod tests {
         let (rmw_config_path, rmw_secrets_path) = (config_path.clone(), secrets_path.clone());
         let rmw_writer = std::thread::spawn(move || {
             let _guard = lock_config_read_modify_write().expect("rmw lock");
-            let mut config = read_config_files_verified(&rmw_config_path, &rmw_secrets_path)
-                .expect("read");
+            let mut config =
+                read_config_files_verified(&rmw_config_path, &rmw_secrets_path).expect("read");
             config.proxy_url = Some("https://rmw-writer.example".to_string());
             write_config_files(&rmw_config_path, &rmw_secrets_path, &config).expect("write");
         });
@@ -5047,7 +5049,8 @@ mod tests {
         // yet, so an intolerant snapshot fails the whole screen (and every
         // auto-sync eligibility check) before any backend can be configured.
         for service in [CredentialService::Webdav, CredentialService::Cloud] {
-            let config = read_config_files_verified(&config_path, &secrets_path).unwrap_or_default();
+            let config =
+                read_config_files_verified(&config_path, &secrets_path).unwrap_or_default();
             assert_eq!(
                 resolve_sync_snapshot_secret_unlocked(
                     &config_path,

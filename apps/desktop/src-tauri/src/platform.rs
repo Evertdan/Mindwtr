@@ -116,7 +116,12 @@ fn normalize_open_path(
         .and_then(|fallback| fallback.canonicalize().ok())
         // The path is the one clue a user has for repairing a broken
         // reference (moved file, relocated portable profile) — name it (#1001).
-        .ok_or_else(|| format!("File does not exist or cannot be accessed: {}", candidate.display()))
+        .ok_or_else(|| {
+            format!(
+                "File does not exist or cannot be accessed: {}",
+                candidate.display()
+            )
+        })
 }
 
 fn path_is_under_allowed_root(path: &Path, allowed_roots: &[PathBuf]) -> bool {
@@ -850,23 +855,17 @@ mod tests {
             .join("attachments")
             .join("id-1.txt");
 
-        let resolved = normalize_open_path(
-            &stale.to_string_lossy(),
-            Some(&managed_dir),
-            Some("id-1"),
-        )
-            .expect("stale portable path resolves against the current profile");
+        let resolved =
+            normalize_open_path(&stale.to_string_lossy(), Some(&managed_dir), Some("id-1"))
+                .expect("stale portable path resolves against the current profile");
         assert_eq!(resolved, managed_file.canonicalize().expect("canonicalize"));
 
         // A path with no counterpart in the managed dir still fails, and names
         // the recorded path so the user can repair the reference (#1001).
         let missing = dir.path().join("elsewhere").join("report.pdf");
-        let error = normalize_open_path(
-            &missing.to_string_lossy(),
-            Some(&managed_dir),
-            Some("id-1"),
-        )
-            .expect_err("unrelated missing file must not resolve");
+        let error =
+            normalize_open_path(&missing.to_string_lossy(), Some(&managed_dir), Some("id-1"))
+                .expect_err("unrelated missing file must not resolve");
         assert!(error.contains(&missing.display().to_string()), "{error}");
 
         let mismatched = normalize_open_path(
@@ -875,14 +874,12 @@ mod tests {
             Some("different-id"),
         )
         .expect_err("fallback must stay bound to its attachment id");
-        assert!(mismatched.contains(&stale.display().to_string()), "{mismatched}");
+        assert!(
+            mismatched.contains(&stale.display().to_string()),
+            "{mismatched}"
+        );
 
-        assert!(normalize_open_path(
-            &stale.to_string_lossy(),
-            Some(&managed_dir),
-            None,
-        )
-        .is_err());
+        assert!(normalize_open_path(&stale.to_string_lossy(), Some(&managed_dir), None,).is_err());
     }
 
     #[test]

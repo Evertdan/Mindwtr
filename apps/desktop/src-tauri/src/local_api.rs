@@ -428,9 +428,15 @@ impl Drop for ConnectionSlotGuard {
 // window that could let the count exceed the cap - a concurrent decrement
 // from a finishing handler can only make a borderline request wait, never
 // let the count overshoot.
-fn accept_or_reject(mut stream: TcpStream, active_connections: &Arc<AtomicUsize>) -> Option<TcpStream> {
+fn accept_or_reject(
+    mut stream: TcpStream,
+    active_connections: &Arc<AtomicUsize>,
+) -> Option<TcpStream> {
     if active_connections.load(Ordering::SeqCst) >= MAX_LOCAL_API_CONNECTIONS {
-        let _ = write_response(&mut stream, ApiResponse::error(503, "Local API server is busy"));
+        let _ = write_response(
+            &mut stream,
+            ApiResponse::error(503, "Local API server is busy"),
+        );
         return None;
     }
     active_connections.fetch_add(1, Ordering::SeqCst);

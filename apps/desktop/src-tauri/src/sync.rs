@@ -4151,7 +4151,11 @@ mod tests {
             ("config.rs", config_source, "get_sync_backend"),
             ("config.rs", config_source, "get_sync_cloud_provider"),
             ("config.rs", config_source, "get_sync_cloud_provider_state"),
-            ("config.rs", config_source, "get_sync_configuration_snapshot"),
+            (
+                "config.rs",
+                config_source,
+                "get_sync_configuration_snapshot",
+            ),
             ("config.rs", config_source, "set_sync_backend"),
             ("config.rs", config_source, "set_sync_cloud_provider"),
             ("config.rs", config_source, "set_obsidian_config"),
@@ -4164,7 +4168,11 @@ mod tests {
                 include_str!("email_capture.rs"),
                 "set_email_capture_config",
             ),
-            ("lib.rs", include_str!("lib.rs"), "set_desktop_rendering_config"),
+            (
+                "lib.rs",
+                include_str!("lib.rs"),
+                "set_desktop_rendering_config",
+            ),
             (
                 "local_api.rs",
                 include_str!("local_api.rs"),
@@ -4195,7 +4203,11 @@ mod tests {
     #[test]
     fn sync_file_commands_grant_fs_scope_for_override_paths() {
         let source = include_str!("sync.rs");
-        for name in ["read_sync_file", "read_sync_file_versioned", "write_sync_file"] {
+        for name in [
+            "read_sync_file",
+            "read_sync_file_versioned",
+            "write_sync_file",
+        ] {
             let body = find_function_body(source, name);
             assert!(
                 body.contains("resolve_sync_dir_granting_scope"),
@@ -4402,10 +4414,7 @@ mod tests {
                 "get_db_path_cmd",
                 "builds a path string; the only I/O is one Path::exists() stat",
             ),
-            (
-                "get_dropbox_redirect_uri",
-                "pure string builder, no I/O",
-            ),
+            ("get_dropbox_redirect_uri", "pure string builder, no I/O"),
             (
                 "discard_staged_dropbox_credentials",
                 "only mutates an in-memory Mutex-guarded staged-credential map",
@@ -4488,7 +4497,9 @@ mod tests {
                 }
                 if known_blocking.contains(name.as_str()) {
                     seen_known_blocking.insert(
-                        *known_blocking.get(name.as_str()).expect("just checked contains"),
+                        *known_blocking
+                            .get(name.as_str())
+                            .expect("just checked contains"),
                     );
                     continue;
                 }
