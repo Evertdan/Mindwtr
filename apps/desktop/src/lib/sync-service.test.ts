@@ -1073,6 +1073,66 @@ describe('SyncService testability hooks', () => {
         expect(sessionStorage.getItem(CLOUD_TOKEN_KEY)).toBeNull();
     });
 
+    it('migrates a legacy cloud url without replacing a known native token', async () => {
+        localStorage.setItem(CLOUD_URL_KEY, 'https://legacy-cloud.example.com');
+        localStorage.setItem(CLOUD_ALLOW_INSECURE_HTTP_KEY, 'true');
+        let cloudUrl = '';
+        let cloudToken = 'native-token';
+        const snapshot = () => ({
+            backend: 'file' as const,
+            syncPath: '',
+            cloudProvider: 'selfhosted' as const,
+            cloudProviderAuthority: 'native' as const,
+            webdav: {
+                url: '',
+                username: '',
+                password: null,
+                passwordAuthority: 'opaque' as const,
+                hasPassword: null,
+                allowInsecureHttp: false,
+                allowWeakFingerprint: true,
+            },
+            cloud: {
+                url: cloudUrl,
+                token: cloudToken,
+                tokenAuthority: 'known' as const,
+                allowInsecureHttp: cloudUrl ? true : false,
+                rememberToken: false,
+            },
+        });
+        const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
+            if (command === 'recover_dropbox_credentials_before_sync_configuration') return true;
+            if (command === 'get_sync_configuration_snapshot') return snapshot();
+            if (command === 'set_cloud_config') {
+                cloudUrl = String(args?.url ?? '');
+                cloudToken = String(args?.token ?? '');
+                return true;
+            }
+            if (command === 'get_cloud_config') {
+                return { url: cloudUrl, token: cloudToken, allowInsecureHttp: true };
+            }
+            throw new Error(`Unexpected command: ${command}`);
+        });
+        __syncServiceTestUtils.setDependenciesForTests({
+            isTauriRuntime: () => true,
+            invoke: invoke as unknown as <T>(command: string, args?: Record<string, unknown>) => Promise<T>,
+        });
+
+        await expect(SyncService.getPersistedSyncConfigurationSnapshot()).resolves.toMatchObject({
+            cloud: {
+                url: 'https://legacy-cloud.example.com',
+                token: 'native-token',
+            },
+        });
+        expect(invoke).toHaveBeenCalledWith('set_cloud_config', {
+            url: 'https://legacy-cloud.example.com',
+            token: 'native-token',
+            allowInsecureHttp: true,
+        });
+        expect(localStorage.getItem(CLOUD_URL_KEY)).toBeNull();
+        expect(localStorage.getItem(CLOUD_ALLOW_INSECURE_HTTP_KEY)).toBeNull();
+    });
+
     it('preserves a non-remembered local legacy token when native provider migration fails', async () => {
         localStorage.setItem(CLOUD_URL_KEY, 'https://legacy-cloud.example.com');
         localStorage.setItem(CLOUD_TOKEN_KEY, 'must-survive-failed-migration');

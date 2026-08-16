@@ -1243,20 +1243,21 @@ export class SyncService {
                 }
                 const hasKnownNativeCloudToken = current.cloud.tokenAuthority === 'known'
                     && Boolean(current.cloud.token);
-                if (!hasKnownNativeCloudToken) {
-                    await invokeSyncNative('set_cloud_config', {
-                        url: legacyCloud.url,
-                        token: legacyCloud.token,
-                        allowInsecureHttp: legacyCloud.allowInsecureHttp === true,
-                    });
-                    const persistedCloud = await invokeSyncNative<CloudConfig>('get_cloud_config');
-                    if (
-                        persistedCloud.url !== legacyCloud.url
-                        || persistedCloud.token !== legacyCloud.token
-                        || persistedCloud.allowInsecureHttp !== legacyCloud.allowInsecureHttp
-                    ) {
-                        throw new Error('Legacy self-hosted sync configuration did not persist correctly');
-                    }
+                const tokenToPersist = hasKnownNativeCloudToken
+                    ? current.cloud.token ?? ''
+                    : legacyCloud.token;
+                await invokeSyncNative('set_cloud_config', {
+                    url: legacyCloud.url,
+                    token: tokenToPersist,
+                    allowInsecureHttp: legacyCloud.allowInsecureHttp === true,
+                });
+                const persistedCloud = await invokeSyncNative<CloudConfig>('get_cloud_config');
+                if (
+                    persistedCloud.url !== legacyCloud.url
+                    || persistedCloud.token !== tokenToPersist
+                    || persistedCloud.allowInsecureHttp !== legacyCloud.allowInsecureHttp
+                ) {
+                    throw new Error('Legacy self-hosted sync configuration did not persist correctly');
                 }
             }
 
