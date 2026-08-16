@@ -64,6 +64,24 @@ describe('createLocalAttachmentFs managed-dir fallback', () => {
         expect(await fs.localFileExists(STALE_URI, { id: 'a1' })).toBe(false);
     });
 
+    it('does not treat a path that only shares the data-dir prefix as managed', async () => {
+        const outsidePath = `${BASE_DATA_DIR}-archive/a1.pdf`;
+        const bytes = new Uint8Array([1, 2, 3]);
+        const { exists, readFile } = createFs({ [outsidePath]: bytes });
+        const fs = createLocalAttachmentFs(vi.fn(), {
+            baseDataDir: BASE_DATA_DIR,
+            dataBaseDir: 'data',
+            exists,
+            readFile,
+        });
+
+        const attachment = { id: 'a1' };
+        expect(await fs.localFileExists(outsidePath, attachment)).toBe(true);
+        expect(await fs.readLocalFile(outsidePath, attachment)).toBe(bytes);
+        expect(exists).toHaveBeenCalledWith(outsidePath);
+        expect(readFile).toHaveBeenCalledWith(outsidePath);
+    });
+
     it('does not fall back to a managed file owned by a different attachment', async () => {
         const { exists, readFile } = createFs({ [MANAGED_FILE]: new Uint8Array([1]) });
         const fs = createLocalAttachmentFs(vi.fn(), {

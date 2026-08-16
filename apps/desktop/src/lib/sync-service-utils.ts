@@ -117,7 +117,13 @@ export const createLocalAttachmentFs = (
     readLocalFile: (path: string, attachment: Pick<Attachment, 'id'>) => Promise<Uint8Array>;
     localFileExists: (path: string, attachment: Pick<Attachment, 'id'>) => Promise<boolean>;
 } => {
-    const toRelative = (path: string): string => path.slice(deps.baseDataDir.length).replace(/^[\\/]/, '');
+    const baseDataDir = deps.baseDataDir.replace(/[\\/]+$/, '');
+    const isWithinDataDir = (path: string): boolean => Boolean(baseDataDir) && (
+        path === baseDataDir
+        || path.startsWith(`${baseDataDir}/`)
+        || path.startsWith(`${baseDataDir}\\`)
+    );
+    const toRelative = (path: string): string => path.slice(baseDataDir.length).replace(/^[\\/]/, '');
 
     // A portable profile travels with the install, so a URI recorded at its
     // previous location is stale even though the file moved along inside
@@ -139,7 +145,7 @@ export const createLocalAttachmentFs = (
         path: string,
         attachment: Pick<Attachment, 'id'>,
     ): Promise<Uint8Array> => {
-        if (path.startsWith(deps.baseDataDir)) {
+        if (isWithinDataDir(path)) {
             return await deps.readFile(toRelative(path), { baseDir: deps.dataBaseDir });
         }
         try {
@@ -156,7 +162,7 @@ export const createLocalAttachmentFs = (
         attachment: Pick<Attachment, 'id'>,
     ): Promise<boolean> => {
         try {
-            if (path.startsWith(deps.baseDataDir)) {
+            if (isWithinDataDir(path)) {
                 return await deps.exists(toRelative(path), { baseDir: deps.dataBaseDir });
             }
             if (await deps.exists(normalizeAttachmentFsPath(path))) return true;
