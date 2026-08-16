@@ -155,6 +155,7 @@ export function ChecklistField({
     const markdownEditorAssist = useTaskStore((state) => isMarkdownEditorAssistEnabled(state.settings));
     const [checklistDraft, setChecklistDraft] = useState<Task['checklist']>(checklist || []);
     const checklistDraftRef = useRef<Task['checklist']>(checklist || []);
+    const persistedChecklistRef = useRef<Task['checklist']>(checklist || []);
     const checklistDirtyRef = useRef(false);
     const checklistInputRefs = useRef<Array<HTMLInputElement | null>>([]);
     const checklistSelectionRefs = useRef<Array<MarkdownSelection>>([]);
@@ -178,6 +179,7 @@ export function ChecklistField({
         if (!taskChanged && areChecklistsEqual(incoming, checklistDraftRef.current)) return;
         setChecklistDraft(incoming);
         checklistDraftRef.current = incoming;
+        persistedChecklistRef.current = incoming;
         checklistDirtyRef.current = false;
     }, [taskId, checklist]);
 
@@ -188,6 +190,7 @@ export function ChecklistField({
     }, []);
 
     const commitChecklistUpdate = useCallback((nextChecklist: Task['checklist']) => {
+        persistedChecklistRef.current = nextChecklist;
         updateTask(taskId, { checklist: nextChecklist });
     }, [taskId, updateTask]);
 
@@ -208,7 +211,9 @@ export function ChecklistField({
         setChecklistDraft(filtered);
         checklistDraftRef.current = filtered;
         checklistDirtyRef.current = false;
-        commitChecklistUpdate(filtered);
+        if (!areChecklistsEqual(filtered, persistedChecklistRef.current)) {
+            commitChecklistUpdate(filtered);
+        }
         return true;
     }, [commitChecklistUpdate]);
 
@@ -220,7 +225,10 @@ export function ChecklistField({
     useEffect(() => () => {
         const list = checklistDraftRef.current || [];
         const filtered = list.filter((item) => item.title.trim() !== '');
-        if (checklistDirtyRef.current || filtered.length !== list.length) {
+        if (
+            (checklistDirtyRef.current || filtered.length !== list.length)
+            && !areChecklistsEqual(filtered, persistedChecklistRef.current)
+        ) {
             commitChecklistUpdateRef.current(filtered);
         }
     }, []);
@@ -418,9 +426,6 @@ export function ChecklistField({
                                             onPaste={(event) => {
                                                 handleChecklistPaste(index, event);
                                             }}
-                                            onBlur={() => {
-                                                commitChecklistDraft();
-                                            }}
                                             onSelect={(event) => {
                                                 const selection = getInputSelection(event.currentTarget);
                                                 checklistSelectionRefs.current[index] = selection;
@@ -475,10 +480,7 @@ export function ChecklistField({
                                                     };
                                                     const nextList = [...checklistItems];
                                                     nextList.splice(index + 1, 0, newItem);
-                                                    setChecklistDraft(nextList);
-                                                    checklistDraftRef.current = nextList;
-                                                    checklistDirtyRef.current = false;
-                                                    commitChecklistUpdate(nextList);
+                                                    updateChecklistDraft(nextList);
                                                     focusChecklistIndex(index + 1, event.currentTarget);
                                                     return;
                                                 }
@@ -501,8 +503,6 @@ export function ChecklistField({
                                                     if (nextIndex >= 0 && nextIndex < checklistItems.length) {
                                                         event.preventDefault();
                                                         focusChecklistIndex(nextIndex, event.currentTarget);
-                                                    } else {
-                                                        commitChecklistDraft();
                                                     }
                                                 }
                                             }}
@@ -545,10 +545,7 @@ export function ChecklistField({
                             isCompleted: false,
                         };
                         const nextList = [...(checklistDraft || []), newItem];
-                        setChecklistDraft(nextList);
-                        checklistDraftRef.current = nextList;
-                        checklistDirtyRef.current = false;
-                        commitChecklistUpdate(nextList);
+                        updateChecklistDraft(nextList);
                         focusChecklistIndex(nextList.length - 1, source);
                     }}
                     onKeyDown={(event) => {
@@ -561,10 +558,7 @@ export function ChecklistField({
                                 isCompleted: false,
                             };
                             const nextList = [...(checklistDraft || []), newItem];
-                            setChecklistDraft(nextList);
-                            checklistDraftRef.current = nextList;
-                            checklistDirtyRef.current = false;
-                            commitChecklistUpdate(nextList);
+                            updateChecklistDraft(nextList);
                             focusChecklistIndex(nextList.length - 1, event.currentTarget);
                         }
                     }}

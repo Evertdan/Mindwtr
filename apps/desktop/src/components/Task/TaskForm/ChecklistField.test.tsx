@@ -222,14 +222,16 @@ describe('ChecklistField', () => {
         await waitFor(() => {
             expect(getAllByRole('textbox')).toHaveLength(1);
         }, { timeout: 500 });
-        expect(updates[updates.length - 1]).toEqual({
-            checklist: [{ id: '1', title: 'Item 1', isCompleted: false }],
-        });
+        expect(updates).toEqual([]);
     });
 
     it('keeps the blank row minted by Enter while focus moves between checklist rows (#1045)', async () => {
+        const updates: Partial<Task>[] = [];
         const { getAllByRole } = render(
-            <ChecklistHarness initial={[{ id: '1', title: 'Item 1', isCompleted: false }]} />
+            <ChecklistHarness
+                initial={[{ id: '1', title: 'Item 1', isCompleted: false }]}
+                onUpdateTask={(next) => updates.push(next)}
+            />
         );
 
         const input = getAllByRole('textbox')[0];
@@ -242,6 +244,34 @@ describe('ChecklistField', () => {
         fireEvent.blur(getAllByRole('textbox')[0], { relatedTarget: getAllByRole('textbox')[1] });
 
         expect(getAllByRole('textbox')).toHaveLength(2);
+        expect(updates).toEqual([]);
+    });
+
+    it('commits a newly titled checklist row once when focus leaves the checklist', async () => {
+        const updates: Partial<Task>[] = [];
+        const { getAllByRole, getByRole } = render(
+            <div>
+                <ChecklistHarness
+                    initial={[{ id: '1', title: 'Item 1', isCompleted: false }]}
+                    onUpdateTask={(next) => updates.push(next)}
+                />
+                <button type="button">outside</button>
+            </div>
+        );
+
+        const input = getAllByRole('textbox')[0];
+        fireEvent.focus(input);
+        fireEvent.keyDown(input, { key: 'Enter' });
+        await waitFor(() => {
+            expect(getAllByRole('textbox')).toHaveLength(2);
+        }, { timeout: 500 });
+
+        const newInput = getAllByRole('textbox')[1];
+        fireEvent.change(newInput, { target: { value: 'Item 2' } });
+        fireEvent.blur(newInput, { relatedTarget: getByRole('button', { name: 'outside' }) });
+
+        expect(updates).toHaveLength(1);
+        expect(updates[0]?.checklist?.map((item) => item.title)).toEqual(['Item 1', 'Item 2']);
     });
 
     it('focuses inserted checklist items without scrolling the editor container', async () => {
