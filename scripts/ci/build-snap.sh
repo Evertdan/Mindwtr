@@ -56,7 +56,7 @@ else
     run_snap_store_command sudo snap install --channel "${snapcraft_channel}" --classic snapcraft
 fi
 
-run_snap_store_command sudo -u "${ci_user}" -E snapcraft --enable-manifest
+run_snap_store_command sudo -u "${ci_user}" -E env SNAPCRAFT_BUILD_INFO=1 snapcraft
 
 snap_path="$(find . -maxdepth 1 -type f -name '*.snap' | sort | tail -n 1)"
 if [ -z "${snap_path}" ]; then

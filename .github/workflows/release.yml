@@ -1430,7 +1430,7 @@ jobs:
             aur-proposal
 
       - name: Preserve exact published tree as an artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: aur-proposal-mindwtr-${{ steps.version.outputs.tag }}
           path: aur-proposal/
