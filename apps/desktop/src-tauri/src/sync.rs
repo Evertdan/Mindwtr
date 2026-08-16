@@ -4263,6 +4263,28 @@ mod tests {
             managed,
             true
         ));
+        assert!(!sync_fs_path_is_allowed(
+            Path::new("attachments/a.txt"),
+            managed,
+            true
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn sync_fs_paths_reject_symlink_components_inside_an_allowed_tree() {
+        use std::os::unix::fs::symlink;
+
+        let managed = tempfile::tempdir().expect("managed temp dir");
+        let outside = tempfile::tempdir().expect("outside temp dir");
+        let redirected = managed.path().join("redirected");
+        symlink(outside.path(), &redirected).expect("create directory symlink");
+
+        assert!(!sync_fs_path_is_allowed(
+            &redirected.join("external.txt"),
+            managed.path(),
+            false
+        ));
     }
 
     /// (name, is_async) for every `#[tauri::command...]` declaration found in
@@ -8612,16 +8634,33 @@ pub(crate) fn write_sync_file(
 // The same two path families the fs plugin accepts for these calls: the runtime
 // scope (the sync folder, granted by expand_tauri_fs_scope) and the managed data
 // dir (granted through the static capability, which a non-plugin command cannot
-// read back). `..` is rejected outright so the managed-dir prefix check cannot
-// be walked out of.
+// read back). Traversal and symlink components are rejected so a lexical grant
+// cannot be redirected outside either allowed tree.
 fn sync_fs_path_is_allowed(path: &Path, managed_dir: &Path, scope_allows: bool) -> bool {
-    if path
-        .components()
-        .any(|component| component == std::path::Component::ParentDir)
+    if !path.is_absolute()
+        || path
+            .components()
+            .any(|component| component == std::path::Component::ParentDir)
     {
         return false;
     }
-    path.starts_with(managed_dir) || scope_allows
+    if !path.starts_with(managed_dir) && !scope_allows {
+        return false;
+    }
+
+    let mut candidate = PathBuf::new();
+    for component in path.components() {
+        candidate.push(component.as_os_str());
+        match fs::symlink_metadata(&candidate) {
+            Ok(metadata) if metadata.file_type().is_symlink() => return false,
+            Ok(_) => {}
+            // Missing trailing components are valid for exists/create/write
+            // operations. Their nearest existing ancestor was already checked.
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return true,
+            Err(_) => return false,
+        }
+    }
+    true
 }
 
 fn sync_fs_path(app: &tauri::AppHandle, path: String) -> Result<PathBuf, String> {
@@ -8660,6 +8699,19 @@ pub(crate) fn sync_fs_rename(
     from: String,
     to: String,
 ) -> Result<(), String> {
-    fs::rename(sync_fs_path(&app, from)?, sync_fs_path(&app, to)?)
-        .map_err(|error| error.to_string())
+    let from = sync_fs_path(&app, from)?;
+    let to = sync_fs_path(&app, to)?;
+    if from.parent() != to.parent() {
+        return Err("sync file rename must stay within one directory".to_string());
+    }
+    if !fs::metadata(&from)
+        .map_err(|error| error.to_string())?
+        .is_file()
+    {
+        return Err(format!(
+            "sync file rename source is not a file: {}",
+            from.display()
+        ));
+    }
+    fs::rename(from, to).map_err(|error| error.to_string())
 }
