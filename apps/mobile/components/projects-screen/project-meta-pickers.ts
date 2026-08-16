@@ -9,10 +9,36 @@ type AreaColorMeta = {
     swatch: string;
 };
 
+/**
+ * Spoken/printed labels for the area swatches, used by the iOS action sheets
+ * (which list colors as text rows, not dots). Keyed by the exact hex in
+ * AREA_PRESET_COLORS — a preset missing here falls back to its raw hex, so
+ * every new swatch needs a row.
+ */
+export const AREA_COLOR_DISPLAY_BY_HEX: Record<string, AreaColorMeta> = {
+    '#3b82f6': { nameKey: 'projects.colorBlue', swatch: '🔵' },
+    '#10b981': { nameKey: 'projects.colorGreen', swatch: '🟢' },
+    '#f59e0b': { nameKey: 'projects.colorAmber', swatch: '🟠' },
+    '#ef4444': { nameKey: 'projects.colorRed', swatch: '🔴' },
+    '#8b5cf6': { nameKey: 'projects.colorPurple', swatch: '🟣' },
+    '#ec4899': { nameKey: 'projects.colorPink', swatch: '🩷' },
+    '#f97316': { nameKey: 'projects.colorOrange', swatch: '🟠' },
+    '#14b8a6': { nameKey: 'projects.colorTeal', swatch: '🩵' },
+    '#06b6d4': { nameKey: 'projects.colorCyan', swatch: '🩵' },
+    '#6366f1': { nameKey: 'projects.colorIndigo', swatch: '🔵' },
+    '#f43f5e': { nameKey: 'projects.colorRose', swatch: '🔴' },
+    '#64748b': { nameKey: 'projects.colorSlate', swatch: '🩶' },
+};
+
+const areaColorLabel = (t: TranslateFn, color: string): string => {
+    const meta = AREA_COLOR_DISPLAY_BY_HEX[color] ?? { nameKey: '', swatch: '◯' };
+    const name = meta.nameKey ? t(meta.nameKey) : color.toUpperCase();
+    return `${meta.swatch} ${name}`;
+};
+
 type OpenProjectAreaPickerArgs = {
     addArea: (name: string, options: { color: string }) => Promise<Area | null | undefined>;
     areaUsage: Map<string, number>;
-    colorDisplayByHex: Record<string, AreaColorMeta>;
     colors: readonly string[];
     deleteArea: (id: string) => void;
     logProjectError: (message: string, error?: unknown) => void;
@@ -42,7 +68,6 @@ type OpenProjectTagPickerArgs = {
 export const openProjectAreaPicker = ({
     addArea,
     areaUsage,
-    colorDisplayByHex,
     colors,
     deleteArea,
     logProjectError,
@@ -95,11 +120,7 @@ export const openProjectAreaPicker = ({
                             {
                                 options: [
                                     t('common.cancel'),
-                                    ...colors.map((color) => {
-                                        const colorMeta = colorDisplayByHex[color] ?? { nameKey: '', swatch: '◯' };
-                                        const colorName = colorMeta.nameKey ? t(colorMeta.nameKey) : color.toUpperCase();
-                                        return `${colorMeta.swatch} ${colorName}`;
-                                    }),
+                                    ...colors.map((color) => areaColorLabel(t, color)),
                                 ],
                                 cancelButtonIndex: 0,
                                 title: chooseColorLabel,
@@ -164,11 +185,9 @@ export const openProjectAreaPicker = ({
                     {
                         options: [
                             t('common.cancel'),
-                            ...colors.map((color) => {
-                                const colorMeta = colorDisplayByHex[color] ?? { nameKey: '', swatch: '◯' };
-                                const colorName = colorMeta.nameKey ? t(colorMeta.nameKey) : color.toUpperCase();
-                                return `${area.color === color ? '✓ ' : ''}${colorMeta.swatch} ${colorName}`;
-                            }),
+                            ...colors.map((color) => (
+                                `${area.color === color ? '✓ ' : ''}${areaColorLabel(t, color)}`
+                            )),
                         ],
                         cancelButtonIndex: 0,
                         title: changeColorLabel,

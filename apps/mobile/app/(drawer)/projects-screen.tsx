@@ -195,14 +195,6 @@ export default function ProjectsScreen() {
   const overlayModalPresentation = 'overFullScreen' as const;
 
   const colors = AREA_PRESET_COLORS;
-  const colorDisplayByHex: Record<string, { nameKey: string; swatch: string }> = {
-    '#3b82f6': { nameKey: 'projects.colorBlue', swatch: '🔵' },
-    '#10b981': { nameKey: 'projects.colorGreen', swatch: '🟢' },
-    '#f59e0b': { nameKey: 'projects.colorAmber', swatch: '🟠' },
-    '#ef4444': { nameKey: 'projects.colorRed', swatch: '🔴' },
-    '#8b5cf6': { nameKey: 'projects.colorPurple', swatch: '🟣' },
-    '#ec4899': { nameKey: 'projects.colorPink', swatch: '🩷' },
-  };
   const {
     areaUsage,
     focusedCount,
@@ -717,7 +709,6 @@ export default function ProjectsScreen() {
     openProjectAreaPicker({
       addArea,
       areaUsage,
-      colorDisplayByHex,
       colors,
       deleteArea,
       logProjectError,

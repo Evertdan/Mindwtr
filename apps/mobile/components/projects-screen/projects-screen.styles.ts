@@ -67,6 +67,7 @@ export const projectsScreenStyles = StyleSheet.create({
     },
     colorPicker: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         gap: 8,
     },
     colorOption: {

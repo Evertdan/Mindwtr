@@ -1,4 +1,5 @@
 import { fireEvent, render } from '@testing-library/react';
+import { AREA_PRESET_COLORS } from '@mindwtr/core';
 import { describe, expect, it, vi } from 'vitest';
 import { AreaColorPicker } from './AreaColorPicker';
 
@@ -64,5 +65,24 @@ describe('AreaColorPicker', () => {
 
         expect(getByTestId('area-color-picker-root').className).toContain('z-50');
         expect(getByTestId('area-color-picker-menu').className).toContain('z-50');
+    });
+
+    it('offers every preset color, wrapped into a grid', () => {
+        const { getByLabelText, getByTestId } = render(
+            <AreaColorPicker
+                value="#3b82f6"
+                onChange={vi.fn()}
+                title="Area color"
+            />,
+        );
+
+        fireEvent.click(getByLabelText('Area color'));
+
+        const menu = getByTestId('area-color-picker-menu');
+        // None + one button per preset. jsdom cannot measure, so the wrap is
+        // pinned as a declaration: a single flex row overflows past six colors.
+        expect(menu.querySelectorAll('button')).toHaveLength(AREA_PRESET_COLORS.length + 1);
+        expect(menu.className).toContain('grid-cols-7');
+        expect(menu.className).not.toContain('flex gap-2');
     });
 });
