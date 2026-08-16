@@ -4245,40 +4245,67 @@ mod tests {
         }
     }
 
+    // Fixtures build on std::env::temp_dir(): a hardcoded "/home/u/..." is not
+    // an absolute path on Windows and its ancestry crosses a symlink on the
+    // macOS runners, which made this test fail on both platforms while the
+    // Linux run stayed green.
     #[test]
     fn sync_fs_paths_are_confined_to_the_managed_dir_and_the_granted_scope() {
-        let managed = Path::new("/home/u/.local/share/mindwtr");
+        let root = std::env::temp_dir();
+        let managed = root.join("mindwtr-sync-fs-test-managed");
         assert!(sync_fs_path_is_allowed(
             &managed.join("attachments/a.txt"),
-            managed,
+            &managed,
             false
         ));
         // The sync folder is only ever reachable through the runtime fs scope.
         assert!(sync_fs_path_is_allowed(
-            Path::new("/mnt/rclone/sync/attachments/a.txt"),
-            managed,
+            &root.join("mindwtr-sync-fs-test-sync/attachments/a.txt"),
+            &managed,
             true
         ));
         assert!(!sync_fs_path_is_allowed(
-            Path::new("/home/u/.ssh/id_ed25519"),
-            managed,
+            &root.join("mindwtr-sync-fs-test-elsewhere/id_ed25519"),
+            &managed,
             false
         ));
         // Traversal must not walk out of the managed dir, scope or no scope.
         assert!(!sync_fs_path_is_allowed(
             &managed.join("../../.ssh/id_ed25519"),
-            managed,
+            &managed,
             false
         ));
         assert!(!sync_fs_path_is_allowed(
             &managed.join("../../.ssh/id_ed25519"),
-            managed,
+            &managed,
             true
         ));
         assert!(!sync_fs_path_is_allowed(
             Path::new("attachments/a.txt"),
-            managed,
+            &managed,
             true
+        ));
+    }
+
+    // The managed dir itself may legitimately sit behind a symlink (portable
+    // installs, symlinked $HOME or XDG dirs, macOS's /var and /home): only
+    // symlinks BELOW the trust root are traversal.
+    #[cfg(unix)]
+    #[test]
+    fn sync_fs_paths_allow_a_managed_dir_behind_a_symlinked_ancestor() {
+        use std::os::unix::fs::symlink;
+
+        let real = tempfile::tempdir().expect("real temp dir");
+        let link_root = tempfile::tempdir().expect("link-root temp dir");
+        let linked = link_root.path().join("data");
+        symlink(real.path(), &linked).expect("create ancestor symlink");
+        std::fs::create_dir_all(real.path().join("mindwtr")).expect("create managed dir");
+        let managed = linked.join("mindwtr");
+
+        assert!(sync_fs_path_is_allowed(
+            &managed.join("attachments/a.txt"),
+            &managed,
+            false
         ));
     }
 
@@ -8655,10 +8682,21 @@ fn sync_fs_path_is_allowed(path: &Path, managed_dir: &Path, scope_allows: bool) 
     {
         return false;
     }
-    if !path.starts_with(managed_dir) && !scope_allows {
-        return false;
-    }
-
+    // Reject symlinks below the trust root only — never in the root's own
+    // ancestry. macOS reaches real paths through symlinks (/var, /tmp, /home),
+    // and symlinked $HOME/XDG data dirs are common on Linux, so walking from
+    // "/" forbade every sync-folder operation for those setups (it also failed
+    // this crate's macOS CI, whose runners have a symlinked /home). Below the
+    // root the walk stays: a symlink lexically inside the managed dir can point
+    // anywhere, which is the traversal this guard exists to stop.
+    let Ok(suffix) = path.strip_prefix(managed_dir) else {
+        // Not under the managed dir: the sync folder, reachable only through
+        // the runtime fs scope. The scope grant (expand_tauri_fs_scope on the
+        // user's own folder pick) is the authority there, matching the fs
+        // plugin reachability these commands replaced (#1037) — and a sync
+        // folder on a virtual mount may not answer per-component stats at all.
+        return scope_allows;
+    };
     let mut candidate = PathBuf::new();
     for component in path.components() {
         candidate.push(component.as_os_str());
