@@ -8697,8 +8697,8 @@ fn sync_fs_path_is_allowed(path: &Path, managed_dir: &Path, scope_allows: bool) 
         // folder on a virtual mount may not answer per-component stats at all.
         return scope_allows;
     };
-    let mut candidate = PathBuf::new();
-    for component in path.components() {
+    let mut candidate = managed_dir.to_path_buf();
+    for component in suffix.components() {
         candidate.push(component.as_os_str());
         match fs::symlink_metadata(&candidate) {
             Ok(metadata) if metadata.file_type().is_symlink() => return false,
