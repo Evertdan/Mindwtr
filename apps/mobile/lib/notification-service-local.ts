@@ -16,7 +16,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeEventEmitter, NativeModules, PermissionsAndroid, Platform } from 'react-native';
 
-import { logInfo, logWarn } from './app-log';
+import { isLoggingEnabled, logInfo, logWarn } from './app-log';
 import { ensureReminderNotificationChannel, restorePersistentCaptureNotification } from '@/modules/notification-open-intents';
 import { getDuplicateAlarmRetryFireAt } from './notification-service-local-utils';
 
@@ -113,6 +113,8 @@ let rescheduleQueue: Promise<void> = Promise.resolve();
 let alarmMap = new Map<string, LocalAlarmMapEntry>();
 let loadedAlarmMap = false;
 let alarmMapLoadPromise: Promise<void> | null = null;
+// Last payload `saveAlarmMap` actually wrote; null means "unknown, write it".
+let lastSavedAlarmMapJson: string | null = null;
 const configByKey = new Map<string, string>();
 
 type AlarmScheduleRequest = {
@@ -169,6 +171,7 @@ async function clearPomodoroAlarmEntry(): Promise<void> {
 
 function resetRuntimeState(): void {
   configByKey.clear();
+  lastSavedAlarmMapJson = null;
   rescheduleQueue = Promise.resolve();
   notificationOpenHandler = null;
   alarmMapLoadPromise = null;
@@ -331,9 +334,18 @@ async function loadAlarmMapIfNeeded(): Promise<void> {
 }
 
 async function saveAlarmMap(): Promise<void> {
+  // Every reschedule cycle ends here, but a cycle that re-derives the same
+  // alarms leaves the map byte-identical — the common case, since most saves
+  // touch no reminder-relevant field. Comparing the serialized form catches
+  // that regardless of which path mutated the map (schedule, cancel, clear),
+  // so a no-op cycle costs no AsyncStorage write (#766).
+  const serialized = JSON.stringify(serializeAlarmMap(alarmMap));
+  if (serialized === lastSavedAlarmMapJson) return;
   try {
-    await AsyncStorage.setItem(LOCAL_ALARM_MAP_KEY, JSON.stringify(serializeAlarmMap(alarmMap)));
+    await AsyncStorage.setItem(LOCAL_ALARM_MAP_KEY, serialized);
+    lastSavedAlarmMapJson = serialized;
   } catch (error) {
+    lastSavedAlarmMapJson = null;
     logNotificationError('Failed to persist alarm map', error);
   }
 }
@@ -582,7 +594,12 @@ async function scheduleAlarmRequests(api: AlarmNotificationsApi, requests: Alarm
 // one number that separates "still leaking" from "orphans from before the fix
 // firing one last time" without another week of counting notifications by
 // hand. Returns null when the module cannot enumerate.
+//
+// Diagnostics-only, so it is gated on logging: the enumeration is a native
+// round-trip that a reschedule cycle otherwise pays on every store change even
+// though nothing reads the result with logging off (#766).
 async function countPendingNativeAlarms(api: AlarmNotificationsApi): Promise<number | null> {
+  if (!isLoggingEnabled()) return null;
   if (typeof api.getScheduledAlarms !== 'function') return null;
   try {
     const pending = await api.getScheduledAlarms();

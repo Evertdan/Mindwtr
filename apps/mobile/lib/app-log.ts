@@ -252,7 +252,7 @@ async function ensureLegacyLogFilePath(): Promise<string | null> {
   }
 }
 
-function isLoggingEnabled(): boolean {
+export function isLoggingEnabled(): boolean {
   // settings can be briefly undefined (store still hydrating, partial test
   // stores); a log call must never throw over it.
   return useTaskStore.getState().settings?.diagnostics?.loggingEnabled === true;

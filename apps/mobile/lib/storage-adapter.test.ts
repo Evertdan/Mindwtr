@@ -326,6 +326,57 @@ describe('mobile storage adapter', () => {
     await expect(mobileStorage.getData()).rejects.toThrow('SQLite read timed out');
   }, 20_000);
 
+  it('stops re-serializing a library already known to exceed the backup cap (#766)', async () => {
+    const makeTask = (id: string): Task => ({
+      id,
+      title: `Task ${id} ${'padding '.repeat(20)}`,
+      status: 'next',
+      tags: [],
+      contexts: [],
+      createdAt: '2026-06-15T00:00:00.000Z',
+      updatedAt: '2026-06-15T00:00:00.000Z',
+    });
+    const hugeSnapshot: AppData = {
+      tasks: Array.from({ length: 6_000 }, (_, index) => makeTask(`task-${index}`)),
+      projects: [],
+      sections: [],
+      areas: [],
+      people: [],
+      settings: {},
+    };
+
+    const { mobileStorage, __mobileStorageTestUtils } = await import('./storage-adapter');
+    if (!mobileStorage.saveTask) {
+      throw new Error('Expected mobile storage to support saveTask');
+    }
+    __mobileStorageTestUtils.setSqliteStateForTests({
+      adapter: { saveTask: sqliteAdapterSaveTask },
+      client: {},
+    });
+
+    const oversizeWarnings = () => logWarnMock.mock.calls.filter(
+      ([message]) => message === '[Storage] Skipped JSON backup; library exceeds the readable AsyncStorage size',
+    ).length;
+
+    await mobileStorage.saveTask(hugeSnapshot.tasks[0], hugeSnapshot);
+    await __mobileStorageTestUtils.flushPendingStartupJsonBackup();
+    expect(oversizeWarnings()).toBe(1);
+
+    // flush() bypasses the backup's throttle (app background, SQLite-failure
+    // fallback), so without a guard every one of those re-serialized multiple MB
+    // on the JS thread only to discard the string again.
+    await mobileStorage.saveTask(hugeSnapshot.tasks[1], hugeSnapshot);
+    await __mobileStorageTestUtils.flushPendingStartupJsonBackup();
+    expect(oversizeWarnings()).toBe(1);
+
+    // Still treated as absent, so nothing downstream trusts a backup that was
+    // never written.
+    __mobileStorageTestUtils.setSqliteInitializerForTests(async () => {
+      throw new Error('SQLite read timed out');
+    });
+    await expect(mobileStorage.getData()).rejects.toThrow('SQLite read timed out');
+  }, 20_000);
+
   it('lets a contended SQLite read outlast the fail-fast cap when the JSON backup is unusable (#766)', async () => {
     const makeTask = (id: string): Task => ({
       id,

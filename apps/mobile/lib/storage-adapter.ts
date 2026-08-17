@@ -404,6 +404,10 @@ const parseStoredAppDataJson = (jsonValue: string): AppData => (
 // failure into total, unrecoverable save loss (#979).
 const JSON_BACKUP_MAX_CHARS = Platform.OS === 'android' ? 1_500_000 : Number.POSITIVE_INFINITY;
 let jsonBackupSkippedOversize = false;
+// Set alongside the flag above so an oversized library re-measures on the
+// backup's own cadence instead of on every flush (see saveStartupJsonBackup).
+let jsonBackupOversizeAtMs = 0;
+let jsonBackupOversizeChars = 0;
 
 const isJsonBackupUsable = (): boolean => !jsonBackupSkippedOversize;
 
@@ -426,9 +430,20 @@ const saveStartupJsonBackup = async (
     phasePrefix: string,
     minimumUpdatedAtMs = 0,
 ): Promise<{ sizeChars: number; skipped: boolean }> => {
+    // Serializing multiple MB blocks the JS thread, and past the cap the string
+    // is thrown away. The coalescer throttles the timer path but flush() (app
+    // background, SQLite-failure fallback) bypasses it, so an oversized library
+    // paid that stringify on every flush for nothing. Re-measure no more often
+    // than the backup's own interval: a library that shrinks back under the cap
+    // still recovers, one that stays over stops re-serializing itself (#766).
+    if (jsonBackupSkippedOversize && Date.now() - jsonBackupOversizeAtMs < JSON_BACKUP_MIN_INTERVAL_MS) {
+        return { sizeChars: jsonBackupOversizeChars, skipped: true };
+    }
     const jsonValue = await measureStartupPhase(`${phasePrefix}.json_backup_stringify`, async () => JSON.stringify(data));
     if (jsonValue.length > JSON_BACKUP_MAX_CHARS) {
         jsonBackupSkippedOversize = true;
+        jsonBackupOversizeAtMs = Date.now();
+        jsonBackupOversizeChars = jsonValue.length;
         logStorageWarn('[Storage] Skipped JSON backup; library exceeds the readable AsyncStorage size', undefined, {
             sizeChars: String(jsonValue.length),
             maxChars: String(JSON_BACKUP_MAX_CHARS),
@@ -436,6 +451,8 @@ const saveStartupJsonBackup = async (
         return { sizeChars: jsonValue.length, skipped: true };
     }
     jsonBackupSkippedOversize = false;
+    jsonBackupOversizeAtMs = 0;
+    jsonBackupOversizeChars = 0;
     const updatedAtMs = Math.max(Date.now(), minimumUpdatedAtMs);
     await measureStartupPhase(`${phasePrefix}.json_backup_set`, async () =>
         AsyncStorage.setItem(DATA_KEY, jsonValue)
@@ -1486,6 +1503,8 @@ export const __mobileStorageTestUtils = {
         latestQueuedWriteStartedAtMs = 0;
         jsonBackupCoalescer.reset();
         jsonBackupSkippedOversize = false;
+        jsonBackupOversizeAtMs = 0;
+        jsonBackupOversizeChars = 0;
         widgetRefreshCoalescer.reset();
         initializeSqliteState = initSqliteState;
         jsonAheadOfSqlite = false;

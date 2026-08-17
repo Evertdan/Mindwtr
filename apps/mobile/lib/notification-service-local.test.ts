@@ -16,6 +16,7 @@ const {
   mockAlarmGetScheduledAlarms,
   mockEnsureReminderNotificationChannel,
   mockRestorePersistentCaptureNotification,
+  mockIsLoggingEnabled,
   mockLogInfo,
   mockPlatform,
   mockPermissionsAndroidCheck,
@@ -50,6 +51,7 @@ const {
   mockAlarmGetScheduledAlarms: vi.fn(async () => [] as Array<{ id: string }>),
   mockEnsureReminderNotificationChannel: vi.fn(async () => undefined),
   mockRestorePersistentCaptureNotification: vi.fn(),
+  mockIsLoggingEnabled: vi.fn(() => true),
   mockLogInfo: vi.fn(async () => undefined),
   mockPlatform: {
     OS: 'android',
@@ -125,6 +127,7 @@ vi.mock('@mindwtr/core', async (importOriginal) => {
 });
 
 vi.mock('./app-log', () => ({
+  isLoggingEnabled: mockIsLoggingEnabled,
   logInfo: mockLogInfo,
   logWarn: vi.fn(async () => undefined),
 }));
@@ -168,6 +171,8 @@ describe('notification-service-local', () => {
     mockEnsureReminderNotificationChannel.mockResolvedValue(undefined);
     mockRestorePersistentCaptureNotification.mockReset();
     mockLogInfo.mockClear();
+    mockIsLoggingEnabled.mockReset();
+    mockIsLoggingEnabled.mockReturnValue(true);
     mockPermissionsAndroidCheck.mockReset();
     mockPermissionsAndroidRequest.mockReset();
     mockPermissionsAndroidCheck.mockResolvedValue(true);
@@ -420,6 +425,55 @@ describe('notification-service-local', () => {
         }),
       })
     );
+  });
+
+  it('does not enumerate pending native alarms when diagnostics logging is off', async () => {
+    // The enumeration is a native round-trip that only feeds the cycle log, and
+    // a reschedule runs on every store change (#766).
+    mockIsLoggingEnabled.mockReturnValue(false);
+    mockStoreState.tasks = [
+      { id: 'task-1', title: 'Task one', dueDate: new Date(Date.now() + 5 * 60 * 1000).toISOString() },
+    ];
+
+    await startLocalMobileNotifications();
+
+    expect(mockAlarmGetScheduledAlarms).not.toHaveBeenCalled();
+  });
+
+  it('does not rewrite the alarm map when a reschedule cycle derives the same alarms', async () => {
+    // Most saves touch no reminder-relevant field, so the cycle re-derives an
+    // identical map; persisting it again is an AsyncStorage write per save (#766).
+    mockStoreState.tasks = [
+      { id: 'task-1', title: 'Task one', dueDate: new Date(Date.now() + 5 * 60 * 1000).toISOString() },
+    ];
+
+    await startLocalMobileNotifications();
+    const listener = (mockStoreSubscribe.mock.calls as unknown[][])[0]?.[0] as (state: unknown, prevState: unknown) => void;
+    const alarmMapWrites = () => mockAsyncStorageSetItem.mock.calls.filter(
+      ([key]) => key === 'mindwtr:local:alarms:v1'
+    ).length;
+    expect(alarmMapWrites()).toBe(1);
+
+    vi.useFakeTimers();
+    try {
+      const shared = {
+        tasks: mockStoreState.tasks,
+        projects: mockStoreState.projects,
+        settings: mockStoreState.settings,
+      };
+      // A task-array identity change with the same reminder fields: the cycle
+      // runs, derives the same alarm, and must not touch storage again.
+      listener({ ...shared, tasks: [...mockStoreState.tasks] }, shared);
+      await vi.advanceTimersByTimeAsync(3000);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(mockLogInfo).toHaveBeenCalledWith(
+      '[Local Notifications] Reschedule cycle complete',
+      expect.anything()
+    );
+    expect(alarmMapWrites()).toBe(1);
   });
 
   it('only schedules the next 60 upcoming task reminders on iOS', async () => {
