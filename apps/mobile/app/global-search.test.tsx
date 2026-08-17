@@ -102,6 +102,12 @@ vi.mock('@/lib/task-meta-navigation', () => ({
     openProjectScreen: vi.fn(),
 }));
 
+const showToastMock = vi.hoisted(() => vi.fn());
+vi.mock('../contexts/toast-context', () => ({
+    useToast: () => ({ showToast: showToastMock }),
+    ToastViewport: () => null,
+}));
+
 const nowIso = '2026-06-01T12:00:00.000Z';
 
 const makeTask = (id: string, title: string, overrides: Partial<Task> = {}): Task => ({
@@ -159,6 +165,44 @@ describe('SearchScreen task results', () => {
         expect(taskEditModalPropsSpy.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({
             visible: true,
             task: expect.objectContaining({ id: 'task-1' }),
+        }));
+    });
+
+    it('completes a task from the search row check icon with an undo toast', async () => {
+        // #1051: the check icon is a real completion toggle, not decoration.
+        updateTaskMock.mockResolvedValue({ success: true });
+        let tree!: ReturnType<typeof create>;
+        act(() => {
+            tree = create(<SearchScreen />);
+        });
+
+        const resultList = tree.root.findByType(FlatList);
+        const resultRow = resultList.props.renderItem({
+            item: resultList.props.data[0],
+            index: 0,
+        });
+        let rowTree!: ReturnType<typeof create>;
+        act(() => {
+            rowTree = create(resultRow);
+        });
+        const checkButton = rowTree.root.findAllByType(TouchableOpacity).find(
+            (node) => node.props.accessibilityLabel === 'Mark Done'
+        );
+        expect(checkButton).toBeDefined();
+
+        await act(async () => {
+            checkButton!.props.onPress();
+            await Promise.resolve();
+        });
+
+        expect(updateTaskMock).toHaveBeenCalledWith('task-1', { status: 'done' });
+        expect(showToastMock).toHaveBeenCalledWith(expect.objectContaining({
+            actionLabel: expect.any(String),
+            onAction: expect.any(Function),
+        }));
+        // Completing from the icon must not open the editor.
+        expect(taskEditModalPropsSpy.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({
+            visible: false,
         }));
     });
 

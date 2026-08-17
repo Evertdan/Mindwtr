@@ -30,6 +30,7 @@ import { useTaskStore,
     PRESET_CONTEXTS,
     PRESET_TAGS,
     shallow,
+    undoTaskCompletion,
     translateWithFallback, tFallback, } from '@mindwtr/core';
 import { computeGlobalSearchResults } from '@mindwtr/core/global-search-filter';
 import { useThemeColors } from '@/hooks/use-theme-colors';
@@ -39,6 +40,8 @@ import { Search, X, Folder, CheckCircle, ChevronRight, SlidersHorizontal } from 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TaskEditModal } from '@/components/task-edit-modal';
 import { ThemedAlertHost } from '@/components/themed-alert';
+import { settleStoreAction } from '@/components/store-action-result';
+import { useToast, ToastViewport } from '../contexts/toast-context';
 import { openContextsScreen, openProjectScreen } from '@/lib/task-meta-navigation';
 import { useFutureStartRevealTick, useLocalDayKey } from '@/hooks/use-local-day-key';
 
@@ -69,6 +72,7 @@ export default function SearchScreen() {
     }), shallow);
     const tc = useThemeColors();
     const { t } = useLanguage();
+    const { showToast } = useToast();
     const router = useRouter();
   const params = useLocalSearchParams<{ q?: string }>();
   const requestedQuery = decodeSearchParam(params.q);
@@ -299,6 +303,44 @@ export default function SearchScreen() {
         else if (status === 'someday') router.push('/someday');
         else if (status === 'reference') router.push('/reference' as never);
         else router.push('/focus');
+    };
+
+    const showTaskActionFailure = (message?: string) => {
+        showToast({
+            title: tFallback(t, 'common.error', 'Error'),
+            message: message || tFallback(t, 'task.updateFailed', 'Could not update task.'),
+            tone: 'error',
+            durationMs: 4200,
+        });
+    };
+
+    // The row's check icon completes the task in place (#1051) — same
+    // immediate-complete-with-undo-toast contract as the task list rows.
+    const completeTaskFromSearch = (result: SearchTaskResult) => {
+        const task = _allTasks.find((item) => item.id === result.id && !item.deletedAt);
+        if (!task || isTaskFinished(task)) return;
+        const previousStatus = task.status;
+        const wasFocusedToday = task.isFocusedToday === true;
+        void settleStoreAction(() => updateTask(task.id, { status: 'done' }))
+            .then((outcome) => {
+                if (!outcome.ok) {
+                    showTaskActionFailure(outcome.message);
+                    return;
+                }
+                showToast({
+                    message: tFallback(t, 'task.markedDone', '{title} marked Done').replace('{title}', task.title),
+                    tone: 'info',
+                    actionLabel: tFallback(t, 'common.undo', 'Undo'),
+                    onAction: () => {
+                        void settleStoreAction(() => (
+                            undoTaskCompletion(task.id, previousStatus, wasFocusedToday)
+                        )).then((undoOutcome) => {
+                            if (!undoOutcome.ok) showTaskActionFailure(undoOutcome.message);
+                        });
+                    },
+                    durationMs: 5200,
+                });
+            });
     };
 
     const handleSelect = (result: { type: 'project'; item: SearchProjectResult } | { type: 'task'; item: SearchTaskResult }) => {
@@ -705,8 +747,17 @@ export default function SearchScreen() {
                         >
                             {item.type === 'project' ? (
                                 <Folder size={24} color={tc.tint} />
+                            ) : isTaskFinished(item.item as SearchTaskResult) ? (
+                                <CheckCircle size={24} color={tc.tint} />
                             ) : (
-                                <CheckCircle size={24} color={tc.secondaryText} />
+                                <TouchableOpacity
+                                    onPress={() => completeTaskFromSearch(item.item as SearchTaskResult)}
+                                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={tFallback(t, 'review.markDone', 'Mark Done')}
+                                >
+                                    <CheckCircle size={24} color={tc.secondaryText} />
+                                </TouchableOpacity>
                             )}
                             <View style={styles.resultText}>
                                 <Text style={[styles.resultTitle, { color: tc.text }]}>{item.item.title}</Text>
@@ -779,6 +830,9 @@ export default function SearchScreen() {
             {/* This route is presented modally, so a root-level alert never
                 reaches the screen on iOS (#940). */}
             <ThemedAlertHost />
+            {/* Same modal-covering problem for toasts: the completion undo
+                toast must render inside this screen, not the root overlay. */}
+            <ToastViewport />
         </SafeAreaView>
     );
 }
