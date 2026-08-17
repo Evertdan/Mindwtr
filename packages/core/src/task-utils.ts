@@ -732,32 +732,51 @@ export function getTaskFocusEligibility(
 }
 
 /**
+ * Sorts on keys read once per task instead of once per comparison. These
+ * comparators parse date strings, and at a few thousand tasks the O(n log n)
+ * parses — not the sort — were the cost (#766). The comparison itself is
+ * unchanged, and `sort` stays stable, so the resulting order is identical.
+ */
+function sortByPrecomputedKey<T, K>(
+    tasks: readonly T[],
+    toKey: (task: T) => K,
+    compare: (a: K, b: K) => number
+): T[] {
+    const decorated = tasks.map((task) => ({ task, key: toKey(task) }));
+    decorated.sort((a, b) => compare(a.key, b.key));
+    return decorated.map((entry) => entry.task);
+}
+
+/**
  * Sort tasks by status, due date, and creation time.
  * Order: inbox → next → waiting → someday → reference → done → archived
  * Within same status: tasks with due dates first (sorted by date), then by creation time (FIFO)
  */
 export function sortTasks(tasks: Task[]): Task[] {
-    return [...tasks].sort((a, b) => {
-        // 1. Sort by Status
-        const statusA = TASK_STATUS_ORDER[a.status] ?? 99;
-        const statusB = TASK_STATUS_ORDER[b.status] ?? 99;
+    return sortByPrecomputedKey(
+        tasks,
+        (task) => ({
+            status: TASK_STATUS_ORDER[task.status] ?? 99,
+            due: safeDueTime(task.dueDate, Number.NaN),
+            created: safeTime(task.createdAt, 0),
+        }),
+        (a, b) => {
+            // 1. Sort by Status
+            if (a.status !== b.status) {
+                return a.status - b.status;
+            }
 
-        if (statusA !== statusB) {
-            return statusA - statusB;
+            // 2. Sort by Due Date (tasks with valid due dates first)
+            const hasDueA = Number.isFinite(a.due);
+            const hasDueB = Number.isFinite(b.due);
+            if (hasDueA && !hasDueB) return -1;
+            if (!hasDueA && hasDueB) return 1;
+            if (hasDueA && hasDueB && a.due !== b.due) return a.due - b.due;
+
+            // 3. Created At (oldest first for FIFO)
+            return a.created - b.created;
         }
-
-        // 2. Sort by Due Date (tasks with valid due dates first)
-        const dueA = safeDueTime(a.dueDate, Number.NaN);
-        const dueB = safeDueTime(b.dueDate, Number.NaN);
-        const hasDueA = Number.isFinite(dueA);
-        const hasDueB = Number.isFinite(dueB);
-        if (hasDueA && !hasDueB) return -1;
-        if (!hasDueA && hasDueB) return 1;
-        if (hasDueA && hasDueB && dueA !== dueB) return dueA - dueB;
-
-        // 3. Created At (oldest first for FIFO)
-        return safeTime(a.createdAt, 0) - safeTime(b.createdAt, 0);
-    });
+    );
 }
 
 function compareDeletedAtDesc(
@@ -807,56 +826,50 @@ export function sortTasksBy(tasks: Task[], sortBy: TaskSortBy = 'default'): Task
         return sortTasks(tasks);
     }
 
-    const copy = [...tasks];
-
     const timeOrInfinity = (value?: string) => safeTime(value, Infinity);
     const dueOrInfinity = (value?: string) => safeDueTime(value, Infinity);
     const timeOrZero = (value?: string) => safeTime(value, 0);
+    const byDateThenCreated = (read: (task: Task) => number) => sortByPrecomputedKey(
+        tasks,
+        (task) => ({ date: read(task), created: timeOrZero(task.createdAt) }),
+        (a, b) => (a.date !== b.date ? a.date - b.date : a.created - b.created)
+    );
 
     switch (sortBy) {
         case 'title':
-            return copy.sort((a, b) => {
-                const cmp = textCollator.compare(a.title, b.title);
-                if (cmp !== 0) return cmp;
-                return safeTime(a.createdAt, 0) - safeTime(b.createdAt, 0);
-            });
+            return sortByPrecomputedKey(
+                tasks,
+                (task) => ({ title: task.title, created: safeTime(task.createdAt, 0) }),
+                (a, b) => {
+                    const cmp = textCollator.compare(a.title, b.title);
+                    if (cmp !== 0) return cmp;
+                    return a.created - b.created;
+                }
+            );
         case 'due':
-            return copy.sort((a, b) => {
-                const aDue = dueOrInfinity(a.dueDate);
-                const bDue = dueOrInfinity(b.dueDate);
-                if (aDue !== bDue) return aDue - bDue;
-                return timeOrZero(a.createdAt) - timeOrZero(b.createdAt);
-            });
+            return byDateThenCreated((task) => dueOrInfinity(task.dueDate));
         case 'start':
-            return copy.sort((a, b) => {
-                const aStart = timeOrInfinity(a.startTime);
-                const bStart = timeOrInfinity(b.startTime);
-                if (aStart !== bStart) return aStart - bStart;
-                return timeOrZero(a.createdAt) - timeOrZero(b.createdAt);
-            });
+            return byDateThenCreated((task) => timeOrInfinity(task.startTime));
         case 'review':
-            return copy.sort((a, b) => {
-                const aReview = timeOrInfinity(a.reviewAt);
-                const bReview = timeOrInfinity(b.reviewAt);
-                if (aReview !== bReview) return aReview - bReview;
-                return timeOrZero(a.createdAt) - timeOrZero(b.createdAt);
-            });
+            return byDateThenCreated((task) => timeOrInfinity(task.reviewAt));
         case 'created':
-            return copy.sort((a, b) => timeOrZero(a.createdAt) - timeOrZero(b.createdAt));
+            return sortByPrecomputedKey(tasks, (task) => timeOrZero(task.createdAt), (a, b) => a - b);
         case 'created-desc':
-            return copy.sort((a, b) => timeOrZero(b.createdAt) - timeOrZero(a.createdAt));
+            return sortByPrecomputedKey(tasks, (task) => timeOrZero(task.createdAt), (a, b) => b - a);
         case 'completed':
             // Deliberately keyed on completedAt alone, unlike the Done list's
             // default order (sortDoneTasksForListView), which falls back to
             // updatedAt/createdAt so every done task gets a position. Archive
             // holds archived-but-never-completed tasks, and those belong at the
             // end rather than sorted in by when they were last touched (#945).
-            return copy.sort((a, b) => {
-                const aCompleted = safeTime(a.completedAt, -Infinity);
-                const bCompleted = safeTime(b.completedAt, -Infinity);
-                if (aCompleted !== bCompleted) return bCompleted - aCompleted;
-                return textCollator.compare(a.title, b.title);
-            });
+            return sortByPrecomputedKey(
+                tasks,
+                (task) => ({ completed: safeTime(task.completedAt, -Infinity), title: task.title }),
+                (a, b) => {
+                    if (a.completed !== b.completed) return b.completed - a.completed;
+                    return textCollator.compare(a.title, b.title);
+                }
+            );
         default:
             return sortTasks(tasks);
     }
@@ -915,11 +928,15 @@ function getCompletionListTime(task: Pick<Task, 'completedAt' | 'updatedAt' | 'c
 }
 
 export function sortDoneTasksForListView<T extends Pick<Task, 'completedAt' | 'updatedAt' | 'createdAt' | 'title'>>(tasks: T[]): T[] {
-    return [...tasks].sort((a, b) => {
-        const completionDiff = getCompletionListTime(b) - getCompletionListTime(a);
-        if (completionDiff !== 0) return completionDiff;
-        return textCollator.compare(a.title, b.title);
-    });
+    return sortByPrecomputedKey(
+        tasks,
+        (task) => ({ completion: getCompletionListTime(task), title: task.title }),
+        (a, b) => {
+            const completionDiff = b.completion - a.completion;
+            if (completionDiff !== 0) return completionDiff;
+            return textCollator.compare(a.title, b.title);
+        }
+    );
 }
 
 export function groupCompletedTasksLast<T extends Pick<Task, 'status'>>(tasks: T[]): T[] {

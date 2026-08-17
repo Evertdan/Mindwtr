@@ -10,6 +10,7 @@ import {
     compareTasksByProjectThenOrder,
     getCalendarPlanningCandidates,
     sortTasks,
+    sortTasksBy,
     sortFocusNextActions,
     sortTasksBySavedPreference,
     getProjectDeadlineBoosts,
@@ -363,6 +364,44 @@ describe('task-utils', () => {
 
             const sorted = sortTasks(tasks as Task[]);
             expect(sorted.map(t => t.title)).toEqual(['Soon', 'Later', 'No Date']);
+        });
+
+        // #766: these comparators parse date strings, and parsing them inside
+        // the comparator makes the work n·log(n) instead of n — at a few
+        // thousand tasks the parses, not the sort, were the cost.
+        it.each([
+            ['sortTasks', (tasks: Task[]) => sortTasks(tasks)],
+            ['sortTasksBy due', (tasks: Task[]) => sortTasksBy(tasks, 'due')],
+            ['sortDoneTasksForListView', (tasks: Task[]) => sortDoneTasksForListView(tasks)],
+        ] as const)('reads each task date once per sort, not once per comparison (%s)', (_label, sort) => {
+            // Shuffled on purpose: an already-ordered array sorts in ~n
+            // comparisons, which hides the per-comparison parsing this guards.
+            const tasks = Array.from({ length: 512 }, (_, index) => {
+                const day = (index * 197) % 512;
+                return {
+                    id: `task-${index}`,
+                    title: `Task ${day}`,
+                    status: 'next',
+                    dueDate: new Date(Date.UTC(2026, 0, 1) + day * 86_400_000).toISOString(),
+                    completedAt: new Date(Date.UTC(2026, 5, 1) + day * 86_400_000).toISOString(),
+                    createdAt: new Date(Date.UTC(2025, 0, 1) + day * 3_600_000).toISOString(),
+                    updatedAt: new Date(Date.UTC(2025, 6, 1) + day * 3_600_000).toISOString(),
+                };
+            }) as Task[];
+
+            const parseSpy = vi.spyOn(Date, 'parse');
+            let parseCalls = 0;
+            try {
+                sort(tasks);
+                // Read before restoring: mockRestore() clears the record.
+                parseCalls = parseSpy.mock.calls.length;
+            } finally {
+                parseSpy.mockRestore();
+            }
+
+            // Every date field of every task, read once, leaves headroom below
+            // the ~4,600 comparisons an n·log(n) sort of this list performs.
+            expect(parseCalls).toBeLessThanOrEqual(tasks.length * 4);
         });
     });
 

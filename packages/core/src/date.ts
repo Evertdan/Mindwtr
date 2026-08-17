@@ -625,12 +625,28 @@ export function getShortWeekdayLabels(locale?: string): string[] {
 }
 
 /**
+ * The exact shape every timestamp core stamps has (`new Date().toISOString()`),
+ * and the one the engine parses natively. `parseISO` accepts a much wider
+ * grammar and walks it by hand, which cost two thirds of the whole derived-state
+ * rebuild at a few thousand tasks (#766). Anything that does not match this —
+ * date-only values above all, whose local-midnight handling lives below — falls
+ * through to the general path unchanged.
+ */
+const ISO_INSTANT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+/**
  * Safely parses a date string to a Date object.
  * Returns null if invalid.
  */
 export function safeParseDate(dateStr: string | undefined | null): Date | null {
     if (!dateStr) return null;
     try {
+        if (ISO_INSTANT_PATTERN.test(dateStr)) {
+            const parsed = Date.parse(dateStr);
+            // A NaN here means the engine declined a string this pattern
+            // accepted; the general path below still gets its turn.
+            if (Number.isFinite(parsed)) return new Date(parsed);
+        }
         const hasTimezone = /Z$|[+-]\d{2}:?\d{2}$/.test(dateStr);
         if (!hasTimezone) {
             const match = /^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2})(?::(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?)?)?$/.exec(dateStr);

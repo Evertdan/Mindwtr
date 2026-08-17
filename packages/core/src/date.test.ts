@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { isValid, parseISO } from 'date-fns';
 import {
     canUseJalaliCalendar,
     configureDateFormatting,
@@ -41,6 +42,31 @@ describe('date utils', () => {
         expect(parsed.getDate()).toBe(2);
         expect(parsed.getHours()).toBe(3);
         expect(parsed.getMinutes()).toBe(4);
+    });
+
+    // #766: full ISO instants take a Date.parse fast path instead of parseISO.
+    // It has to agree with parseISO exactly — including on the shapes it must
+    // decline and hand back to the general path.
+    it.each([
+        '2025-01-02T03:04:05.678Z',
+        '2025-01-02T03:04:05Z',
+        '2025-01-02T03:04Z',
+        '2025-01-02T03:04:05.678+05:30',
+        '2025-01-02T03:04:05-08:00',
+        '2024-02-29T23:59:59.999Z',
+        '2025-03-30T01:30:00.000+01:00',
+        '2025-01-02T03:04:05+0530',
+        '2025-01-02 03:04:05Z',
+        '2025-01-02T03:04:05.678901Z',
+        '2025-13-02T03:04:05Z',
+    ])('parses %s identically to parseISO', (value) => {
+        const parsed = safeParseDate(value);
+        const reference = parseISO(value);
+        if (!isValid(reference)) {
+            expect(parsed).toBeNull();
+            return;
+        }
+        expect(parsed?.getTime()).toBe(reference.getTime());
     });
 
     it('preserves years below 100 instead of coercing to 19xx', () => {
