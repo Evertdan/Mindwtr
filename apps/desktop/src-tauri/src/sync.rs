@@ -3962,6 +3962,36 @@ mod tests {
     }
 
     #[test]
+    fn unsupported_flock_degrades_to_lockless_instead_of_failing_sync() {
+        // ENOSYS/EOPNOTSUPP from flock (FUSE/network mounts, #1036 follow-up)
+        // must classify as unsupported, not as a fatal lock error.
+        #[cfg(target_os = "linux")]
+        {
+            let enosys = std::io::Error::from_raw_os_error(38);
+            assert!(is_sync_lock_unsupported(&enosys));
+            assert!(!is_sync_lock_contention(&enosys));
+        }
+        assert!(is_sync_lock_unsupported(&std::io::Error::from(
+            std::io::ErrorKind::Unsupported
+        )));
+        assert!(!is_sync_lock_unsupported(&std::io::Error::from(
+            std::io::ErrorKind::WouldBlock
+        )));
+
+        // Releasing a lockless holder must not try to unlock the OS lock.
+        let dir = tempfile::tempdir().expect("temp dir");
+        let real = acquire_sync_lock(dir.path()).expect("locked holder");
+        let lockless = SyncFileLock {
+            file: File::open(dir.path().join(".mindwtr.lock")).expect("open lock file"),
+            locked: false,
+        };
+        release_sync_lock(&lockless);
+        // The real lock is still held after the lockless release.
+        acquire_sync_lock(dir.path()).expect_err("OS lock must still be held");
+        release_sync_lock(&real);
+    }
+
+    #[test]
     fn expired_lease_content_cannot_break_an_active_sync_lock() {
         let dir = tempfile::tempdir().expect("temp dir");
         let lock_path = dir.path().join(".mindwtr.lock");
@@ -7993,6 +8023,17 @@ const SYNC_FILE_WRITE_CONFLICT: &str = "SYNC_FILE_WRITE_CONFLICT";
 #[derive(Debug)]
 struct SyncFileLock {
     file: File,
+    /// false when the filesystem cannot take an OS lock at all (`flock` is
+    /// ENOSYS on some FUSE/network mounts, #1036 follow-up). Sync then runs
+    /// lockless — the pre-1.2 behavior — instead of failing outright: the OS
+    /// lock only ever serialized same-machine writers, cross-machine safety
+    /// comes from the merge.
+    locked: bool,
+}
+
+fn is_sync_lock_unsupported(error: &std::io::Error) -> bool {
+    // std maps ENOSYS and EOPNOTSUPP to Unsupported on every unix target.
+    error.kind() == std::io::ErrorKind::Unsupported
 }
 
 fn is_sync_lock_contention(error: &std::io::Error) -> bool {
@@ -8045,7 +8086,7 @@ fn acquire_sync_lock(sync_dir: &Path) -> Result<SyncFileLock, String> {
         .or_else(|_| open_sync_lock_file(&lock_path, true))
         .map_err(|error| format!("Failed to open sync lock: {error}"))?;
     let read_only_error = match file.try_lock_exclusive() {
-        Ok(()) => return Ok(SyncFileLock { file }),
+        Ok(()) => return Ok(SyncFileLock { file, locked: true }),
         Err(error) if is_sync_lock_contention(&error) => {
             return Err(sync_lock_error_message(&error))
         }
@@ -8061,12 +8102,24 @@ fn acquire_sync_lock(sync_dir: &Path) -> Result<SyncFileLock, String> {
     let file = open_sync_lock_file(&lock_path, true)
         .map_err(|error| format!("Failed to open sync lock: {error}"))?;
     match file.try_lock_exclusive() {
-        Ok(()) => Ok(SyncFileLock { file }),
+        Ok(()) => Ok(SyncFileLock { file, locked: true }),
+        Err(error) if is_sync_lock_unsupported(&error) => {
+            log::warn!(
+                "This filesystem does not support OS file locks ({error}); syncing without an exclusive lock"
+            );
+            Ok(SyncFileLock {
+                file,
+                locked: false,
+            })
+        }
         Err(error) => Err(sync_lock_error_message(&error)),
     }
 }
 
 fn release_sync_lock(sync_lock: &SyncFileLock) {
+    if !sync_lock.locked {
+        return;
+    }
     if let Err(error) = FileExt::unlock(&sync_lock.file) {
         log::warn!("Failed to release sync file lock: {error}");
     }
