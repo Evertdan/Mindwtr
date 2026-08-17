@@ -1253,6 +1253,16 @@ pub fn run() {
         .setup(move |app| {
             ensure_data_file(&app.handle()).ok();
 
+            // #913: read back rather than re-derive — this is the exact value
+            // WebView2 saw when the windows were created above/below.
+            #[cfg(target_os = "windows")]
+            if let Ok(arguments) = env::var(WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS_ENV) {
+                append_native_log_line(
+                    &app.handle(),
+                    &format!("WebView2 merged browser arguments: {arguments}"),
+                );
+            }
+
             match recover_dropbox_credentials_on_startup(&app.handle()) {
                 Ok(DropboxStartupRecoveryOutcome::Ready) => {}
                 Ok(DropboxStartupRecoveryOutcome::SyncDisabled { warning }) => {
