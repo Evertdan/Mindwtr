@@ -655,6 +655,51 @@ describe('CalendarView', () => {
     });
 
 
+    it('drags a planning panel task onto a month day', async () => {
+        storeMocks.taskStoreState.tasks = [
+            makeTask({
+                id: 'task-plan',
+                title: 'Draft planning memo',
+            }),
+        ];
+
+        renderCalendar();
+        await flushCalendarEffects();
+        await expandPlanningPanel();
+
+        const panel = screen.getByText('Plan next actions').closest('aside') as HTMLElement;
+        const planCard = panel.querySelector('[data-planning-task-id="task-plan"]') as HTMLElement;
+        expect(planCard).toHaveAttribute('draggable', 'true');
+
+        // Starts empty: the drag data must come from the row's own dragstart.
+        const values = new Map<string, string>();
+        const types: string[] = [];
+        const dataTransfer = {
+            dropEffect: 'none' as DataTransfer['dropEffect'],
+            effectAllowed: 'all' as DataTransfer['effectAllowed'],
+            types,
+            getData: vi.fn((type: string) => values.get(type) ?? ''),
+            setData: vi.fn((type: string, value: string) => {
+                values.set(type, value);
+                if (!types.includes(type)) types.push(type);
+            }),
+        } as unknown as DataTransfer;
+
+        const dropTarget = document.querySelector('[data-calendar-drop-date="2026-04-04"]') as HTMLElement;
+        expect(dropTarget).toBeTruthy();
+
+        await act(async () => {
+            fireEvent.dragStart(planCard, { dataTransfer });
+            fireEvent.dragOver(dropTarget, { dataTransfer });
+            fireEvent.drop(dropTarget, { dataTransfer });
+            await Promise.resolve();
+        });
+
+        expect(storeMocks.taskStoreState.updateTask).toHaveBeenCalledWith('task-plan', {
+            dueDate: '2026-04-04',
+        });
+    });
+
     it('explains disabled planning schedule buttons until a day is selected', async () => {
         storeMocks.taskStoreState.tasks = [
             makeTask({
