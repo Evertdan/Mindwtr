@@ -1,6 +1,6 @@
 import { BookOpen, Edit3, Link2, Paperclip } from 'lucide-react';
 import { tFallback, type Attachment } from '@mindwtr/core';
-import { useBareFileReferenceCheck } from '../../../lib/attachment-reference';
+import { useBareFileReferenceCheck, useExternalFileReferenceCheck } from '../../../lib/attachment-reference';
 import { getAttachmentDisplayTitle } from '../../../lib/attachment-utils';
 import { isImageAttachment } from '../task-item-attachment-utils';
 import { AttachmentImage } from '../AttachmentImage';
@@ -32,6 +32,12 @@ export function AttachmentsField({
     removeAttachment,
 }: AttachmentsFieldProps) {
     const isBareFileReference = useBareFileReferenceCheck();
+    // Edit shows for real links and for file attachments pointing outside the
+    // managed dir — the pre-#1001-fix "Add link" shape; re-saving one converts
+    // it to a true pointer.
+    const isExternalFileReference = useExternalFileReferenceCheck();
+    const canEditAsLink = (attachment: Attachment) =>
+        attachment.kind === 'link' || isExternalFileReference(attachment);
     const imageAttachmentIds = new Set(
         visibleEditAttachments
             .filter((attachment) => (
@@ -125,7 +131,7 @@ export function AttachmentsField({
                                                 {displayTitle}
                                             </button>
                                             <div className="flex shrink-0 items-center gap-2">
-                                                {attachment.kind === 'link' && (
+                                                {canEditAsLink(attachment) && (
                                                     <button
                                                         type="button"
                                                         onClick={() => editLinkAttachment(attachment)}
@@ -173,7 +179,7 @@ export function AttachmentsField({
                                     </button>
                                 </div>
                                 <div className="flex shrink-0 items-center gap-2">
-                                    {attachment.kind === 'link' && (
+                                    {canEditAsLink(attachment) && (
                                         <button
                                             type="button"
                                             onClick={() => editLinkAttachment(attachment)}

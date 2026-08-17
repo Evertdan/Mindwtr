@@ -469,6 +469,13 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
                         kind: 'link',
                         title: normalized.title,
                         uri: normalized.uri,
+                        // A pointer owns no managed copy: drop the file
+                        // bookkeeping a pre-conversion item carried (#1001).
+                        mimeType: undefined,
+                        size: undefined,
+                        cloudKey: undefined,
+                        fileHash: undefined,
+                        localStatus: undefined,
                         updatedAt: now,
                     }
                     : attachment
@@ -488,7 +495,9 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
     }, [editingLinkAttachmentId]);
 
     const editLinkAttachment = useCallback((attachment: Attachment) => {
-        if (attachment.kind !== 'link') return;
+        // 'file' is allowed on purpose: a pre-#1001-fix "Add link" item was
+        // recorded as a file attachment, and re-saving it here is the explicit
+        // conversion path back to a true pointer.
         setAttachmentError(null);
         setEditingLinkAttachmentId(attachment.id);
         setLinkPromptVariant('link');

@@ -299,6 +299,45 @@ describe('useTaskItemAttachments resetAttachmentState orphan cleanup', () => {
         expect(invokeMock).not.toHaveBeenCalledWith('import_attachment_file', expect.anything());
         expect(writeFileMock).not.toHaveBeenCalled();
     });
+
+    it('converts a pre-fix file-kind link back to a pointer via edit', () => {
+        // #1001 follow-up: "Add link" items recorded before the pointer fix
+        // carry kind:'file' plus managed-copy bookkeeping. Editing one must be
+        // allowed and re-saving must produce a clean pointer.
+        const legacy = {
+            id: 'legacy-1',
+            kind: 'file',
+            title: 'spec.docx',
+            uri: 'D:/docs/spec.docx',
+            cloudKey: 'attachments/legacy-1.docx',
+            fileHash: 'abc123',
+            localStatus: 'available',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        } as Attachment;
+        const { result } = renderHook(() => useTaskItemAttachments({ task, t }));
+
+        act(() => {
+            result.current.resetAttachmentState([legacy]);
+        });
+        act(() => {
+            result.current.editLinkAttachment(legacy);
+        });
+        expect(result.current.showLinkPrompt).toBe(true);
+        act(() => {
+            result.current.handleAddLinkAttachment('D:/docs/spec.docx');
+        });
+
+        const converted = result.current.editAttachments[0];
+        expect(converted).toMatchObject({
+            id: 'legacy-1',
+            kind: 'link',
+            uri: 'D:/docs/spec.docx',
+        });
+        expect(converted.cloudKey).toBeUndefined();
+        expect(converted.fileHash).toBeUndefined();
+        expect(converted.localStatus).toBeUndefined();
+    });
 });
 
 // The overlays take the hook's result whole, so they can be rendered over the

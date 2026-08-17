@@ -6,17 +6,25 @@ import { isTauriRuntime } from './runtime';
 
 type AttachmentRef = Pick<Attachment, 'kind' | 'uri' | 'cloudKey'>;
 
-// A bare reference is a file attachment the app does not own: its path lies
-// outside the managed attachments dir and no synced copy (cloudKey) exists to
-// restore it. Pure string comparison — never stats the disk, safe in render paths.
-export function isBareFileReference(attachment: AttachmentRef, managedDirPrefix: string | null): boolean {
+// An external reference is a file attachment whose path lies outside the
+// managed attachments dir. Pre-#1001-fix "Add link" items are this shape —
+// possibly with a synced copy (cloudKey) attached — and are the ones Edit
+// can convert into true link pointers. Pure string comparison — never stats
+// the disk, safe in render paths.
+export function isExternalFileReference(attachment: AttachmentRef, managedDirPrefix: string | null): boolean {
     if (attachment.kind !== 'file') return false;
-    if (attachment.cloudKey) return false;
     if (!managedDirPrefix) return false;
     const uri = (attachment.uri || '').trim();
     if (!uri || /^https?:\/\//i.test(uri)) return false;
     const normalized = normalizeAttachmentPathForUrl(stripFileScheme(uri));
     return !normalized.startsWith(managedDirPrefix);
+}
+
+// A bare reference is an external reference the app also cannot restore:
+// no synced copy (cloudKey) exists.
+export function isBareFileReference(attachment: AttachmentRef, managedDirPrefix: string | null): boolean {
+    if (attachment.cloudKey) return false;
+    return isExternalFileReference(attachment, managedDirPrefix);
 }
 
 let cachedManagedDirPrefix: string | null = null;
@@ -43,7 +51,7 @@ async function loadManagedDirPrefix(): Promise<string | null> {
 
 // Resolves the managed attachments dir once per session; until it resolves,
 // every attachment counts as owned (paperclip) so icons never flicker.
-export function useBareFileReferenceCheck(): (attachment: AttachmentRef) => boolean {
+function useManagedDirPrefix(): string | null {
     const [prefix, setPrefix] = useState<string | null>(cachedManagedDirPrefix);
     useEffect(() => {
         if (prefix) return;
@@ -55,5 +63,15 @@ export function useBareFileReferenceCheck(): (attachment: AttachmentRef) => bool
             cancelled = true;
         };
     }, [prefix]);
+    return prefix;
+}
+
+export function useBareFileReferenceCheck(): (attachment: AttachmentRef) => boolean {
+    const prefix = useManagedDirPrefix();
     return (attachment) => isBareFileReference(attachment, prefix);
+}
+
+export function useExternalFileReferenceCheck(): (attachment: AttachmentRef) => boolean {
+    const prefix = useManagedDirPrefix();
+    return (attachment) => isExternalFileReference(attachment, prefix);
 }
