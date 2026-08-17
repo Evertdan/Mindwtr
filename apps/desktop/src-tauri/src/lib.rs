@@ -143,7 +143,11 @@ use sync::resolve_sync_path_bookmark;
 const APP_NAME: &str = "mindwtr";
 const CONFIG_FILE_NAME: &str = "config.toml";
 const SECRETS_FILE_NAME: &str = "secrets.toml";
-const DROPBOX_CREDENTIAL_STATE_FILE_NAME: &str = "dropbox-credential-state.json";
+const SYNC_BACKEND_STATE_FILE_NAME: &str = "sync-backend-state.json";
+// The pre-1.2.2 name. The file is the durable authority for the sync backend
+// switch whatever backend is selected, so it is no longer named after Dropbox;
+// `sync_backend_state_path_in` migrates old profiles on first resolution.
+const LEGACY_SYNC_BACKEND_STATE_FILE_NAME: &str = "dropbox-credential-state.json";
 const DROPBOX_CREDENTIAL_STATE_VERSION: u8 = 1;
 const DATA_FILE_NAME: &str = "data.json";
 const DB_FILE_NAME: &str = "mindwtr.db";

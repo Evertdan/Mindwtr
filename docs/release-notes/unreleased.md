@@ -9,5 +9,6 @@ Changes collected after `v1.2.1` and before the next version tag.
 ## Full Change List
 
 - Desktop: right-clicking one task and then another no longer leaves the first row wearing the highlight ring — dismissing a context menu with the pointer no longer snaps keyboard focus back to the old row. Closing the menu with Escape still returns focus to where you were. (#999)
+- Desktop: the sync backend state file in your profile folder is now called `sync-backend-state.json`. It tracks whichever sync backend you picked, not just Dropbox, so the old Dropbox-specific name was misleading; existing profiles are renamed automatically on the next launch. (#1007)
 - Desktop: a date field now shows a warning outline while the typed text isn't a date it can read. Nonsense never saved — it quietly reverted when you left the field — but nothing said so while you typed. (#1050)
 - Recurring tasks: a monthly or yearly task whose start and due fall on different days no longer has its start pulled onto the due date's day-of-month. Completing "starts the 14th, due the 15th" now creates "starts September 14, due September 15" instead of a copy starting August 15 — a leftover from recurrences saved before start and due tracked their anchor days separately. Desktop, mobile, and the local automation API.

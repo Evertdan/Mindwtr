@@ -264,11 +264,54 @@ fn publish_atomic_temp_file(
         .map_err(|error| error.error.to_string())
 }
 
-fn dropbox_credential_state_path_from_secrets_path(secrets_path: &Path) -> PathBuf {
-    secrets_path
-        .parent()
-        .unwrap_or_else(|| Path::new("."))
-        .join(DROPBOX_CREDENTIAL_STATE_FILE_NAME)
+fn sync_backend_state_path_from_secrets_path(secrets_path: &Path) -> PathBuf {
+    sync_backend_state_path_in(secrets_path.parent().unwrap_or_else(|| Path::new(".")))
+}
+
+// The single "resolve, migrating if needed" seam. Every producer of the state
+// path goes through here, so a local API/CLI/MCP process that opens an
+// un-migrated profile migrates it before its own first read - including the
+// bare `.exists()` probes that never parse the file.
+fn sync_backend_state_path_in(dir: &Path) -> PathBuf {
+    let path = dir.join(SYNC_BACKEND_STATE_FILE_NAME);
+    let legacy = dir.join(LEGACY_SYNC_BACKEND_STATE_FILE_NAME);
+    if legacy.exists() {
+        migrate_legacy_sync_backend_state(&legacy, &path);
+    }
+    path
+}
+
+// Both names can exist at once after a crash mid-migration, or after a
+// downgrade wrote the old name again. Prefer the file that still validates,
+// and between two valid ones the newer generation - the same counter every
+// state write bumps. The migration is a rename, never copy-then-delete, so no
+// window leaves zero files, and the legacy file is removed only once a valid
+// successor is confirmed on disk.
+fn migrate_legacy_sync_backend_state(legacy: &Path, path: &Path) {
+    let legacy_state = read_dropbox_credential_state_file(legacy).ok().flatten();
+    let current_state = read_dropbox_credential_state_file(path).ok().flatten();
+    let outcome = match (&legacy_state, &current_state) {
+        (Some(legacy_state), Some(current_state))
+            if legacy_state.generation <= current_state.generation =>
+        {
+            remove_file_durably(legacy)
+        }
+        (Some(_), _) => fs::rename(legacy, path).map_err(|error| error.to_string()),
+        (None, Some(_)) => remove_file_durably(legacy),
+        // Neither file validates: keep the legacy bytes for inspection and let
+        // the caller re-derive state from the config pair as it would for a
+        // profile that never had one.
+        (None, None) => return,
+    };
+    if let Err(error) = outcome {
+        if legacy.exists() {
+            log::warn!(
+                "Failed to migrate {} to {}: {error}",
+                legacy.display(),
+                path.display()
+            );
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -475,8 +518,8 @@ fn fingerprint_optional_file(path: &Path) -> Result<Option<String>, String> {
     }
 }
 
-pub(crate) fn get_dropbox_credential_state_path(app: &tauri::AppHandle) -> PathBuf {
-    crate::storage::get_config_dir(app).join(DROPBOX_CREDENTIAL_STATE_FILE_NAME)
+pub(crate) fn get_sync_backend_state_path(app: &tauri::AppHandle) -> PathBuf {
+    sync_backend_state_path_in(&crate::storage::get_config_dir(app))
 }
 
 fn write_owner_only_atomic_text(path: &Path, content: &str) -> Result<(), String> {
@@ -878,7 +921,7 @@ pub(crate) fn read_config(app: &tauri::AppHandle) -> AppConfigToml {
             return AppConfigToml::default();
         }
     };
-    if get_dropbox_credential_state_path(app).exists() {
+    if get_sync_backend_state_path(app).exists() {
         config.dropbox_tokens = None;
         config.dropbox_promotion_journal = None;
     }
@@ -1249,7 +1292,7 @@ where
     preflight_existing_config_toml(config_path)?;
     preflight_existing_config_toml(secrets_path)?;
     let mut sanitized = config.clone();
-    let state_path = dropbox_credential_state_path_from_secrets_path(secrets_path);
+    let state_path = sync_backend_state_path_from_secrets_path(secrets_path);
     if let Some(state) = read_dropbox_credential_state_file(&state_path)? {
         // Once the dedicated state file exists it is the sole authority for
         // Dropbox fallback bytes. A stale whole-config snapshot must never
@@ -1777,7 +1820,7 @@ fn read_config_files_unlocked(
     let mut config = read_config_toml_optional_strict(config_path)?;
     let secrets = read_config_toml_optional_strict(secrets_path)?;
     merge_config(&mut config, secrets);
-    if dropbox_credential_state_path_from_secrets_path(secrets_path).exists() {
+    if sync_backend_state_path_from_secrets_path(secrets_path).exists() {
         config.dropbox_tokens = None;
         config.dropbox_promotion_journal = None;
     }
@@ -1787,7 +1830,7 @@ fn read_config_files_unlocked(
 fn load_or_migrate_dropbox_credential_state_unlocked(
     app: &tauri::AppHandle,
 ) -> Result<DropboxCredentialStateFile, String> {
-    let state_path = get_dropbox_credential_state_path(app);
+    let state_path = get_sync_backend_state_path(app);
     load_or_migrate_dropbox_credential_state_paths_unlocked(
         &get_config_path(app),
         &get_secrets_path(app),
@@ -1873,7 +1916,7 @@ where
     update_dropbox_credential_state_paths_unlocked(
         &get_config_path(app),
         &get_secrets_path(app),
-        &get_dropbox_credential_state_path(app),
+        &get_sync_backend_state_path(app),
         update,
     )
 }
@@ -2250,7 +2293,7 @@ fn read_sync_configuration_pair(
 > {
     let config_path = get_config_path(app);
     let secrets_path = get_secrets_path(app);
-    let state_path = get_dropbox_credential_state_path(app);
+    let state_path = get_sync_backend_state_path(app);
     let _credential_guard = lock_dropbox_credential_state()?;
     let (_, provider_state) = read_sync_backend_publication_state_paths_unlocked_with(
         &config_path,
@@ -2353,7 +2396,7 @@ pub(crate) fn read_sync_backend_publication_state(
     read_sync_backend_publication_state_paths_with(
         &get_config_path(app),
         &get_secrets_path(app),
-        &get_dropbox_credential_state_path(app),
+        &get_sync_backend_state_path(app),
         || {},
     )
 }
@@ -2598,7 +2641,7 @@ pub(crate) fn set_sync_backend(app: tauri::AppHandle, backend: String) -> Result
     publish_sync_backend_paths_with(
         &get_config_path(&app),
         &get_secrets_path(&app),
-        &get_dropbox_credential_state_path(&app),
+        &get_sync_backend_state_path(&app),
         normalized,
         || Ok(()),
     )?;
@@ -3768,7 +3811,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let config_path = dir.path().join("config.toml");
         let secrets_path = dir.path().join("secrets.toml");
-        let dropbox_state_path = dir.path().join(DROPBOX_CREDENTIAL_STATE_FILE_NAME);
+        let dropbox_state_path = dir.path().join(SYNC_BACKEND_STATE_FILE_NAME);
         let previous = AppConfigToml {
             sync_backend: Some("off".to_string()),
             local_api_port: Some("1111".to_string()),
@@ -4577,7 +4620,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("should create temp dir");
         let config_path = dir.path().join("config.toml");
         let secrets_path = dir.path().join("secrets.toml");
-        let state_path = dir.path().join(DROPBOX_CREDENTIAL_STATE_FILE_NAME);
+        let state_path = dir.path().join(SYNC_BACKEND_STATE_FILE_NAME);
         let public_config = AppConfigToml {
             sync_backend: Some("cloud".to_string()),
             sync_cloud_provider: Some("dropbox".to_string()),
@@ -4631,12 +4674,135 @@ mod tests {
         assert_eq!(scrubbed_public.local_api_port.as_deref(), Some("3456"));
     }
 
+    fn sync_backend_state_with_generation(
+        generation: u64,
+        token_fallback: &str,
+    ) -> DropboxCredentialStateFile {
+        DropboxCredentialStateFile {
+            token_fallback: Some(token_fallback.to_string()),
+            sync_backend_marker: "cloud".to_string(),
+            generation,
+            ..DropboxCredentialStateFile::default()
+        }
+    }
+
+    #[test]
+    fn legacy_sync_backend_state_file_name_migrates_on_first_path_resolution() {
+        let dir = tempfile::tempdir().expect("should create temp dir");
+        let legacy_path = dir.path().join(LEGACY_SYNC_BACKEND_STATE_FILE_NAME);
+        let legacy = sync_backend_state_with_generation(4, "legacy-token-bundle");
+        write_dropbox_credential_state_file(&legacy_path, &legacy).expect("write legacy state");
+
+        let resolved = sync_backend_state_path_in(dir.path());
+
+        assert_eq!(resolved, dir.path().join(SYNC_BACKEND_STATE_FILE_NAME));
+        assert!(
+            !legacy_path.exists(),
+            "the legacy name must not survive its own migration"
+        );
+        assert_eq!(
+            read_dropbox_credential_state_file(&resolved)
+                .expect("read migrated state")
+                .expect("migrated state exists"),
+            legacy,
+            "migration must move the bytes, not re-derive them"
+        );
+    }
+
+    #[test]
+    fn both_sync_backend_state_file_names_resolve_to_the_newest_valid_generation() {
+        // Newer under the legacy name (a downgrade wrote it after the upgrade
+        // had already migrated once): the legacy file wins and replaces it.
+        let dir = tempfile::tempdir().expect("should create temp dir");
+        let legacy_path = dir.path().join(LEGACY_SYNC_BACKEND_STATE_FILE_NAME);
+        let state_path = dir.path().join(SYNC_BACKEND_STATE_FILE_NAME);
+        let newer_legacy = sync_backend_state_with_generation(9, "downgrade-token-bundle");
+        write_dropbox_credential_state_file(&legacy_path, &newer_legacy)
+            .expect("write legacy state");
+        write_dropbox_credential_state_file(
+            &state_path,
+            &sync_backend_state_with_generation(3, "stale-token-bundle"),
+        )
+        .expect("write current state");
+
+        sync_backend_state_path_in(dir.path());
+
+        assert!(!legacy_path.exists());
+        assert_eq!(
+            read_dropbox_credential_state_file(&state_path)
+                .expect("read resolved state")
+                .expect("resolved state exists"),
+            newer_legacy
+        );
+
+        // Older under the legacy name: the current file stands and the legacy
+        // leftover is dropped.
+        let dir = tempfile::tempdir().expect("should create temp dir");
+        let legacy_path = dir.path().join(LEGACY_SYNC_BACKEND_STATE_FILE_NAME);
+        let state_path = dir.path().join(SYNC_BACKEND_STATE_FILE_NAME);
+        let current = sync_backend_state_with_generation(9, "current-token-bundle");
+        write_dropbox_credential_state_file(
+            &legacy_path,
+            &sync_backend_state_with_generation(3, "stale-token-bundle"),
+        )
+        .expect("write legacy state");
+        write_dropbox_credential_state_file(&state_path, &current).expect("write current state");
+
+        sync_backend_state_path_in(dir.path());
+
+        assert!(!legacy_path.exists());
+        assert_eq!(
+            read_dropbox_credential_state_file(&state_path)
+                .expect("read resolved state")
+                .expect("resolved state exists"),
+            current
+        );
+
+        // A corrupt file never wins over a valid one, whichever name carries it.
+        let dir = tempfile::tempdir().expect("should create temp dir");
+        let legacy_path = dir.path().join(LEGACY_SYNC_BACKEND_STATE_FILE_NAME);
+        let state_path = dir.path().join(SYNC_BACKEND_STATE_FILE_NAME);
+        let valid_legacy = sync_backend_state_with_generation(1, "valid-token-bundle");
+        write_dropbox_credential_state_file(&legacy_path, &valid_legacy)
+            .expect("write legacy state");
+        fs::write(&state_path, b"{ not json").expect("write corrupt current state");
+
+        sync_backend_state_path_in(dir.path());
+
+        assert!(!legacy_path.exists());
+        assert_eq!(
+            read_dropbox_credential_state_file(&state_path)
+                .expect("read resolved state")
+                .expect("resolved state exists"),
+            valid_legacy
+        );
+    }
+
+    #[test]
+    fn sync_backend_state_path_creates_nothing_when_no_state_file_exists() {
+        let dir = tempfile::tempdir().expect("should create temp dir");
+
+        let resolved = sync_backend_state_path_in(dir.path());
+
+        assert_eq!(resolved, dir.path().join(SYNC_BACKEND_STATE_FILE_NAME));
+        assert!(!resolved.exists());
+        assert!(!dir
+            .path()
+            .join(LEGACY_SYNC_BACKEND_STATE_FILE_NAME)
+            .exists());
+        assert_eq!(
+            fs::read_dir(dir.path()).expect("read profile dir").count(),
+            0,
+            "resolving the path on a fresh profile must not write anything"
+        );
+    }
+
     #[test]
     fn stale_whole_config_write_cannot_resurrect_dedicated_dropbox_authority() {
         let dir = tempfile::tempdir().expect("should create temp dir");
         let config_path = dir.path().join("config.toml");
         let secrets_path = dir.path().join("secrets.toml");
-        let state_path = dir.path().join(DROPBOX_CREDENTIAL_STATE_FILE_NAME);
+        let state_path = dir.path().join(SYNC_BACKEND_STATE_FILE_NAME);
         let dedicated = DropboxCredentialStateFile {
             token_fallback: Some("current-candidate-token-bundle".to_string()),
             promotion_journal: Some("current-promotion-journal".to_string()),
@@ -4686,7 +4852,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("should create temp dir");
         let config_path = dir.path().join("config.toml");
         let secrets_path = dir.path().join("secrets.toml");
-        let state_path = dir.path().join(DROPBOX_CREDENTIAL_STATE_FILE_NAME);
+        let state_path = dir.path().join(SYNC_BACKEND_STATE_FILE_NAME);
         let initial = AppConfigToml {
             sync_backend: Some("off".to_string()),
             local_api_port: Some("3456".to_string()),
@@ -4781,7 +4947,7 @@ mod tests {
             let dir = tempfile::tempdir().expect("should create temp dir");
             let config_path = dir.path().join("config.toml");
             let secrets_path = dir.path().join("secrets.toml");
-            let state_path = dir.path().join(DROPBOX_CREDENTIAL_STATE_FILE_NAME);
+            let state_path = dir.path().join(SYNC_BACKEND_STATE_FILE_NAME);
             write_config_toml(
                 &config_path,
                 &AppConfigToml {
@@ -4864,7 +5030,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("should create temp dir");
         let config_path = dir.path().join("config.toml");
         let secrets_path = dir.path().join("secrets.toml");
-        let state_path = dir.path().join(DROPBOX_CREDENTIAL_STATE_FILE_NAME);
+        let state_path = dir.path().join(SYNC_BACKEND_STATE_FILE_NAME);
         write_config_toml(
             &config_path,
             &AppConfigToml {
@@ -4929,7 +5095,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("should create temp dir");
         let config_path = dir.path().join("config.toml");
         let secrets_path = dir.path().join("secrets.toml");
-        let state_path = dir.path().join(DROPBOX_CREDENTIAL_STATE_FILE_NAME);
+        let state_path = dir.path().join(SYNC_BACKEND_STATE_FILE_NAME);
         write_config_toml(
             &config_path,
             &AppConfigToml {
@@ -4997,7 +5163,7 @@ mod tests {
     #[test]
     fn dedicated_dropbox_state_is_owner_only_on_create_and_overwrite() {
         let dir = tempfile::tempdir().expect("should create temp dir");
-        let state_path = dir.path().join(DROPBOX_CREDENTIAL_STATE_FILE_NAME);
+        let state_path = dir.path().join(SYNC_BACKEND_STATE_FILE_NAME);
         let mut state = DropboxCredentialStateFile {
             token_fallback: Some("private-token-bundle".to_string()),
             ..DropboxCredentialStateFile::default()
@@ -5041,7 +5207,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let config_path = dir.path().join("config.toml");
         let secrets_path = dir.path().join("secrets.toml");
-        let dropbox_state_path = dropbox_credential_state_path_from_secrets_path(&secrets_path);
+        let dropbox_state_path = sync_backend_state_path_from_secrets_path(&secrets_path);
         let keyring_read = || Err("keyring unavailable".to_string());
         let keyring_write = |_: Option<String>| Err("keyring unavailable".to_string());
 
