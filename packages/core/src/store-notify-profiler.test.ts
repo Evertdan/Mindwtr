@@ -9,6 +9,7 @@ import {
     endNotifyProfile,
     instrumentStoreSubscribe,
     nameNotifyListener,
+    recordDerivedStateRebuild,
 } from './store-notify-profiler';
 
 type TestState = {
@@ -50,6 +51,8 @@ describe('store notify profiler', () => {
             maxMs: 8,
             top5Ms: [8, 4],
             top5Names: ['anonymous', 'anonymous'],
+            derivedRebuildCount: 0,
+            derivedRebuildMs: 0,
         });
         unsubscribeFirst();
         unsubscribeSecond();
@@ -185,7 +188,28 @@ describe('fetchData notify profiling log fields', () => {
             notifyMaxMs: expect.any(String),
             notifyTop5Ms: expect.any(String),
             notifyTop5Names: expect.any(String),
+            // Splits the setNotifyMs remainder: rebuilds reached through a
+            // subscriber's selector vs genuine React render time (#766).
+            notifyDerivedRebuilds: expect.any(String),
+            notifyDerivedRebuildMs: expect.any(String),
         });
+    });
+
+    it('attributes derived-state rebuilds inside a notify to the profile (#766)', () => {
+        beginNotifyProfile();
+        recordDerivedStateRebuild(12.4);
+        recordDerivedStateRebuild(3.6);
+        const profile = endNotifyProfile();
+
+        expect(profile?.derivedRebuildCount).toBe(2);
+        expect(profile?.derivedRebuildMs).toBeCloseTo(16, 5);
+
+        // Outside a profiling window the recorder is a no-op.
+        recordDerivedStateRebuild(50);
+        beginNotifyProfile();
+        const empty = endNotifyProfile();
+        expect(empty?.derivedRebuildCount).toBe(0);
+        expect(empty?.derivedRebuildMs).toBe(0);
     });
 
     it('omits notify profiling fields when diagnostics logging is disabled', async () => {

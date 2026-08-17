@@ -5,6 +5,15 @@ export type NotifyProfile = {
     maxMs: number;
     top5Ms: number[];
     top5Names: string[];
+    /**
+     * Derived-state rebuilds that ran inside this notify (getDerivedState cache
+     * misses). setNotifyMs minus notifyTimedMs isolates React render time, but
+     * a rebuild reached through a subscriber's SELECTOR lands in that remainder
+     * too (#766) — these two numbers split it: remainder minus derivedRebuildMs
+     * is genuinely React.
+     */
+    derivedRebuildCount: number;
+    derivedRebuildMs: number;
 };
 
 type TimedEntry = {
@@ -14,6 +23,8 @@ type TimedEntry = {
 
 type ProfileCollection = {
     entries: TimedEntry[];
+    derivedRebuildCount: number;
+    derivedRebuildMs: number;
 };
 
 type InstrumentableStore = {
@@ -110,8 +121,19 @@ export const instrumentStoreSubscribe = <TStore extends InstrumentableStore>(
 };
 
 export const beginNotifyProfile = (): void => {
-    currentProfile = { entries: [] };
+    currentProfile = { entries: [], derivedRebuildCount: 0, derivedRebuildMs: 0 };
 };
+
+/** Called by getDerivedState when a cache miss forces a rebuild. Free outside
+ *  a profiling window — the accumulator only exists while one is open. */
+export const recordDerivedStateRebuild = (ms: number): void => {
+    const profile = currentProfile;
+    if (!profile) return;
+    profile.derivedRebuildCount += 1;
+    profile.derivedRebuildMs += ms;
+};
+
+export const profilerNow = now;
 
 export const endNotifyProfile = (): NotifyProfile | null => {
     const profile = currentProfile;
@@ -130,5 +152,7 @@ export const endNotifyProfile = (): NotifyProfile | null => {
         maxMs: profile.entries[0]?.ms ?? 0,
         top5Ms: top5.map((entry) => entry.ms),
         top5Names: top5.map((entry) => entry.name),
+        derivedRebuildCount: profile.derivedRebuildCount,
+        derivedRebuildMs: profile.derivedRebuildMs,
     };
 };
