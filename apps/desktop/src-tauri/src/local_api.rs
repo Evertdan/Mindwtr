@@ -1870,13 +1870,33 @@ fn iso_day(value: &str) -> Option<u32> {
     parse_iso_prefix(value).map(|(_, _, day, _)| day)
 }
 
+// The legacy single `anchorDay` is credited ONLY to the field it was derived
+// from (dueDate, else startTime, else reviewAt — the order that writes it).
+// Letting it anchor the other fields advanced a start of the 14th as a day-15
+// rule, so "start 14th / due 15th, monthly" came back starting Aug 15 instead
+// of Sep 14. Mirrors resolveRecurrenceFieldAnchorDays in core's recurrence.ts;
+// the shared parity fixtures pin both sides.
+fn recurrence_anchor_owner_field(task: &Map<String, Value>) -> Option<&'static str> {
+    ["dueDate", "startTime", "reviewAt"]
+        .into_iter()
+        .find(|key| {
+            task.get(*key)
+                .and_then(|value| value.as_str())
+                .is_some_and(|value| !value.trim().is_empty())
+        })
+}
+
 fn recurrence_anchor_day_for_field(
     task: &Map<String, Value>,
     field_anchor_key: &str,
     field_key: &str,
 ) -> Option<u32> {
     recurrence_anchor_day_value(task, field_anchor_key)
-        .or_else(|| recurrence_anchor_day_value(task, "anchorDay"))
+        .or_else(|| {
+            (recurrence_anchor_owner_field(task) == Some(field_key))
+                .then(|| recurrence_anchor_day_value(task, "anchorDay"))
+                .flatten()
+        })
         .or_else(|| {
             task.get(field_key)
                 .and_then(|value| value.as_str())

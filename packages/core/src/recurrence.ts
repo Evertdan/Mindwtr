@@ -497,7 +497,7 @@ function getRecurrenceFieldAnchorDay(
         : field === 'dueDate'
             ? recurrence.dueAnchorDay
             : recurrence.reviewAnchorDay;
-    return normalizeAnchorDay(fieldAnchor) ?? normalizeAnchorDay(recurrence.anchorDay);
+    return normalizeAnchorDay(fieldAnchor);
 }
 
 const getDateDay = (value: string | undefined): number | undefined => {
@@ -505,15 +505,53 @@ const getDateDay = (value: string | undefined): number | undefined => {
     return parsed ? parsed.getDate() : undefined;
 };
 
+type RecurrenceScheduleDates = Pick<Task, 'startTime' | 'dueDate' | 'reviewAt'>;
+
+/**
+ * Per-field anchor days with the legacy single `anchorDay` credited ONLY to
+ * the field it was derived from (due, else start, else review — the same
+ * order that writes it). A recurrence saved before per-field anchors existed
+ * carries just `anchorDay` from its due day; letting that number anchor the
+ * OTHER fields advanced a start of the 14th as a day-15 rule, so completing
+ * "start 14th / due 15th, monthly" produced start Aug 15 instead of Sep 14.
+ * The owner keeps the global anchor over its own date's day on purpose: the
+ * stored date may be a clamped 31st sitting on Feb 28, and the anchor is what
+ * returns it to the 31st.
+ */
+function resolveRecurrenceFieldAnchorDays(
+    recurrence: Task['recurrence'],
+    dates: RecurrenceScheduleDates,
+): { startTime?: number; dueDate?: number; reviewAt?: number } {
+    const globalAnchor = normalizeAnchorDay(
+        recurrence && typeof recurrence === 'object' ? (recurrence as Recurrence).anchorDay : undefined
+    );
+    const ownerField: 'startTime' | 'dueDate' | 'reviewAt' | null = dates.dueDate
+        ? 'dueDate'
+        : dates.startTime
+            ? 'startTime'
+            : dates.reviewAt
+                ? 'reviewAt'
+                : null;
+    const resolve = (field: 'startTime' | 'dueDate' | 'reviewAt'): number | undefined => (
+        getRecurrenceFieldAnchorDay(recurrence, field)
+            ?? (field === ownerField ? globalAnchor : undefined)
+            ?? getDateDay(dates[field])
+    );
+    return {
+        startTime: resolve('startTime'),
+        dueDate: resolve('dueDate'),
+        reviewAt: resolve('reviewAt'),
+    };
+}
+
 function getNextRecurrenceAnchorDays(task: Task, rule: RecurrenceRule) {
     if (rule !== 'monthly' && rule !== 'yearly') return {};
 
-    const startAnchorDay = getRecurrenceFieldAnchorDay(task.recurrence, 'startTime')
-        ?? getDateDay(task.startTime);
-    const dueAnchorDay = getRecurrenceFieldAnchorDay(task.recurrence, 'dueDate')
-        ?? getDateDay(task.dueDate);
-    const reviewAnchorDay = getRecurrenceFieldAnchorDay(task.recurrence, 'reviewAt')
-        ?? getDateDay(task.reviewAt);
+    const {
+        startTime: startAnchorDay,
+        dueDate: dueAnchorDay,
+        reviewAt: reviewAnchorDay,
+    } = resolveRecurrenceFieldAnchorDays(task.recurrence, task);
     const anchorDay = normalizeAnchorDay(
         typeof task.recurrence === 'object' ? task.recurrence.anchorDay : undefined
     ) ?? dueAnchorDay ?? startAnchorDay ?? reviewAnchorDay;
@@ -1140,11 +1178,7 @@ type ProjectedOccurrenceAnchors = {
  * month after, instead of returning to 31 whenever the month allows it.
  */
 function resolveProjectedOccurrenceAnchors(task: Task, baseTask: Task): ProjectedOccurrenceAnchors {
-    return {
-        startTime: getRecurrenceFieldAnchorDay(task.recurrence, 'startTime') ?? getDateDay(baseTask.startTime),
-        dueDate: getRecurrenceFieldAnchorDay(task.recurrence, 'dueDate') ?? getDateDay(baseTask.dueDate),
-        reviewAt: getRecurrenceFieldAnchorDay(task.recurrence, 'reviewAt') ?? getDateDay(baseTask.reviewAt),
-    };
+    return resolveRecurrenceFieldAnchorDays(task.recurrence, baseTask);
 }
 
 /**
@@ -1641,12 +1675,11 @@ export function createNextRecurringTask(
     const count = getRecurrenceCountValue(task.recurrence);
     const until = getRecurrenceUntilValue(task.recurrence);
     const completedOccurrences = getRecurrenceCompletedOccurrencesValue(task.recurrence) ?? 0;
-    const startAnchorDay = getRecurrenceFieldAnchorDay(task.recurrence, 'startTime')
-        ?? getDateDay(task.startTime);
-    const dueAnchorDay = getRecurrenceFieldAnchorDay(task.recurrence, 'dueDate')
-        ?? getDateDay(task.dueDate);
-    const reviewAnchorDay = getRecurrenceFieldAnchorDay(task.recurrence, 'reviewAt')
-        ?? getDateDay(task.reviewAt);
+    const {
+        startTime: startAnchorDay,
+        dueDate: dueAnchorDay,
+        reviewAt: reviewAnchorDay,
+    } = resolveRecurrenceFieldAnchorDays(task.recurrence, task);
     const parsedCompletedAt = safeParseDate(completedAtIso);
     const fallbackCompletedAt = (() => {
         const candidate = new Date(completedAtIso);

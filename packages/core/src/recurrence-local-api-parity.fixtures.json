@@ -118,9 +118,7 @@
         "rule": "monthly",
         "seriesId": "parity-monthly-anchor-followup",
         "anchorDay": 31,
-        "startAnchorDay": 31,
-        "dueAnchorDay": 31,
-        "reviewAnchorDay": 31
+        "dueAnchorDay": 31
       },
       "tags": [],
       "contexts": [],
@@ -156,9 +154,7 @@
         "rule": "yearly",
         "seriesId": "parity-yearly-leap-anchor",
         "anchorDay": 29,
-        "startAnchorDay": 29,
-        "dueAnchorDay": 29,
-        "reviewAnchorDay": 29
+        "dueAnchorDay": 29
       },
       "tags": [],
       "contexts": [],
@@ -461,7 +457,9 @@
       "title": "Water plants",
       "status": "next",
       "dueDate": "2026-07-30",
-      "recurrence": { "rule": "daily" },
+      "recurrence": {
+        "rule": "daily"
+      },
       "taskMode": "deep",
       "textDirection": "rtl",
       "repeatReminderMinutes": 30,
@@ -477,7 +475,9 @@
       "title": "Water plants",
       "status": "done",
       "dueDate": "2026-07-30",
-      "recurrence": { "rule": "daily" },
+      "recurrence": {
+        "rule": "daily"
+      },
       "taskMode": "deep",
       "textDirection": "rtl",
       "repeatReminderMinutes": 30,
@@ -494,7 +494,10 @@
       "title": "Water plants",
       "status": "next",
       "dueDate": "2026-07-31",
-      "recurrence": { "rule": "daily", "seriesId": "action-complete-recurring" },
+      "recurrence": {
+        "rule": "daily",
+        "seriesId": "action-complete-recurring"
+      },
       "taskMode": "deep",
       "textDirection": "rtl",
       "repeatReminderMinutes": 30,
@@ -604,7 +607,11 @@
     "containers": {
       "projects": [],
       "sections": [],
-      "areas": [{ "id": "area-live" }]
+      "areas": [
+        {
+          "id": "area-live"
+        }
+      ]
     },
     "expectedTask": {
       "id": "action-restore-dangling",
@@ -632,7 +639,14 @@
       "title": "Standup",
       "status": "next",
       "startTime": "2026-07-20T09:00:00.000Z",
-      "recurrence": { "rule": "weekly", "byDay": ["MO", "WE", "FR"] },
+      "recurrence": {
+        "rule": "weekly",
+        "byDay": [
+          "MO",
+          "WE",
+          "FR"
+        ]
+      },
       "tags": [],
       "contexts": [],
       "createdAt": "2026-07-01T00:00:00.000Z",
@@ -687,8 +701,13 @@
       "title": "Prep the day before",
       "status": "next",
       "dueDate": "2026-07-30",
-      "relativeStartOffset": { "amount": -1, "unit": "day" },
-      "recurrence": { "rule": "daily" },
+      "relativeStartOffset": {
+        "amount": -1,
+        "unit": "day"
+      },
+      "recurrence": {
+        "rule": "daily"
+      },
       "tags": [],
       "contexts": [],
       "createdAt": "2026-07-01T00:00:00.000Z",
@@ -718,9 +737,22 @@
       "revBy": "device-old"
     },
     "containers": {
-      "projects": [{ "id": "project-a" }],
-      "sections": [{ "id": "section-a", "projectId": "project-a" }],
-      "areas": [{ "id": "area-a" }]
+      "projects": [
+        {
+          "id": "project-a"
+        }
+      ],
+      "sections": [
+        {
+          "id": "section-a",
+          "projectId": "project-a"
+        }
+      ],
+      "areas": [
+        {
+          "id": "area-a"
+        }
+      ]
     },
     "expectedTask": {
       "id": "action-restore-adopt-project",
@@ -759,8 +791,20 @@
       "revBy": "device-old"
     },
     "containers": {
-      "projects": [{ "id": "project-a" }, { "id": "project-b" }],
-      "sections": [{ "id": "section-b", "projectId": "project-b" }],
+      "projects": [
+        {
+          "id": "project-a"
+        },
+        {
+          "id": "project-b"
+        }
+      ],
+      "sections": [
+        {
+          "id": "section-b",
+          "projectId": "project-b"
+        }
+      ],
       "areas": []
     },
     "expectedTask": {
@@ -799,9 +843,17 @@
       "revBy": "device-old"
     },
     "containers": {
-      "projects": [{ "id": "project-c" }],
+      "projects": [
+        {
+          "id": "project-c"
+        }
+      ],
       "sections": [],
-      "areas": [{ "id": "area-c" }]
+      "areas": [
+        {
+          "id": "area-c"
+        }
+      ]
     },
     "expectedTask": {
       "id": "action-restore-area-dropped",
@@ -816,5 +868,43 @@
       "revBy": "device-a"
     },
     "expectedFollowUp": null
+  },
+  {
+    "name": "monthly legacy anchorDay stays off a start with its own day",
+    "completedAt": "2026-08-14T18:00:00.000Z",
+    "previousStatus": "done",
+    "task": {
+      "id": "parity-legacy-anchor-start",
+      "title": "Pay rent",
+      "status": "done",
+      "startTime": "2026-08-14",
+      "dueDate": "2026-08-15",
+      "recurrence": {
+        "rule": "monthly",
+        "anchorDay": 15
+      },
+      "tags": [],
+      "contexts": [],
+      "createdAt": "2026-08-01T00:00:00.000Z",
+      "updatedAt": "2026-08-01T00:00:00.000Z"
+    },
+    "expected": {
+      "title": "Pay rent",
+      "status": "next",
+      "startTime": "2026-09-14",
+      "dueDate": "2026-09-15",
+      "recurrence": {
+        "rule": "monthly",
+        "seriesId": "parity-legacy-anchor-start",
+        "anchorDay": 15,
+        "startAnchorDay": 14,
+        "dueAnchorDay": 15
+      },
+      "tags": [],
+      "contexts": [],
+      "isFocusedToday": false,
+      "createdAt": "2026-08-14T18:00:00.000Z",
+      "updatedAt": "2026-08-14T18:00:00.000Z"
+    }
   }
 ]

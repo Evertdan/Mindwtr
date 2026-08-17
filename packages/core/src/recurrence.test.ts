@@ -192,6 +192,51 @@ describe('recurrence', () => {
         expect(next?.status).toBe('next');
     });
 
+    it('keeps a legacy single anchorDay off the start date when it came from the due day', () => {
+        // Pre-per-field-anchor recurrences carry only anchorDay, derived from
+        // the due day. Crediting it to the start field advanced an Aug 14
+        // start as a day-15 monthly rule: the first day-15 after Aug 14 is
+        // Aug 15, so the next copy started a day later in the SAME month.
+        const task: Task = {
+            id: 't-legacy-anchor',
+            title: 'Pay rent',
+            status: 'done',
+            tags: [],
+            contexts: [],
+            startTime: '2026-08-14',
+            dueDate: '2026-08-15',
+            recurrence: { rule: 'monthly', strategy: 'strict', anchorDay: 15 },
+            createdAt: '2026-08-01T00:00:00.000Z',
+            updatedAt: '2026-08-01T00:00:00.000Z',
+        };
+
+        const next = createNextRecurringTask(task, '2026-08-14T18:00:00.000Z', 'done');
+        expect(next?.startTime).toBe('2026-09-14');
+        expect(next?.dueDate).toBe('2026-09-15');
+        // The next copy's per-field anchors must record each field's own day,
+        // so the series stays correct from here on.
+        expect(next?.recurrence).toMatchObject({ startAnchorDay: 14, dueAnchorDay: 15 });
+    });
+
+    it('keeps the legacy anchorDay authoritative for the field it was derived from', () => {
+        // Due Jan 31 clamps to Feb 28; the global anchor is what returns the
+        // series to the 31st in March — the owner field must keep it.
+        const task: Task = {
+            id: 't-legacy-anchor-owner',
+            title: 'Invoice',
+            status: 'done',
+            tags: [],
+            contexts: [],
+            dueDate: '2026-02-28',
+            recurrence: { rule: 'monthly', strategy: 'strict', anchorDay: 31 },
+            createdAt: '2026-01-31T00:00:00.000Z',
+            updatedAt: '2026-01-31T00:00:00.000Z',
+        };
+
+        const next = createNextRecurringTask(task, '2026-02-28T10:00:00.000Z', 'done');
+        expect(next?.dueDate).toBe('2026-03-31');
+    });
+
     it('preserves text direction on the next recurring task', () => {
         const task: Task = {
             id: 't1-rtl',
