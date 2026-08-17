@@ -32,7 +32,8 @@ use crate::{
     mindwtr_macos_resolve_security_bookmark,
 };
 use crate::{
-    AppConfigToml, DropboxResolvedCredentialHandle, DropboxTokenBundle, DropboxTokenResponse,
+    AppConfigToml, DropboxCredentialStateFile, DropboxResolvedCredentialHandle, DropboxTokenBundle,
+    DropboxTokenResponse,
     APP_NAME, DATA_FILE_NAME, DROPBOX_AUTH_ENDPOINT, DROPBOX_DEFAULT_TOKEN_LIFETIME_SECS,
     DROPBOX_OAUTH_TIMEOUT_SECS, DROPBOX_REDIRECT_HOST, DROPBOX_REDIRECT_PATH,
     DROPBOX_REDIRECT_PORT, DROPBOX_REVOKE_ENDPOINT, DROPBOX_SCOPES, DROPBOX_TOKEN_ENDPOINT,
@@ -1618,6 +1619,36 @@ where
             && !tokens.access_token.trim().is_empty()
             && !tokens.refresh_token.trim().is_empty()
     }))
+}
+
+/// Whether the credential-state file holds any trace of Dropbox ever being set
+/// up. When it holds none, an unreachable keyring cannot be hiding tokens —
+/// there were never any to hide — so a status probe may answer "not connected"
+/// instead of erroring (#1043: keyring-less WebDAV/self-hosted setups saw a
+/// Dropbox error banner for a service they never used).
+fn dropbox_state_has_credential_evidence(state: &DropboxCredentialStateFile) -> bool {
+    state.token_fallback.is_some()
+        || state.promotion_journal.is_some()
+        || !state.resolved_credential_handles.is_empty()
+        || state.cloud_provider.trim() == "dropbox"
+}
+
+/// A failed connection-status probe stays an error only while Dropbox evidence
+/// exists (a real setup whose keyring is unreachable deserves the loud path);
+/// with no evidence the probe answers "not connected".
+fn dropbox_status_probe_outcome(
+    result: Result<bool, String>,
+    has_credential_evidence: bool,
+) -> Result<bool, String> {
+    match result {
+        Err(error) if !has_credential_evidence => {
+            log::warn!(
+                "Dropbox status check failed with no stored Dropbox credentials; reporting disconnected: {error}"
+            );
+            Ok(false)
+        }
+        other => other,
+    }
 }
 
 fn read_dropbox_tokens_for_recovery_with<ReadKeyring, ReadFallback>(
@@ -3945,6 +3976,35 @@ mod tests {
         );
         let remote = read_sync_file_from_dir(dir.path()).expect("read winning remote");
         assert_eq!(remote["tasks"][0]["id"], "first-writer");
+    }
+
+    #[test]
+    fn dropbox_status_probe_without_evidence_reports_disconnected() {
+        assert!(!dropbox_state_has_credential_evidence(
+            &DropboxCredentialStateFile::default()
+        ));
+        assert!(dropbox_state_has_credential_evidence(
+            &DropboxCredentialStateFile {
+                cloud_provider: "dropbox".to_string(),
+                ..DropboxCredentialStateFile::default()
+            }
+        ));
+        assert!(dropbox_state_has_credential_evidence(
+            &DropboxCredentialStateFile {
+                token_fallback: Some("{}".to_string()),
+                ..DropboxCredentialStateFile::default()
+            }
+        ));
+
+        assert_eq!(
+            dropbox_status_probe_outcome(Err("keyring down".to_string()), false),
+            Ok(false)
+        );
+        assert_eq!(
+            dropbox_status_probe_outcome(Err("keyring down".to_string()), true),
+            Err("keyring down".to_string())
+        );
+        assert_eq!(dropbox_status_probe_outcome(Ok(true), false), Ok(true));
     }
 
     #[test]
@@ -7585,9 +7645,16 @@ pub(crate) fn is_dropbox_connected(
     client_id: String,
 ) -> Result<bool, String> {
     let _entries = state.inner.lock().map_err(|error| error.to_string())?;
-    recover_dropbox_credentials(&app)?;
-    let normalized_client_id = normalize_dropbox_client_id(&client_id)?;
-    is_dropbox_connected_with(&normalized_client_id, || read_dropbox_tokens(&app))
+    let result = (|| {
+        recover_dropbox_credentials(&app)?;
+        let normalized_client_id = normalize_dropbox_client_id(&client_id)?;
+        is_dropbox_connected_with(&normalized_client_id, || read_dropbox_tokens(&app))
+    })();
+    // An unreadable state file proves nothing either way; keep the error then.
+    let has_evidence = read_dropbox_credential_state(&app)
+        .map(|state| dropbox_state_has_credential_evidence(&state))
+        .unwrap_or(true);
+    dropbox_status_probe_outcome(result, has_evidence)
 }
 
 #[tauri::command]
