@@ -78,6 +78,33 @@ describe('DateField', () => {
         expect(screen.getByLabelText('Ends on')).toBeTruthy();
     });
 
+    it('marks unparseable typed text invalid without committing it (#1050)', () => {
+        const onDateChange = vi.fn();
+        render(
+            <DateField
+                t={t}
+                label="Due"
+                dateAriaLabel="Due"
+                dateValue="2026-04-19"
+                selectedDate={new Date(2026, 3, 19)}
+                nativeDateInputLocale="en-US"
+                dateInputClassName="border"
+                hasValue
+                onDateChange={onDateChange}
+                onClear={vi.fn()}
+            />
+        );
+
+        const input = screen.getByRole('textbox', { name: 'Due' });
+        fireEvent.change(input, { target: { value: 'saasdjfasdj' } });
+        expect(input).toHaveAttribute('aria-invalid', 'true');
+        expect(onDateChange).not.toHaveBeenCalled();
+
+        fireEvent.change(input, { target: { value: '04/20/2026' } });
+        expect(input).not.toHaveAttribute('aria-invalid');
+        expect(onDateChange).toHaveBeenCalledWith('2026-04-20');
+    });
+
     it('typing the field empty reverts on blur when the host passes no onClear', async () => {
         const onDateChange = vi.fn();
         render(

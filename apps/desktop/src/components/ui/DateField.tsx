@@ -322,6 +322,10 @@ export function DateField({
         }
         onDateChange(parsed);
     };
+    // Unparseable text never commits (blur reverts to the saved value), but
+    // without a signal it looked accepted while typed (#1050).
+    const isDraftInvalid = draftDateValue.trim() !== ''
+        && parseDateInputDisplay(draftDateValue, dateInputOrder, calendarSystem) === null;
     const applyCalendarDate = (date: Date) => {
         const nextDateValue = safeFormatDate(date, 'yyyy-MM-dd');
         setDraftDateValue(formatDateInputDisplay(nextDateValue, dateInputOrder, calendarSystem));
@@ -370,6 +374,7 @@ export function DateField({
                         aria-haspopup="dialog"
                         aria-expanded={isCalendarOpen}
                         value={draftDateValue}
+                        aria-invalid={isDraftInvalid || undefined}
                         onChange={(event) => handleDateInputChange(event.target.value)}
                         // The calendar icon is a small target, so the whole field opens the
                         // popover (#896). openCalendar only positions and shows it — it never
@@ -385,7 +390,10 @@ export function DateField({
                                 event.preventDefault();
                             }
                         }}
-                        className={`${dateInputClassName} w-full pr-8`}
+                        className={cn(
+                            `${dateInputClassName} w-full pr-8`,
+                            isDraftInvalid && 'border-warning ring-1 ring-inset ring-warning/50',
+                        )}
                     />
                     <button
                         type="button"
