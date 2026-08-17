@@ -77,8 +77,8 @@ const renderClosableMenu = (overrides: Partial<ComponentProps<typeof TaskQuickAc
         return open ? (
             <TaskQuickActionMenu
                 {...props}
-                onClose={() => {
-                    props.onClose();
+                onClose={(options) => {
+                    props.onClose(options);
                     setOpen(false);
                 }}
             />
@@ -164,6 +164,28 @@ describe('TaskQuickActionMenu', () => {
         } finally {
             document.body.removeChild(outsideButton);
         }
+    });
+
+    // Pointer dismissals must not restore focus to the opener: the deferred
+    // focus() lands after whatever the pointer opened next (another row's
+    // menu) and leaves the old row wearing the focus ring (#999). Keyboard
+    // closes keep the a11y focus-return.
+    it('marks pointer dismissals as no-focus-restore', () => {
+        const props = renderMenu();
+        fireEvent.mouseDown(document.body);
+        expect(props.onClose).toHaveBeenCalledWith({ restoreFocus: false });
+        // Finish the gesture: the dismissal armed capture-once click/mouseup
+        // swallowers on window, which would otherwise eat the next test's
+        // first click.
+        fireEvent.mouseUp(document.body);
+        fireEvent.click(document.body);
+    });
+
+    it('keeps the a11y focus-return on keyboard closes', () => {
+        const props = renderMenu();
+        fireEvent.keyDown(window, { key: 'Escape' });
+        expect(props.onClose).toHaveBeenCalledTimes(1);
+        expect(props.onClose).not.toHaveBeenCalledWith({ restoreFocus: false });
     });
 
     it('ignores the initial layout scroll after opening but closes on later scrolls', () => {

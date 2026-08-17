@@ -1057,8 +1057,16 @@ export const TaskItem = memo(function TaskItem({
             y: rect.bottom + 4,
         });
     }, [isEditing, onSelect, selectionMode]);
-    const handleCloseQuickActionMenu = useCallback(() => {
+    const handleCloseQuickActionMenu = useCallback((options?: { restoreFocus?: boolean }) => {
         setQuickActionMenu(null);
+        // Keyboard and menu-action closes return focus to the row's trigger;
+        // pointer dismissals must not — the deferred focus() lands after
+        // whatever the pointer opened next (another row's menu), yanking focus
+        // back and leaving this row wearing the focus-within ring (#999).
+        if (options?.restoreFocus === false) {
+            quickActionReturnFocusRef.current = null;
+            return;
+        }
         window.setTimeout(() => {
             quickActionReturnFocusRef.current?.focus();
             quickActionReturnFocusRef.current = null;

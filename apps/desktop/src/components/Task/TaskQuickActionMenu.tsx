@@ -55,7 +55,13 @@ export interface TaskQuickActionMenuProps {
         title: string;
         onToggle: () => void;
     };
-    onClose: () => void;
+    /**
+     * `restoreFocus: false` marks a dismissal where focus should follow the
+     * pointer (outside click/right-click, scroll) instead of returning to the
+     * row's trigger — a deferred focus-return there lands after whatever the
+     * pointer opened next and paints the old row's focus ring (#999).
+     */
+    onClose: (options?: { restoreFocus?: boolean }) => void;
     onRename?: () => void;
     onDuplicate: () => void;
     onPromoteToProject?: () => void;
@@ -242,11 +248,11 @@ export function TaskQuickActionMenu({
             // Only mousedown has a click that could follow it in the same
             // gesture — contextmenu (a right-click elsewhere) never fires one.
             if (event.type === 'mousedown') suppressDismissClick();
-            onClose();
+            onClose({ restoreFocus: false });
         };
         const handleScrollOrResize = (event: Event) => {
             if (event.type === 'scroll' && !initialLayoutScrollSettledRef.current) return;
-            onClose();
+            onClose({ restoreFocus: false });
         };
         const getMenuItems = () => Array.from(
             menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ?? [],
