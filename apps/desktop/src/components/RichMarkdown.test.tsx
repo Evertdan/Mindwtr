@@ -46,8 +46,10 @@ describe('RichMarkdown', () => {
             </LanguageProvider>
         );
 
+        // The URL lives in title, never href — an href invites the engine's
+        // speculative preconnect to the linked host (#913).
         expect(screen.getByRole('link', { name: 'person@example.com' })).toHaveAttribute(
-            'href',
+            'title',
             'mailto:person@example.com'
         );
 
@@ -66,6 +68,6 @@ describe('RichMarkdown', () => {
             </LanguageProvider>
         );
 
-        expect(screen.getByRole('link', { name: 'email' })).toHaveAttribute('href', 'mid:960830.1639@example.com');
+        expect(screen.getByRole('link', { name: 'email' })).toHaveAttribute('title', 'mid:960830.1639@example.com');
     });
 });

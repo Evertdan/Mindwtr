@@ -150,20 +150,24 @@ export function InternalMarkdownLink({ href, className, children, linkContext }:
         if (!isSafeExternalHref(href)) {
             return <>{children}</>;
         }
+        // No `href` on purpose: an anchor carrying the real URL is what the
+        // engine's speculative preconnect keys on — WebView2 dialed the linked
+        // host's servers on hover/click even though the click handler opens the
+        // URL externally (#913). A button with role="link" keeps the link
+        // semantics and keyboard behavior with nothing left to preconnect to.
         return (
-            <a
-                href={href}
-                target="_blank"
-                rel="noreferrer"
-                className={cn('text-primary underline underline-offset-2 hover:opacity-90', className)}
+            <button
+                type="button"
+                role="link"
+                title={href}
+                className={cn('bg-transparent p-0 text-left [font:inherit] text-primary underline underline-offset-2 hover:opacity-90', className)}
                 onClick={(event) => {
-                    event.preventDefault();
                     event.stopPropagation();
                     void openExternalHref(href);
                 }}
             >
                 {children}
-            </a>
+            </button>
         );
     }
 

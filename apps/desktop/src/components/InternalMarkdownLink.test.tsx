@@ -39,7 +39,20 @@ describe('InternalMarkdownLink', () => {
             </LanguageProvider>
         );
 
-        expect(getByRole('link', { name: 'Email' })).toHaveAttribute('href', 'mid:960830.1639@example.com');
+        expect(getByRole('link', { name: 'Email' })).toHaveAttribute('title', 'mid:960830.1639@example.com');
+    });
+
+    it('gives external links no href for the engine to preconnect to', () => {
+        // #913: WebView2 speculatively resolves and connects to any href's
+        // host on hover/click; the URL must live only in the click handler.
+        const { getByRole, container } = render(
+            <LanguageProvider>
+                <InternalMarkdownLink href="https://example.com/page" linkContext={currentLinkContext()}>Example</InternalMarkdownLink>
+            </LanguageProvider>
+        );
+
+        expect(getByRole('link', { name: 'Example' })).toHaveAttribute('title', 'https://example.com/page');
+        expect(container.querySelector('[href]')).toBeNull();
     });
 
     it('restores deleted task links and navigates to the live task view', async () => {
