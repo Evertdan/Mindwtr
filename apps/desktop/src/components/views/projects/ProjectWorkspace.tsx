@@ -12,6 +12,7 @@ import { Attachment,
     type Section,
     type TaskSortBy,
     generateUUID,
+    getInlineMarkdownPreview,
     sortTasksBy,
     splitCompletedTasks, tFallback, } from '@mindwtr/core';
 import type { DragEndEvent } from '@dnd-kit/core';
@@ -23,6 +24,7 @@ import { browseForLinkTarget } from '../../../lib/attachment-import';
 import { isTauriRuntime } from '../../../lib/runtime';
 import { TokenPickerModal } from '../../TokenPickerModal';
 import { TaskItem } from '../../TaskItem';
+import { InlineMarkdown } from '../../Markdown';
 import { useUiStore } from '../../../store/ui-store';
 import { BulkSelectionToolbar } from '../list/BulkSelectionToolbar';
 import { LIST_END_GAP, SortBySelect, VIEW_FILTER_INPUT } from '../list/list-toolbar';
@@ -52,6 +54,10 @@ import {
 } from './projects-utils';
 import { toDateTimeLocalValue } from '../../Task/task-item-helpers';
 import type { ConfirmationRequestOptions } from '../../../hooks/useConfirmDialog';
+
+// The one visible line is far shorter; the cap only keeps a pathological
+// single-line note out of the inline markdown tokenizer.
+const SECTION_NOTES_PREVIEW_MAX_CHARS = 300;
 
 const PROJECT_TASK_VIRTUALIZATION_THRESHOLD = 80;
 const PROJECT_TASK_ROW_ESTIMATE = 88;
@@ -1127,6 +1133,11 @@ export function ProjectWorkspace({
             : resolveText('projects.moveSectionDown', 'Move section down');
         const MoveBackIcon = isHorizontal ? ArrowLeft : ArrowUp;
         const MoveForwardIcon = isHorizontal ? ArrowRight : ArrowDown;
+        // Hidden while the editor is open: the textarea below already shows the
+        // notes, and it saves on blur, so a preview would sit there stale.
+        const notesPreview = hasNotes && !notesOpen
+            ? getInlineMarkdownPreview(group.section.description ?? '').slice(0, SECTION_NOTES_PREVIEW_MAX_CHARS)
+            : '';
         const disabledArrow = 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-muted-foreground';
 
         return (
@@ -1212,6 +1223,15 @@ export function ProjectWorkspace({
                         <Trash2 className="h-3.5 w-3.5" />
                     </button>
                 </div>
+                {notesPreview && (
+                    <div
+                        data-section-notes-preview
+                        title={notesPreview}
+                        className="w-full truncate text-xs font-normal text-muted-foreground"
+                    >
+                        <InlineMarkdown markdown={notesPreview} interactiveLinks={false} />
+                    </div>
+                )}
             </div>
         );
     };

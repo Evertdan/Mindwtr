@@ -363,3 +363,67 @@ describe('ProjectWorkspace sections-as-columns (#1019)', () => {
         expect(store.reorderSections).toHaveBeenCalledWith(project.id, [shipping.id, planning.id]);
     });
 });
+
+describe('ProjectWorkspace section notes preview', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        useUiStore.setState({ editingTaskId: null, projectLayouts: {} });
+        window.localStorage.clear();
+    });
+
+    const withNotes = (description?: string): Section[] => [
+        { ...planning, description },
+        shipping,
+    ];
+
+    const previewTexts = (container: HTMLElement) =>
+        Array.from(container.querySelectorAll('[data-section-notes-preview]'))
+            .map((node) => node.textContent);
+
+    it('shows the first notes line under the section header, markdown markers stripped', () => {
+        const { container } = renderWorkspace({
+            store: { sections: withNotes('# Kickoff **scope**\n\nSecond line') },
+        });
+
+        expect(previewTexts(container)).toEqual(['Kickoff scope']);
+    });
+
+    it('shows the preview in the columns layout too', () => {
+        const { container } = renderWorkspace({
+            layout: 'columns',
+            store: { sections: withNotes('Natural planning: purpose first') },
+        });
+
+        const columns = container.querySelectorAll('[data-project-section-columns] > div');
+        expect(columns[1].querySelector('[data-section-notes-preview]')?.textContent)
+            .toBe('Natural planning: purpose first');
+        expect(columns[2].querySelector('[data-section-notes-preview]')).toBeNull();
+    });
+
+    it('renders nothing for empty or whitespace-only notes', () => {
+        const { container } = renderWorkspace({ store: { sections: withNotes('   \n  ') } });
+        expect(previewTexts(container)).toEqual([]);
+
+        const { container: undefinedNotes } = renderWorkspace({ store: { sections: withNotes() } });
+        expect(previewTexts(undefinedNotes)).toEqual([]);
+    });
+
+    // The editor textarea below shows the same text and saves on blur, so a
+    // preview left up there would go stale while typing.
+    it('hides that section\'s preview while its notes editor is open', () => {
+        const { container, getAllByRole } = renderWorkspace({
+            store: {
+                sections: [
+                    { ...planning, description: 'Planning notes' },
+                    { ...shipping, description: 'Shipping notes' },
+                ],
+            },
+        });
+
+        expect(previewTexts(container)).toEqual(['Planning notes', 'Shipping notes']);
+
+        fireEvent.click(getAllByRole('button', { name: 'Section notes' })[0]);
+
+        expect(previewTexts(container)).toEqual(['Shipping notes']);
+    });
+});
