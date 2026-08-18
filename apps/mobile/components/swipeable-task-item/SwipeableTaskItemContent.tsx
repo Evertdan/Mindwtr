@@ -1,5 +1,5 @@
-import React, { type ReactNode, useMemo } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import React, { type ReactNode, useMemo, useRef, useState } from 'react';
+import { Pressable, Text, TextInput, View } from 'react-native';
 import { CircleDot, History, ListChecks, Repeat } from 'lucide-react-native';
 import { useThemeTokens } from '../../hooks/use-theme-tokens';
 import { useStatusColors } from '../../hooks/use-status-colors';
@@ -47,6 +47,7 @@ interface SwipeableTaskItemContentProps {
     localChecklist: Task['checklist'];
     interactionDisabled?: boolean;
     onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => void;
+    onAddChecklistItem: (title: string) => void;
     onContextPress?: (context: string) => void;
     onEditCompletedAt?: () => void;
     onLongPress: () => void;
@@ -91,6 +92,7 @@ export function SwipeableTaskItemContent({
     language,
     localChecklist,
     onAccessibilityAction,
+    onAddChecklistItem,
     onContextPress,
     onEditCompletedAt,
     onLongPress,
@@ -123,6 +125,11 @@ export function SwipeableTaskItemContent({
             projectColor: projectArea?.color,
         };
     }, [areas, projects, task.projectId]);
+
+    // Draft text lives here, not in useSwipeableChecklist: it must never reach the
+    // pending-checklist flush, so an unsubmitted line is discarded with the row.
+    const [checklistDraft, setChecklistDraft] = useState('');
+    const checklistDraftRef = useRef<TextInput>(null);
 
     const resolvedDirection = resolveTaskTextDirection(task);
     const textDirection = resolvedDirection === 'rtl' ? 'rtl' : 'ltr';
@@ -559,6 +566,28 @@ export function SwipeableTaskItemContent({
                                 />
                             </Pressable>
                         ))}
+                        {!selectionMode && !interactionDisabled && (
+                            <TextInput
+                                ref={checklistDraftRef}
+                                value={checklistDraft}
+                                onChangeText={setChecklistDraft}
+                                onSubmitEditing={() => {
+                                    if (!checklistDraft.trim()) {
+                                        checklistDraftRef.current?.blur();
+                                        return;
+                                    }
+                                    onAddChecklistItem(checklistDraft);
+                                    setChecklistDraft('');
+                                }}
+                                placeholder={`+ ${t('taskEdit.addItem')}`}
+                                placeholderTextColor={tc.secondaryText}
+                                style={[styles.checklistAddInput, { color: tc.text }]}
+                                accessibilityLabel={t('taskEdit.addItem')}
+                                returnKeyType="done"
+                                blurOnSubmit={false}
+                                submitBehavior="submit"
+                            />
+                        )}
                     </View>
                 )}
                 {showAge && (

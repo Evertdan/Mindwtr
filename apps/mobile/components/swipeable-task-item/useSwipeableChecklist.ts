@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getChecklistProgress, Task, useTaskStore } from '@mindwtr/core';
+import { generateUUID, getChecklistProgress, Task, useTaskStore } from '@mindwtr/core';
 import { logError } from '../../lib/app-log';
 import { settleStoreAction } from '../store-action-result';
 
@@ -85,23 +85,41 @@ export function useSwipeableChecklist(task: Task, updateTask: UpdateTask) {
         setShowChecklist((value) => !value);
     }, []);
 
+    const scheduleChecklistUpdate = useCallback((taskId: string, checklist: Task['checklist']) => {
+        pendingChecklist.current = { taskId, checklist };
+        clearChecklistTimer();
+        checklistUpdateTimer.current = setTimeout(() => {
+            const pending = pendingChecklist.current;
+            if (!pending || pending.taskId !== taskId) return;
+            flushPendingChecklist();
+            checklistUpdateTimer.current = null;
+        }, 200);
+    }, [clearChecklistTimer, flushPendingChecklist]);
+
     const toggleChecklistItem = useCallback((index: number) => {
         const taskId = task.id;
         setLocalChecklist((currentChecklist) => {
             const nextChecklist = (currentChecklist || []).map((item, itemIndex) =>
                 itemIndex === index ? { ...item, isCompleted: !item.isCompleted } : item
             );
-            pendingChecklist.current = { taskId, checklist: nextChecklist };
-            clearChecklistTimer();
-            checklistUpdateTimer.current = setTimeout(() => {
-                const pending = pendingChecklist.current;
-                if (!pending || pending.taskId !== taskId) return;
-                flushPendingChecklist();
-                checklistUpdateTimer.current = null;
-            }, 200);
+            scheduleChecklistUpdate(taskId, nextChecklist);
             return nextChecklist;
         });
-    }, [clearChecklistTimer, flushPendingChecklist, task.id]);
+    }, [scheduleChecklistUpdate, task.id]);
+
+    const addChecklistItem = useCallback((title: string) => {
+        const trimmed = title.trim();
+        if (!trimmed) return;
+        const taskId = task.id;
+        setLocalChecklist((currentChecklist) => {
+            const nextChecklist = [
+                ...(currentChecklist || []),
+                { id: generateUUID(), title: trimmed, isCompleted: false },
+            ];
+            scheduleChecklistUpdate(taskId, nextChecklist);
+            return nextChecklist;
+        });
+    }, [scheduleChecklistUpdate, task.id]);
 
     const checklistProgress = useMemo(
         () => getChecklistProgress({ ...task, checklist: localChecklist }),
@@ -109,6 +127,7 @@ export function useSwipeableChecklist(task: Task, updateTask: UpdateTask) {
     );
 
     return {
+        addChecklistItem,
         cancelPendingChecklist,
         checklistProgress,
         localChecklist,

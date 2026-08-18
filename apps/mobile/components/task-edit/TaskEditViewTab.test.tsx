@@ -355,6 +355,90 @@ describe('TaskEditViewTab', () => {
     }
   });
 
+  // #1055: the read-only preview can grow the checklist it already renders.
+  it('adds checklist items from the preview without opening the form tab', () => {
+    const applyChecklistUpdate = vi.fn();
+    const renderPreview = (checklist: any[], onApply = applyChecklistUpdate) => {
+      let tree!: renderer.ReactTestRenderer;
+      renderer.act(() => {
+        tree = renderer.create(
+          <TaskEditViewTab
+            t={(key) => ({ 'taskEdit.addItem': 'Add Item', 'taskEdit.checklist': 'Checklist' }[key] ?? key)}
+            tc={{
+              text: '#fff',
+              secondaryText: '#aaa',
+              inputBg: '#111',
+              border: '#222',
+              cardBg: '#000',
+              tint: '#3b82f6',
+            } as any}
+            styles={taskEditStyles as any}
+            mergedTask={{
+              id: 'task-1',
+              title: 'Groceries',
+              status: 'next',
+              tags: [],
+              contexts: [],
+              checklist,
+              createdAt: '2026-04-01T00:00:00.000Z',
+              updatedAt: '2026-04-01T00:00:00.000Z',
+            }}
+            projects={[]}
+            sections={[]}
+            areas={[]}
+            prioritiesEnabled={false}
+            timeEstimatesEnabled={false}
+            formatTimeEstimateLabel={(value) => String(value)}
+            formatDate={(value) => value}
+            formatDueDate={(value) => value}
+            getRecurrenceRuleValue={() => ''}
+            getRecurrenceStrategyValue={() => 'strict'}
+            applyChecklistUpdate={onApply}
+            visibleAttachments={[]}
+            openAttachment={vi.fn()}
+            isImageAttachment={() => false}
+            textDirectionStyle={{}}
+            resolvedDirection="ltr"
+            showStatusField={false}
+          />
+        );
+      });
+      return tree;
+    };
+    const findAddInputs = (tree: renderer.ReactTestRenderer) => tree.root.findAll((node) => (
+      typeof node.type === 'string'
+      && node.props.accessibilityLabel === 'Add Item'
+      && typeof node.props.onSubmitEditing === 'function'
+    ));
+
+    // A task with no checklist must not grow a new field.
+    expect(findAddInputs(renderPreview([]))).toHaveLength(0);
+
+    const tree = renderPreview([{ id: 'item-1', title: 'Bread', isCompleted: false }]);
+    expect(findAddInputs(tree)).toHaveLength(1);
+
+    renderer.act(() => {
+      findAddInputs(tree)[0].props.onChangeText('  Milk  ');
+    });
+    renderer.act(() => {
+      findAddInputs(tree)[0].props.onSubmitEditing();
+    });
+
+    expect(applyChecklistUpdate).toHaveBeenCalledTimes(1);
+    expect(applyChecklistUpdate).toHaveBeenCalledWith([
+      { id: 'item-1', title: 'Bread', isCompleted: false },
+      expect.objectContaining({ title: 'Milk', isCompleted: false }),
+    ]);
+    expect(findAddInputs(tree)[0].props.value).toBe('');
+    expect(findAddInputs(tree)[0].props.blurOnSubmit).toBe(false);
+
+    // Empty submit is a no-op, not an empty item.
+    renderer.act(() => {
+      findAddInputs(tree)[0].props.onSubmitEditing();
+    });
+    expect(applyChecklistUpdate).toHaveBeenCalledTimes(1);
+  });
+
   it('hides the status row when the task editor layout hides status', () => {
     let tree!: renderer.ReactTestRenderer;
     renderer.act(() => {

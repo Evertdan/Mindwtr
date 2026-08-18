@@ -557,6 +557,12 @@ export const styles = StyleSheet.create({
         fontSize: 14,
         flex: 1,
     },
+    viewChecklistAddInput: {
+        fontSize: 14,
+        paddingVertical: 6,
+        // Aligns with the checklist text, which sits after an 18pt icon plus the 8pt row gap.
+        paddingLeft: 26,
+    },
     viewAttachmentGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',

@@ -263,6 +263,7 @@ function SwipeableTaskItemInner({
         && isTaskActionable(task);
     const isReference = task.status === 'reference';
     const {
+        addChecklistItem,
         cancelPendingChecklist,
         checklistProgress,
         localChecklist,
@@ -666,6 +667,7 @@ function SwipeableTaskItemInner({
             language={language}
             localChecklist={localChecklist}
             onAccessibilityAction={handleAccessibilityAction}
+            onAddChecklistItem={addChecklistItem}
             onContextPress={onContextPress}
             onEditCompletedAt={isTaskFinished(task) && !selectionMode
                 ? () => setCompletedAtPicker('edit')

@@ -118,6 +118,12 @@ export const styles = StyleSheet.create({
     checklistItemText: {
         fontSize: 11,
     },
+    checklistAddInput: {
+        fontSize: 11,
+        paddingVertical: 4,
+        paddingHorizontal: 0,
+        minHeight: 28,
+    },
     checklistItemCompleted: {
         textDecorationLine: 'line-through',
         opacity: 0.6,

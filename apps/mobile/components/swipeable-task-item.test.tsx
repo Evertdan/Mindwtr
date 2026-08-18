@@ -2059,6 +2059,171 @@ it('can keep the focus star without adding a redundant focus outline', () => {
     vi.useRealTimers();
   });
 
+  // #1055: the inline expansion can add items, not just tick them. The add goes
+  // through the same pending/flush pipeline as a tick, so the list-mode status
+  // recomputation (done -> next once an unchecked item exists) comes along free.
+  it('adds a checklist item from the row expansion and flushes it with the recomputed status', () => {
+    vi.useFakeTimers();
+    translate.overrides = { 'taskEdit.addItem': 'Add Item' };
+    const task = {
+      id: 'task-1',
+      title: 'Groceries',
+      status: 'done',
+      taskMode: 'list',
+      checklist: [{ id: 'item-1', title: 'Bread', isCompleted: true }],
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    } as any;
+    storeState.tasks = [task];
+    storeState._allTasks = [task];
+    getChecklistProgress.mockImplementation((value: any) => {
+      const checklist = value?.checklist ?? [];
+      if (!checklist.length) return null;
+      const completed = checklist.filter((entry: any) => entry.isCompleted).length;
+      return {
+        completed,
+        total: checklist.length,
+        percent: completed / checklist.length,
+      };
+    });
+
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(
+        <SwipeableTaskItem
+          task={task}
+          isDark={false}
+          tc={{
+            taskItemBg: '#111111',
+            border: '#222222',
+            text: '#ffffff',
+            secondaryText: '#999999',
+            tint: '#3b82f6',
+            warning: '#f59e0b',
+          } as any}
+          onPress={vi.fn()}
+          onStatusChange={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      );
+    });
+
+    const findAddInputs = () => tree.root.findAll((node) => (
+      typeof node.type === 'string'
+      && node.props.accessibilityLabel === 'Add Item'
+      && typeof node.props.onSubmitEditing === 'function'
+    ));
+
+    // Collapsed rows show no add field, and opening the expansion must not steal focus.
+    expect(findAddInputs()).toHaveLength(0);
+    const checklistProgressButton = tree.root.find((node) => node.props.accessibilityLabel === 'checklist.progress');
+    renderer.act(() => {
+      checklistProgressButton.props.onPress();
+    });
+    expect(findAddInputs()[0].props.autoFocus).toBeFalsy();
+
+    renderer.act(() => {
+      findAddInputs()[0].props.onChangeText('Milk');
+    });
+    renderer.act(() => {
+      findAddInputs()[0].props.onSubmitEditing();
+    });
+
+    // Field cleared for the next item, keyboard kept up.
+    expect(findAddInputs()[0].props.value).toBe('');
+    expect(findAddInputs()[0].props.blurOnSubmit).toBe(false);
+
+    renderer.act(() => {
+      vi.runAllTimers();
+    });
+
+    expect(updateTask).toHaveBeenCalledTimes(1);
+    expect(updateTask).toHaveBeenCalledWith('task-1', {
+      checklist: [
+        { id: 'item-1', title: 'Bread', isCompleted: true },
+        expect.objectContaining({ title: 'Milk', isCompleted: false }),
+      ],
+      status: 'next',
+    });
+    expect(updateTask.mock.calls[0][1].checklist[1].id).toBeTruthy();
+
+    renderer.act(() => {
+      tree.unmount();
+    });
+    vi.useRealTimers();
+  });
+
+  it('ignores a whitespace-only checklist add and never flushes half-typed text', () => {
+    vi.useFakeTimers();
+    translate.overrides = { 'taskEdit.addItem': 'Add Item' };
+    const task = {
+      id: 'task-1',
+      title: 'Groceries',
+      status: 'next',
+      checklist: [{ id: 'item-1', title: 'Bread', isCompleted: false }],
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    } as any;
+    storeState.tasks = [task];
+    storeState._allTasks = [task];
+    getChecklistProgress.mockReturnValue({ completed: 0, total: 1, percent: 0 });
+
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(
+        <SwipeableTaskItem
+          task={task}
+          isDark={false}
+          tc={{
+            taskItemBg: '#111111',
+            border: '#222222',
+            text: '#ffffff',
+            secondaryText: '#999999',
+            tint: '#3b82f6',
+            warning: '#f59e0b',
+          } as any}
+          onPress={vi.fn()}
+          onStatusChange={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      );
+    });
+
+    const findAddInputs = () => tree.root.findAll((node) => (
+      typeof node.type === 'string'
+      && node.props.accessibilityLabel === 'Add Item'
+      && typeof node.props.onSubmitEditing === 'function'
+    ));
+
+    const checklistProgressButton = tree.root.find((node) => node.props.accessibilityLabel === 'checklist.progress');
+    renderer.act(() => {
+      checklistProgressButton.props.onPress();
+    });
+    renderer.act(() => {
+      findAddInputs()[0].props.onChangeText('   ');
+    });
+    renderer.act(() => {
+      findAddInputs()[0].props.onSubmitEditing();
+    });
+    renderer.act(() => {
+      vi.runAllTimers();
+    });
+
+    expect(updateTask).not.toHaveBeenCalled();
+
+    // Typed-but-unsubmitted text is draft state only: it must not reach the unmount flush.
+    renderer.act(() => {
+      findAddInputs()[0].props.onChangeText('Eggs');
+    });
+    renderer.act(() => {
+      tree.unmount();
+      vi.runAllTimers();
+    });
+
+    expect(updateTask).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
   // The #766 boundary itself: a list re-render must not re-render rows whose
   // task did not change. Guarded with the real render counter. `tc` is one
   // shared object because that is what resolveThemeTokens now hands callers.

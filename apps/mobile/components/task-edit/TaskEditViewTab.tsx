@@ -1,8 +1,9 @@
 import React from 'react';
-import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CheckSquare, Square } from 'lucide-react-native';
 import {
   formatRecurrenceLabel,
+  generateUUID,
   getAttachmentDisplayTitle,
   getRecurringTaskPreviewDate,
   hasTimeComponent,
@@ -81,6 +82,9 @@ function TaskEditViewTabComponent({
   onStatusUpdate,
   showStatusField = true,
 }: TaskEditViewTabProps) {
+  const [checklistDraft, setChecklistDraft] = React.useState('');
+  const checklistDraftRef = React.useRef<TextInput>(null);
+
   const renderViewRow = (label: string, value?: string, onPress?: () => void, accessibilityLabel?: string) => {
     if (value === undefined || value === null || value === '') return null;
     const content = (
@@ -279,6 +283,27 @@ function TaskEditViewTabComponent({
                 />
               </TouchableOpacity>
             ))}
+            <TextInput
+              ref={checklistDraftRef}
+              value={checklistDraft}
+              onChangeText={setChecklistDraft}
+              onSubmitEditing={() => {
+                const title = checklistDraft.trim();
+                if (!title) {
+                  checklistDraftRef.current?.blur();
+                  return;
+                }
+                applyChecklistUpdate([...checklist, { id: generateUUID(), title, isCompleted: false }]);
+                setChecklistDraft('');
+              }}
+              placeholder={`+ ${t('taskEdit.addItem')}`}
+              placeholderTextColor={tc.secondaryText}
+              style={[styles.viewChecklistAddInput, textDirectionStyle, { color: tc.text }]}
+              accessibilityLabel={t('taskEdit.addItem')}
+              returnKeyType="done"
+              blurOnSubmit={false}
+              submitBehavior="submit"
+            />
           </View>
         </View>
       ) : null}
