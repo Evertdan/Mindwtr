@@ -76,14 +76,14 @@
     },
     "apps/cloud": {
       "name": "mindwtr-cloud",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "dependencies": {
         "@mindwtr/core": "workspace:*",
       },
     },
     "apps/desktop": {
       "name": "mindwtr",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "dependencies": {
         "@dnd-kit/core": "^6.1.0",
         "@dnd-kit/sortable": "^8.0.0",
@@ -149,7 +149,7 @@
     },
     "apps/mobile": {
       "name": "mobile",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "dependencies": {
         "@babel/runtime": "^7.28.4",
         "@expo/metro-runtime": "^6.1.2",
@@ -182,7 +182,7 @@
         "expo-image": "~3.0.11",
         "expo-image-picker": "~17.0.11",
         "expo-linking": "~8.0.12",
-        "expo-local-authentication": "~17.0.8",
+        "expo-local-authentication": "~17.0.9",
         "expo-network": "~8.0.8",
         "expo-router": "~6.0.21",
         "expo-secure-store": "~15.0.8",
@@ -234,7 +234,7 @@
     },
     "packages/core": {
       "name": "@mindwtr/core",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "dependencies": {
         "@babel/runtime": "^7.28.4",
         "chrono-node": "^2.9.0",
@@ -1530,7 +1530,7 @@
 
     "expo-linking": ["expo-linking@8.0.12", "", { "dependencies": { "expo-constants": "~18.0.13", "invariant": "^2.2.4" }, "peerDependencies": { "react": "*", "react-native": "*" } }, "sha512-FpXeIpFgZuxihwT9lBo86YD3y6LphBuAhN680MMxm/Y7fmsc57vimn2d3vFu68VI0+Z9w457t494mu2wvlgWTQ=="],
 
-    "expo-local-authentication": ["expo-local-authentication@17.0.8", "", { "dependencies": { "invariant": "^2.2.4" }, "peerDependencies": { "expo": "*" } }, "sha512-Q5fXHhu6w3pVPlFCibU72SYIAN+9wX7QpFn9h49IUqs0Equ44QgswtGrxeh7fdnDqJrrYGPet5iBzjnE70uolA=="],
+    "expo-local-authentication": ["expo-local-authentication@17.0.9", "", { "dependencies": { "invariant": "^2.2.4" }, "peerDependencies": { "expo": "*" } }, "sha512-Ro2m6JJ7ebaDCMsnh6CeXKqXUdK5xP2lnrJlAopUO2DGqX5693BWC14ANFihFWL6qEV7IIV4hGpdU5RYyBCbuQ=="],
 
     "expo-manifests": ["expo-manifests@1.0.11", "", { "dependencies": { "@expo/config": "~12.0.13", "expo-json-utils": "~0.15.0" }, "peerDependencies": { "expo": "*" } }, "sha512-6zItytTewN37Cjhp3glUg0ozrgW2GwB8x9wtfzUNoJIMmxO38nnGdTLMaotYhRqdf5PP2Dzdmej1HDHXVNUpRw=="],
 
