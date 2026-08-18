@@ -317,10 +317,13 @@ Mindwtr 的发展离不开用户与贡献者的支持，感谢大家一起把它
   <a href="https://github.com/nicopico-dev" title="@nicopico-dev">
     <img src="docs/assets/sponsors/nicopico-dev.png" width="60" height="60" alt="@nicopico-dev" />
   </a>
+  <a href="https://github.com/Hillside502" title="@Hillside502">
+    <img src="docs/assets/sponsors/hillside502.png" width="60" height="60" alt="@Hillside502" />
+  </a>
 </p>
 
 <p align="center">
-  <sub><a href="https://github.com/jarrydstan">@jarrydstan</a> · <a href="https://github.com/ronmolenda">@ronmolenda</a> · <a href="https://github.com/karl1990">@karl1990</a> · <a href="https://github.com/srijan">@srijan</a> · <a href="https://github.com/davibicudo">@davibicudo</a> · <a href="https://github.com/PLPeeters">@PLPeeters</a> · <a href="https://github.com/danhs">@danhs</a> · <a href="https://github.com/NikoScotch">@NikoScotch</a> · <a href="https://github.com/nicopico-dev">@nicopico-dev</a></sub>
+  <sub><a href="https://github.com/jarrydstan">@jarrydstan</a> · <a href="https://github.com/ronmolenda">@ronmolenda</a> · <a href="https://github.com/karl1990">@karl1990</a> · <a href="https://github.com/srijan">@srijan</a> · <a href="https://github.com/davibicudo">@davibicudo</a> · <a href="https://github.com/PLPeeters">@PLPeeters</a> · <a href="https://github.com/danhs">@danhs</a> · <a href="https://github.com/NikoScotch">@NikoScotch</a> · <a href="https://github.com/nicopico-dev">@nicopico-dev</a> · <a href="https://github.com/Hillside502">@Hillside502</a></sub>
 </p>
 
 ---
