@@ -4055,7 +4055,7 @@ describe('TaskStore', () => {
         const duplicatedTask = useTaskStore.getState()._allTasks.find((task) => (
             task.projectId === duplicated?.id && task.title === 'Reference checklist'
         ));
-        expect(duplicatedTask?.status).toBe('next');
+        expect(duplicatedTask?.status).toBe('reference');
         expect(duplicatedTask?.sectionId).toBe(duplicatedSection?.id);
         expect(duplicatedTask?.checklist?.map((item) => ({
             title: item.title,

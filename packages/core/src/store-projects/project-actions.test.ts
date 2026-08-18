@@ -254,4 +254,63 @@ describe('project actions', () => {
         expect(copiedTaskAttachment?.fileHash).toBeUndefined();
         expect(copiedTaskAttachment?.localStatus).toBeUndefined();
     });
+
+    it('keeps reference tasks as reference (not next) when duplicating a project', async () => {
+        const { addProject, addSection, addTask, duplicateProject } = useTaskStore.getState();
+        const project = await addProject('Template', '#3b82f6');
+        expect(project).not.toBeNull();
+        if (!project) return;
+        const section = await addSection(project.id, 'Notes');
+        expect(section).not.toBeNull();
+        if (!section) return;
+
+        const referenceTaskResult = await addTask('Reference notes', {
+            projectId: project.id,
+            sectionId: section.id,
+            status: 'reference',
+            dueDate: BASE_NOW,
+            checklist: [{ id: 'item-1', title: 'Read this', isCompleted: true }],
+        });
+        const doneTaskResult = await addTask('Done task', {
+            projectId: project.id,
+            sectionId: section.id,
+            status: 'done',
+        });
+        const nextTaskResult = await addTask('Next task', {
+            projectId: project.id,
+            sectionId: section.id,
+            status: 'next',
+        });
+        expect(referenceTaskResult.success).toBe(true);
+        expect(doneTaskResult.success).toBe(true);
+        expect(nextTaskResult.success).toBe(true);
+        if (!referenceTaskResult.success || !doneTaskResult.success || !nextTaskResult.success) return;
+
+        const duplicatedProject = await duplicateProject(project.id);
+        expect(duplicatedProject).not.toBeNull();
+        if (!duplicatedProject) return;
+
+        const copiedTasks = useTaskStore
+            .getState()
+            ._allTasks.filter((task) => task.projectId === duplicatedProject.id);
+        const copiedSectionId = useTaskStore
+            .getState()
+            ._allSections.find((sec) => sec.projectId === duplicatedProject.id)?.id;
+        expect(copiedSectionId).toBeDefined();
+
+        const copiedReference = copiedTasks.find((task) => task.title === 'Reference notes');
+        expect(copiedReference).toMatchObject({
+            status: 'reference',
+            sectionId: copiedSectionId,
+            dueDate: undefined,
+        });
+        expect(copiedReference?.checklist?.[0]).toMatchObject({ isCompleted: false });
+        expect(copiedReference?.checklist?.[0].id).not.toBe('item-1');
+
+        const copiedDone = copiedTasks.find((task) => task.title === 'Done task');
+        expect(copiedDone).toMatchObject({ status: 'next', sectionId: copiedSectionId });
+
+        const copiedNext = copiedTasks.find((task) => task.title === 'Next task');
+        expect(copiedNext).toMatchObject({ status: 'next', sectionId: copiedSectionId });
+    });
 });

@@ -732,7 +732,7 @@ export const createProjectCoreActions = ({
                     id: uuidv4(),
                     projectId: newProject.id,
                     sectionId: nextSectionId,
-                    status: 'next' as TaskStatus,
+                    status: (task.status === 'reference' ? 'reference' : 'next') as TaskStatus,
                     startTime: undefined,
                     dueDate: undefined,
                     reviewAt: undefined,
