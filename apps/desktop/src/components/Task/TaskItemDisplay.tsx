@@ -588,9 +588,11 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
                 event.stopPropagation();
                 onRequestBackdatedComplete?.();
             } : undefined}
-            title={canBackdateComplete
-                ? tFallback(t, 'task.completeBackdateHint', 'Right-click to complete with a different time')
-                : undefined}
+            title={quickActionIsPromote
+                ? tFallback(t, task.status === 'waiting' ? 'waiting.moveToNext' : 'someday.moveToNext', 'Move to Next')
+                : canBackdateComplete
+                    ? tFallback(t, 'task.completeBackdateHint', 'Right-click to complete with a different time')
+                    : undefined}
             aria-label={quickActionIsPromote ? t('status.next') : t('status.done')}
             className={cn(
                 quickActionIsPromote

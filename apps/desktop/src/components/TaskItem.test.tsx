@@ -1788,6 +1788,55 @@ describe('TaskItem', () => {
         });
     });
 
+    it('promotes a someday task from the row arrow with a tooltip and an undo toast', async () => {
+        const somedayTask: Task = {
+            ...mockTask,
+            id: 'someday-1',
+            title: 'Sharpen the saw',
+            status: 'someday',
+        };
+        act(() => {
+            useTaskStore.setState((state) => ({
+                ...state,
+                tasks: [somedayTask],
+                _allTasks: [somedayTask],
+                projects: [],
+                _allProjects: [],
+                sections: [],
+                _allSections: [],
+                areas: [],
+                _allAreas: [],
+            }));
+        });
+
+        const { getByRole } = render(
+            <LanguageProvider>
+                <TaskItem task={somedayTask} />
+            </LanguageProvider>
+        );
+
+        const promoteButton = getByRole('button', { name: 'Next' });
+        // #1053: the arrow needs a hover tooltip naming the action.
+        expect(promoteButton).toHaveAttribute('title', 'Move to Next');
+
+        fireEvent.click(promoteButton);
+
+        await waitFor(() => {
+            expect(useTaskStore.getState()._allTasks.find((task) => task.id === 'someday-1')?.status).toBe('next');
+        });
+        const toasts = useUiStore.getState().toasts;
+        const toast = toasts[toasts.length - 1];
+        expect(toast?.message).toBe('Sharpen the saw moved to Next');
+        expect(toast?.action?.label).toBe('Undo');
+
+        act(() => {
+            toast?.action?.onClick();
+        });
+        await waitFor(() => {
+            expect(useTaskStore.getState()._allTasks.find((task) => task.id === 'someday-1')?.status).toBe('someday');
+        });
+    });
+
     it('does not show today focus toggle unless a view provides it', () => {
         const { queryByRole } = render(
             <LanguageProvider>

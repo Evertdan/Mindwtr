@@ -55,7 +55,7 @@ import { useTaskItemEditState } from './Task/useTaskItemEditState';
 import { useTaskItemProjectContext } from './Task/useTaskItemProjectContext';
 import { useTaskItemFieldLayout } from './Task/useTaskItemFieldLayout';
 import { useTaskItemSubmit } from './Task/useTaskItemSubmit';
-import { formatTaskMarkedDoneMessage } from './views/list/task-list-scope';
+import { formatTaskMarkedDoneMessage, formatTaskMovedMessage } from './views/list/task-list-scope';
 import { dispatchNavigateEvent } from '../lib/navigation-events';
 import { usePomodoroStore } from '../store/pomodoro-store';
 import { dispatchContextsTokenSelection } from '../lib/contexts-view-state';
@@ -953,15 +953,39 @@ export const TaskItem = memo(function TaskItem({
                 }
                 if (nextStatus === 'done' && previousStatus !== 'done') {
                     handleTaskCompleted(previousStatus, wasFocusedToday);
+                } else if (nextStatus === 'next' && (previousStatus === 'someday' || previousStatus === 'waiting')) {
+                    // The row's ➔ promote removes the task from the list it was
+                    // clicked in, so it gets the same toast + undo contract as
+                    // completing does (#1053).
+                    const undo = registerUndoableAction(() => {
+                        void moveTask(task.id, previousStatus)
+                            .catch((error) => reportError('Failed to undo task promotion', error));
+                    });
+                    if (undoNotificationsEnabled) {
+                        showToast(
+                            formatTaskMovedMessage(t, task.title, 'next'),
+                            'info',
+                            5000,
+                            {
+                                label: undoLabel,
+                                onClick: undo,
+                            }
+                        );
+                    }
                 }
             })
             .catch((error) => reportError('Failed to change task status', error));
     }, [
         handleTaskCompleted,
         moveTask,
+        showToast,
+        t,
         task.id,
         task.isFocusedToday,
         task.status,
+        task.title,
+        undoLabel,
+        undoNotificationsEnabled,
     ]);
     const handleEditorMarkDone = useCallback(() => {
         if (!isTaskActionable(task)) return;
