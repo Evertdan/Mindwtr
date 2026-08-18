@@ -73,6 +73,11 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
     const editAttachmentsRef = useRef(editAttachments);
     editAttachmentsRef.current = editAttachments;
     const [attachmentError, setAttachmentError] = useState<string | null>(null);
+    // Pre-conversion snapshots of file attachments edited into link pointers
+    // (#913/#1001): once the task saves with the record as a pointer, the old
+    // managed copy is provably orphaned and gets cleaned up. Captured outside
+    // the setState updater on purpose — StrictMode double-invokes updaters.
+    const convertedFileAttachmentsRef = useRef<Attachment[]>([]);
     const [audioAttachment, setAudioAttachment] = useState<Attachment | null>(null);
     const [audioSource, setAudioSource] = useState<string | null>(null);
     const [audioError, setAudioError] = useState<string | null>(null);
@@ -462,6 +467,15 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
         if (!normalized.uri) return false;
         const now = new Date().toISOString();
         if (editingLinkAttachmentId) {
+            const previous = editAttachmentsRef.current.find(
+                (attachment) => attachment.id === editingLinkAttachmentId
+            );
+            if (previous && previous.kind === 'file' && previous.uri !== normalized.uri) {
+                convertedFileAttachmentsRef.current = [
+                    ...convertedFileAttachmentsRef.current.filter((a) => a.id !== previous.id),
+                    previous,
+                ];
+            }
             setEditAttachments((prev) => prev.map((attachment) => (
                 attachment.id === editingLinkAttachmentId
                     ? {
@@ -526,7 +540,17 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
         const nextList = attachments || [];
         const nextIds = new Set(nextList.map((a) => a.id));
         const orphaned = editAttachmentsRef.current.filter((a) => !nextIds.has(a.id));
-        if (orphaned.length > 0) void deleteOrphanedAttachmentFiles(orphaned);
+        // A record edited from file to link pointer persisted only if the
+        // incoming (saved) list carries the conversion — a cancel hands back
+        // the original file record and the managed copy must survive.
+        const nextById = new Map(nextList.map((a) => [a.id, a]));
+        const converted = convertedFileAttachmentsRef.current.filter((old) => {
+            const next = nextById.get(old.id);
+            return next?.kind === 'link' && next.uri !== old.uri;
+        });
+        convertedFileAttachmentsRef.current = [];
+        const removable = [...orphaned, ...converted];
+        if (removable.length > 0) void deleteOrphanedAttachmentFiles(removable);
         setEditAttachments(nextList);
         setAttachmentError(null);
         closeLinkPrompt();

@@ -205,6 +205,52 @@ describe('useTaskItemAttachments resetAttachmentState orphan cleanup', () => {
         expect(result.current.editAttachments).toEqual(task.attachments || []);
     });
 
+    it('removes the managed copy when a converted link persists, keeps it on cancel', async () => {
+        // #913/#1001 follow-up: converting a pre-fix file-kind link to a
+        // pointer must clean up the copy the app restored into data/attachments
+        // — but only once the conversion actually saves.
+        const legacy = {
+            id: 'legacy-1',
+            kind: 'file' as const,
+            title: 'spec.docx',
+            uri: '/data/mindwtr/attachments/legacy-1.docx',
+            cloudKey: 'attachments/legacy-1.docx',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
+        const { result } = renderHook(() => useTaskItemAttachments({ task, t }));
+
+        // Round 1: convert, then cancel — the copy must survive.
+        act(() => {
+            result.current.resetAttachmentState([legacy]);
+        });
+        act(() => {
+            result.current.editLinkAttachment(legacy);
+        });
+        act(() => {
+            result.current.handleAddLinkAttachment('D:/docs/spec.docx');
+        });
+        await act(async () => {
+            result.current.resetAttachmentState([legacy]);
+            await Promise.resolve();
+        });
+        expect(removeMock).not.toHaveBeenCalled();
+
+        // Round 2: convert, then save — now the copy is orphaned.
+        act(() => {
+            result.current.editLinkAttachment(legacy);
+        });
+        act(() => {
+            result.current.handleAddLinkAttachment('D:/docs/spec.docx');
+        });
+        const savedPointer = { ...legacy, kind: 'link' as const, uri: 'D:/docs/spec.docx' };
+        await act(async () => {
+            result.current.resetAttachmentState([savedPointer]);
+            await Promise.resolve();
+        });
+        expect(removeMock).toHaveBeenCalledWith('/data/mindwtr/attachments/legacy-1.docx');
+    });
+
     it('does not remove a file that was already on the task', async () => {
         const existingAttachment = {
             id: 'existing-1',
