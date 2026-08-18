@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import {
     formatPomodoroClock,
+    getPomodoroFocusSessionsCompletedToday,
     getPomodoroPresetOptions,
     PomodoroAutoStartOptions,
     resetPomodoroState,
@@ -245,7 +246,7 @@ export function PomodoroPanel({ tasks }: PomodoroPanelProps) {
             <div className="text-center">
                 <p className="font-mono text-4xl leading-none tracking-wider tabular-nums">{formatPomodoroClock(timerState.remainingSeconds)}</p>
                 <p className="text-xs text-muted-foreground mt-1.5">
-                    {sessionCountLabel}: {timerState.completedFocusSessions}
+                    {sessionCountLabel}: {getPomodoroFocusSessionsCompletedToday(snapshot.sessionHistory)}
                 </p>
             </div>
 

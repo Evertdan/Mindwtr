@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_POMODORO_DURATIONS, createPomodoroState } from '@mindwtr/core';
+import { DEFAULT_POMODORO_DURATIONS, createPomodoroState, getPomodoroLocalDayKey } from '@mindwtr/core';
 
 import {
   pausePomodoroSession,
@@ -19,6 +19,8 @@ const baseSession = (overrides?: Partial<ResolvedPomodoroSession>): ResolvedPomo
   sessionHistory: {
     totalCompletedFocusSessions: 0,
     completedFocusSessionsByTaskId: {},
+    todayDayKey: getPomodoroLocalDayKey(),
+    completedTodayFocusSessions: 0,
   },
   ...overrides,
 });
@@ -79,6 +81,8 @@ describe('pomodoro-session helpers', () => {
         completedFocusSessionsByTaskId: {
           'task-1': 1,
         },
+        todayDayKey: getPomodoroLocalDayKey(),
+        completedTodayFocusSessions: 1,
       },
     }), 10_000);
 
@@ -90,6 +94,8 @@ describe('pomodoro-session helpers', () => {
       completedFocusSessionsByTaskId: {
         'task-1': 2,
       },
+      todayDayKey: getPomodoroLocalDayKey(),
+      completedTodayFocusSessions: 2,
     });
     expect(serializePomodoroSession(resolved).sessionHistory).toEqual(resolved.sessionHistory);
   });

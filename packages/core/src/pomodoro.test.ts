@@ -8,6 +8,7 @@ import {
     formatPomodoroClock,
     getPomodoroPresetOptions,
     getPomodoroPhaseSeconds,
+    getPomodoroFocusSessionsCompletedToday,
     recordPomodoroFocusSessions,
     sanitizePomodoroDurations,
     sanitizePomodoroSessionHistory,
@@ -106,12 +107,33 @@ describe('pomodoro helpers', () => {
                 'task-2': -1,
                 '': 4,
             },
-        }, 5)).toEqual({
+        }, 5, '2026-08-17')).toEqual({
             totalCompletedFocusSessions: 5,
             completedFocusSessionsByTaskId: {
                 'task-1': 2,
             },
+            todayDayKey: '2026-08-17',
+            completedTodayFocusSessions: 0,
         });
+    });
+
+    it('keeps the today-count within its day and zeroes it on rollover', () => {
+        const stored = {
+            totalCompletedFocusSessions: 9,
+            completedFocusSessionsByTaskId: {},
+            todayDayKey: '2026-08-17',
+            completedTodayFocusSessions: 4,
+        };
+
+        const sameDay = sanitizePomodoroSessionHistory(stored, 0, '2026-08-17');
+        expect(sameDay.completedTodayFocusSessions).toBe(4);
+        expect(getPomodoroFocusSessionsCompletedToday(sameDay, '2026-08-17')).toBe(4);
+
+        const nextDay = sanitizePomodoroSessionHistory(stored, 0, '2026-08-18');
+        expect(nextDay.completedTodayFocusSessions).toBe(0);
+        expect(nextDay.totalCompletedFocusSessions).toBe(9);
+        // Display-time guard: a stale in-memory history reads as zero too.
+        expect(getPomodoroFocusSessionsCompletedToday(stored, '2026-08-18')).toBe(0);
     });
 
     it('records completed focus sessions in local task history', () => {
@@ -120,21 +142,25 @@ describe('pomodoro helpers', () => {
             completedFocusSessionsByTaskId: {
                 'task-1': 1,
             },
+            todayDayKey: '2026-08-17',
+            completedTodayFocusSessions: 1,
         };
 
-        const next = recordPomodoroFocusSessions(previous, 'task-1', 2);
+        const next = recordPomodoroFocusSessions(previous, 'task-1', 2, '2026-08-17');
 
         expect(next).toEqual({
             totalCompletedFocusSessions: 4,
             completedFocusSessionsByTaskId: {
                 'task-1': 3,
             },
+            todayDayKey: '2026-08-17',
+            completedTodayFocusSessions: 3,
         });
-        expect(previous).toEqual({
-            totalCompletedFocusSessions: 2,
-            completedFocusSessionsByTaskId: {
-                'task-1': 1,
-            },
-        });
+        expect(previous.totalCompletedFocusSessions).toBe(2);
+
+        // A session credited after midnight lands on the new day's count.
+        const rolled = recordPomodoroFocusSessions(previous, 'task-1', 1, '2026-08-18');
+        expect(rolled.completedTodayFocusSessions).toBe(1);
+        expect(rolled.totalCompletedFocusSessions).toBe(3);
     });
 });

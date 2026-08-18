@@ -8,6 +8,7 @@ import {
   createPomodoroState,
   DEFAULT_POMODORO_DURATIONS,
   formatPomodoroClock,
+  getPomodoroFocusSessionsCompletedToday,
   getPomodoroPresetOptions,
   type PomodoroAutoStartOptions,
   type PomodoroDurations,
@@ -463,7 +464,7 @@ export function PomodoroPanel({
       <View style={styles.timerBox}>
         <Text style={[styles.timerText, { color: tc.text }]}>{formatPomodoroClock(timerState.remainingSeconds)}</Text>
         <Text style={[styles.sessionText, { color: tc.secondaryText }]}>
-          {`${sessionsDoneLabel}: ${timerState.completedFocusSessions}`}
+          {`${sessionsDoneLabel}: ${getPomodoroFocusSessionsCompletedToday(sessionHistory)}`}
         </Text>
       </View>
 

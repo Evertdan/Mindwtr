@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { useTaskStore, type Task } from '@mindwtr/core';
+import { getPomodoroLocalDayKey, useTaskStore, type Task } from '@mindwtr/core';
 import { LanguageProvider } from '../../contexts/language-context';
 import { DESKTOP_POMODORO_SESSION_STORAGE_KEY, PomodoroPanel } from './PomodoroPanel';
 const nowIso = '2026-07-01T12:00:00.000Z';
@@ -54,6 +54,10 @@ describe('PomodoroPanel desktop persistence', () => {
                 completedFocusSessionsByTaskId: {
                     'task-1': 2,
                 },
+                // The visible count is per-day: today's stored count restores,
+                // while a lifetime total from another day would show 0.
+                todayDayKey: getPomodoroLocalDayKey(),
+                completedTodayFocusSessions: 4,
             },
         }));
 
@@ -77,7 +81,33 @@ describe('PomodoroPanel desktop persistence', () => {
         expect(stored.sessionHistory).toEqual({
             totalCompletedFocusSessions: 0,
             completedFocusSessionsByTaskId: {},
+            todayDayKey: getPomodoroLocalDayKey(),
+            completedTodayFocusSessions: 0,
         });
+    });
+
+    it('shows zero completed sessions once the stored day has passed', () => {
+        window.localStorage.setItem(DESKTOP_POMODORO_SESSION_STORAGE_KEY, JSON.stringify({
+            durations: { focusMinutes: 25, breakMinutes: 5 },
+            timerState: {
+                phase: 'focus',
+                remainingSeconds: 1200,
+                isRunning: false,
+                completedFocusSessions: 4,
+            },
+            selectedTaskId: 'task-1',
+            updatedAtMs: Date.now(),
+            sessionHistory: {
+                totalCompletedFocusSessions: 4,
+                completedFocusSessionsByTaskId: { 'task-1': 2 },
+                todayDayKey: '2001-01-01',
+                completedTodayFocusSessions: 4,
+            },
+        }));
+
+        const { getByText } = renderPanel();
+
+        expect(getByText('Focus sessions completed: 0')).toBeInTheDocument();
     });
 
     it('links a task through the searchable popup and clears back to timer only', () => {

@@ -21,6 +21,10 @@ export interface PomodoroState {
 export interface PomodoroSessionHistory {
     totalCompletedFocusSessions: number;
     completedFocusSessionsByTaskId: Record<string, number>;
+    /** Local YYYY-MM-DD the today-count belongs to; rolls over automatically. */
+    todayDayKey: string;
+    /** Sessions completed on todayDayKey — the count the panels display (#833). */
+    completedTodayFocusSessions: number;
 }
 
 export interface PomodoroTickResult {
@@ -103,9 +107,18 @@ function sanitizeCompletedSessionCount(value: unknown, fallback = 0): number {
     return Math.max(0, Math.floor(value));
 }
 
+export function getPomodoroLocalDayKey(nowMs = Date.now()): string {
+    const date = new Date(nowMs);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 export function sanitizePomodoroSessionHistory(
     value?: Partial<PomodoroSessionHistory> | null,
-    fallbackTotalCompletedFocusSessions = 0
+    fallbackTotalCompletedFocusSessions = 0,
+    todayDayKey: string = getPomodoroLocalDayKey()
 ): PomodoroSessionHistory {
     const completedFocusSessionsByTaskId: Record<string, number> = {};
     const rawByTaskId = value?.completedFocusSessionsByTaskId;
@@ -128,24 +141,45 @@ export function sanitizePomodoroSessionHistory(
         taskTotal
     );
 
+    // The today-count survives a reload only while the stored day key still is
+    // today; a stale or missing key (including pre-daily-count stored data)
+    // starts the day at zero.
+    const completedTodayFocusSessions = value?.todayDayKey === todayDayKey
+        ? sanitizeCompletedSessionCount(value?.completedTodayFocusSessions)
+        : 0;
+
     return {
         totalCompletedFocusSessions,
         completedFocusSessionsByTaskId,
+        todayDayKey,
+        completedTodayFocusSessions,
     };
+}
+
+/** The count the panels display: today's sessions, zero once the local day rolls. */
+export function getPomodoroFocusSessionsCompletedToday(
+    history: Partial<PomodoroSessionHistory> | undefined,
+    todayDayKey: string = getPomodoroLocalDayKey()
+): number {
+    if (!history || history.todayDayKey !== todayDayKey) return 0;
+    return sanitizeCompletedSessionCount(history.completedTodayFocusSessions);
 }
 
 export function recordPomodoroFocusSessions(
     history: Partial<PomodoroSessionHistory> | undefined,
     taskId?: string,
-    completedSessions = 1
+    completedSessions = 1,
+    todayDayKey: string = getPomodoroLocalDayKey()
 ): PomodoroSessionHistory {
-    const sanitized = sanitizePomodoroSessionHistory(history);
+    const sanitized = sanitizePomodoroSessionHistory(history, 0, todayDayKey);
     const increment = sanitizeCompletedSessionCount(completedSessions);
     if (increment <= 0) return sanitized;
 
     const next: PomodoroSessionHistory = {
         totalCompletedFocusSessions: sanitized.totalCompletedFocusSessions + increment,
         completedFocusSessionsByTaskId: { ...sanitized.completedFocusSessionsByTaskId },
+        todayDayKey: sanitized.todayDayKey,
+        completedTodayFocusSessions: sanitized.completedTodayFocusSessions + increment,
     };
     const normalizedTaskId = taskId?.trim();
     if (normalizedTaskId) {
