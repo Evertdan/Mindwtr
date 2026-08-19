@@ -32,6 +32,8 @@ const applyAlarmCompleteConstantsPatchToSource = transformFor('alarm-complete-ac
 const applyAlarmTaskOpenIntentPatchToSource = transformFor('alarm-task-open-intent');
 const applyAlarmCompleteUtilPatchToSource = transformFor('alarm-complete-action-util');
 const applyAlarmCompleteReceiverPatchToSource = transformFor('alarm-complete-action-receiver');
+const applyAlarmDeadRowUtilPatchToSource = transformFor('alarm-dead-row-util');
+const applyAlarmActionDeadRowPatchToSource = transformFor('alarm-dead-row-actions');
 const applyAlarmIosCompleteActionPatchToSource = transformFor('alarm-ios-complete-action');
 const applyAlarmIosUniqueIdentifierPatchToSource = transformFor('alarm-ios-unique-identifier');
 const applyAlarmIosDeletePendingPatchToSource = transformFor('alarm-ios-delete-pending-arg');
@@ -384,6 +386,341 @@ class AlarmReceiver {
     expect(receiver).toContain('emit("OnNotificationOpened"');
   });
 
+  it('carries the tray notification post id on every action intent so a dead alarm row can still be cleared (#1028)', () => {
+    const input = `class AlarmUtil {
+    private NotificationManager getNotificationManager() {
+        return null;
+    }
+
+    void send(Alarm alarm, Bundle bundle, NotificationCompat.Builder mBuilder, Context mContext, int notificationID) {
+            if (alarm.isHasButton()) {
+                boolean hasCompleteAction = "true".equals(bundle.getString("notificationActionComplete"));
+                if (hasCompleteAction) {
+                    Intent completeIntent = new Intent(mContext, AlarmReceiver.class);
+                    completeIntent.setAction(NOTIFICATION_ACTION_COMPLETE);
+                    completeIntent.putExtra("AlarmId", alarm.getId());
+                    completeIntent.putExtras(bundle);
+                    PendingIntent pendingComplete = PendingIntent.getBroadcast(mContext, notificationID + 2, completeIntent, getUpdateCurrentImmutableFlags());
+                    NotificationCompat.Action completeAction = new NotificationCompat.Action(android.R.drawable.checkbox_on_background, "COMPLETE", pendingComplete);
+                    mBuilder.addAction(completeAction);
+                }
+
+                Intent snoozeIntent = new Intent(mContext, AlarmReceiver.class);
+                snoozeIntent.setAction(NOTIFICATION_ACTION_SNOOZE);
+                snoozeIntent.putExtra("SnoozeAlarmId", alarm.getId());
+                PendingIntent pendingSnooze = PendingIntent.getBroadcast(mContext, notificationID + 1, snoozeIntent, getUpdateCurrentImmutableFlags());
+                NotificationCompat.Action snoozeAction = new NotificationCompat.Action(R.drawable.ic_snooze, "SNOOZE", pendingSnooze);
+                mBuilder.addAction(snoozeAction);
+
+                Intent dismissIntent = new Intent(mContext, AlarmReceiver.class);
+                dismissIntent.setAction(NOTIFICATION_ACTION_DISMISS);
+                dismissIntent.putExtra("AlarmId", alarm.getId());
+                PendingIntent pendingDismiss = PendingIntent.getBroadcast(mContext, notificationID, dismissIntent, getUpdateCurrentImmutableFlags());
+                NotificationCompat.Action dismissAction = new NotificationCompat.Action(android.R.drawable.ic_lock_idle_alarm, "DISMISS", pendingDismiss);
+                mBuilder.addAction(dismissAction);
+            }
+    }
+
+    void removeAllFiredNotifications() {
+        getNotificationManager().cancelAll();
+    }
+}`;
+
+    const output = applyAlarmDeadRowUtilPatchToSource(input);
+
+    // Every action intent gets the notification's real post id, not just the
+    // DB row id it already carried — removeFiredNotification(id) resolves
+    // the row id back to the post id via a DB lookup, which fails silently
+    // once the row is gone.
+    expect(output).toContain('completeIntent.putExtra("NotificationId", notificationID);');
+    expect(output).toContain('snoozeIntent.putExtra("NotificationId", notificationID);');
+    expect(output).toContain('dismissIntent.putExtra("NotificationId", notificationID);');
+    expect(output.indexOf('completeIntent.putExtra("AlarmId"')).toBeLessThan(output.indexOf('completeIntent.putExtra("NotificationId"'));
+    expect(output).toContain('void clearNotification(int notificationId)');
+    expect(output).toContain('getNotificationManager().cancel(notificationId);');
+    // Idempotent: a second pass leaves the patched source untouched.
+    expect(applyAlarmDeadRowUtilPatchToSource(output)).toBe(output);
+  });
+
+  it('throws naming the missing marker when one action-intent anchor silently drifts', () => {
+    // Same fixture as above, except the completeIntent anchor picked up a
+    // trailing comment (as if upstream reformatted just that one line). The
+    // other two intents and the clearNotification helper still patch fine,
+    // so a bare "did anything change" check would pass this through with the
+    // dead-row fix silently missing from the COMPLETE action — the one that
+    // matters most, since it's the one that delivers the task payload.
+    const input = `class AlarmUtil {
+    private NotificationManager getNotificationManager() {
+        return null;
+    }
+
+    void send(Alarm alarm, Bundle bundle, NotificationCompat.Builder mBuilder, Context mContext, int notificationID) {
+            if (alarm.isHasButton()) {
+                boolean hasCompleteAction = "true".equals(bundle.getString("notificationActionComplete"));
+                if (hasCompleteAction) {
+                    Intent completeIntent = new Intent(mContext, AlarmReceiver.class);
+                    completeIntent.setAction(NOTIFICATION_ACTION_COMPLETE);
+                    completeIntent.putExtra("AlarmId", alarm.getId()); // vendor reformat
+                    completeIntent.putExtras(bundle);
+                    PendingIntent pendingComplete = PendingIntent.getBroadcast(mContext, notificationID + 2, completeIntent, getUpdateCurrentImmutableFlags());
+                    NotificationCompat.Action completeAction = new NotificationCompat.Action(android.R.drawable.checkbox_on_background, "COMPLETE", pendingComplete);
+                    mBuilder.addAction(completeAction);
+                }
+
+                Intent snoozeIntent = new Intent(mContext, AlarmReceiver.class);
+                snoozeIntent.setAction(NOTIFICATION_ACTION_SNOOZE);
+                snoozeIntent.putExtra("SnoozeAlarmId", alarm.getId());
+                PendingIntent pendingSnooze = PendingIntent.getBroadcast(mContext, notificationID + 1, snoozeIntent, getUpdateCurrentImmutableFlags());
+                NotificationCompat.Action snoozeAction = new NotificationCompat.Action(R.drawable.ic_snooze, "SNOOZE", pendingSnooze);
+                mBuilder.addAction(snoozeAction);
+
+                Intent dismissIntent = new Intent(mContext, AlarmReceiver.class);
+                dismissIntent.setAction(NOTIFICATION_ACTION_DISMISS);
+                dismissIntent.putExtra("AlarmId", alarm.getId());
+                PendingIntent pendingDismiss = PendingIntent.getBroadcast(mContext, notificationID, dismissIntent, getUpdateCurrentImmutableFlags());
+                NotificationCompat.Action dismissAction = new NotificationCompat.Action(android.R.drawable.ic_lock_idle_alarm, "DISMISS", pendingDismiss);
+                mBuilder.addAction(dismissAction);
+            }
+    }
+
+    void removeAllFiredNotifications() {
+        getNotificationManager().cancelAll();
+    }
+}`;
+
+    expect(() => applyAlarmDeadRowUtilPatchToSource(input)).toThrow(
+      'alarm-dead-row-util: expected marker not found after transform: completeIntent.putExtra("NotificationId", notificationID);'
+    );
+  });
+
+  it('hardens all three notification actions against a dead alarm row (#1028)', () => {
+    const input = `class AlarmReceiver {
+    void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (action != null) {
+                switch (action) {
+                    case Constants.NOTIFICATION_ACTION_SNOOZE:
+                        id = intent.getExtras().getInt("SnoozeAlarmId");
+
+                        try {
+                            alarm = alarmDB.getAlarm(id);
+                            alarmUtil.snoozeAlarm(alarm);
+                            Log.e(TAG, "alarm snoozed: " + alarm.toString());
+
+                            alarmUtil.removeFiredNotification(alarm.getId());
+                        } catch (Exception e) {
+                            alarmUtil.stopAlarmSound();
+                            e.printStackTrace();
+                        }
+                        break;
+
+                    case Constants.NOTIFICATION_ACTION_COMPLETE:
+                        id = intent.getExtras().getInt("AlarmId");
+
+                        try {
+                            alarm = alarmDB.getAlarm(id);
+                            Bundle payload = new Bundle();
+                            if (intent.getExtras() != null) {
+                                payload.putAll(intent.getExtras());
+                            }
+                            payload.putString("id", String.valueOf(alarm.getId()));
+                            if (payload.getString("alarmKey") == null && payload.getString("taskId") != null) {
+                                payload.putString("alarmKey", "task:" + payload.getString("taskId"));
+                            }
+                            payload.putString("actionIdentifier", "complete");
+                            LinkedHashMap<String, String> pendingPayload = new LinkedHashMap<>();
+                            for (String key : payload.keySet()) {
+                                Object value = payload.get(key);
+                                if (value != null) {
+                                    pendingPayload.put(key, String.valueOf(value));
+                                }
+                            }
+                            NotificationOpenPayloadStore.cache(pendingPayload);
+
+                            alarmUtil.removeFiredNotification(alarm.getId());
+                            alarmUtil.cancelAlarm(alarm, false);
+                            alarmUtil.stopAlarmSound();
+
+                            if (ANModule.getReactAppContext() != null) {
+                                ANModule.getReactAppContext().getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class).emit("OnNotificationOpened", BundleJSONConverter.convertToJSON(payload).toString());
+                            } else {
+                                Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+                                if (launchIntent != null) {
+                                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                                    launchIntent.putExtras(payload);
+                                    context.startActivity(launchIntent);
+                                }
+                            }
+                        } catch (Exception e) {
+                            alarmUtil.stopAlarmSound();
+                            e.printStackTrace();
+                        }
+                        break;
+
+                    case Constants.NOTIFICATION_ACTION_DISMISS:
+                        id = intent.getExtras().getInt("AlarmId");
+
+                        try {
+                            alarm = alarmDB.getAlarm(id);
+                            Log.e(TAG, "alarm cancelled: " + alarm.toString());
+
+                            // emit notification dismissed
+                            if (ANModule.getReactAppContext() != null) {
+                                ANModule.getReactAppContext().getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class).emit("OnNotificationDismissed", "{\\"id\\": \\"" + alarm.getId() + "\\"}");
+                            }
+
+                            alarmUtil.removeFiredNotification(alarm.getId());
+                            ${''}
+                            alarmUtil.cancelAlarm(alarm, false);
+                        } catch (Exception e) {
+                            alarmUtil.stopAlarmSound();
+                            e.printStackTrace();
+                        }
+                        break;
+                }
+            }
+    }
+}`;
+
+    const output = applyAlarmActionDeadRowPatchToSource(input);
+
+    // (a) every case gets a null-alarm branch that clears the tray notification.
+    const snoozeCase = output.slice(output.indexOf('NOTIFICATION_ACTION_SNOOZE'), output.indexOf('NOTIFICATION_ACTION_COMPLETE'));
+    const completeCase = output.slice(output.indexOf('NOTIFICATION_ACTION_COMPLETE'), output.indexOf('NOTIFICATION_ACTION_DISMISS'));
+    const dismissCase = output.slice(output.indexOf('NOTIFICATION_ACTION_DISMISS'));
+
+    expect(snoozeCase).toContain('if (alarm != null) {');
+    expect(snoozeCase).toContain('alarmUtil.clearNotification(intent.getExtras().getInt("NotificationId"));');
+    expect(completeCase).toContain('if (alarm != null) {');
+    expect(completeCase).toContain('alarmUtil.clearNotification(intent.getExtras().getInt("NotificationId"));');
+    expect(dismissCase).toContain('if (alarm != null) {');
+    expect(dismissCase).toContain('alarmUtil.clearNotification(intent.getExtras().getInt("NotificationId"));');
+
+    // Every case receipts before doing anything else.
+    expect(output).toContain('Log.d(TAG, "ACTION_SNOOZE id=" + id + " alarmFound=" + (alarm != null));');
+    expect(output).toContain('Log.d(TAG, "ACTION_COMPLETE id=" + id + " alarmFound=" + (alarm != null));');
+    expect(output).toContain('Log.d(TAG, "ACTION_DISMISS id=" + id + " alarmFound=" + (alarm != null));');
+
+    // (b) COMPLETE's dead-row path builds the payload from intent extras,
+    // falling back to the intent's own id instead of dereferencing a null alarm.
+    expect(completeCase).toContain('payload.putString("id", String.valueOf(alarm != null ? alarm.getId() : id));');
+    expect(completeCase).toContain('payload.putAll(intent.getExtras());');
+    expect(completeCase).toContain('emit("OnNotificationOpened"');
+
+    // (c) SNOOZE's dead-row path never inserts/updates an alarm row — it
+    // degrades to a plain dismiss instead of reconstructing schedule state.
+    const snoozeDeadRowBranch = snoozeCase.slice(snoozeCase.indexOf('else if (intent.getExtras()'));
+    expect(snoozeDeadRowBranch).not.toContain('getAlarmDB().insert(');
+    expect(snoozeDeadRowBranch).not.toContain('getAlarmDB().update(');
+    expect(snoozeDeadRowBranch).not.toContain('alarmUtil.snoozeAlarm(');
+
+    // DISMISS still emits with the intent's id, not a dereferenced null alarm.
+    expect(dismissCase).toContain('emit("OnNotificationDismissed", "{\\"id\\": \\"" + id + "\\"}");');
+
+    // Idempotent: a second pass leaves the patched source untouched.
+    expect(applyAlarmActionDeadRowPatchToSource(output)).toBe(output);
+  });
+
+  it('throws naming the missing marker when one case anchor silently drifts', () => {
+    // Same fixture as above, except the SNOOZE case's removeFiredNotification
+    // line picked up a trailing comment (as if upstream touched just that one
+    // case). COMPLETE and DISMISS still patch fine — a build that only
+    // re-checks "did the file change" would succeed on the first prebuild and
+    // only throw on the *next* one, once the idempotency guard's early-return
+    // marker is present but the SNOOZE case never actually got hardened.
+    const input = `class AlarmReceiver {
+    void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (action != null) {
+                switch (action) {
+                    case Constants.NOTIFICATION_ACTION_SNOOZE:
+                        id = intent.getExtras().getInt("SnoozeAlarmId");
+
+                        try {
+                            alarm = alarmDB.getAlarm(id);
+                            alarmUtil.snoozeAlarm(alarm);
+                            Log.e(TAG, "alarm snoozed: " + alarm.toString());
+
+                            alarmUtil.removeFiredNotification(alarm.getId()); // vendor reformat
+                        } catch (Exception e) {
+                            alarmUtil.stopAlarmSound();
+                            e.printStackTrace();
+                        }
+                        break;
+
+                    case Constants.NOTIFICATION_ACTION_COMPLETE:
+                        id = intent.getExtras().getInt("AlarmId");
+
+                        try {
+                            alarm = alarmDB.getAlarm(id);
+                            Bundle payload = new Bundle();
+                            if (intent.getExtras() != null) {
+                                payload.putAll(intent.getExtras());
+                            }
+                            payload.putString("id", String.valueOf(alarm.getId()));
+                            if (payload.getString("alarmKey") == null && payload.getString("taskId") != null) {
+                                payload.putString("alarmKey", "task:" + payload.getString("taskId"));
+                            }
+                            payload.putString("actionIdentifier", "complete");
+                            LinkedHashMap<String, String> pendingPayload = new LinkedHashMap<>();
+                            for (String key : payload.keySet()) {
+                                Object value = payload.get(key);
+                                if (value != null) {
+                                    pendingPayload.put(key, String.valueOf(value));
+                                }
+                            }
+                            NotificationOpenPayloadStore.cache(pendingPayload);
+
+                            alarmUtil.removeFiredNotification(alarm.getId());
+                            alarmUtil.cancelAlarm(alarm, false);
+                            alarmUtil.stopAlarmSound();
+
+                            if (ANModule.getReactAppContext() != null) {
+                                ANModule.getReactAppContext().getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class).emit("OnNotificationOpened", BundleJSONConverter.convertToJSON(payload).toString());
+                            } else {
+                                Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+                                if (launchIntent != null) {
+                                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                                    launchIntent.putExtras(payload);
+                                    context.startActivity(launchIntent);
+                                }
+                            }
+                        } catch (Exception e) {
+                            alarmUtil.stopAlarmSound();
+                            e.printStackTrace();
+                        }
+                        break;
+
+                    case Constants.NOTIFICATION_ACTION_DISMISS:
+                        id = intent.getExtras().getInt("AlarmId");
+
+                        try {
+                            alarm = alarmDB.getAlarm(id);
+                            Log.e(TAG, "alarm cancelled: " + alarm.toString());
+
+                            // emit notification dismissed
+                            if (ANModule.getReactAppContext() != null) {
+                                ANModule.getReactAppContext().getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class).emit("OnNotificationDismissed", "{\\"id\\": \\"" + alarm.getId() + "\\"}");
+                            }
+
+                            alarmUtil.removeFiredNotification(alarm.getId());
+                            ${''}
+                            alarmUtil.cancelAlarm(alarm, false);
+                        } catch (Exception e) {
+                            alarmUtil.stopAlarmSound();
+                            e.printStackTrace();
+                        }
+                        break;
+                }
+            }
+    }
+}`;
+
+    expect(() => applyAlarmActionDeadRowPatchToSource(input)).toThrow(
+      'alarm-dead-row-actions: expected marker not found after transform: Log.d(TAG, "ACTION_SNOOZE id="'
+    );
+  });
+
   it('adds iOS complete actions and exposes pending action payloads', () => {
     const input = `#import "RnAlarmNotification.h"
 
@@ -608,6 +945,10 @@ describe('PATCHES registry completeness', () => {
     // Added after the collapse (#1020), pinned here for the same reason as the
     // original sites: dropping it silently restores the duplicate-reminder leak.
     ['RnAlarmNotification.m', 'applyAlarmIosDeletePendingPatchToSource'],
+    // Added for #1028: dropping either silently restores the dead-row silent
+    // no-op on a notification action tap.
+    ['AlarmUtil.java', 'applyAlarmDeadRowUtilPatchToSource'],
+    ['AlarmReceiver.java', 'applyAlarmActionDeadRowPatchToSource'],
   ];
 
   it('has exactly one registry entry per original call site — none dropped in the collapse', () => {
@@ -621,7 +962,7 @@ describe('PATCHES registry completeness', () => {
   });
 
   it('every entry declares required/firstMatchOnly explicitly', () => {
-    expect(PATCHES).toHaveLength(18);
+    expect(PATCHES).toHaveLength(20);
     for (const patch of PATCHES) {
       expect(typeof patch.id).toBe('string');
       expect(typeof patch.required).toBe('boolean');

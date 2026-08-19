@@ -648,6 +648,291 @@ ${pendingPayloadCacheBlock}
   );
 };
 
+// The action intents only ever carried the DB row id (`alarm.getId()`),
+// which `removeFiredNotification` resolves back to the notification's real
+// post id (`alarm.getAlarmId()`) via a DB lookup — `sendNotification` posts
+// every reminder under `notificationID = alarm.getAlarmId()`. A later
+// reschedule cycle that deletes the row before a stale notification is
+// tapped makes that lookup fail silently, so the tray notification never
+// clears (#1028). Carry the post id as its own extra so the receiver can
+// clear the notification directly, without needing the row to still exist.
+const applyAlarmDeadRowUtilPatchToSource = (original) => {
+  let next = original;
+
+  next = next.replace(
+    '                    completeIntent.putExtra("AlarmId", alarm.getId());\n                    completeIntent.putExtras(bundle);',
+    '                    completeIntent.putExtra("AlarmId", alarm.getId());\n                    completeIntent.putExtra("NotificationId", notificationID);\n                    completeIntent.putExtras(bundle);'
+  );
+  next = next.replace(
+    '                snoozeIntent.putExtra("SnoozeAlarmId", alarm.getId());\n                PendingIntent pendingSnooze',
+    '                snoozeIntent.putExtra("SnoozeAlarmId", alarm.getId());\n                snoozeIntent.putExtra("NotificationId", notificationID);\n                PendingIntent pendingSnooze'
+  );
+  next = next.replace(
+    '                dismissIntent.putExtra("AlarmId", alarm.getId());\n                PendingIntent pendingDismiss',
+    '                dismissIntent.putExtra("AlarmId", alarm.getId());\n                dismissIntent.putExtra("NotificationId", notificationID);\n                PendingIntent pendingDismiss'
+  );
+
+  const removeAllMarker = `    void removeAllFiredNotifications() {
+        getNotificationManager().cancelAll();
+    }
+`;
+  if (!next.includes('void clearNotification(int notificationId)') && next.includes(removeAllMarker)) {
+    next = next.replace(
+      removeAllMarker,
+      `${removeAllMarker}
+    // Cancels a tray notification by its post id directly, with no DB
+    // lookup — for a receiver action whose alarm row is already gone (#1028).
+    void clearNotification(int notificationId) {
+        getNotificationManager().cancel(notificationId);
+    }
+`
+    );
+  }
+
+  // Each insertion above is an independent .replace() — none is atomic with
+  // the others, so one silently drifting (e.g. a comment landing on the
+  // completeIntent anchor) must not pass as "the patch applied" just because
+  // the other three still matched. Assert every marker this transform owns.
+  const requiredMarkers = [
+    'completeIntent.putExtra("NotificationId", notificationID);',
+    'snoozeIntent.putExtra("NotificationId", notificationID);',
+    'dismissIntent.putExtra("NotificationId", notificationID);',
+    'void clearNotification(int notificationId)',
+  ];
+  for (const marker of requiredMarkers) {
+    if (!next.includes(marker)) {
+      throw new Error(`alarm-dead-row-util: expected marker not found after transform: ${marker}`);
+    }
+  }
+
+  return next;
+};
+
+// Hardens the three notification action cases against a dead alarm row (the
+// row was deleted by a reschedule cycle after the notification was posted
+// but before it was tapped — #1028). Every case now: logs a receipt (action,
+// id, whether the row was found), and on a dead row still clears the tray
+// notification and stops the sound instead of silently doing nothing.
+// COMPLETE still delivers its payload (built from intent extras, which
+// already carry the full bundle via putExtras) and still emits/caches
+// OnNotificationOpened. DISMISS still emits OnNotificationDismissed with the
+// intent's id. SNOOZE degrades to a plain dismiss on a dead row — the JS
+// reschedule cycle owns alarm state and will re-add anything still due, so
+// the receiver must not try to reconstruct or reschedule from nothing.
+const applyAlarmActionDeadRowPatchToSource = (original) => {
+  if (original.includes('Log.d(TAG, "ACTION_SNOOZE id="')) return original;
+
+  let next = original;
+
+  next = next.replace(
+    `                    case Constants.NOTIFICATION_ACTION_SNOOZE:
+                        id = intent.getExtras().getInt("SnoozeAlarmId");
+
+                        try {
+                            alarm = alarmDB.getAlarm(id);
+                            alarmUtil.snoozeAlarm(alarm);
+                            Log.e(TAG, "alarm snoozed: " + alarm.toString());
+
+                            alarmUtil.removeFiredNotification(alarm.getId());
+                        } catch (Exception e) {
+                            alarmUtil.stopAlarmSound();
+                            e.printStackTrace();
+                        }
+                        break;
+`,
+    `                    case Constants.NOTIFICATION_ACTION_SNOOZE:
+                        id = intent.getExtras().getInt("SnoozeAlarmId");
+
+                        try {
+                            alarm = alarmDB.getAlarm(id);
+                            Log.d(TAG, "ACTION_SNOOZE id=" + id + " alarmFound=" + (alarm != null));
+                            if (alarm != null) {
+                                alarmUtil.snoozeAlarm(alarm);
+                                Log.e(TAG, "alarm snoozed: " + alarm.toString());
+
+                                alarmUtil.removeFiredNotification(alarm.getId());
+                            } else if (intent.getExtras().containsKey("NotificationId")) {
+                                // Dead row: degrade snooze to dismiss instead of
+                                // reconstructing schedule state from nothing. The JS
+                                // reschedule cycle re-adds anything still due.
+                                alarmUtil.clearNotification(intent.getExtras().getInt("NotificationId"));
+                                alarmUtil.stopAlarmSound();
+                            } else {
+                                alarmUtil.removeFiredNotification(id);
+                                alarmUtil.stopAlarmSound();
+                            }
+                        } catch (Exception e) {
+                            alarmUtil.stopAlarmSound();
+                            e.printStackTrace();
+                        }
+                        break;
+`
+  );
+
+  next = next.replace(
+    `                    case Constants.NOTIFICATION_ACTION_COMPLETE:
+                        id = intent.getExtras().getInt("AlarmId");
+
+                        try {
+                            alarm = alarmDB.getAlarm(id);
+                            Bundle payload = new Bundle();
+                            if (intent.getExtras() != null) {
+                                payload.putAll(intent.getExtras());
+                            }
+                            payload.putString("id", String.valueOf(alarm.getId()));
+                            if (payload.getString("alarmKey") == null && payload.getString("taskId") != null) {
+                                payload.putString("alarmKey", "task:" + payload.getString("taskId"));
+                            }
+                            payload.putString("actionIdentifier", "complete");
+                            LinkedHashMap<String, String> pendingPayload = new LinkedHashMap<>();
+                            for (String key : payload.keySet()) {
+                                Object value = payload.get(key);
+                                if (value != null) {
+                                    pendingPayload.put(key, String.valueOf(value));
+                                }
+                            }
+                            NotificationOpenPayloadStore.cache(pendingPayload);
+
+                            alarmUtil.removeFiredNotification(alarm.getId());
+                            alarmUtil.cancelAlarm(alarm, false);
+                            alarmUtil.stopAlarmSound();
+
+                            if (ANModule.getReactAppContext() != null) {
+                                ANModule.getReactAppContext().getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class).emit("OnNotificationOpened", BundleJSONConverter.convertToJSON(payload).toString());
+                            } else {
+                                Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+                                if (launchIntent != null) {
+                                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                                    launchIntent.putExtras(payload);
+                                    context.startActivity(launchIntent);
+                                }
+                            }
+                        } catch (Exception e) {
+                            alarmUtil.stopAlarmSound();
+                            e.printStackTrace();
+                        }
+                        break;
+`,
+    `                    case Constants.NOTIFICATION_ACTION_COMPLETE:
+                        id = intent.getExtras().getInt("AlarmId");
+
+                        try {
+                            alarm = alarmDB.getAlarm(id);
+                            Log.d(TAG, "ACTION_COMPLETE id=" + id + " alarmFound=" + (alarm != null));
+                            Bundle payload = new Bundle();
+                            if (intent.getExtras() != null) {
+                                payload.putAll(intent.getExtras());
+                            }
+                            payload.putString("id", String.valueOf(alarm != null ? alarm.getId() : id));
+                            if (payload.getString("alarmKey") == null && payload.getString("taskId") != null) {
+                                payload.putString("alarmKey", "task:" + payload.getString("taskId"));
+                            }
+                            payload.putString("actionIdentifier", "complete");
+                            LinkedHashMap<String, String> pendingPayload = new LinkedHashMap<>();
+                            for (String key : payload.keySet()) {
+                                Object value = payload.get(key);
+                                if (value != null) {
+                                    pendingPayload.put(key, String.valueOf(value));
+                                }
+                            }
+                            NotificationOpenPayloadStore.cache(pendingPayload);
+
+                            if (alarm != null) {
+                                alarmUtil.removeFiredNotification(alarm.getId());
+                                alarmUtil.cancelAlarm(alarm, false);
+                            } else if (intent.getExtras().containsKey("NotificationId")) {
+                                alarmUtil.clearNotification(intent.getExtras().getInt("NotificationId"));
+                            } else {
+                                alarmUtil.removeFiredNotification(id);
+                            }
+                            alarmUtil.stopAlarmSound();
+
+                            if (ANModule.getReactAppContext() != null) {
+                                ANModule.getReactAppContext().getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class).emit("OnNotificationOpened", BundleJSONConverter.convertToJSON(payload).toString());
+                            } else {
+                                Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+                                if (launchIntent != null) {
+                                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                                    launchIntent.putExtras(payload);
+                                    context.startActivity(launchIntent);
+                                }
+                            }
+                        } catch (Exception e) {
+                            alarmUtil.stopAlarmSound();
+                            e.printStackTrace();
+                        }
+                        break;
+`
+  );
+
+  next = next.replace(
+    `                    case Constants.NOTIFICATION_ACTION_DISMISS:
+                        id = intent.getExtras().getInt("AlarmId");
+
+                        try {
+                            alarm = alarmDB.getAlarm(id);
+                            Log.e(TAG, "alarm cancelled: " + alarm.toString());
+
+                            // emit notification dismissed
+                            if (ANModule.getReactAppContext() != null) {
+                                ANModule.getReactAppContext().getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class).emit("OnNotificationDismissed", "{\\"id\\": \\"" + alarm.getId() + "\\"}");
+                            }
+
+                            alarmUtil.removeFiredNotification(alarm.getId());
+                            ${''}
+                            alarmUtil.cancelAlarm(alarm, false);
+                        } catch (Exception e) {
+                            alarmUtil.stopAlarmSound();
+                            e.printStackTrace();
+                        }
+                        break;
+`,
+    `                    case Constants.NOTIFICATION_ACTION_DISMISS:
+                        id = intent.getExtras().getInt("AlarmId");
+
+                        try {
+                            alarm = alarmDB.getAlarm(id);
+                            Log.d(TAG, "ACTION_DISMISS id=" + id + " alarmFound=" + (alarm != null));
+
+                            // emit notification dismissed
+                            if (ANModule.getReactAppContext() != null) {
+                                ANModule.getReactAppContext().getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class).emit("OnNotificationDismissed", "{\\"id\\": \\"" + id + "\\"}");
+                            }
+
+                            if (alarm != null) {
+                                alarmUtil.removeFiredNotification(alarm.getId());
+                                alarmUtil.cancelAlarm(alarm, false);
+                            } else if (intent.getExtras().containsKey("NotificationId")) {
+                                alarmUtil.clearNotification(intent.getExtras().getInt("NotificationId"));
+                            } else {
+                                alarmUtil.removeFiredNotification(id);
+                            }
+                            alarmUtil.stopAlarmSound();
+                        } catch (Exception e) {
+                            alarmUtil.stopAlarmSound();
+                            e.printStackTrace();
+                        }
+                        break;
+`
+  );
+
+  // Each case above is rewritten by its own .replace() — one anchor drifting
+  // (e.g. upstream touching just the SNOOZE case) must not pass silently
+  // while the other two cases still applied. Assert every case's receipt.
+  const requiredMarkers = [
+    'Log.d(TAG, "ACTION_SNOOZE id="',
+    'Log.d(TAG, "ACTION_COMPLETE id="',
+    'Log.d(TAG, "ACTION_DISMISS id="',
+  ];
+  for (const marker of requiredMarkers) {
+    if (!next.includes(marker)) {
+      throw new Error(`alarm-dead-row-actions: expected marker not found after transform: ${marker}`);
+    }
+  }
+
+  return next;
+};
+
 const getAndroidSourceCandidates = (projectRoot, fileName) => [
   path.join(projectRoot, 'node_modules', 'react-native-alarm-notification', 'android', 'src', 'main', 'java', 'com', 'emekalites', 'react', 'alarm', 'notification', fileName),
   path.join(projectRoot, '..', '..', 'node_modules', 'react-native-alarm-notification', 'android', 'src', 'main', 'java', 'com', 'emekalites', 'react', 'alarm', 'notification', fileName),
@@ -994,6 +1279,17 @@ const PATCHES = [
     appliedMarker: 'notificationActionComplete',
   },
   {
+    id: 'alarm-dead-row-util',
+    platform: 'android',
+    getCandidates: androidJavaCandidates('AlarmUtil.java'),
+    transform: applyAlarmDeadRowUtilPatchToSource,
+    required: true,
+    // Must run after alarm-complete-action-util: it extends that block's
+    // action intents with a NotificationId extra.
+    firstMatchOnly: false,
+    appliedMarker: 'void clearNotification(int notificationId)',
+  },
+  {
     id: 'alarm-audio-interface',
     platform: 'android',
     getCandidates: androidJavaCandidates('AudioInterface.java'),
@@ -1040,6 +1336,18 @@ const PATCHES = [
     required: true,
     firstMatchOnly: false,
     appliedMarker: 'case Constants.NOTIFICATION_ACTION_COMPLETE',
+  },
+  {
+    id: 'alarm-dead-row-actions',
+    platform: 'android',
+    getCandidates: androidJavaCandidates('AlarmReceiver.java'),
+    transform: applyAlarmActionDeadRowPatchToSource,
+    required: true,
+    // Must run after alarm-receiver-dismiss-guard and
+    // alarm-complete-action-receiver: it rewrites the case blocks those
+    // produce.
+    firstMatchOnly: false,
+    appliedMarker: 'Log.d(TAG, "ACTION_SNOOZE id="',
   },
   {
     id: 'alarm-complete-action-constants',
