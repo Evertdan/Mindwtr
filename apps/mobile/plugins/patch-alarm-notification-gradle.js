@@ -769,8 +769,15 @@ const applyAlarmActionDeadRowPatchToSource = (original) => {
 `
   );
 
-  next = next.replace(
-    `                    case Constants.NOTIFICATION_ACTION_COMPLETE:
+  // applyAlarmCompleteReceiverPatchToSource inserts this case through two
+  // different paths depending on whether it already existed: a fresh
+  // full-case insert (what a pristine install goes through — e.g. CI, which
+  // never has a pre-patched node_modules) leaves TWO blank lines before
+  // removeFiredNotification; an incremental cache-block-only insert into an
+  // already-present case leaves ONE (what a dev machine's already-patched
+  // node_modules can carry from an earlier prebuild). Try the pipeline-fresh
+  // (canonical) shape first, then the other — see #1028 correction.
+  const completeCaseOld = `                    case Constants.NOTIFICATION_ACTION_COMPLETE:
                         id = intent.getExtras().getInt("AlarmId");
 
                         try {
@@ -812,8 +819,12 @@ const applyAlarmActionDeadRowPatchToSource = (original) => {
                             e.printStackTrace();
                         }
                         break;
-`,
-    `                    case Constants.NOTIFICATION_ACTION_COMPLETE:
+`;
+  const completeCaseOldCanonical = completeCaseOld.replace(
+    'NotificationOpenPayloadStore.cache(pendingPayload);\n\n                            alarmUtil.removeFiredNotification',
+    'NotificationOpenPayloadStore.cache(pendingPayload);\n\n\n                            alarmUtil.removeFiredNotification'
+  );
+  const completeCaseHardened = `                    case Constants.NOTIFICATION_ACTION_COMPLETE:
                         id = intent.getExtras().getInt("AlarmId");
 
                         try {
@@ -862,8 +873,9 @@ const applyAlarmActionDeadRowPatchToSource = (original) => {
                             e.printStackTrace();
                         }
                         break;
-`
-  );
+`;
+  next = next.replace(completeCaseOldCanonical, completeCaseHardened);
+  next = next.replace(completeCaseOld, completeCaseHardened);
 
   next = next.replace(
     `                    case Constants.NOTIFICATION_ACTION_DISMISS:
