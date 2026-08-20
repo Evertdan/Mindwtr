@@ -95,6 +95,7 @@ let activeLocale: Locale = DEFAULT_LOCALE;
 let activeDateFormatSetting: DateFormatSetting = 'system';
 let activeTimeFormatSetting: TimeFormatSetting = 'system';
 let activeCalendarSystem: CalendarSystemSetting = 'gregorian';
+let activeLanguage: Language = 'en';
 
 const normalizeLocaleTag = (value?: string | null): string => String(value || '').trim().replace(/_/g, '-');
 
@@ -399,6 +400,7 @@ export function configureDateFormatting(params: {
     activeDateFormatSetting = dateFormat;
     activeTimeFormatSetting = timeFormat;
     activeCalendarSystem = calendarSystem;
+    activeLanguage = language;
 
     if (dateFormat === 'mdy') {
         activeLocale = enUS;
@@ -429,6 +431,33 @@ export function isActiveDateFormatDayFirst(): boolean {
     } catch {
         return false;
     }
+}
+
+/** The app language quick-add's locale date parsing is keyed off (#1059). */
+export function getActiveLanguage(): Language {
+    return activeLanguage;
+}
+
+/**
+ * Wide and abbreviated month names for a language, read off the same
+ * date-fns locale table `configureDateFormatting` uses — so quick-add's
+ * bare-month-name skip doesn't need its own copy of the locale map (#1059).
+ */
+export function getMonthNamesForLanguage(language: Language): string[] {
+    const locale = DATE_LOCALE_BY_LANGUAGE[language];
+    if (!locale?.localize) return [];
+    const names: string[] = [];
+    for (let month = 0; month < 12; month += 1) {
+        const monthIndex = month as Parameters<Locale['localize']['month']>[0];
+        for (const width of ['wide', 'abbreviated'] as const) {
+            names.push(locale.localize.month(monthIndex, { width }));
+            // Declining languages inflect months inside a date ("января" in
+            // Russian) differently from the standalone default above; chrono
+            // matches the inflected forms too, so both belong in the set.
+            names.push(locale.localize.month(monthIndex, { width, context: 'formatting' }));
+        }
+    }
+    return names;
 }
 
 /**

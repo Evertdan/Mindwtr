@@ -371,6 +371,122 @@ describe('quick-add', () => {
         });
     });
 
+    // #1059: quick-add's natural-language date parsing uses chrono-node's
+    // locale parsers for the app languages chrono supports, keyed off the
+    // active app language, always falling back to the English parser so an
+    // English phrase still works no matter the UI language.
+    describe('locale-aware natural language dates (#1059)', () => {
+        afterEach(() => {
+            configureDateFormatting({});
+        });
+
+        it('detects a French bare date phrase', () => {
+            configureDateFormatting({ language: 'fr' });
+            const now = new Date('2026-08-04T10:00:00');
+            const result = parseQuickAdd('Appeler le dentiste vendredi prochain', undefined, now);
+            expect(result.detectedDate?.matchedText).toBe('vendredi prochain');
+            expect(result.detectedDate?.titleWithoutDate).toBe('Appeler le dentiste');
+        });
+
+        it('detects a German bare date phrase', () => {
+            configureDateFormatting({ language: 'de' });
+            const now = new Date('2026-08-04T10:00:00');
+            const result = parseQuickAdd('Zahnarzt anrufen nächsten Freitag', undefined, now);
+            expect(result.detectedDate?.date).toBeTruthy();
+        });
+
+        it('detects a Spanish bare date phrase', () => {
+            configureDateFormatting({ language: 'es' });
+            const now = new Date('2026-08-04T10:00:00');
+            const result = parseQuickAdd('Llamar al dentista el próximo viernes', undefined, now);
+            expect(result.detectedDate?.matchedText).toBe('próximo viernes');
+        });
+
+        it('resolves a Simplified Chinese /due: command', () => {
+            configureDateFormatting({ language: 'zh' });
+            const now = new Date('2026-08-04T10:00:00');
+            const result = parseQuickAddDateCommands('Buy groceries /due:明天', now);
+            expect(result.props.dueDate).toBe('2026-08-05');
+        });
+
+        it('falls back to the English parser for an English phrase under a French UI', () => {
+            configureDateFormatting({ language: 'fr' });
+            const now = new Date('2026-08-04T10:00:00');
+            const result = parseQuickAdd('Call dentist tomorrow', undefined, now);
+            expect(result.detectedDate?.matchedText).toBe('tomorrow');
+        });
+
+        it('does not auto-detect a bare month name under French', () => {
+            configureDateFormatting({ language: 'fr' });
+            const now = new Date('2026-08-04T10:00:00');
+            const result = parseQuickAdd('Réunion budget mai', undefined, now);
+            expect(result.title).toBe('Réunion budget mai');
+            expect(result.detectedDate).toBeUndefined();
+        });
+
+        // Unlike fr, chrono's Italian parser DOES match a bare trailing month
+        // name, so this exercises the localized bare-month skip itself.
+        it('skips a bare Italian month name the locale parser matches', () => {
+            configureDateFormatting({ language: 'it' });
+            const now = new Date('2026-08-04T10:00:00');
+            const result = parseQuickAdd('Rivedere budget maggio', undefined, now);
+            expect(result.title).toBe('Rivedere budget maggio');
+            expect(result.detectedDate).toBeUndefined();
+        });
+
+        // Russian inflects months inside dates ("января", genitive) differently
+        // from the standalone form ("январь") the locale table lists first —
+        // chrono.ru matches the inflected form, so the skip must cover it too.
+        it('skips inflected Russian bare month names', () => {
+            configureDateFormatting({ language: 'ru' });
+            const now = new Date('2026-08-04T10:00:00');
+            for (const title of ['Отчет января', 'Отчет мар.', 'Отчет январь']) {
+                const result = parseQuickAdd(title, undefined, now);
+                expect(result.detectedDate).toBeUndefined();
+                expect(result.title).toBe(title);
+            }
+        });
+
+        it('keeps unsupported-locale UI languages English-only', () => {
+            configureDateFormatting({ language: 'pl' });
+            const now = new Date('2026-08-04T10:00:00');
+            const english = parseQuickAdd('Call dentist tomorrow', undefined, now);
+            expect(english.detectedDate?.matchedText).toBe('tomorrow');
+
+            const polish = parseQuickAdd('Zadzwon do dentysty jutro', undefined, now);
+            expect(polish.detectedDate).toBeUndefined();
+            expect(polish.title).toBe('Zadzwon do dentysty jutro');
+        });
+
+        it('resolves a French /due: command with a locale date word', () => {
+            configureDateFormatting({ language: 'fr' });
+            const now = new Date('2026-08-04T10:00:00');
+            const result = parseQuickAddDateCommands('Payer le loyer /due:demain', now);
+            expect(result.props.dueDate).toBe('2026-08-05');
+        });
+
+        it('keeps the dot-date parser on the locale chrono instance', () => {
+            configureDateFormatting({ language: 'fr' });
+            const now = new Date('2026-08-04T10:00:00');
+            const result = parseQuickAddDateCommands('Payer le loyer /due:26.08.2026', now);
+            expect(result.props.dueDate).toBe('2026-08-26');
+        });
+
+        it('naturalLanguageDates: false still suppresses bare detection under French', () => {
+            configureDateFormatting({ language: 'fr' });
+            const now = new Date('2026-08-04T10:00:00');
+            const result = parseQuickAdd(
+                'Appeler le dentiste vendredi prochain',
+                undefined,
+                now,
+                undefined,
+                { naturalLanguageDates: false },
+            );
+            expect(result.detectedDate).toBeUndefined();
+            expect(result.title).toBe('Appeler le dentiste vendredi prochain');
+        });
+    });
+
     describe('naturalLanguageDates toggle', () => {
         const now = new Date('2026-07-16T10:00:00Z');
 

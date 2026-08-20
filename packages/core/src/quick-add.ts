@@ -4,7 +4,8 @@ import type { Area, Attachment, Person, Project, Task, TaskEnergyLevel, TaskStat
 import { generateUUID } from './uuid';
 import { normalizeTaskStatus } from './task-status';
 import { normalizeLinkAttachmentInput } from './attachment-link-utils';
-import { isActiveDateFormatDayFirst, normalizeClockTimeInput } from './date';
+import { getActiveLanguage, getMonthNamesForLanguage, isActiveDateFormatDayFirst, normalizeClockTimeInput } from './date';
+import type { Language } from './i18n/i18n-types';
 import { getUsedTaskTokens } from './task-token-usage';
 import { getPersonOptionNames } from './people';
 
@@ -262,6 +263,62 @@ const getQuickAddChrono = (): chrono.Chrono => (
     isActiveDateFormatDayFirst() ? quickAddChronoDayFirst : quickAddChrono
 );
 
+// chrono-node locale parsers for the app languages it natively supports
+// (#1059). Every other app language (en, and any without a chrono locale)
+// keeps today's English-only behavior via the fallback in parseNaturalDate /
+// detectTrailingDate below.
+type LocaleChronoLanguage = 'de' | 'es' | 'fr' | 'it' | 'ja' | 'nl' | 'pt' | 'ru' | 'sv' | 'zh' | 'zh-Hant';
+const LOCALE_CHRONO_FACTORY: Record<LocaleChronoLanguage, () => chrono.Chrono> = {
+    de: () => chrono.de.casual.clone(),
+    es: () => chrono.es.casual.clone(),
+    fr: () => chrono.fr.casual.clone(),
+    it: () => chrono.it.casual.clone(),
+    ja: () => chrono.ja.casual.clone(),
+    nl: () => chrono.nl.casual.clone(),
+    pt: () => chrono.pt.casual.clone(),
+    ru: () => chrono.ru.casual.clone(),
+    sv: () => chrono.sv.casual.clone(),
+    zh: () => chrono.zh.hans.casual.clone(),
+    'zh-Hant': () => chrono.zh.hant.casual.clone(),
+};
+const localeChronoCache = new Map<LocaleChronoLanguage, chrono.Chrono>();
+
+function isLocaleChronoLanguage(language: Language): language is LocaleChronoLanguage {
+    // Own-property check: `in` would also admit prototype keys like
+    // 'constructor' if a corrupted settings value slipped through upstream.
+    return Object.prototype.hasOwnProperty.call(LOCALE_CHRONO_FACTORY, language);
+}
+
+/** The active language's chrono instance, or null when it has no locale parser (falls back to English). */
+function getLocaleQuickAddChrono(): chrono.Chrono | null {
+    const language = getActiveLanguage();
+    if (!isLocaleChronoLanguage(language)) return null;
+    let instance = localeChronoCache.get(language);
+    if (!instance) {
+        instance = LOCALE_CHRONO_FACTORY[language]();
+        instance.parsers.push(dotDateParser);
+        localeChronoCache.set(language, instance);
+    }
+    return instance;
+}
+
+const localizedMonthNamesCache = new Map<Language, Set<string>>();
+
+function normalizeMonthToken(value: string): string {
+    return value.trim().toLowerCase().replace(/\.$/, '');
+}
+
+/** Whether matchedText is a bare month name in the given language — English uses the static regex, others the date-fns locale table. */
+function isBareMonthName(matchedText: string, language: Language): boolean {
+    if (language === 'en') return BARE_MONTH_RE.test(matchedText);
+    let names = localizedMonthNamesCache.get(language);
+    if (!names) {
+        names = new Set(getMonthNamesForLanguage(language).map(normalizeMonthToken));
+        localizedMonthNamesCache.set(language, names);
+    }
+    return names.has(normalizeMonthToken(matchedText));
+}
+
 type DateCommandParseOptions = {
     defaultScheduleTime?: string | null;
 };
@@ -324,16 +381,25 @@ function resolveChronoDate(
     return isValid(parsed) ? { date: parsed, hasExplicitTime } : null;
 }
 
+// A result only counts if it spans the whole input — used for both the
+// locale attempt and the English fallback so the acceptance rule lives once.
+function parseWholeTextResult(chronoInstance: chrono.Chrono, text: string, now: Date): chrono.ParsedResult | null {
+    const results = chronoInstance.parse(text, { instant: now }, { forwardDate: true });
+    const result = results[0];
+    if (!result) return null;
+    const matchedEnd = result.index + result.text.length;
+    if (result.index !== 0 || matchedEnd !== text.length) return null;
+    return result;
+}
+
 function parseNaturalDate(raw: string, now: Date, defaultTimeMode: DateDefaultTimeMode = 'now'): ParsedNaturalDate | null {
     const text = raw.trim();
     if (!text) return { date: buildDefaultDate(now, defaultTimeMode), hasExplicitTime: defaultTimeMode === 'now' };
 
-    const results = getQuickAddChrono().parse(text, { instant: now }, { forwardDate: true });
-    const result = results[0];
+    const localeChrono = getLocaleQuickAddChrono();
+    const result = (localeChrono && parseWholeTextResult(localeChrono, text, now))
+        ?? parseWholeTextResult(getQuickAddChrono(), text, now);
     if (!result) return null;
-
-    const matchedEnd = result.index + result.text.length;
-    if (result.index !== 0 || matchedEnd !== text.length) return null;
 
     return resolveChronoDate(result, now, defaultTimeMode);
 }
@@ -342,17 +408,21 @@ function formatDueDateValue(parsed: ParsedNaturalDate): string {
     return parsed.hasExplicitTime ? parsed.date.toISOString() : format(parsed.date, 'yyyy-MM-dd');
 }
 
-function detectTrailingDate(title: string, now: Date): QuickAddDetectedDate | undefined {
-    const trimmed = title.trim();
-    if (!trimmed) return undefined;
-
-    const results = getQuickAddChrono().parse(trimmed, { instant: now }, { forwardDate: true });
+// Reverse-scan acceptance loop shared by the locale pass and the English
+// fallback pass; `language` picks which bare-month check the results were
+// produced under (the active language for a locale pass, English otherwise).
+function findTrailingDateInResults(
+    results: chrono.ParsedResult[],
+    trimmed: string,
+    now: Date,
+    language: Language,
+): QuickAddDetectedDate | undefined {
     for (let index = results.length - 1; index >= 0; index -= 1) {
         const result = results[index];
         const matchedText = result.text.trim();
         const suffix = trimmed.slice(result.index + result.text.length);
         if (!matchedText || !TRAILING_DATE_SUFFIX_RE.test(suffix)) continue;
-        if (PURE_TIME_ONLY_RE.test(matchedText) || BARE_MONTH_RE.test(matchedText)) continue;
+        if (PURE_TIME_ONLY_RE.test(matchedText) || isBareMonthName(matchedText, language)) continue;
 
         const titleWithoutDate = trimmed.slice(0, result.index).replace(TRAILING_DATE_SEPARATOR_RE, '').trim();
         if (!titleWithoutDate) continue;
@@ -368,6 +438,21 @@ function detectTrailingDate(title: string, now: Date): QuickAddDetectedDate | un
     }
 
     return undefined;
+}
+
+function detectTrailingDate(title: string, now: Date): QuickAddDetectedDate | undefined {
+    const trimmed = title.trim();
+    if (!trimmed) return undefined;
+
+    const localeChrono = getLocaleQuickAddChrono();
+    if (localeChrono) {
+        const localeResults = localeChrono.parse(trimmed, { instant: now }, { forwardDate: true });
+        const localeDetected = findTrailingDateInResults(localeResults, trimmed, now, getActiveLanguage());
+        if (localeDetected) return localeDetected;
+    }
+
+    const results = getQuickAddChrono().parse(trimmed, { instant: now }, { forwardDate: true });
+    return findTrailingDateInResults(results, trimmed, now, 'en');
 }
 
 function stripToken(source: string, token: string): string {
