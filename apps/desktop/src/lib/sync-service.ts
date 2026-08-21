@@ -581,13 +581,25 @@ async function getDropboxAccessTokenDirect(
     });
 }
 
+// The connection-status probe reruns on every settings visit and auto-sync
+// tick, so a persistently broken keyring would re-toast the same error
+// forever (#1060). Each distinct failure is reported once; a successful
+// probe re-arms reporting so a new breakage is loud again.
+let lastReportedDropboxStatusFailure: string | null = null;
+
 async function isDropboxConnectedDirect(clientId: string): Promise<boolean> {
     const normalized = clientId.trim();
     if (!normalized || !isTauriRuntimeEnv()) return false;
     try {
-        return await invokeSyncNative<boolean>('is_dropbox_connected', { clientId: normalized });
+        const connected = await invokeSyncNative<boolean>('is_dropbox_connected', { clientId: normalized });
+        lastReportedDropboxStatusFailure = null;
+        return connected;
     } catch (error) {
-        syncServiceDependencies.reportError('Failed to check Dropbox connection status', error);
+        const message = error instanceof Error ? error.message : String(error);
+        if (message !== lastReportedDropboxStatusFailure) {
+            lastReportedDropboxStatusFailure = message;
+            syncServiceDependencies.reportError('Failed to check Dropbox connection status', error);
+        }
         return false;
     }
 }
@@ -2621,6 +2633,7 @@ export const __syncServiceTestUtils = {
             ...defaultSyncServiceDependencies,
         };
         lastObservedPersistedDataForSync = null;
+        lastReportedDropboxStatusFailure = null;
     },
     async persistLocalDataForTests(data: AppData) {
         await persistLocalDataForSync(data);

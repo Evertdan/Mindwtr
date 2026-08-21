@@ -3405,3 +3405,40 @@ describe('SyncService orchestration', () => {
         }
     });
 });
+
+// #1060: the connection-status probe reruns on every settings visit and
+// auto-sync tick; a persistently broken keyring must not re-report the same
+// failure each time, but a new failure (or a break after recovery) stays loud.
+describe('Dropbox connection status probe reporting', () => {
+    it('reports each distinct probe failure once, re-arming after success', async () => {
+        const reportError = vi.fn();
+        let failure: string | null = 'keyring down';
+        const invoke = vi.fn(async (command: string) => {
+            if (command === 'is_dropbox_connected') {
+                if (failure) throw new Error(failure);
+                return true;
+            }
+            return undefined;
+        });
+        __syncServiceTestUtils.setDependenciesForTests({
+            isTauriRuntime: () => true,
+            invoke: invoke as unknown as <T>(command: string, args?: Record<string, unknown>) => Promise<T>,
+            reportError,
+        });
+
+        await expect(SyncService.isDropboxConnected('app-key')).resolves.toBe(false);
+        await expect(SyncService.isDropboxConnected('app-key')).resolves.toBe(false);
+        expect(reportError).toHaveBeenCalledTimes(1);
+
+        failure = 'portal denied';
+        await expect(SyncService.isDropboxConnected('app-key')).resolves.toBe(false);
+        expect(reportError).toHaveBeenCalledTimes(2);
+
+        failure = null;
+        await expect(SyncService.isDropboxConnected('app-key')).resolves.toBe(true);
+
+        failure = 'keyring down';
+        await expect(SyncService.isDropboxConnected('app-key')).resolves.toBe(false);
+        expect(reportError).toHaveBeenCalledTimes(3);
+    });
+});
