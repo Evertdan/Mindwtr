@@ -24,6 +24,7 @@ import {
     getWaitingPerson,
     groupCompletedTasksLast,
     getNextFutureStartRevealAt,
+    getUpcomingDeferredTasks,
     isTaskFutureStart,
     shouldShowTaskForStart,
     sortDoneTasksForListView,
@@ -1046,6 +1047,49 @@ describe('task-utils', () => {
                 eligible: false,
                 reason: 'deferred',
             });
+        });
+    });
+
+    describe('getUpcomingDeferredTasks', () => {
+        const now = new Date(2026, 3, 5, 12, 0, 0, 0);
+        const makeTask = (overrides: Partial<Task>): Task => ({
+            id: overrides.id ?? 'task',
+            title: overrides.title ?? 'Task',
+            status: overrides.status ?? 'next',
+            tags: [],
+            contexts: [],
+            createdAt: '2026-04-01T00:00:00.000Z',
+            updatedAt: '2026-04-01T00:00:00.000Z',
+            ...overrides,
+        });
+
+        it('previews hidden deferred and recurring next tasks inside the window, by reveal date', () => {
+            const recurringDue = makeTask({ id: 'recurring', title: 'Weekly meeting', dueDate: '2026-04-10', recurrence: { rule: 'weekly' } });
+            const deferredStart = makeTask({ id: 'deferred', title: 'Prep slides', startTime: '2026-04-08' });
+            const visibleToday = makeTask({ id: 'today', startTime: '2026-04-05' });
+            const beyondWindow = makeTask({ id: 'far', startTime: '2026-04-20' });
+            // A plain due date never hides a task, so it is not "upcoming" — it is already visible.
+            const oneTimeFutureDue = makeTask({ id: 'due-only', dueDate: '2026-04-09' });
+            const somedayDeferred = makeTask({ id: 'someday', status: 'someday', startTime: '2026-04-08' });
+
+            const upcoming = getUpcomingDeferredTasks(
+                [recurringDue, deferredStart, visibleToday, beyondWindow, oneTimeFutureDue, somedayDeferred],
+                { now },
+            );
+
+            expect(upcoming.map((entry) => entry.task.id)).toEqual(['deferred', 'recurring']);
+            expect(upcoming[0]?.appearsAt.getTime()).toBe(new Date(2026, 3, 8).getTime());
+            expect(upcoming[1]?.appearsAt.getTime()).toBe(new Date(2026, 3, 10).getTime());
+        });
+
+        it('honours the last day of the window and a custom window length', () => {
+            const lastDay = makeTask({ id: 'last-day', startTime: '2026-04-12' });
+            const dayAfter = makeTask({ id: 'day-after', startTime: '2026-04-13' });
+
+            expect(getUpcomingDeferredTasks([lastDay, dayAfter], { now }).map((entry) => entry.task.id))
+                .toEqual(['last-day']);
+            expect(getUpcomingDeferredTasks([lastDay, dayAfter], { now, windowDays: 8 }).map((entry) => entry.task.id))
+                .toEqual(['last-day', 'day-after']);
         });
     });
 

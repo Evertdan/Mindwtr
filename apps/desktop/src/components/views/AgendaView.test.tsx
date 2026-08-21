@@ -243,6 +243,61 @@ describe('AgendaView', () => {
         expect(queryByText('Start today inbox task')).not.toBeInTheDocument();
     });
 
+    it('previews deferred and recurring tasks surfacing within a week under Upcoming (#1061)', () => {
+        const now = new Date();
+        const inThreeDays = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 3, 9, 0, 0, 0);
+        const inTwelveDays = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 12, 9, 0, 0, 0);
+        const deferredTask: Task = {
+            id: 'deferred-task',
+            title: 'Deferred prep task',
+            status: 'next',
+            startTime: inThreeDays.toISOString(),
+            tags: [],
+            contexts: [],
+            createdAt: nowIso,
+            updatedAt: nowIso,
+        };
+        const recurringTask: Task = {
+            id: 'recurring-task',
+            title: 'Weekly meeting task',
+            status: 'next',
+            dueDate: inThreeDays.toISOString(),
+            recurrence: { rule: 'weekly' },
+            tags: [],
+            contexts: [],
+            createdAt: nowIso,
+            updatedAt: nowIso,
+        };
+        const farTask: Task = {
+            id: 'far-task',
+            title: 'Far away task',
+            status: 'next',
+            startTime: inTwelveDays.toISOString(),
+            tags: [],
+            contexts: [],
+            createdAt: nowIso,
+            updatedAt: nowIso,
+        };
+
+        useTaskStore.setState({
+            tasks: [deferredTask, recurringTask, farTask],
+            _allTasks: [deferredTask, recurringTask, farTask],
+            projects: [],
+            _allProjects: [],
+            areas: [],
+            _allAreas: [],
+            settings: {},
+            highlightTaskId: null,
+        });
+
+        const { getByText, queryByText } = renderAgenda();
+
+        expect(getByText('Upcoming')).toBeInTheDocument();
+        expect(getByText('Deferred prep task')).toBeInTheDocument();
+        expect(getByText('Weekly meeting task')).toBeInTheDocument();
+        expect(queryByText('Far away task')).not.toBeInTheDocument();
+    });
+
     it('shows an empty state when active tasks do not produce agenda sections', () => {
         const inboxTask: Task = {
             id: 'inbox-task',
@@ -424,9 +479,14 @@ describe('AgendaView', () => {
             highlightTaskId: null,
         });
 
-        const { queryByRole, queryByText } = renderAgenda();
+        const { getByText, queryByRole, queryByText } = renderAgenda();
 
-        expect(queryByText('Future start next task')).not.toBeInTheDocument();
+        // The task previews under Upcoming (#1061) — never in Today/Next, and
+        // still with no visibility toggle: the list-view showFutureStarts
+        // setting has no lever here.
+        const upcomingSection = document.getElementById('agenda-section-upcoming');
+        expect(upcomingSection).not.toBeNull();
+        expect(upcomingSection).toContainElement(getByText('Future start next task'));
         expect(queryByText(/hidden \(future start\)/)).not.toBeInTheDocument();
         expect(queryByRole('button', { name: /^(show|hide)$/i })).not.toBeInTheDocument();
     });
@@ -455,14 +515,17 @@ describe('AgendaView', () => {
             highlightTaskId: null,
         });
 
-        const { getByText, queryByText } = renderAgenda();
-        expect(queryByText('Starts tomorrow')).not.toBeInTheDocument();
+        const { getByText } = renderAgenda();
+        // Still tomorrow's task: visible only as an Upcoming preview.
+        expect(document.getElementById('agenda-section-upcoming')).toContainElement(getByText('Starts tomorrow'));
 
         act(() => {
             vi.advanceTimersByTime(200);
         });
 
+        // Midnight passed: the task graduates out of Upcoming into Today.
         expect(getByText('Starts tomorrow')).toBeInTheDocument();
+        expect(document.getElementById('agenda-section-upcoming')).toBeNull();
     });
 
     it('refreshes date-sensitive sections when the desktop becomes visible on a new day', () => {
@@ -489,8 +552,9 @@ describe('AgendaView', () => {
             highlightTaskId: null,
         });
 
-        const { getByText, queryByText } = renderAgenda();
-        expect(queryByText('Starts tomorrow')).not.toBeInTheDocument();
+        const { getByText } = renderAgenda();
+        // Still tomorrow's task: visible only as an Upcoming preview.
+        expect(document.getElementById('agenda-section-upcoming')).toContainElement(getByText('Starts tomorrow'));
 
         vi.setSystemTime(new Date(2026, 2, 3, 10, 0, 0));
         act(() => {
@@ -498,6 +562,7 @@ describe('AgendaView', () => {
         });
 
         expect(getByText('Starts tomorrow')).toBeInTheDocument();
+        expect(document.getElementById('agenda-section-upcoming')).toBeNull();
     });
 
     it('removes focused tasks immediately when a local edit makes them ineligible', async () => {
@@ -580,11 +645,12 @@ describe('AgendaView', () => {
             highlightTaskId: null,
         });
 
-        const { queryByText } = renderAgenda();
+        const { getByText, queryByText } = renderAgenda();
 
-        expect(queryByText('Future first')).not.toBeInTheDocument();
+        // The deferred first action previews under Upcoming; the follower stays
+        // sequentially blocked and appears nowhere.
+        expect(document.getElementById('agenda-section-upcoming')).toContainElement(getByText('Future first'));
         expect(queryByText('Following next')).not.toBeInTheDocument();
-        expect(queryByText(/future-start|future start/i)).not.toBeInTheDocument();
     });
 
     it('shows due-soon next actions before undated tasks and sinks far-future due tasks', () => {

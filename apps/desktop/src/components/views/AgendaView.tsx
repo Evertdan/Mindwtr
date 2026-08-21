@@ -14,13 +14,13 @@ import {
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { shallow, useTaskStore, TaskPriority, TimeEstimate, applyFilter, buildAdvancedFilterCriteriaChips, compareProjectsByOrder, removeAdvancedFilterCriteriaChip, formatFocusTaskLimitText,
-    getFocusStarBlockedText, formatTimeEstimateLabel, generateUUID, getUsedTaskTokens, getFocusSequentialFirstTaskIds, getProjectDeadlineBoosts, getProjectDeadlineBoostLabel, getTaskMetadataFilterVisibility, markSavedFilterDeleted, normalizeFocusTaskLimit, resolveFeatureFlags, safeParseDate, safeParseDueDate, isDueForReview, SAVED_FILTER_NO_PROJECT_ID, shouldShowTaskForStart, sortFocusNextActions, sortTasksByFocusOrder, sortTasksBySavedPreference, translateWithFallback, tFallback } from '@mindwtr/core';
+    getFocusStarBlockedText, formatTimeEstimateLabel, generateUUID, getUsedTaskTokens, getFocusSequentialFirstTaskIds, getProjectDeadlineBoosts, getProjectDeadlineBoostLabel, getTaskMetadataFilterVisibility, markSavedFilterDeleted, normalizeFocusTaskLimit, resolveFeatureFlags, safeParseDate, safeParseDueDate, isDueForReview, SAVED_FILTER_NO_PROJECT_ID, getUpcomingDeferredTasks, shouldShowTaskForStart, sortFocusNextActions, sortTasksByFocusOrder, sortTasksBySavedPreference, translateWithFallback, tFallback } from '@mindwtr/core';
 import type { MultiValueFilterMatchMode, ProjectDeadlineBoost, SavedFilter, SortField, Task, TaskEnergyLevel } from '@mindwtr/core';
 import { useTaskFilterSelections } from '@mindwtr/core/task-filter-selections';
 import { useLanguage } from '../../contexts/language-context';
 import { cn } from '../../lib/utils';
 import { useUiStore } from '../../store/ui-store';
-import { AlertCircle, Clock, ArrowRight, Folder, CheckCircle2, X } from 'lucide-react';
+import { AlertCircle, CalendarDays, Clock, ArrowRight, Folder, CheckCircle2, X } from 'lucide-react';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
 import { checkBudget } from '../../config/performanceBudgets';
@@ -57,7 +57,7 @@ const AGENDA_ACTIVE_STATUSES: Task['status'][] = ['inbox', 'next', 'waiting', 's
 const DEFAULT_FOCUS_SORT_BY: SortField = 'default';
 const FOCUS_VIEW_STATE_STORAGE_KEY = 'mindwtr:view:focus:v1';
 
-type FocusSectionKey = 'schedule' | 'nextActions' | 'reviewDue';
+type FocusSectionKey = 'schedule' | 'nextActions' | 'upcoming' | 'reviewDue';
 type SetFocusCollapsedGroups = (
     updater: (current: CollapsedGroups<NextGroupBy>) => CollapsedGroups<NextGroupBy>,
 ) => void;
@@ -71,6 +71,7 @@ const DEFAULT_FOCUS_VIEW_STATE: FocusPersistedViewState = {
     expandedSections: {
         schedule: true,
         nextActions: true,
+        upcoming: true,
         reviewDue: true,
     },
     collapsedGroups: emptyCollapsedGroups(FOCUS_AXES),
@@ -87,6 +88,7 @@ function sanitizeFocusViewState(value: unknown, fallback: FocusPersistedViewStat
         expandedSections: {
             schedule: typeof expandedSections.schedule === 'boolean' ? expandedSections.schedule : fallback.expandedSections.schedule,
             nextActions: typeof expandedSections.nextActions === 'boolean' ? expandedSections.nextActions : fallback.expandedSections.nextActions,
+            upcoming: typeof expandedSections.upcoming === 'boolean' ? expandedSections.upcoming : fallback.expandedSections.upcoming,
             reviewDue: typeof expandedSections.reviewDue === 'boolean' ? expandedSections.reviewDue : fallback.expandedSections.reviewDue,
         },
         collapsedGroups: sanitizeCollapsedGroups(FOCUS_AXES, parsed.collapsedGroups, fallback.collapsedGroups),
@@ -509,7 +511,7 @@ export function AgendaView() {
         + (activeSavedFilterId && filterSelections.activeCount === 0 && effectiveFocusSortBy === DEFAULT_FOCUS_SORT_BY ? 1 : 0);
     const saveFilterDefaultName = getSavedFilterDefaultName(activeFilterChips, resolveText('savedFilters.defaultName', 'Focus filter'));
 
-    const { filteredActiveTasks, reviewDueCandidates } = useMemo(() => {
+    const { filteredActiveTasks, reviewDueCandidates, upcomingCandidates } = useMemo(() => {
         void localDayKey;
         const now = new Date();
         const filtered = applyFilter(activeTasks, effectiveFilterCriteria, { projects, now, tokenMatchMode: 'all' })
@@ -522,7 +524,15 @@ export function AgendaView() {
                 return true;
             });
         const reviewDue = applyFilter(reviewDueBase, effectiveFilterCriteria, { projects, now, tokenMatchMode: 'all' });
-        return { filteredActiveTasks: filtered, reviewDueCandidates: reviewDue };
+        // The Upcoming preview draws from baseActiveTasks: the deferral filter that
+        // produced activeTasks is exactly what hides these rows today (#1061).
+        const upcomingBase = applyFilter(
+            baseActiveTasks.filter((task) => matchesSearchQuery(task.title)),
+            effectiveFilterCriteria,
+            { projects, now, tokenMatchMode: 'all' },
+        );
+        const upcoming = getUpcomingDeferredTasks(upcomingBase, { now }).map((entry) => entry.task);
+        return { filteredActiveTasks: filtered, reviewDueCandidates: reviewDue, upcomingCandidates: upcoming };
     }, [activeTasks, baseActiveTasks, effectiveFilterCriteria, localDayKey, matchesSearchQuery, projects]);
 
     const reviewDueProjects = useMemo(() => {
@@ -735,6 +745,9 @@ export function AgendaView() {
         return {
             schedule: sortSchedule(schedule),
             nextActions: sortNextActions(nextActions),
+            // The forecast keeps reveal-date order even under a custom sort — the
+            // date a task appears is the only ordering that means anything here.
+            upcoming: upcomingCandidates.filter((task) => !isSequentialBlocked(task)),
             reviewDue: sortReviewDue(reviewDue),
             projectDeadlineBoosts,
         };
@@ -749,6 +762,7 @@ export function AgendaView() {
         sequentialProjectIds,
         sequentialWithinSectionProjectIds,
         sortBySavedPerspective,
+        upcomingCandidates,
     ]);
     const nextActionGroups = useMemo(() => (
         groupTasks(effectiveNextGroupBy, { tasks: sections.nextActions, areas, projectMap, t, theme: settings?.theme })
@@ -798,6 +812,7 @@ export function AgendaView() {
         const visible = [...focusedTasks];
         if (expandedSections.schedule) visible.push(...sections.schedule);
         if (expandedSections.nextActions) visible.push(...visibleNextActions);
+        if (expandedSections.upcoming) visible.push(...sections.upcoming);
         if (expandedSections.reviewDue) visible.push(...sections.reviewDue);
         return visible;
     }, [
@@ -864,6 +879,7 @@ export function AgendaView() {
     const hasAgendaContent = focusedTasks.length > 0
         || sections.schedule.length > 0
         || sections.nextActions.length > 0
+        || sections.upcoming.length > 0
         || sections.reviewDue.length > 0
         || reviewDueProjects.length > 0;
     const pomodoroTasks = (() => {
@@ -1236,6 +1252,25 @@ export function AgendaView() {
                                     </div>
                                 </AgendaCollapsibleSection>
                             )
+                        )}
+
+                        {sections.upcoming.length > 0 && (
+                            <AgendaCollapsibleSection
+                                title={tFallback(t, 'agenda.upcoming', 'Upcoming')}
+                                icon={CalendarDays}
+                                color="text-muted-foreground"
+                                count={sections.upcoming.length}
+                                expanded={expandedSections.upcoming}
+                                onToggle={() => toggleSection('upcoming')}
+                                controlsId="agenda-section-upcoming"
+                            >
+                                <AgendaTaskList
+                                    tasks={sections.upcoming}
+                                    buildFocusToggle={buildFocusToggle}
+                                    showListDetails={showListDetails}
+                                    highlightTaskId={highlightTaskId}
+                                />
+                            </AgendaCollapsibleSection>
                         )}
 
                         {sections.reviewDue.length > 0 && (

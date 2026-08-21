@@ -29,6 +29,7 @@ import DraggableFlatList, {
 
 import {
   applyFilter,
+  getUpcomingDeferredTasks,
   buildAdvancedFilterCriteriaChips,
   buildFocusTaskGroups,
   getProjectDeadlineBoostLabel,
@@ -116,6 +117,7 @@ const DEFAULT_EXPANDED_SECTIONS = {
   focus: true,
   schedule: true,
   next: true,
+  upcoming: true,
   reviewDue: true,
   reviewProjects: true,
 };
@@ -140,7 +142,7 @@ type FocusFilterChip = {
   variant?: 'advanced' | 'excluded';
 };
 
-type FocusSectionType = 'focus' | 'schedule' | 'next' | 'reviewDue' | 'reviewProjects';
+type FocusSectionType = 'focus' | 'schedule' | 'next' | 'upcoming' | 'reviewDue' | 'reviewProjects';
 
 type FocusListItem =
   | { type: 'task'; task: Task; grouped?: boolean }
@@ -179,6 +181,7 @@ const readPersistedFocusExpandedSections = (raw: string | null): Partial<FocusEx
         reviewDue?: unknown;
         reviewProjects?: unknown;
         schedule?: unknown;
+        upcoming?: unknown;
       };
     };
     const persisted = parsed.expandedSections;
@@ -190,6 +193,7 @@ const readPersistedFocusExpandedSections = (raw: string | null): Partial<FocusEx
       ? persisted.next
       : persisted.nextActions;
     if (typeof nextActionsExpanded === 'boolean') next.next = nextActionsExpanded;
+    if (typeof persisted.upcoming === 'boolean') next.upcoming = persisted.upcoming;
     if (typeof persisted.reviewDue === 'boolean') next.reviewDue = persisted.reviewDue;
     if (typeof persisted.reviewProjects === 'boolean') next.reviewProjects = persisted.reviewProjects;
     return Object.keys(next).length > 0 ? next : null;
@@ -204,6 +208,7 @@ const serializeFocusViewState = (expandedSections: FocusExpandedSections): strin
     schedule: expandedSections.schedule,
     next: expandedSections.next,
     nextActions: expandedSections.next,
+    upcoming: expandedSections.upcoming,
     reviewDue: expandedSections.reviewDue,
     reviewProjects: expandedSections.reviewProjects,
   },
@@ -358,6 +363,16 @@ export default function FocusScreen() {
     selections.criteria,
     projects,
   ]);
+  // The Upcoming preview draws from baseActiveTasks: the deferral filter that
+  // produced activeTasks is exactly what hides these rows today (#1061).
+  const upcomingCandidates = useMemo(() => {
+    void localDayKey;
+    const now = new Date();
+    return getUpcomingDeferredTasks(
+      applyFilter(baseActiveTasks, selections.criteria, { projects, tokenMatchMode: 'all' }),
+      { now },
+    ).map((entry) => entry.task);
+  }, [baseActiveTasks, localDayKey, projects, selections.criteria]);
   const getFocusGroupByLabel = useCallback((groupBy: FocusGroupBy) => {
     switch (groupBy) {
       case 'context':
@@ -717,7 +732,7 @@ export default function FocusScreen() {
     });
   }, [activeSavedFilter?.sortOrder, effectiveFocusSortBy, prioritiesEnabled, projects]);
 
-  const { focusedTasks, schedule, nextActions, reviewDue, projectDeadlineBoosts } = useMemo(() => {
+  const { focusedTasks, schedule, nextActions, upcoming, reviewDue, projectDeadlineBoosts } = useMemo(() => {
     void localDayKey;
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
@@ -785,6 +800,9 @@ export default function FocusScreen() {
         })
         : sortBySavedPerspective(nextItems),
       reviewDue: effectiveFocusSortBy === DEFAULT_FOCUS_SORT_BY ? reviewDueItems : sortBySavedPerspective(reviewDueItems),
+      // The forecast keeps reveal-date order even under a custom sort — the
+      // date a task appears is the only ordering that means anything here.
+      upcoming: upcomingCandidates.filter((task) => !isSequentialBlocked(task)),
       projectDeadlineBoosts: nextProjectDeadlineBoosts,
     };
   }, [
@@ -797,6 +815,7 @@ export default function FocusScreen() {
     sequentialProjectIds,
     sequentialWithinSectionProjectIds,
     sortBySavedPerspective,
+    upcomingCandidates,
   ]);
   const reviewDueProjects = useMemo(() => {
     void localDayKey;
@@ -981,6 +1000,13 @@ export default function FocusScreen() {
         expanded: expandedSections.next,
         type: 'next',
       },
+      ...(upcoming.length > 0 ? [{
+        title: t('agenda.upcoming') ?? 'Upcoming',
+        data: expandedSections.upcoming ? buildTaskItems(upcoming) : [],
+        totalCount: upcoming.length,
+        expanded: expandedSections.upcoming,
+        type: 'upcoming' as const,
+      }] : []),
       {
         title: t('agenda.reviewDue') ?? 'Review Due',
         data: expandedSections.reviewDue ? buildTaskItems(reviewDue) : [],
@@ -1007,8 +1033,10 @@ export default function FocusScreen() {
     expandedSections.reviewDue,
     expandedSections.reviewProjects,
     expandedSections.schedule,
+    expandedSections.upcoming,
     focusedTasks,
     nextActions,
+    upcoming,
     projects,
     resolveText,
     reviewDue,

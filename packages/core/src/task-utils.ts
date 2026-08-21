@@ -416,18 +416,24 @@ function earliestDate(a: Date | null, b: Date | null): Date | null {
     return a <= b ? a : b;
 }
 
-export function isTaskFutureStart(
+export function getTaskDeferUntil(
     task: Pick<Task, 'startTime'> & Partial<Pick<Task, 'dueDate' | 'recurrence' | 'reviewAt'>>,
-    now: Date = new Date(),
-): boolean {
+): Date | null {
     const start = safeParseDate(task.startTime);
     // A recurring task without a start date defers on its next remaining
     // schedule field (the earlier of due/review); otherwise the next instance
     // spawned on completion reappears in Next/Focus immediately,
     // indistinguishable from the instance just completed (#843).
-    const deferUntil = start ?? (hasRecurrenceRule(task.recurrence)
+    return start ?? (hasRecurrenceRule(task.recurrence)
         ? earliestDate(safeParseDate(task.dueDate), safeParseDate(task.reviewAt))
         : null);
+}
+
+export function isTaskFutureStart(
+    task: Pick<Task, 'startTime'> & Partial<Pick<Task, 'dueDate' | 'recurrence' | 'reviewAt'>>,
+    now: Date = new Date(),
+): boolean {
+    const deferUntil = getTaskDeferUntil(task);
     if (!deferUntil) return false;
 
     const endOfToday = new Date(
@@ -440,6 +446,50 @@ export function isTaskFutureStart(
         999,
     );
     return deferUntil > endOfToday;
+}
+
+export type UpcomingDeferredTask = {
+    task: Task;
+    /** The defer-until date the task will surface on. */
+    appearsAt: Date;
+};
+
+export const UPCOMING_DEFERRED_WINDOW_DAYS = 7;
+
+/**
+ * The Focus "Upcoming" preview (#1061): next-status tasks the start/recurrence
+ * deferral currently hides but which surface within the window, sorted by the
+ * date they will appear. Derives the date via getTaskDeferUntil — the same
+ * derivation isTaskFutureStart uses — so the preview cannot disagree with the
+ * actual reveal.
+ */
+export function getUpcomingDeferredTasks(
+    tasks: readonly Task[],
+    options: { now?: Date; windowDays?: number } = {},
+): UpcomingDeferredTask[] {
+    const now = options.now ?? new Date();
+    const windowDays = options.windowDays ?? UPCOMING_DEFERRED_WINDOW_DAYS;
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const windowEnd = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + windowDays,
+        23,
+        59,
+        59,
+        999,
+    );
+    const upcoming: UpcomingDeferredTask[] = [];
+    for (const task of tasks) {
+        if (task.status !== 'next') continue;
+        const deferUntil = getTaskDeferUntil(task);
+        if (!deferUntil || deferUntil <= endOfToday || deferUntil > windowEnd) continue;
+        upcoming.push({ task, appearsAt: deferUntil });
+    }
+    return upcoming.sort((a, b) => (
+        (a.appearsAt.getTime() - b.appearsAt.getTime())
+        || a.task.title.localeCompare(b.task.title)
+    ));
 }
 
 export function shouldShowTaskForStart(

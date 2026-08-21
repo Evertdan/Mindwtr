@@ -192,6 +192,7 @@ vi.mock('../contexts/language-context', () => {
         'agenda.todaysFocus': "Today's Focus",
         'focus.schedule': 'Today',
         'focus.nextActions': 'Next Actions',
+        'agenda.upcoming': 'Upcoming',
         'agenda.reviewDue': 'Review Due',
         'agenda.reviewDueProjects': 'Projects to review',
         'agenda.allClear': 'All clear',
@@ -794,11 +795,38 @@ describe('FocusScreen', () => {
           schedule: true,
           next: false,
           nextActions: false,
+          upcoming: true,
           reviewDue: true,
           reviewProjects: true,
         },
       })
     );
+  });
+
+  it('previews deferred and recurring tasks surfacing within a week under Upcoming (#1061)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 3, 5, 12, 0, 0, 0));
+    storeState.tasks = [
+      makeTask('deferred-soon', { title: 'Deferred soon', startTime: '2026-04-08' }),
+      makeTask('recurring-soon', { title: 'Recurring soon', dueDate: '2026-04-10', recurrence: { rule: 'weekly' } }),
+      makeTask('deferred-far', { title: 'Deferred far', startTime: '2026-04-20' }),
+      makeTask('plain-next', { title: 'Plain next' }),
+    ];
+
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<FocusScreen />);
+    });
+
+    findButtonByLabel(tree, 'Upcoming');
+    const shownIds = tree.root.findAllByType(SwipeableTaskItem).map((node) => node.props.task.id);
+    expect(shownIds).toContain('deferred-soon');
+    expect(shownIds).toContain('recurring-soon');
+    expect(shownIds).not.toContain('deferred-far');
+    // Reveal-date order inside the section: start Apr 8 before due Apr 10.
+    expect(shownIds.indexOf('deferred-soon')).toBeLessThan(shownIds.indexOf('recurring-soon'));
+    vi.useRealTimers();
   });
 
   it('renders mobile Next Actions flat by default', () => {
