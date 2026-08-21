@@ -673,6 +673,49 @@ describe('TaskEditContentField', () => {
     });
   });
 
+  it('focuses a newly added checklist row from its first layout, not the mount commit', () => {
+    const { getState, applyChecklistUpdate } = createChecklistState();
+    const focus = vi.fn();
+    let tree!: ReturnType<typeof create>;
+
+    const renderField = () => (
+      <TaskEditContentField
+        {...baseProps}
+        fieldId="checklist"
+        checklist={getState().checklist}
+        applyChecklistUpdate={applyChecklistUpdate}
+      />
+    );
+
+    act(() => {
+      tree = create(renderField(), { createNodeMock: () => ({ focus }) });
+    });
+
+    const addItem = tree.root.findByProps({ testID: 'mobile-checklist-add-item' });
+    act(() => {
+      addItem.props.onPress();
+    });
+    act(() => {
+      tree.update(renderField());
+    });
+
+    // Focusing before the row has a native layout makes Android's ScrollView
+    // jump to the top of the checklist, so the mount commit must not focus.
+    expect(focus).not.toHaveBeenCalled();
+
+    const newInput = tree.root.findByProps({ accessibilityLabel: 'taskEdit.checklist 2' });
+    act(() => {
+      newInput.props.onLayout();
+    });
+    expect(focus).toHaveBeenCalledTimes(1);
+
+    // Later relayouts of the same row must not steal focus again.
+    act(() => {
+      newInput.props.onLayout();
+    });
+    expect(focus).toHaveBeenCalledTimes(1);
+  });
+
   it('does not add another blank checklist item while one is already empty', () => {
     const { getState, applyChecklistUpdate } = createChecklistState([
       { id: 'check-1', title: '', isCompleted: false },

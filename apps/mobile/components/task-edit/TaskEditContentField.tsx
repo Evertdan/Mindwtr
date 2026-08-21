@@ -148,14 +148,14 @@ export function TaskEditContentField({
     }, [checklist]);
 
     const pendingChecklistFocusKeyRef = React.useRef<string | null>(null);
-    React.useEffect(() => {
-        const key = pendingChecklistFocusKeyRef.current;
-        if (!key) return;
-        const input = checklistInputRefs.current[key];
-        if (!input) return;
+    // A just-added row is focused from its first onLayout, not the mount commit:
+    // focusing before native layout makes Android's ScrollView scroll-to-focused-
+    // child measure the unpositioned row and jump to the top of the checklist.
+    const handleChecklistRowLayout = React.useCallback((key: string) => {
+        if (pendingChecklistFocusKeyRef.current !== key) return;
         pendingChecklistFocusKeyRef.current = null;
-        input.focus();
-    }, [checklist]);
+        checklistInputRefs.current[key]?.focus();
+    }, []);
 
     const getChecklistSelection = React.useCallback((key: string, value: string): MarkdownSelection => (
         checklistSelectionRefs.current[key] ?? { start: value.length, end: value.length }
@@ -665,6 +665,7 @@ export function TaskEditContentField({
                                                 ref={(node) => {
                                                     checklistInputRefs.current[checklistItemKey] = node;
                                                 }}
+                                                onLayout={() => handleChecklistRowLayout(checklistItemKey)}
                                                 style={[
                                                     styles.checklistInput,
                                                     textDirectionStyle,
