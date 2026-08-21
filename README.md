@@ -293,7 +293,7 @@ You can help in several ways:
 
 ## Sponsors
 
-Thanks to these monthly sponsors for supporting Mindwtr.
+Thanks to these monthly sponsors for supporting Mindwtr. Companies interested in sponsoring Mindwtr — README/website placement or partnerships — see [SPONSORS.md](SPONSORS.md).
 
 <p align="center">
   <a href="https://github.com/jarrydstan" title="@jarrydstan">

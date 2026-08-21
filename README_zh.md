@@ -287,7 +287,7 @@ Mindwtr 的发展离不开用户与贡献者的支持，感谢大家一起把它
 
 ## 赞助者
 
-感谢这些按月赞助 Mindwtr 的朋友。
+感谢这些按月赞助 Mindwtr 的朋友。企业赞助（README/官网展示或合作伙伴计划）请参阅 [SPONSORS.md](SPONSORS.md)。
 
 <p align="center">
   <a href="https://github.com/jarrydstan" title="@jarrydstan">
