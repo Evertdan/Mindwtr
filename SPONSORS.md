@@ -37,7 +37,7 @@ Individual supporter tiers ($5+/month) live on [GitHub Sponsors](https://github.
 1. Email **[support@mindwtr.app](mailto:support@mindwtr.app)** with your company name, website, preferred tier, and destination URL.
 2. Provide an SVG logo where possible, or a high-resolution transparent PNG.
 3. Mindwtr reviews the sponsor and placement before confirming.
-4. Pay via GitHub Sponsors, or request an invoice / other payment method. Corporate placements may require a short written sponsorship agreement; strategic partnerships and product integrations always do.
+4. Standard sponsorships can be paid through GitHub Sponsors. Companies requiring contracts, invoices, purchase orders, or alternative payment arrangements should contact [support@mindwtr.app](mailto:support@mindwtr.app). Corporate placements may require a short written sponsorship agreement; strategic partnerships and product integrations always do.
 
 ## Product and API partnerships
 
