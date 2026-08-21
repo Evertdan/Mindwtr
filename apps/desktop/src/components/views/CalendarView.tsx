@@ -84,6 +84,7 @@ export function CalendarView() {
         externalCalendars,
         externalError,
         getExternalCalendarColor,
+        getTaskAccentColor,
         getAllDayItemsForDay,
         getCalendarItemsForDate,
         handleMonthChange,
@@ -632,6 +633,9 @@ export function CalendarView() {
                                                         : "border-l-[3px] border-destructive/70 bg-background/60 text-foreground",
                                                     taskMenuRingClass(task.id)
                                                 )}
+                                                style={!projected && !completed && item.kind !== 'scheduled'
+                                                    ? { borderLeftColor: getTaskAccentColor(task) }
+                                                    : undefined}
                                                 title={projected ? `${task.title} (${projectedLabel})` : task.title}
                                                 onDragStart={(event) => handleCalendarTaskDragStart(event, task, item.kind)}
                                                 onClick={(e) => {
@@ -768,6 +772,9 @@ export function CalendarView() {
                                                             : "border-destructive/70 bg-background/70",
                                                         taskMenuRingClass(item.task.id)
                                                     )}
+                                                    style={!projected && !completed && item.kind !== 'scheduled'
+                                                        ? { borderLeftColor: getTaskAccentColor(item.task) }
+                                                        : undefined}
                                                     title={projected ? `${item.title} (${projectedLabel})` : item.title}
                                                 >
                                                     {projected ? `${item.title} · ${projectedLabel}` : item.title}
@@ -989,6 +996,9 @@ export function CalendarView() {
                                                                 : item.kind === 'scheduled' ? "bg-primary/10 text-primary" : "border-l-[3px] border-destructive/70 bg-background",
                                                             taskMenuRingClass(item.task.id)
                                                         )}
+                                                        style={!projected && !completed && item.kind !== 'scheduled'
+                                                            ? { borderLeftColor: getTaskAccentColor(item.task) }
+                                                            : undefined}
                                                     >
                                                         <span className="w-20 shrink-0 text-xs font-medium text-muted-foreground">{timeLabel}</span>
                                                         <span className={cn('min-w-0 flex-1 truncate text-foreground', completed && 'text-muted-foreground line-through')}>{item.title}</span>

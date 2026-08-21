@@ -19,6 +19,7 @@ type CalendarSelectedDayPanelController = Pick<
     | 'editingTimeTaskId'
     | 'editingTimeValue'
     | 'getExternalCalendarColor'
+    | 'getTaskAccentColor'
     | 'isExternalLoading'
     | 'markTaskDone'
     | 'openQuickAddForDate'
@@ -65,6 +66,7 @@ export function CalendarSelectedDayPanel({ controller }: CalendarSelectedDayPane
         editingTimeTaskId,
         editingTimeValue,
         getExternalCalendarColor,
+        getTaskAccentColor,
         isExternalLoading,
         markTaskDone,
         openQuickAddForDate,
@@ -236,6 +238,9 @@ export function CalendarSelectedDayPanel({ controller }: CalendarSelectedDayPane
                                                 ? "border border-dashed border-primary/50 bg-primary/5"
                                                 : kind === 'scheduled' ? "bg-primary/5" : "border-l-[3px] border-destructive/70 bg-background/60"
                                         )}
+                                        style={!projected && kind !== 'scheduled'
+                                            ? { borderLeftColor: getTaskAccentColor(task) }
+                                            : undefined}
                                     >
                                         <button
                                             type="button"

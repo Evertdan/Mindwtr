@@ -506,6 +506,28 @@ describe('CalendarView', () => {
         expect(storeMocks.taskStoreState.addTask).not.toHaveBeenCalled();
     });
 
+    it('colors the month due bar by project or area, keeping red for unfiled tasks', async () => {
+        storeMocks.taskStoreState.projects = [
+            makeProject({ id: 'project-green', title: 'Green project', color: '#22c55e' }),
+        ];
+        storeMocks.taskStoreState.areas = [
+            makeArea({ id: 'area-violet', name: 'Violet area', color: '#8b5cf6' }),
+        ];
+        storeMocks.taskStoreState.tasks = [
+            makeTask({ id: 'task-project', title: 'Project due task', projectId: 'project-green', dueDate: '2026-04-10' }),
+            makeTask({ id: 'task-area', title: 'Area due task', areaId: 'area-violet', dueDate: '2026-04-10' }),
+            makeTask({ id: 'task-plain', title: 'Unfiled due task', dueDate: '2026-04-10' }),
+        ];
+
+        renderCalendar();
+        await flushCalendarEffects();
+
+        expect(screen.getByRole('button', { name: /Project due task/ })).toHaveStyle({ borderLeftColor: '#22c55e' });
+        expect(screen.getByRole('button', { name: /Area due task/ })).toHaveStyle({ borderLeftColor: '#8b5cf6' });
+        // No project or area: the inline override stays unset so the themed red applies.
+        expect(screen.getByRole('button', { name: /Unfiled due task/ }).style.borderLeftColor).toBe('');
+    });
+
     it('parses quick-add syntax when creating a scheduled task from the calendar composer', async () => {
         storeMocks.taskStoreState.projects = [
             makeProject({ id: 'project-launch', title: 'Launch' }),
