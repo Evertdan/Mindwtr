@@ -1379,8 +1379,13 @@ pub fn run() {
             let is_flatpak_install = cfg!(target_os = "linux") && is_flatpak();
             if let Some(window) = app.get_webview_window("main") {
                 enable_desktop_spellcheck(&window);
+                // 128x128, not icon.png: GTK3 on X11 silently drops window
+                // icons whose _NET_WM_ICON property would be too large, so
+                // the 512px master never reached the taskbar and AppImages —
+                // with no installed .desktop file to fall back on — showed a
+                // blank entry (#1018).
                 #[cfg(target_os = "linux")]
-                if let Ok(icon) = Image::from_bytes(include_bytes!("../icons/icon.png")) {
+                if let Ok(icon) = Image::from_bytes(include_bytes!("../icons/128x128.png")) {
                     let _ = window.set_icon(icon);
                 }
                 if cfg!(target_os = "linux") && is_niri_session() {
