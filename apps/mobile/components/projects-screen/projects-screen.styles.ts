@@ -767,6 +767,9 @@ export const projectsScreenStyles = StyleSheet.create({
         paddingVertical: 9,
         borderBottomWidth: StyleSheet.hairlineWidth,
     },
+    projectOptionsRowDisabled: {
+        opacity: 0.45,
+    },
     projectOptionsIcon: {
         width: 32,
         height: 32,

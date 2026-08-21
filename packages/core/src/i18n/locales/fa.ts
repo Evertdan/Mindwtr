@@ -651,6 +651,7 @@ export const faOverrides: Record<string, string> = {
         'projects.moveProjectFailed': 'انتقال پروژه ناموفق بود',
         'projects.taskOrder': 'ترتیب کارها',
         'projects.reorderTasks': 'تغییر ترتیب',
+        'projects.reorderNeedsDefaultSort': 'وقتی مرتب‌سازی روی پیش‌فرض باشد در دسترس است',
         'projects.taskReorderFailed': 'تغییر ترتیب کارها ناموفق بود.',
         'projects.deletedAreaFilterResetAlert': 'حوزه انتخاب‌شده حذف شد، بنابراین فیلتر به همه حوزه‌ها بازنشانی شد.',
         'projects.search': 'جستجوی پروژه‌ها',

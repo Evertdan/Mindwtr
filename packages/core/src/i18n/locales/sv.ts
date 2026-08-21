@@ -651,6 +651,7 @@ export const svOverrides: Record<string, string> = {
         'projects.moveProjectFailed': 'Det gick inte att flytta projektet',
         'projects.taskOrder': 'Uppgiftsordning',
         'projects.reorderTasks': 'Ändra ordning',
+        'projects.reorderNeedsDefaultSort': 'Tillgängligt när sortering är standard',
         'projects.taskReorderFailed': 'Det gick inte att ändra ordning på uppgifterna.',
         'projects.deletedAreaFilterResetAlert': 'Det valda området togs bort, så filtret återställdes till Alla områden.',
         'projects.search': 'Sök projekt',

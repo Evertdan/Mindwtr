@@ -1687,6 +1687,7 @@ export const zhHans: Record<string, string> = {
         'projects.moveProjectFailed': '移动项目失败',
         'projects.taskOrder': '任务顺序',
         'projects.reorderTasks': '排序',
+        'projects.reorderNeedsDefaultSort': '排序方式为默认时可用',
         'projects.taskReorderFailed': '任务排序失败。',
         'projects.removeFromFocus': '移出专注',
         'projects.taskMovedTo': '已移动到 {{name}}',

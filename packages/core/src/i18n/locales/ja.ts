@@ -679,6 +679,7 @@ export const jaOverrides: Record<string, string> = {
         'projects.moveProjectFailed': 'プロジェクトを移動できませんでした',
         'projects.taskOrder': 'タスクの並び順',
         'projects.reorderTasks': '並べ替え',
+        'projects.reorderNeedsDefaultSort': '並び順が「デフォルト」のときに使用できます',
         'projects.taskReorderFailed': 'タスクの並べ替えに失敗しました。',
         'projects.deletedAreaFilterResetAlert': '選択していたエリアが削除されたため、絞り込みを「すべてのエリア」に戻しました。',
         'projects.search': 'プロジェクトを検索',

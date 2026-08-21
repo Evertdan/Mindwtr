@@ -444,6 +444,7 @@ function ProjectOptionsModal({
 
 function ProjectOptionRow({
     description,
+    disabled = false,
     icon,
     label,
     onPress,
@@ -453,6 +454,7 @@ function ProjectOptionRow({
     tc,
 }: {
     description?: string;
+    disabled?: boolean;
     icon: React.ComponentProps<typeof Ionicons>['name'];
     label: string;
     onPress: () => void;
@@ -464,9 +466,10 @@ function ProjectOptionRow({
     return (
         <TouchableOpacity
             accessibilityRole="button"
-            accessibilityState={{ selected }}
+            accessibilityState={{ selected, disabled }}
+            disabled={disabled}
             onPress={onPress}
-            style={[styles.projectOptionsRow, { borderBottomColor: tc.border }]}
+            style={[styles.projectOptionsRow, { borderBottomColor: tc.border }, disabled ? styles.projectOptionsRowDisabled : null]}
             testID={testID}
         >
             <View style={[styles.projectOptionsIcon, { backgroundColor: selected ? `${tc.tint}20` : tc.filterBg }]}>
@@ -1529,8 +1532,15 @@ export function ProjectDetailModal({
                                             tc={tc}
                                         />
                                     ) : null}
-                                    {taskListOptions.enableProjectReorder && hasProjectTaskOrderTargets && !sortIsActive ? (
+                                    {taskListOptions.enableProjectReorder && hasProjectTaskOrderTargets ? (
+                                        // Kept visible but disabled under a custom sort: hiding
+                                        // the row read as "manual ordering doesn't exist" to
+                                        // users who had a sort active (Discord report).
                                         <ProjectOptionRow
+                                            description={sortIsActive && !projectTaskReorderMode
+                                                ? tFallback(t, 'projects.reorderNeedsDefaultSort', 'Available when Sort is Default')
+                                                : undefined}
+                                            disabled={sortIsActive && !projectTaskReorderMode}
                                             icon={projectTaskReorderMode ? 'checkmark-circle-outline' : 'list-outline'}
                                             label={projectTaskReorderMode ? doneButtonLabel : projectOrderLabel}
                                             onPress={() => {

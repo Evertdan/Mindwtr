@@ -1687,6 +1687,7 @@ export const zhHant: Record<string, string> = {
         'projects.moveProjectFailed': '移動項目失敗',
         'projects.taskOrder': '任務順序',
         'projects.reorderTasks': '排序',
+        'projects.reorderNeedsDefaultSort': '排序方式為預設時可用',
         'projects.taskReorderFailed': '任務排序失敗。',
         'projects.removeFromFocus': '移出聚焦',
         'projects.taskMovedTo': '已移動到 {{name}}',

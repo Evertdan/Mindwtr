@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, Dimensions, Keyboard, KeyboardAvoidingView, Modal, Platform, TextInput } from 'react-native';
+import { Alert, Dimensions, Keyboard, KeyboardAvoidingView, Modal, Platform, Text, TextInput } from 'react-native';
 import { act, create } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Project, Section, Task } from '@mindwtr/core';
@@ -748,7 +748,7 @@ describe('ProjectDetailModal task sorting', () => {
 
         const hiddenToggle = findOptionButton(tree.root, 'project-view-completed-option');
         expect(hiddenToggle.props.accessibilityRole).toBe('button');
-        expect(hiddenToggle.props.accessibilityState).toEqual({ selected: false });
+        expect(hiddenToggle.props.accessibilityState).toEqual({ selected: false, disabled: false });
         expect(hiddenToggle.findByProps({ name: 'eye-off-outline' }).props.name).toBe('eye-off-outline');
 
         act(() => {
@@ -759,7 +759,7 @@ describe('ProjectDetailModal task sorting', () => {
         });
 
         const visibleToggle = findOptionButton(tree.root, 'project-view-completed-option');
-        expect(visibleToggle.props.accessibilityState).toEqual({ selected: true });
+        expect(visibleToggle.props.accessibilityState).toEqual({ selected: true, disabled: false });
         expect(visibleToggle.findByProps({ name: 'eye-outline' }).props.name).toBe('eye-outline');
         expect(taskListPropsSpy.mock.calls.at(-1)?.[0].project.includeDone).toBe(true);
     });
@@ -1140,5 +1140,54 @@ describe('ProjectDetailModal archived projects', () => {
             includeArchived: false,
             includeDone: true,
         });
+    });
+});
+
+// The manual "Order" entry used to disappear entirely while a custom sort was
+// active, which read as "manual ordering doesn't exist" (Discord report). It
+// now stays visible, disabled, with a hint naming the way back.
+describe('ProjectDetailModal reorder option under a custom sort', () => {
+    it('shows the Order row disabled with a default-sort hint instead of hiding it', () => {
+        let tree!: ReturnType<typeof create>;
+
+        act(() => {
+            tree = create(<ProjectDetailModal {...createProjectDetailModalProps({
+                sections: [section('section-1', 'One'), section('section-2', 'Two')],
+                taskSortBy: 'due',
+            })} />);
+        });
+
+        act(() => {
+            tree.root.findByProps({ testID: 'project-task-view-options-button' }).props.onPress();
+        });
+
+        const row = findOptionButton(tree.root, 'project-view-reorder-option');
+        expect(row.props.disabled).toBe(true);
+        expect(row.props.accessibilityState).toEqual({ selected: false, disabled: true });
+        expect(
+            tree.root.findAllByType(Text).some((node) =>
+                String(node.props.children) === 'Available when Sort is Default'),
+        ).toBe(true);
+    });
+
+    it('keeps the Order row enabled under the default sort', () => {
+        let tree!: ReturnType<typeof create>;
+
+        act(() => {
+            tree = create(<ProjectDetailModal {...createProjectDetailModalProps({
+                sections: [section('section-1', 'One'), section('section-2', 'Two')],
+            })} />);
+        });
+
+        act(() => {
+            tree.root.findByProps({ testID: 'project-task-view-options-button' }).props.onPress();
+        });
+
+        const row = findOptionButton(tree.root, 'project-view-reorder-option');
+        expect(row.props.disabled).toBe(false);
+        expect(
+            tree.root.findAllByType(Text).some((node) =>
+                String(node.props.children) === 'Available when Sort is Default'),
+        ).toBe(false);
     });
 });
