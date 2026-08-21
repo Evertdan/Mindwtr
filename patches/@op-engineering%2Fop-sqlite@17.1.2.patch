@@ -1,0 +1,70 @@
+diff --git a/cpp/utils.cpp b/cpp/utils.cpp
+index 1f2ad590213843a0901d4643191d73a0f9336287..1b2a99a33c267d40b821197ae3348517b7b5d156 100644
+--- a/cpp/utils.cpp
++++ b/cpp/utils.cpp
+@@ -380,22 +380,35 @@ promisify(jsi::Runtime &rt, std::shared_ptr<ThreadPool> thread_pool,
+   auto executor =
+       HFN3(lambda = std::move(lambda),
+            resolve_callback = std::move(resolve_callback), thread_pool) {
++    // Identity of the runtime this promise was created on. A query can outlive
++    // the React instance; its completion is then delivered by the CallInvoker
++    // to a NEW runtime (or the new instance's buffered startup queue), where
++    // touching the captured jsi::Values crashes inside Hermes. Compare before
++    // use and deliberately leak the values on mismatch — destroying a
++    // jsi::Value without its owning runtime is also UB.
++    jsi::Runtime *origin_rt = &rt;
+     auto resolve = std::make_shared<jsi::Value>(rt, args[0]);
+     auto reject = std::make_shared<jsi::Value>(rt, args[1]);
+ 
+-    auto task = [lambda = lambda, thread_pool,
++    auto task = [lambda = lambda, thread_pool, origin_rt,
+                  resolve_callback = resolve_callback,
+                  resolve = std::move(resolve), reject = std::move(reject)]() {
+       try {
+         std::any result = lambda();
+ 
+         if (opsqlite::invalidated) {
++          new jsi::Value(std::move(*resolve));
++          new jsi::Value(std::move(*reject));
+           return;
+         }
+ 
+         opsqlite::invoker->invokeAsync(
+-            [result = std::move(result), resolve = resolve,
++            [result = std::move(result), resolve = resolve, origin_rt,
+              resolve_callback = resolve_callback](jsi::Runtime &rt) {
++              if (opsqlite::invalidated || &rt != origin_rt) {
++                new jsi::Value(std::move(*resolve));
++                return;
++              }
+               auto jsi_result = resolve_callback(rt, result);
+               resolve->asObject(rt).asFunction(rt).call(rt, jsi_result);
+             });
+@@ -406,7 +419,12 @@ promisify(jsi::Runtime &rt, std::shared_ptr<ThreadPool> thread_pool,
+         // https://github.com/facebook/react-native/issues/48027
+         auto what = e.what();
+         opsqlite::invoker->invokeAsync(
+-            [what = std::string(what), reject = reject](jsi::Runtime &rt) {
++            [what = std::string(what), reject = reject,
++             origin_rt](jsi::Runtime &rt) {
++              if (opsqlite::invalidated || &rt != origin_rt) {
++                new jsi::Value(std::move(*reject));
++                return;
++              }
+               auto errorCtr = rt.global().getPropertyAsFunction(rt, "Error");
+               auto error = errorCtr.callAsConstructor(
+                   rt, jsi::String::createFromAscii(rt, what));
+@@ -415,7 +433,12 @@ promisify(jsi::Runtime &rt, std::shared_ptr<ThreadPool> thread_pool,
+       } catch (std::exception &exc) {
+         auto what = exc.what();
+         opsqlite::invoker->invokeAsync(
+-            [what = std::string(what), reject = reject](jsi::Runtime &rt) {
++            [what = std::string(what), reject = reject,
++             origin_rt](jsi::Runtime &rt) {
++              if (opsqlite::invalidated || &rt != origin_rt) {
++                new jsi::Value(std::move(*reject));
++                return;
++              }
+               auto errorCtr = rt.global().getPropertyAsFunction(rt, "Error");
+               auto error = errorCtr.callAsConstructor(
+                   rt, jsi::String::createFromAscii(rt, what));
