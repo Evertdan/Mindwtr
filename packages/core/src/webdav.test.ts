@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { __webdavTestUtils, webdavGetFile, webdavGetJson, webdavHeadFile, webdavPutFile, webdavPutJson } from './webdav';
-import { MAX_DOWNLOAD_BYTES, ResponseTooLargeError } from './http-utils';
+import { MAX_DOWNLOAD_BYTES, MAX_ERROR_BODY_BYTES, ResponseTooLargeError } from './http-utils';
 import { consoleLogger, setLogger, type LogPayload } from './logger';
 
 const makeResponse = (overrides: Partial<Response> & { status: number; ok: boolean }): Response => ({
@@ -455,5 +455,32 @@ describe('webdavGetFile download cap', () => {
         });
         expect(Array.from(new Uint8Array(buffer))).toEqual([4, 5, 6]);
         expect(onProgress.mock.calls).toEqual([[2, 3], [3, 3]]);
+    });
+});
+
+describe('error body cap', () => {
+    it('does not paste an oversized error body into the thrown message', async () => {
+        const huge = 'x'.repeat(MAX_ERROR_BODY_BYTES + 1);
+        const fetcher = vi.fn(async () => makeResponse({
+            ok: false,
+            status: 500,
+            statusText: 'Server Error',
+            text: async () => huge,
+        }));
+
+        await expect(webdavGetJson('https://dav.example/data.json', { fetcher: fetcher as unknown as typeof fetch }))
+            .rejects.toThrow(/WebDAV GET failed \(500\): Server Error/);
+    });
+
+    it('still includes a small error body', async () => {
+        const fetcher = vi.fn(async () => makeResponse({
+            ok: false,
+            status: 500,
+            statusText: 'Server Error',
+            text: async () => 'quota exceeded',
+        }));
+
+        await expect(webdavGetJson('https://dav.example/data.json', { fetcher: fetcher as unknown as typeof fetch }))
+            .rejects.toThrow(/quota exceeded/);
     });
 });

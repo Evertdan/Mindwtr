@@ -3,6 +3,7 @@ import {
     assertConnectionAllowed,
     createProgressStream,
     fetchWithTimeout,
+    MAX_ERROR_BODY_BYTES,
     MAX_DOWNLOAD_BYTES,
     MAX_SYNC_DOCUMENT_BYTES,
     readResponseBody,
@@ -358,7 +359,7 @@ export async function webdavGetJson<T>(
 
     if (res.status === 404) return null;
     if (!res.ok) {
-        const text = await res.text().catch(() => '');
+        const text = await readResponseText(res, MAX_ERROR_BODY_BYTES).catch(() => '');
         const error = new Error(`WebDAV GET failed (${res.status}): ${text || res.statusText}`);
         (error as { status?: number }).status = res.status;
         throw error;
@@ -406,7 +407,7 @@ export async function webdavPutJson(
     }
 
     if (!res.ok) {
-        const text = await res.text().catch(() => '');
+        const text = await readResponseText(res, MAX_ERROR_BODY_BYTES).catch(() => '');
         const error = new Error(`WebDAV PUT failed (${res.status}): ${text || res.statusText}`);
         (error as { status?: number }).status = res.status;
         throw error;
@@ -452,7 +453,7 @@ async function putWebdavBytes(
         res = await sendPut();
     }
     if (!res.ok) {
-        const text = await res.text().catch(() => '');
+        const text = await readResponseText(res, MAX_ERROR_BODY_BYTES).catch(() => '');
         const error = new Error(`WebDAV PUT failed (${res.status}): ${text || res.statusText}`);
         (error as { status?: number }).status = res.status;
         throw error;

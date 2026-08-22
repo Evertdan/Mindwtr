@@ -254,6 +254,10 @@ export const MAX_DOWNLOAD_BYTES = 2 * DEFAULT_MAX_FILE_SIZE_BYTES;
  */
 export const MAX_SYNC_DOCUMENT_BYTES = 1024 * 1024 * 1024;
 
+/** An HTTP error body only ever becomes a message suffix, so it needs a much smaller
+ *  ceiling than a document -- and it is attacker-controlled on every failure path. */
+export const MAX_ERROR_BODY_BYTES = 64 * 1024;
+
 export class ResponseTooLargeError extends Error {
     readonly limitBytes: number;
 

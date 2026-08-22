@@ -3,6 +3,7 @@ import {
     assertConnectionAllowed,
     createProgressStream,
     fetchWithTimeout,
+    MAX_ERROR_BODY_BYTES,
     MAX_DOWNLOAD_BYTES,
     MAX_SYNC_DOCUMENT_BYTES,
     readResponseBody,
@@ -111,7 +112,7 @@ const metadataFromHeaders = (headers: Headers): RemoteFileMetadata => {
 };
 
 const parseCloudJsonWriteBody = async (res: Response): Promise<Partial<CloudJsonWriteResult>> => {
-    const text = await res.text().catch(() => '');
+    const text = await readResponseText(res, MAX_ERROR_BODY_BYTES).catch(() => '');
     const normalized = text.startsWith('\uFEFF') ? text.slice(1).trim() : text.trim();
     if (!normalized) return {};
     try {
@@ -203,7 +204,7 @@ export async function cloudRequestJson<T>(
         CLOUD_TIMEOUT_ERROR,
     );
 
-    const text = await res.text().catch(() => '');
+    const text = await readResponseText(res, MAX_ERROR_BODY_BYTES).catch(() => '');
     if (!res.ok) {
         let serverMessage = '';
         try {
