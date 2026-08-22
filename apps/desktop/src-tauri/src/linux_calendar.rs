@@ -1250,6 +1250,53 @@ mod imp {
         }
 
         #[test]
+        fn escapes_ics_text_specials_without_double_escaping_the_backslash() {
+            // Order matters: backslashes are escaped first, so the ones this
+            // function introduces for newlines/semicolons must not be escaped
+            // again on the way out.
+            for (raw, expected) in [
+                ("plain", "plain"),
+                (r"back\slash", r"back\\slash"),
+                ("semi;colon", r"semi\;colon"),
+                ("comma,separated", r"comma\,separated"),
+                ("line\nbreak", r"line\nbreak"),
+                ("crlf\r\nbreak", r"crlf\nbreak"),
+                ("lone\rreturn", r"lone\nreturn"),
+                (r"all\ of; it, \r\n", r"all\\ of\; it\, \\r\\n"),
+            ] {
+                assert_eq!(escape_ics_text(raw), expected, "escaping {raw:?}");
+            }
+        }
+
+        #[test]
+        fn builds_a_calendar_query_only_for_a_forward_rfc3339_range() {
+            assert_eq!(
+                calendar_query("2026-07-21T13:00:00.000Z", "2026-07-22T13:00:00.000Z").unwrap(),
+                concat!(
+                    "(occur-in-time-range? (make-time \"20260721T130000Z\") ",
+                    "(make-time \"20260722T130000Z\"))"
+                )
+            );
+
+            // A non-RFC3339 bound, an inverted range and an empty range all
+            // have to be refused: EDS would otherwise answer a query that
+            // means something other than what the caller asked for.
+            for (start, end) in [
+                ("2026-07-21", "2026-07-22T13:00:00.000Z"),
+                ("not-a-date", "2026-07-22T13:00:00.000Z"),
+                ("2026-07-21T13:00:00.000Z", "2026-07-21T12:00:00.000Z"),
+                ("2026-07-21T13:00:00.000Z", "2026-07-21T13:00:00.000Z"),
+                ("", ""),
+            ] {
+                assert_eq!(
+                    calendar_query(start, end),
+                    Err("invalid-range".to_string()),
+                    "range {start:?}..{end:?}"
+                );
+            }
+        }
+
+        #[test]
         fn keeps_writable_backends_and_drops_feed_only_ones() {
             assert!(is_writable_backend(Some("local")));
             assert!(is_writable_backend(Some("caldav")));
