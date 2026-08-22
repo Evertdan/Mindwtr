@@ -1,22 +1,41 @@
-import type { CloudProvider } from '@mindwtr/core';
-
-import type { CloudConfig, WebDavConfig } from './sync-attachment-backends';
+import type { CloudProvider } from './sync-client-helpers';
 import type { SyncBackend } from './sync-service-utils';
 
-export type DesktopSyncConfigOverride = {
+/** Candidate transport values for a configuration the caller has already proven
+ *  with an activation probe. Platform-neutral: every field a platform cannot
+ *  express stays undefined and is never written. */
+export type SyncConfigurationCandidate = {
     backend: SyncBackend;
     syncPath?: string;
-    webdav?: WebDavConfig;
+    /** iOS security-scoped bookmark for `syncPath`. Desktop leaves it undefined. */
+    syncPathBookmark?: string | null;
+    webdav?: CandidateWebDavConfiguration;
     cloudProvider?: CloudProvider;
-    cloud?: CloudConfig;
-    /** Opaque native handle for a Dropbox OAuth result that has not replaced
-     *  the durable credential bundle yet. Token bytes never enter JS. */
+    cloud?: CandidateCloudConfiguration;
+    /** Opaque handle for a Dropbox OAuth result that has not replaced the durable
+     *  credential bundle yet. Token bytes never enter this module. */
     dropboxCredentialHandle?: string;
+};
+
+export type CandidateWebDavConfiguration = {
+    url: string;
+    username: string;
+    password?: string;
+    hasPassword?: boolean;
+    allowInsecureHttp?: boolean;
+    allowWeakFingerprint?: boolean;
+};
+
+export type CandidateCloudConfiguration = {
+    url: string;
+    token: string;
+    allowInsecureHttp?: boolean;
+    rememberToken?: boolean;
 };
 
 export type SecretAuthority = 'known' | 'opaque';
 
-export type PersistedWebDavConfiguration = Omit<WebDavConfig, 'password' | 'hasPassword'> & {
+export type PersistedWebDavConfiguration = Omit<CandidateWebDavConfiguration, 'password' | 'hasPassword'> & {
     password: string | null;
     passwordAuthority: SecretAuthority;
     hasPassword: boolean | null;
@@ -24,7 +43,7 @@ export type PersistedWebDavConfiguration = Omit<WebDavConfig, 'password' | 'hasP
     allowWeakFingerprint: boolean;
 };
 
-export type PersistedCloudConfiguration = Omit<CloudConfig, 'token'> & {
+export type PersistedCloudConfiguration = Omit<CandidateCloudConfiguration, 'token'> & {
     token: string | null;
     tokenAuthority: SecretAuthority;
     allowInsecureHttp: boolean;
@@ -45,21 +64,26 @@ export type SyncConfigurationSecretRequirements = {
     requireCloudToken?: boolean;
 };
 
-export type PersistedDesktopSyncConfiguration = {
+export type PersistedSyncConfiguration = {
     backend: SyncBackend;
     syncPath: string;
+    /** Undefined on platforms without security-scoped bookmarks; compared as null. */
+    syncPathBookmark?: string | null;
     webdav: PersistedWebDavConfiguration;
     cloudProvider: CloudProvider;
     cloud: PersistedCloudConfiguration;
 };
 
-export type SyncConfigurationTransactionDependencies = {
+export type SyncConfigurationPort = {
     recoverDropboxCredentialsBeforeConfiguration: () => Promise<void>;
     readConfiguration: (
         requirements?: SyncConfigurationSecretRequirements,
-    ) => Promise<PersistedDesktopSyncConfiguration>;
+    ) => Promise<PersistedSyncConfiguration>;
     writeBackend: (backend: SyncBackend) => Promise<void>;
-    writeSyncPath: (path: string) => Promise<{ success: boolean; path: string; error?: string }>;
+    writeSyncPath: (
+        path: string,
+        bookmark?: string | null,
+    ) => Promise<{ success: boolean; path: string; error?: string }>;
     clearSyncPath: () => Promise<void>;
     writeWebDav: (config: WritableWebDavConfiguration) => Promise<void>;
     writeCloud: (config: WritableCloudConfiguration) => Promise<void>;
@@ -75,6 +99,17 @@ export type SyncConfigurationCommitResult = {
     cleanupPending: boolean;
     handleFinalized: boolean;
 };
+
+/** Thrown when the previous configuration could not be restored and
+ *  reactivated, so sync has deliberately been left disabled. */
+export class SyncConfigurationDisabledError extends Error {
+    readonly syncRemainsDisabled = true;
+
+    constructor(message: string) {
+        super(message);
+        this.name = 'SyncConfigurationDisabledError';
+    }
+}
 
 const errorMessage = (error: unknown): string => {
     if (error instanceof Error && error.message.trim()) return error.message.trim();
@@ -104,8 +139,8 @@ const createTouchedTransportFields = (): TouchedTransportFields => ({
 // but the error persists"). The post-write verification below still requires
 // the new secret to read back exactly.
 const getCandidateSecretRequirements = (
-    candidate: DesktopSyncConfigOverride,
-    previous: PersistedDesktopSyncConfiguration,
+    candidate: SyncConfigurationCandidate,
+    previous: PersistedSyncConfiguration,
 ): SyncConfigurationSecretRequirements => ({
     requireWebdavPassword: candidate.backend === 'webdav'
         && !candidate.webdav?.password?.trim()
@@ -149,11 +184,16 @@ const cloudSecretMatches = (
 };
 
 const markChangedTransportFields = (
-    actual: PersistedDesktopSyncConfiguration,
-    expected: PersistedDesktopSyncConfiguration,
+    actual: PersistedSyncConfiguration,
+    expected: PersistedSyncConfiguration,
     touched: TouchedTransportFields,
 ): void => {
-    if (actual.syncPath !== expected.syncPath) touched.syncPath = true;
+    if (
+        actual.syncPath !== expected.syncPath
+        || (actual.syncPathBookmark ?? null) !== (expected.syncPathBookmark ?? null)
+    ) {
+        touched.syncPath = true;
+    }
     if (
         actual.webdav.url !== expected.webdav.url
         || actual.webdav.username !== expected.webdav.username
@@ -175,11 +215,12 @@ const markChangedTransportFields = (
 };
 
 const configurationMatches = (
-    actual: PersistedDesktopSyncConfiguration,
-    expected: PersistedDesktopSyncConfiguration,
+    actual: PersistedSyncConfiguration,
+    expected: PersistedSyncConfiguration,
 ): boolean => (
     actual.backend === expected.backend
     && actual.syncPath === expected.syncPath
+    && (actual.syncPathBookmark ?? null) === (expected.syncPathBookmark ?? null)
     && actual.cloudProvider === expected.cloudProvider
     && actual.webdav.url === expected.webdav.url
     && actual.webdav.username === expected.webdav.username
@@ -193,9 +234,9 @@ const configurationMatches = (
 );
 
 const ensureBackendDisabled = async (
-    dependencies: SyncConfigurationTransactionDependencies,
+    dependencies: SyncConfigurationPort,
     requirements: SyncConfigurationSecretRequirements,
-): Promise<PersistedDesktopSyncConfiguration> => {
+): Promise<PersistedSyncConfiguration> => {
     await dependencies.writeBackend('off');
     const disabled = await dependencies.readConfiguration(requirements);
     if (disabled.backend !== 'off') {
@@ -205,8 +246,8 @@ const ensureBackendDisabled = async (
 };
 
 const restoreLastProvenConfiguration = async (
-    previous: PersistedDesktopSyncConfiguration,
-    dependencies: SyncConfigurationTransactionDependencies,
+    previous: PersistedSyncConfiguration,
+    dependencies: SyncConfigurationPort,
     options: {
         reactivatePreviousBackend: boolean;
         requirements: SyncConfigurationSecretRequirements;
@@ -229,7 +270,7 @@ const restoreLastProvenConfiguration = async (
         await ensureBackendDisabled(dependencies, {});
     } catch (error) {
         await attempt('keep sync disabled', () => dependencies.writeBackend('off'));
-        throw new Error(
+        throw new SyncConfigurationDisabledError(
             `Previous sync settings were not restored because sync could not be durably disabled. ${errorMessage(error)}`,
         );
     }
@@ -240,7 +281,7 @@ const restoreLastProvenConfiguration = async (
     if (options.touched.syncPath) {
         if (previous.syncPath) {
             await attempt('restore file path', async () => {
-                const result = await dependencies.writeSyncPath(previous.syncPath);
+                const result = await dependencies.writeSyncPath(previous.syncPath, previous.syncPathBookmark);
                 if (!result.success) {
                     throw new Error(result.error || 'Failed to restore sync path');
                 }
@@ -328,23 +369,24 @@ const restoreLastProvenConfiguration = async (
         // Never reactivate a snapshot that was only partly restored. This final
         // write is deliberately last even when an earlier disable failed.
         await attempt('keep sync disabled', () => dependencies.writeBackend('off'));
-        throw new Error(`Previous sync settings could not be fully restored; sync remains disabled. ${failures.join('; ')}`);
+        throw new SyncConfigurationDisabledError(`Previous sync settings could not be fully restored; sync remains disabled. ${failures.join('; ')}`);
     }
 };
 
 const writeCandidateTransport = async (
-    candidate: DesktopSyncConfigOverride,
-    previous: PersistedDesktopSyncConfiguration,
-    dependencies: SyncConfigurationTransactionDependencies,
+    candidate: SyncConfigurationCandidate,
+    previous: PersistedSyncConfiguration,
+    dependencies: SyncConfigurationPort,
     touched: TouchedTransportFields,
-): Promise<PersistedDesktopSyncConfiguration> => {
+): Promise<PersistedSyncConfiguration> => {
     if (candidate.backend === 'file') {
         touched.syncPath = true;
-        const result = await dependencies.writeSyncPath(candidate.syncPath ?? '');
+        const bookmark = candidate.syncPathBookmark ?? null;
+        const result = await dependencies.writeSyncPath(candidate.syncPath ?? '', bookmark);
         if (!result.success) {
             throw new Error(result.error || 'Failed to save sync path');
         }
-        return { ...previous, backend: 'off', syncPath: result.path };
+        return { ...previous, backend: 'off', syncPath: result.path, syncPathBookmark: bookmark };
     }
 
     if (candidate.backend === 'webdav') {
@@ -412,6 +454,11 @@ const writeCandidateTransport = async (
         return { ...previous, backend: 'off', cloudProvider: provider };
     }
 
+    if (candidate.cloudProvider && candidate.cloudProvider !== previous.cloudProvider) {
+        touched.cloudProvider = true;
+        await dependencies.writeCloudProvider(candidate.cloudProvider);
+        return { ...previous, backend: 'off', cloudProvider: candidate.cloudProvider };
+    }
     return { ...previous, backend: 'off' };
 };
 
@@ -422,8 +469,8 @@ const writeCandidateTransport = async (
  * verified after every failed write.
  */
 export async function commitProvenSyncConfiguration(
-    candidate: DesktopSyncConfigOverride,
-    dependencies: SyncConfigurationTransactionDependencies,
+    candidate: SyncConfigurationCandidate,
+    dependencies: SyncConfigurationPort,
 ): Promise<SyncConfigurationCommitResult> {
     const credentialHandle = candidate.dropboxCredentialHandle?.trim() || null;
     if (
@@ -536,7 +583,7 @@ export async function commitProvenSyncConfiguration(
             const credentialDetail = credentialRollbackError
                 ? ` Previous Dropbox credentials could not be restored. ${errorMessage(credentialRollbackError)}`
                 : '';
-            throw new Error(
+            throw new SyncConfigurationDisabledError(
                 `${errorMessage(commitError)}. Sync could not be durably disabled for transport rollback; no further transport changes were attempted. ${errorMessage(rollbackDisableError)}${credentialDetail}`,
             );
         }
@@ -560,13 +607,13 @@ export async function commitProvenSyncConfiguration(
             const credentialDetail = credentialRollbackError
                 ? ` ${errorMessage(credentialRollbackError)}`
                 : '';
-            throw new Error(
+            throw new SyncConfigurationDisabledError(
                 `${errorMessage(commitError)}. ${errorMessage(rollbackError)}${cleanupDetail}${credentialDetail}`,
             );
         }
 
         if (credentialRollbackError) {
-            throw new Error(
+            throw new SyncConfigurationDisabledError(
                 `${errorMessage(commitError)}. Previous Dropbox credentials could not be restored; sync remains disabled. ${errorMessage(credentialRollbackError)}`,
             );
         }

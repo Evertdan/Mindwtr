@@ -173,11 +173,11 @@ import {
 } from './sync-service-config';
 import {
     commitProvenSyncConfiguration as commitProvenSyncConfigurationTransaction,
-    type DesktopSyncConfigOverride,
-    type PersistedDesktopSyncConfiguration,
+    type SyncConfigurationCandidate as DesktopSyncConfigOverride,
+    type PersistedSyncConfiguration as PersistedDesktopSyncConfiguration,
     type SyncConfigurationCommitResult,
     type SyncConfigurationSecretRequirements,
-} from './sync-configuration-transaction';
+} from '@mindwtr/core';
 import {
     buildFastSyncScope,
     clearLocalSyncStatus,

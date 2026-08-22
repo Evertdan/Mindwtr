@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
     commitProvenSyncConfiguration,
-    type PersistedDesktopSyncConfiguration,
-    type SyncConfigurationTransactionDependencies,
+    type PersistedSyncConfiguration,
+    type SyncConfigurationPort,
 } from './sync-configuration-transaction';
 
 const OLD_PASSWORD = 'old-webdav-password';
@@ -14,7 +14,7 @@ const COMMITTED_RESULT = {
     handleFinalized: true,
 } as const;
 
-const baselineConfiguration = (): PersistedDesktopSyncConfiguration => ({
+const baselineConfiguration = (): PersistedSyncConfiguration => ({
     backend: 'cloud',
     syncPath: '',
     webdav: {
@@ -39,11 +39,11 @@ const baselineConfiguration = (): PersistedDesktopSyncConfiguration => ({
 type FailureStep = 'file' | 'webdav' | 'cloud' | 'provider' | 'backend';
 
 const cloneConfiguration = (
-    value: PersistedDesktopSyncConfiguration,
-): PersistedDesktopSyncConfiguration => structuredClone(value);
+    value: PersistedSyncConfiguration,
+): PersistedSyncConfiguration => structuredClone(value);
 
 const createTransactionHarness = (
-    initial: PersistedDesktopSyncConfiguration,
+    initial: PersistedSyncConfiguration,
     failureStep?: FailureStep,
     rollbackFailureStep?: Exclude<FailureStep, 'backend'>,
 ) => {
@@ -65,7 +65,7 @@ const createTransactionHarness = (
         if (primaryFailureInjected) rollbackStarted = true;
     };
 
-    const dependencies: SyncConfigurationTransactionDependencies = {
+    const dependencies: SyncConfigurationPort = {
         recoverDropboxCredentialsBeforeConfiguration: async () => undefined,
         readConfiguration: async (requirements) => {
             events.push('read');
@@ -292,7 +292,7 @@ describe('commitProvenSyncConfiguration', () => {
                     password: 're-entered-password',
                 },
             },
-            expectedSecret: (state: PersistedDesktopSyncConfiguration) => state.webdav.password,
+            expectedSecret: (state: PersistedSyncConfiguration) => state.webdav.password,
         },
         {
             label: 'self-hosted',
@@ -304,7 +304,7 @@ describe('commitProvenSyncConfiguration', () => {
                     token: 're-entered-token',
                 },
             },
-            expectedSecret: (state: PersistedDesktopSyncConfiguration) => state.cloud.token,
+            expectedSecret: (state: PersistedSyncConfiguration) => state.cloud.token,
         },
     ])('re-enters a $label secret over an opaque prior one', async ({ candidate, expectedSecret }) => {
         const initial = baselineConfiguration();
@@ -390,7 +390,7 @@ describe('commitProvenSyncConfiguration', () => {
                     password: 'candidate-password',
                 },
             },
-            makePriorOpaque: (initial: PersistedDesktopSyncConfiguration) => {
+            makePriorOpaque: (initial: PersistedSyncConfiguration) => {
                 initial.webdav = {
                     ...initial.webdav,
                     url: '',
@@ -400,7 +400,7 @@ describe('commitProvenSyncConfiguration', () => {
                     hasPassword: null,
                 };
             },
-            isRestoredEmpty: (state: PersistedDesktopSyncConfiguration) => (
+            isRestoredEmpty: (state: PersistedSyncConfiguration) => (
                 state.webdav.url === '' && state.webdav.password === ''
             ),
             requiresCandidateSecret: (requirements: { requireWebdavPassword?: boolean }) => (
@@ -417,7 +417,7 @@ describe('commitProvenSyncConfiguration', () => {
                     token: 'candidate-token',
                 },
             },
-            makePriorOpaque: (initial: PersistedDesktopSyncConfiguration) => {
+            makePriorOpaque: (initial: PersistedSyncConfiguration) => {
                 initial.cloud = {
                     ...initial.cloud,
                     url: '',
@@ -426,7 +426,7 @@ describe('commitProvenSyncConfiguration', () => {
                     rememberToken: false,
                 };
             },
-            isRestoredEmpty: (state: PersistedDesktopSyncConfiguration) => (
+            isRestoredEmpty: (state: PersistedSyncConfiguration) => (
                 state.cloud.url === '' && state.cloud.token === ''
             ),
             requiresCandidateSecret: (requirements: { requireCloudToken?: boolean }) => (
@@ -885,7 +885,7 @@ describe('commitProvenSyncConfiguration', () => {
     });
 
     it('restores only the touched transport before reactivating the old backend', async () => {
-        const initial: PersistedDesktopSyncConfiguration = {
+        const initial: PersistedSyncConfiguration = {
             ...baselineConfiguration(),
             backend: 'webdav',
             syncPath: '',
@@ -935,9 +935,9 @@ describe('commitProvenSyncConfiguration', () => {
 // a scenario matrix that the mobile implementation can also express, so the two
 // platforms' protocols can be compared step by step. Treat a change here as a
 // protocol change, not a test update.
-describe('desktop commit protocol goldens', () => {
+describe('commit protocol goldens (desktop reference semantics)', () => {
     const goldenHarness = (
-        initial: PersistedDesktopSyncConfiguration,
+        initial: PersistedSyncConfiguration,
         failureStep?: FailureStep,
         rollbackFailureStep?: Exclude<FailureStep, 'backend'>,
     ) => {
@@ -948,7 +948,7 @@ describe('desktop commit protocol goldens', () => {
         return harness;
     };
 
-    const activeWebdav = (): PersistedDesktopSyncConfiguration => ({
+    const activeWebdav = (): PersistedSyncConfiguration => ({
         ...baselineConfiguration(),
         backend: 'webdav',
     });
