@@ -1290,6 +1290,7 @@ class MobileSyncRun {
           password: webdavConfig.password,
           timeoutMs: DEFAULT_SYNC_TIMEOUT_MS,
           fetcher: this.fetchWithAbort,
+          allowWeakFingerprint: webdavConfig.allowWeakFingerprint,
         };
         this.ensureWebdavSyncNotRateLimited();
         try {
@@ -1323,6 +1324,7 @@ class MobileSyncRun {
                 password: webdavConfig.password,
                 timeoutMs: DEFAULT_SYNC_TIMEOUT_MS,
                 fetcher: this.fetchWithAbort,
+                allowWeakFingerprint: webdavConfig.allowWeakFingerprint,
               }),
             WEBDAV_READ_RETRY_OPTIONS
           );

@@ -522,6 +522,11 @@ describe('mobile sync-service runtime', () => {
     expect(coreMocks.performSyncCycle).not.toHaveBeenCalled();
     expect(coreMocks.webdavGetJson).not.toHaveBeenCalled();
     expect(coreMocks.webdavHeadFile).toHaveBeenCalledTimes(1);
+    // BUG-23: the fast-check HEAD gets the same weak-fingerprint option as the read.
+    expect(coreMocks.webdavHeadFile).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ allowWeakFingerprint: true }),
+    );
     expect(storeStateRef.current.updateSettings).not.toHaveBeenCalled();
     expect(asyncStorageMocks.setItem.mock.calls.some(([key]) => key === '@mindwtr_local_sync_status_v1')).toBe(true);
   });
@@ -789,6 +794,32 @@ describe('mobile sync-service runtime', () => {
     const lastSaved = storageMocks.saveData.mock.calls.at(-1)?.[0] as AppData | undefined;
     expect(lastSaved?.tasks[0]?.attachments).toEqual([]);
     expect(asyncStorageMocks.setItem.mock.calls.some(([key]) => key === '@mindwtr_fast_sync_state_v1')).toBe(false);
+  });
+
+  it('passes the resolved weak-fingerprint option to the WebDAV read, write, and head calls', async () => {
+    // BUG-23: it reached GET only, so a server whose ETag is too weak to fingerprint
+    // failed the PUT/HEAD paths on a setting the user never got to influence on mobile.
+    const localData: AppData = {
+      tasks: [],
+      projects: [],
+      sections: [],
+      areas: [],
+      settings: {},
+    };
+    storageMocks.getData.mockResolvedValue(localData);
+    coreMocks.webdavGetJson.mockResolvedValue(null);
+    coreMocks.webdavPutJson.mockResolvedValue({
+      exists: true,
+      fingerprint: 'webdav:v1:etag="put-rev"',
+      etag: '"put-rev"',
+      lastModified: null,
+      contentLength: null,
+    });
+    await syncServiceModule.performMobileSync();
+
+    const weak = expect.objectContaining({ allowWeakFingerprint: true });
+    expect(coreMocks.webdavGetJson).toHaveBeenCalledWith(expect.any(String), weak);
+    expect(coreMocks.webdavPutJson).toHaveBeenCalledWith(expect.any(String), expect.anything(), weak);
   });
 
   it('records WebDAV fast-sync state from the PUT response fingerprint without a follow-up HEAD', async () => {
