@@ -976,4 +976,15 @@ describe('persist', () => {
             .toThrow(/Refusing to save a partial task snapshot/);
         expect(debouncedSave).not.toHaveBeenCalled();
     });
+
+    it('refuses a same-length snapshot that swaps an existing task for a new one', () => {
+        const set = vi.fn();
+        const debouncedSave = vi.fn();
+
+        // t2 disappeared while t3 arrived, so the collection length is unchanged --
+        // a drop the guard must still catch.
+        expect(() => persist(set, debouncedSave, baseState, { tasks: [createTask('t1'), createTask('t3')] }))
+            .toThrow(/Refusing to save a partial task snapshot; missing existing ids: t2/);
+        expect(debouncedSave).not.toHaveBeenCalled();
+    });
 });

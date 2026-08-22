@@ -634,7 +634,9 @@ const assertCollectionSnapshotIncludesExistingItems = <T extends EntityWithId>(
     nextItems: T[],
     previousItems: T[]
 ): void => {
-    if (nextItems.length >= previousItems.length) return;
+    if (nextItems === previousItems) return;
+    // Length tells nothing: a snapshot that drops N rows while adding N others
+    // is exactly as partial as one that just drops them.
     const nextIds = new Set(nextItems.map((item) => item.id));
     const missingIds = previousItems
         .filter((item) => !nextIds.has(item.id))
