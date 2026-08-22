@@ -5221,24 +5221,33 @@ mod tests {
         // Stays empty — see the comment above this const for what refills it.
         const KNOWN_BLOCKING_COMMANDS: &[&str] = &[];
 
-        let sources: &[(&str, &str)] = &[
-            ("audio.rs", include_str!("audio.rs")),
-            ("autostart.rs", include_str!("autostart.rs")),
-            ("config.rs", include_str!("config.rs")),
-            ("email_capture.rs", include_str!("email_capture.rs")),
-            ("install.rs", include_str!("install.rs")),
-            ("lib.rs", include_str!("lib.rs")),
-            ("linux_calendar.rs", include_str!("linux_calendar.rs")),
-            ("local_api.rs", include_str!("local_api.rs")),
-            ("logging.rs", include_str!("logging.rs")),
-            ("obsidian_watcher.rs", include_str!("obsidian_watcher.rs")),
-            ("obsidian_writer.rs", include_str!("obsidian_writer.rs")),
-            ("platform.rs", include_str!("platform.rs")),
-            ("storage.rs", include_str!("storage.rs")),
-            ("sync.rs", include_str!("sync.rs")),
-            ("sync_encryption.rs", include_str!("sync_encryption.rs")),
-            ("ui.rs", include_str!("ui.rs")),
-        ];
+        // Enumerated, not hand-listed: the roster this replaced named 16 files
+        // and silently skipped macos_widget.rs for its whole life, so the one
+        // command it added never faced this check. A new module is now covered
+        // the moment it lands.
+        let src_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut sources: Vec<(String, String)> = std::fs::read_dir(&src_dir)
+            .expect("should read the crate's src directory")
+            .map(|entry| entry.expect("should read a src directory entry").path())
+            .filter(|path| path.extension().is_some_and(|extension| extension == "rs"))
+            .map(|path| {
+                let name = path
+                    .file_name()
+                    .expect("a .rs path has a file name")
+                    .to_string_lossy()
+                    .to_string();
+                let source = std::fs::read_to_string(&path)
+                    .unwrap_or_else(|error| panic!("should read {name}: {error}"));
+                (name, source)
+            })
+            .collect();
+        sources.sort();
+        // A mistyped directory would enumerate nothing and pass vacuously.
+        assert!(
+            sources.len() >= 16,
+            "expected the whole crate's sources, found {}",
+            sources.len()
+        );
 
         let allowed_names: std::collections::HashSet<&str> = ALLOWED_MAIN_THREAD_COMMANDS
             .iter()
@@ -5264,7 +5273,7 @@ mod tests {
         let mut seen_known_blocking: std::collections::HashSet<&str> =
             std::collections::HashSet::new();
         let mut violations: Vec<String> = Vec::new();
-        for (file, source) in sources {
+        for (file, source) in &sources {
             for (name, is_async) in tauri_command_declarations(source) {
                 if is_async || allowed_names.contains(name.as_str()) {
                     continue;

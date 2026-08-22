@@ -38,7 +38,10 @@ fn macos_widget_container_dir() -> Option<PathBuf> {
 /// container being unavailable (unsigned dev build, missing entitlement) or
 /// any I/O failure along the way is logged and swallowed, since a widget that
 /// stays stale for a cycle is not worth interrupting the caller over.
-#[tauri::command]
+// Off the UI thread: the renderer republishes the whole serialized store on
+// every edit, so an edit burst runs a create_dir_all + write + rename per
+// keystroke-sized change against the App Group container.
+#[tauri::command(async)]
 pub(crate) fn write_macos_widget_payload(payload_json: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
