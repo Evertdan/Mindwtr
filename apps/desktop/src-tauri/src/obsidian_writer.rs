@@ -1,3 +1,4 @@
+use crate::config::assert_configured_obsidian_vault;
 use crate::obsidian_paths::{
     is_obsidian_markdown_relative_path, join_obsidian_vault_path, normalize_obsidian_relative_path,
 };
@@ -435,23 +436,41 @@ fn lock_vault_write() -> Result<std::sync::MutexGuard<'static, ()>, String> {
 // read plus atomic write block for as long as the mount takes to answer.
 #[tauri::command(async)]
 pub(crate) fn obsidian_toggle_task(
+    app: tauri::AppHandle,
     vault_path: String,
     relative_file_path: String,
     line_number: usize,
     task_text: String,
     set_completed: bool,
 ) -> Result<(), String> {
+    assert_configured_obsidian_vault(&app, &vault_path)?;
+    toggle_task_in_vault(
+        &vault_path,
+        &relative_file_path,
+        line_number,
+        &task_text,
+        set_completed,
+    )
+}
+
+fn toggle_task_in_vault(
+    vault_path: &str,
+    relative_file_path: &str,
+    line_number: usize,
+    task_text: &str,
+    set_completed: bool,
+) -> Result<(), String> {
     let _vault_guard = lock_vault_write()?;
-    let normalized_relative_path = normalize_obsidian_relative_path(&relative_file_path)?;
+    let normalized_relative_path = normalize_obsidian_relative_path(relative_file_path)?;
     if !is_obsidian_markdown_relative_path(&normalized_relative_path) {
         return Err("Obsidian tasks can only be updated in Markdown files.".to_string());
     }
 
-    let absolute_path = join_obsidian_vault_path(&vault_path, &normalized_relative_path)?;
+    let absolute_path = join_obsidian_vault_path(vault_path, &normalized_relative_path)?;
     let content = fs::read_to_string(&absolute_path)
         .map_err(|error| format!("Failed to read the Obsidian note: {error}"))?;
     let mut lines = split_lines_preserving_endings(&content);
-    let actual_line = find_task_line(&lines, line_number, &task_text)?;
+    let actual_line = find_task_line(&lines, line_number, task_text)?;
     let current = lines
         .get(actual_line - 1)
         .map(|line| line.content.as_str())
@@ -466,17 +485,27 @@ pub(crate) fn obsidian_toggle_task(
 // `obsidian_toggle_task`.
 #[tauri::command(async)]
 pub(crate) fn obsidian_toggle_tasknotes(
+    app: tauri::AppHandle,
     vault_path: String,
     relative_file_path: String,
     set_completed: bool,
 ) -> Result<(), String> {
+    assert_configured_obsidian_vault(&app, &vault_path)?;
+    toggle_tasknotes_in_vault(&vault_path, &relative_file_path, set_completed)
+}
+
+fn toggle_tasknotes_in_vault(
+    vault_path: &str,
+    relative_file_path: &str,
+    set_completed: bool,
+) -> Result<(), String> {
     let _vault_guard = lock_vault_write()?;
-    let normalized_relative_path = normalize_obsidian_relative_path(&relative_file_path)?;
+    let normalized_relative_path = normalize_obsidian_relative_path(relative_file_path)?;
     if !is_obsidian_markdown_relative_path(&normalized_relative_path) {
         return Err("TaskNotes files must be Markdown files ending in .md.".to_string());
     }
 
-    let absolute_path = join_obsidian_vault_path(&vault_path, &normalized_relative_path)?;
+    let absolute_path = join_obsidian_vault_path(vault_path, &normalized_relative_path)?;
     let content = fs::read_to_string(&absolute_path)
         .map_err(|error| format!("Failed to read the TaskNotes file: {error}"))?;
     let line_ending = detect_line_ending(&content);
@@ -518,12 +547,22 @@ pub(crate) fn obsidian_toggle_tasknotes(
 // would otherwise each append to the content the other one read.
 #[tauri::command(async)]
 pub(crate) fn obsidian_create_task(
+    app: tauri::AppHandle,
     vault_path: String,
     relative_file_path: String,
     task_text: String,
 ) -> Result<(), String> {
+    assert_configured_obsidian_vault(&app, &vault_path)?;
+    create_task_in_vault(&vault_path, &relative_file_path, &task_text)
+}
+
+fn create_task_in_vault(
+    vault_path: &str,
+    relative_file_path: &str,
+    task_text: &str,
+) -> Result<(), String> {
     let _vault_guard = lock_vault_write()?;
-    let normalized_relative_path = normalize_obsidian_relative_path(&relative_file_path)?;
+    let normalized_relative_path = normalize_obsidian_relative_path(relative_file_path)?;
     if normalized_relative_path.is_empty() {
         return Err("Choose an Obsidian inbox note before creating a task.".to_string());
     }
@@ -536,7 +575,7 @@ pub(crate) fn obsidian_create_task(
         return Err("Enter a task title before adding it to Obsidian.".to_string());
     }
 
-    let absolute_path = join_obsidian_vault_path(&vault_path, &normalized_relative_path)?;
+    let absolute_path = join_obsidian_vault_path(vault_path, &normalized_relative_path)?;
     let existing_content = match fs::read_to_string(&absolute_path) {
         Ok(content) => content,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
@@ -560,12 +599,22 @@ pub(crate) fn obsidian_create_task(
 // in the same second both see a free filename and one overwrites the other.
 #[tauri::command(async)]
 pub(crate) fn obsidian_create_tasknotes(
+    app: tauri::AppHandle,
     vault_path: String,
     folder: String,
     title: String,
 ) -> Result<String, String> {
+    assert_configured_obsidian_vault(&app, &vault_path)?;
+    create_tasknotes_in_vault(&vault_path, &folder, &title)
+}
+
+fn create_tasknotes_in_vault(
+    vault_path: &str,
+    folder: &str,
+    title: &str,
+) -> Result<String, String> {
     let _vault_guard = lock_vault_write()?;
-    let normalized_folder = normalize_obsidian_relative_path(&folder)?;
+    let normalized_folder = normalize_obsidian_relative_path(folder)?;
     if normalized_folder.is_empty() {
         return Err("Choose a TaskNotes folder before creating a task.".to_string());
     }
@@ -581,12 +630,12 @@ pub(crate) fn obsidian_create_tasknotes(
     }
 
     let mut relative_path = format!("{normalized_folder}/{safe_filename}.md");
-    let mut absolute_path = join_obsidian_vault_path(&vault_path, &relative_path)?;
+    let mut absolute_path = join_obsidian_vault_path(vault_path, &relative_path)?;
 
     if absolute_path.exists() {
         let suffix = OffsetDateTime::now_utc().unix_timestamp();
         relative_path = format!("{normalized_folder}/{safe_filename} {suffix}.md");
-        absolute_path = join_obsidian_vault_path(&vault_path, &relative_path)?;
+        absolute_path = join_obsidian_vault_path(vault_path, &relative_path)?;
     }
 
     let content = build_tasknotes_content(trimmed_title, "\n");
@@ -678,11 +727,11 @@ mod tests {
         )
         .expect("should create note");
 
-        obsidian_toggle_task(
-            temp.path().to_string_lossy().to_string(),
-            "Projects.md".to_string(),
+        toggle_task_in_vault(
+            &temp.path().to_string_lossy(),
+            "Projects.md",
             2,
-            "Draft spec #work [[Spec]]".to_string(),
+            "Draft spec #work [[Spec]]",
             true,
         )
         .expect("should toggle task");
@@ -700,11 +749,11 @@ mod tests {
         let file_path = temp.path().join("Inbox.md");
         fs::write(&file_path, "New line\n- [ ] Follow up client\n").expect("should create note");
 
-        obsidian_toggle_task(
-            temp.path().to_string_lossy().to_string(),
-            "Inbox.md".to_string(),
+        toggle_task_in_vault(
+            &temp.path().to_string_lossy(),
+            "Inbox.md",
             1,
-            "Follow up client".to_string(),
+            "Follow up client",
             true,
         )
         .expect("should find shifted task");
@@ -723,11 +772,11 @@ mod tests {
         )
         .expect("should create note");
 
-        let error = obsidian_toggle_task(
-            temp.path().to_string_lossy().to_string(),
-            "Inbox.md".to_string(),
+        let error = toggle_task_in_vault(
+            &temp.path().to_string_lossy(),
+            "Inbox.md",
             0,
-            "Follow up client".to_string(),
+            "Follow up client",
             true,
         )
         .expect_err("should reject ambiguous task matches");
@@ -740,18 +789,10 @@ mod tests {
         let temp = tempdir().expect("should create temp vault");
         let vault_root = temp.path().to_string_lossy().to_string();
 
-        obsidian_create_task(
-            vault_root.clone(),
-            "Mindwtr/Inbox.md".to_string(),
-            "Capture from Mindwtr".to_string(),
-        )
-        .expect("should create inbox note");
-        obsidian_create_task(
-            vault_root,
-            "Mindwtr/Inbox.md".to_string(),
-            "Second task".to_string(),
-        )
-        .expect("should append task");
+        create_task_in_vault(&vault_root, "Mindwtr/Inbox.md", "Capture from Mindwtr")
+            .expect("should create inbox note");
+        create_task_in_vault(&vault_root, "Mindwtr/Inbox.md", "Second task")
+            .expect("should append task");
 
         let content = fs::read_to_string(temp.path().join("Mindwtr/Inbox.md"))
             .expect("should read inbox note");
@@ -767,11 +808,7 @@ mod tests {
         fs::write(&file_path, "---\nstatus: open\npriority: high\n---\nBody\n")
             .expect("should create tasknote");
 
-        obsidian_toggle_tasknotes(
-            temp.path().to_string_lossy().to_string(),
-            "TaskNotes/Review.md".to_string(),
-            true,
-        )
+        toggle_tasknotes_in_vault(&temp.path().to_string_lossy(), "TaskNotes/Review.md", true)
         .expect("should update tasknotes status");
 
         let updated = fs::read_to_string(&file_path).expect("should read updated tasknote");
@@ -793,11 +830,7 @@ mod tests {
         )
         .expect("should create tasknote");
 
-        obsidian_toggle_tasknotes(
-            temp.path().to_string_lossy().to_string(),
-            "TaskNotes/Review.md".to_string(),
-            false,
-        )
+        toggle_tasknotes_in_vault(&temp.path().to_string_lossy(), "TaskNotes/Review.md", false)
         .expect("should clear tasknotes completion");
 
         let updated = fs::read_to_string(&file_path).expect("should read updated tasknote");
@@ -809,10 +842,10 @@ mod tests {
     #[test]
     fn create_tasknotes_creates_a_markdown_file() {
         let temp = tempdir().expect("should create temp vault");
-        let relative_path = obsidian_create_tasknotes(
-            temp.path().to_string_lossy().to_string(),
-            "TaskNotes".to_string(),
-            "Review rollout / demo?".to_string(),
+        let relative_path = create_tasknotes_in_vault(
+            &temp.path().to_string_lossy(),
+            "TaskNotes",
+            "Review rollout / demo?",
         )
         .expect("should create a tasknotes file");
 

@@ -84,7 +84,48 @@ pub(crate) fn join_obsidian_vault_path(
     if normalized_relative.is_empty() {
         return Err("Obsidian file path is not configured.".to_string());
     }
-    Ok(Path::new(trimmed_vault).join(Path::new(&normalized_relative)))
+    let joined = Path::new(trimmed_vault).join(Path::new(&normalized_relative));
+    assert_inside_obsidian_vault(trimmed_vault, &joined)?;
+    Ok(joined)
+}
+
+/// Re-asserts containment after the join. `normalize_obsidian_relative_path`
+/// rejects `..` textually, but a symlinked folder inside the vault still
+/// resolves outside it. Checks the deepest component that exists, since the
+/// target note (and its folder) may be about to be created.
+fn assert_inside_obsidian_vault(vault_path: &str, joined: &Path) -> Result<(), String> {
+    let vault_root = Path::new(vault_path)
+        .canonicalize()
+        .map_err(|error| format!("Failed to resolve the Obsidian vault path: {error}"))?;
+    let mut candidate = joined;
+    let resolved = loop {
+        if let Ok(resolved) = candidate.canonicalize() {
+            break resolved;
+        }
+        match candidate.parent() {
+            Some(parent) => candidate = parent,
+            None => return Err("Failed to resolve the Obsidian file path.".to_string()),
+        }
+    };
+    if resolved.starts_with(&vault_root) {
+        Ok(())
+    } else {
+        Err("Obsidian file paths must stay inside the configured vault.".to_string())
+    }
+}
+
+/// Whether a renderer-supplied vault path is the one the app has persisted.
+/// Every Obsidian write and the filesystem-scope grant are bound to it, so a
+/// renderer cannot name an arbitrary folder as "the vault".
+pub(crate) fn matches_configured_vault_path(configured: Option<&str>, requested: &str) -> bool {
+    let Some(configured) = configured.map(str::trim).filter(|value| !value.is_empty()) else {
+        return false;
+    };
+    let requested = requested.trim();
+    if requested.is_empty() {
+        return false;
+    }
+    normalize_filesystem_path(Path::new(configured)) == normalize_filesystem_path(Path::new(requested))
 }
 
 pub(crate) fn normalize_filesystem_path(path: &Path) -> String {
@@ -134,6 +175,43 @@ mod tests {
         assert!(should_skip_obsidian_relative_path(".trash/Deleted.md"));
         assert!(should_skip_obsidian_relative_path("Projects/.hidden.md"));
         assert!(!should_skip_obsidian_relative_path("Projects/Alpha.md"));
+    }
+
+    #[test]
+    fn rejects_joined_paths_that_resolve_outside_the_vault() {
+        let temp = tempfile::tempdir().expect("should create temp dir");
+        let vault = temp.path().join("Vault");
+        let outside = temp.path().join("Outside");
+        std::fs::create_dir_all(vault.join("Projects")).expect("should create vault folders");
+        std::fs::create_dir_all(&outside).expect("should create outside folder");
+        std::fs::write(outside.join("Secret.md"), "secret").expect("should create outside note");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&outside, vault.join("Escape")).expect("should link out");
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_dir(&outside, vault.join("Escape")).expect("should link out");
+
+        let vault_path = vault.to_string_lossy().to_string();
+        assert!(join_obsidian_vault_path(&vault_path, "Projects/Alpha.md").is_ok());
+
+        let error = join_obsidian_vault_path(&vault_path, "Escape/Secret.md")
+            .expect_err("should reject a symlinked escape");
+        assert!(error.contains("must stay inside the configured vault"));
+    }
+
+    #[test]
+    fn only_accepts_the_configured_vault_path() {
+        assert!(matches_configured_vault_path(Some("/home/u/Vault"), "/home/u/Vault"));
+        assert!(matches_configured_vault_path(
+            Some("/home/u/Vault/"),
+            " /home/u/Vault "
+        ));
+        assert!(!matches_configured_vault_path(
+            Some("/home/u/Vault"),
+            "/home/u/Vault/Nested"
+        ));
+        assert!(!matches_configured_vault_path(Some("/home/u/Vault"), "/etc"));
+        assert!(!matches_configured_vault_path(None, "/home/u/Vault"));
+        assert!(!matches_configured_vault_path(Some(""), ""));
     }
 
     #[test]

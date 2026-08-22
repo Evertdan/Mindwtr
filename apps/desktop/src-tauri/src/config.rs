@@ -1,4 +1,4 @@
-use crate::obsidian_paths::normalize_obsidian_inbox_file;
+use crate::obsidian_paths::{matches_configured_vault_path, normalize_obsidian_inbox_file};
 use crate::*;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -2557,6 +2557,22 @@ fn read_obsidian_config_payload(config: &AppConfigToml) -> ObsidianConfigPayload
         .unwrap_or_default()
 }
 
+/// Every Obsidian write and the filesystem-scope grant are bound to the vault
+/// the app has persisted: a renderer-supplied vault path is checked against it
+/// rather than trusted, so neither can be pointed at an arbitrary folder.
+/// Pure read, no write branch (B3) — no lock needed.
+pub(crate) fn assert_configured_obsidian_vault(
+    app: &tauri::AppHandle,
+    vault_path: &str,
+) -> Result<(), String> {
+    let configured = read_obsidian_config_payload(&read_config(app)).vault_path;
+    if matches_configured_vault_path(configured.as_deref(), vault_path) {
+        Ok(())
+    } else {
+        Err("Obsidian access is limited to the configured vault.".to_string())
+    }
+}
+
 fn expand_obsidian_payload_scope(app: &tauri::AppHandle, payload: &ObsidianConfigPayload) {
     let Some(vault_path) = payload.vault_path.as_ref() else {
         return;
@@ -2708,7 +2724,11 @@ pub(crate) fn set_obsidian_config(app: tauri::AppHandle, config: Value) -> Resul
     serde_json::to_value(payload).map_err(|e| e.to_string())
 }
 
-// No config.toml I/O at all — just a Tauri fs-scope grant (B3) — no lock needed.
+// A read of the persisted vault plus a Tauri fs-scope grant (B3) — no lock
+// needed. The grant is recursive and lasts the whole app lifetime, so it is
+// bound to the configured vault: the renderer only ever re-grants the folder
+// it already had scanning access to (`set_obsidian_config` grants the same
+// path when the vault is saved).
 #[tauri::command(async)]
 pub(crate) fn expand_obsidian_vault_scope(
     app: tauri::AppHandle,
@@ -2718,6 +2738,7 @@ pub(crate) fn expand_obsidian_vault_scope(
     if trimmed.is_empty() {
         return Ok(false);
     }
+    assert_configured_obsidian_vault(&app, trimmed)?;
     expand_tauri_fs_scope(&app, &PathBuf::from(trimmed));
     Ok(true)
 }
