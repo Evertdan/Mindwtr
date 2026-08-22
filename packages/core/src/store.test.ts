@@ -4284,6 +4284,50 @@ describe('TaskStore', () => {
         expect(nextInstance?.revBy).toBeTruthy();
     });
 
+    // Every other creation path reserves a project order; without one the follow-up
+    // sorts as +Infinity in compareTasksByProjectOrder and lands below every
+    // ordered sibling instead of taking its turn in the project list.
+    it('reserves a project order for a recurring follow-up', async () => {
+        vi.setSystemTime(new Date('2026-07-01T12:00:00.000Z'));
+        const { addProject, addTask, moveTask } = useTaskStore.getState();
+        const project = await addProject('Ops', '#123456');
+        const recurring = await addTask('Daily standup', {
+            status: 'next',
+            projectId: project!.id,
+            recurrence: 'daily',
+            dueDate: '2026-07-01T09:00:00.000Z',
+        });
+        await addTask('Second action', { status: 'next', projectId: project!.id });
+
+        await moveTask(recurring.id!, 'done');
+
+        const followUp = useTaskStore.getState()._allTasks
+            .find((task) => task.id !== recurring.id && task.title === 'Daily standup');
+        expect(followUp).toBeTruthy();
+        expect(typeof followUp?.order).toBe('number');
+        expect(followUp?.orderNum).toBe(followUp?.order);
+        expect(followUp?.pushCount).toBe(0);
+    });
+
+    it('reserves a project order for a recurring follow-up created in a batch update', async () => {
+        vi.setSystemTime(new Date('2026-07-01T12:00:00.000Z'));
+        const { addProject, addTask, batchMoveTasks } = useTaskStore.getState();
+        const project = await addProject('Ops batch', '#123456');
+        const recurring = await addTask('Daily batch standup', {
+            status: 'next',
+            projectId: project!.id,
+            recurrence: 'daily',
+            dueDate: '2026-07-01T09:00:00.000Z',
+        });
+
+        await batchMoveTasks([recurring.id!], 'done');
+
+        const followUp = useTaskStore.getState()._allTasks
+            .find((task) => task.id !== recurring.id && task.title === 'Daily batch standup');
+        expect(typeof followUp?.order).toBe('number');
+        expect(followUp?.orderNum).toBe(followUp?.order);
+    });
+
     it('does not append a duplicate recurring follow-up when one already exists', async () => {
         vi.setSystemTime(new Date('2026-06-09T00:00:00.000Z'));
 

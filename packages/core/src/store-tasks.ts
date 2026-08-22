@@ -9,6 +9,7 @@ import {
     createProjectOrderReserver,
     ensureDeviceId,
     getNextDataChangeAt,
+    getNextProjectOrder,
     getTaskOrder,
     getReferenceTaskFieldClears,
     isTaskVisible,
@@ -137,12 +138,23 @@ const findExistingRecurringFollowUp = (
     return tasks.find((task) => task.id !== excludeId && isExistingRecurringFollowUp(task, candidate)) ?? null;
 };
 
-const stampNewRecurringFollowUp = (task: Task | null, deviceId: string): Task | null => {
+// The follow-up is a fresh task, so it needs what every other creation path
+// stamps: a reserved project order (missing sorts as +Infinity in
+// compareTasksByProjectOrder, dumping the next occurrence below its siblings)
+// and a zeroed push count.
+const stampNewRecurringFollowUp = (
+    task: Task | null,
+    deviceId: string,
+    reserveProjectOrder: ProjectOrderReserver,
+): Task | null => {
     if (!task) return null;
+    const order = reserveProjectOrder(task.projectId);
     return {
         ...task,
         rev: nextRevision(undefined),
         revBy: deviceId,
+        pushCount: 0,
+        ...(order !== undefined ? { order, orderNum: order } : {}),
     };
 };
 
@@ -582,7 +594,13 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
                     { ...preparedUpdates.updates, ...revisionPatch },
                     now
                 );
-                const stampedNextRecurringTask = stampNewRecurringFollowUp(nextRecurringTask, deviceState.deviceId);
+                const stampedNextRecurringTask = stampNewRecurringFollowUp(
+                    nextRecurringTask,
+                    deviceState.deviceId,
+                    // Scans the collection only when there is a follow-up in a
+                    // project; this producer runs on every single-task update.
+                    (projectId) => getNextProjectOrder(projectId, state._allTasks),
+                );
                 const recurringFollowUpTask = findExistingRecurringFollowUp(state._allTasks, stampedNextRecurringTask, oldTask.id)
                     ? null
                     : stampedNextRecurringTask;
@@ -1128,7 +1146,11 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
                     },
                     now
                 );
-                const stampedNextRecurringTask = stampNewRecurringFollowUp(nextRecurringTask, deviceState.deviceId);
+                const stampedNextRecurringTask = stampNewRecurringFollowUp(
+                    nextRecurringTask,
+                    deviceState.deviceId,
+                    projectOrderReserver,
+                );
                 const duplicateFollowUp = findExistingRecurringFollowUp(
                     [...newAllTasksBase, ...nextRecurringTasks],
                     stampedNextRecurringTask,
