@@ -1,3 +1,5 @@
+import type { AppTheme } from './types';
+
 export const EXTERNAL_CALENDAR_COLORS = [
     '#2563EB',
     '#7C3AED',
@@ -114,14 +116,14 @@ export const DRACULA_EXTERNAL_CALENDAR_COLOR_MAP: Record<string, string> = {
     '#65a30d': '#f1fa8c',
 };
 
-const EXTERNAL_CALENDAR_COLOR_MAPS_BY_THEME = new Map<string, Record<string, string>>([
+const EXTERNAL_CALENDAR_COLOR_MAPS_BY_THEME = new Map<AppTheme, Record<string, string>>([
     ['nord', NORD_EXTERNAL_CALENDAR_COLOR_MAP],
     ['catppuccin-macchiato', CATPPUCCIN_MACCHIATO_EXTERNAL_CALENDAR_COLOR_MAP],
     ['dracula', DRACULA_EXTERNAL_CALENDAR_COLOR_MAP],
 ]);
 
 export function themeExternalCalendarDisplayColor(color: string, theme?: string): string {
-    const map = theme ? EXTERNAL_CALENDAR_COLOR_MAPS_BY_THEME.get(theme) : undefined;
+    const map = theme ? EXTERNAL_CALENDAR_COLOR_MAPS_BY_THEME.get(theme as AppTheme) : undefined;
     if (!map) return color;
     return map[color.toLowerCase()] ?? color;
 }

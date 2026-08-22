@@ -1,12 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme as useSystemColorScheme } from 'react-native';
-import { resolveThemeColorScheme, useTaskStore } from '@mindwtr/core';
+import type { AppTheme } from '@mindwtr/core';
+import { resolveThemeColorScheme, themeDescriptor, useTaskStore } from '@mindwtr/core';
+import type { ThemePresetName } from '../constants/theme-presets';
 import { logError } from '../lib/app-log';
 import { markStartupPhase, measureStartupPhase } from '../lib/startup-profiler';
 
-type ThemeMode = 'system' | 'light' | 'dark' | 'material3-light' | 'material3-dark' | 'eink' | 'nord' | 'sepia' | 'oled' | 'catppuccin-macchiato' | 'dracula';
-type ThemePreset = 'default' | 'eink' | 'nord' | 'sepia' | 'oled' | 'catppuccin-macchiato' | 'dracula';
+type ThemeMode = AppTheme;
+type ThemePreset = ThemePresetName;
 type ThemeStyle = 'default' | 'material3';
 type ColorScheme = 'light' | 'dark';
 
@@ -43,14 +45,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     // Every mode that has a THEME_PRESETS entry is its own preset; the rest
     // ('system', 'light', 'dark', both material3 modes) fall back to 'default'.
-    const themePreset: ThemePreset =
-        themeMode === 'eink' ? 'eink' :
-        themeMode === 'nord' ? 'nord' :
-        themeMode === 'sepia' ? 'sepia' :
-        themeMode === 'oled' ? 'oled' :
-        themeMode === 'catppuccin-macchiato' ? 'catppuccin-macchiato' :
-        themeMode === 'dracula' ? 'dracula' :
-        'default';
+    const themePreset: ThemePreset = themeDescriptor(themeMode)?.statusPreset ?? 'default';
 
     // Determine actual color scheme based on mode and system
     const colorScheme: ColorScheme = resolveThemeColorScheme(themeMode, systemColorScheme);

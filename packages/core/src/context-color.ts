@@ -1,3 +1,5 @@
+import type { AppTheme } from './types';
+
 const CONTEXT_COLOR_PALETTE = [
     '#2563eb',
     '#0f766e',
@@ -69,7 +71,7 @@ export const DRACULA_CONTEXT_COLOR_PALETTE = [
     '#f1fa8c',
 ];
 
-const CONTEXT_COLOR_PALETTES_BY_THEME = new Map<string, readonly string[]>([
+const CONTEXT_COLOR_PALETTES_BY_THEME = new Map<AppTheme, readonly string[]>([
     ['nord', NORD_CONTEXT_COLOR_PALETTE],
     ['catppuccin-macchiato', CATPPUCCIN_MACCHIATO_CONTEXT_COLOR_PALETTE],
     ['dracula', DRACULA_CONTEXT_COLOR_PALETTE],
@@ -85,7 +87,7 @@ function hashText(value: string): number {
 }
 
 export function getContextColor(context: string, theme?: string): string {
-    const palette = (theme && CONTEXT_COLOR_PALETTES_BY_THEME.get(theme)) ?? CONTEXT_COLOR_PALETTE;
+    const palette = (theme && CONTEXT_COLOR_PALETTES_BY_THEME.get(theme as AppTheme)) ?? CONTEXT_COLOR_PALETTE;
     const normalized = context.trim().toLowerCase();
     if (!normalized) return palette[0];
     const hash = hashText(normalized);

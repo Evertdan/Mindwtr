@@ -1,21 +1,39 @@
 import { describe, expect, it } from 'vitest';
-import { resolveThemeColorScheme, STATUS_COLORS_BY_THEME, getStatusColor } from './theme-scheme';
+import { SETTINGS_THEME_VALUES } from './settings-options';
+import {
+    resolveThemeColorScheme,
+    themeDescriptor,
+    STATUS_COLORS_BY_THEME,
+    THEME_DESCRIPTORS,
+    getStatusColor,
+    type ThemeColorScheme,
+} from './theme-scheme';
 import type { AppTheme, TaskStatus } from './types';
 
 const TASK_STATUSES: TaskStatus[] = ['inbox', 'next', 'waiting', 'someday', 'reference', 'done', 'archived'];
-const THEME_STATUS_KEYS = ['light', 'dark', 'nord', 'sepia', 'eink', 'oled', 'catppuccin-macchiato', 'dracula'] as const;
+const CONCRETE_THEMES = SETTINGS_THEME_VALUES.filter((theme): theme is Exclude<AppTheme, 'system'> => theme !== 'system');
+
+// The one place the intended light/dark split is stated independently of the
+// registry — without it the tests below would only prove the registry agrees
+// with itself. A theme missing here has no expected scheme, so the loop fails.
+const EXPECTED_SCHEMES: Record<Exclude<AppTheme, 'system'>, ThemeColorScheme> = {
+    'light': 'light',
+    'dark': 'dark',
+    'eink': 'light',
+    'nord': 'dark',
+    'sepia': 'light',
+    'material3-light': 'light',
+    'material3-dark': 'dark',
+    'oled': 'dark',
+    'catppuccin-macchiato': 'dark',
+    'dracula': 'dark',
+};
 
 describe('resolveThemeColorScheme', () => {
-    it('classifies each concrete theme regardless of system scheme', () => {
-        const darkThemes: AppTheme[] = ['dark', 'nord', 'oled', 'material3-dark', 'catppuccin-macchiato', 'dracula'];
-        const lightThemes: AppTheme[] = ['light', 'eink', 'sepia', 'material3-light'];
-        for (const theme of darkThemes) {
-            expect(resolveThemeColorScheme(theme, 'light')).toBe('dark');
-            expect(resolveThemeColorScheme(theme, 'dark')).toBe('dark');
-        }
-        for (const theme of lightThemes) {
-            expect(resolveThemeColorScheme(theme, 'light')).toBe('light');
-            expect(resolveThemeColorScheme(theme, 'dark')).toBe('light');
+    it('classifies every concrete theme regardless of system scheme', () => {
+        for (const theme of CONCRETE_THEMES) {
+            expect(resolveThemeColorScheme(theme, 'light')).toBe(EXPECTED_SCHEMES[theme]);
+            expect(resolveThemeColorScheme(theme, 'dark')).toBe(EXPECTED_SCHEMES[theme]);
         }
     });
 
@@ -25,9 +43,29 @@ describe('resolveThemeColorScheme', () => {
     });
 });
 
+describe('themeDescriptor', () => {
+    it('describes every concrete theme and nothing else', () => {
+        for (const theme of CONCRETE_THEMES) {
+            expect(themeDescriptor(theme)).toBe(THEME_DESCRIPTORS[theme]);
+        }
+        // 'system' has no fixed identity, and stored preferences are untrusted
+        // strings — both must read as "not a theme" rather than as a default.
+        expect(themeDescriptor('system')).toBeUndefined();
+        expect(themeDescriptor('draculaa')).toBeUndefined();
+        expect(themeDescriptor(undefined)).toBeUndefined();
+    });
+
+    it('points every theme at a status palette that exists', () => {
+        for (const theme of CONCRETE_THEMES) {
+            const { scheme, statusPreset } = THEME_DESCRIPTORS[theme];
+            expect(STATUS_COLORS_BY_THEME[statusPreset ?? scheme]).toBeDefined();
+        }
+    });
+});
+
 describe('STATUS_COLORS_BY_THEME', () => {
     it('resolves every theme x status pair to a defined color, including archived and oled', () => {
-        for (const key of THEME_STATUS_KEYS) {
+        for (const key of Object.keys(STATUS_COLORS_BY_THEME) as (keyof typeof STATUS_COLORS_BY_THEME)[]) {
             for (const status of TASK_STATUSES) {
                 const color = STATUS_COLORS_BY_THEME[key][status];
                 expect(color.bg).toBeTruthy();

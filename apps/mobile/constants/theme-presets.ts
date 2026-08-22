@@ -1,4 +1,8 @@
-export type ThemePresetName = 'default' | 'eink' | 'nord' | 'sepia' | 'oled' | 'catppuccin-macchiato' | 'dracula';
+import type { ThemeStatusPreset } from '@mindwtr/core';
+
+// One preset per theme with a bespoke color identity (core's list), plus
+// 'default' for the themes that just use plain light/dark colors.
+export type ThemePresetName = 'default' | ThemeStatusPreset;
 export type ThemePresetColor = `#${string}`;
 
 export type ThemePresetColors = {

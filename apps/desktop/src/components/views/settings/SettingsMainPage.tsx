@@ -5,12 +5,13 @@ import {
     getGlobalQuickAddShortcutOptions,
 } from '../../../lib/global-quick-add-shortcut';
 import { getLocaleCoverageTier, normalizeWeekStartSetting } from '@mindwtr/core';
+import type { DesktopThemeMode } from '../../../lib/theme';
 import { Switch } from '../../ui/Switch';
 import { SettingRow, SettingsCard, SettingsSectionHeader } from './SettingRow';
 
 const FLATPAK_QUICK_ADD_COMMAND = 'flatpak run tech.dongdongbh.mindwtr --quick-add';
 
-type ThemeMode = 'system' | 'light' | 'dark' | 'eink' | 'nord' | 'sepia' | 'oled' | 'catppuccin-macchiato' | 'dracula';
+type ThemeMode = DesktopThemeMode;
 type DensityMode = 'comfortable' | 'compact' | 'condensed';
 type TextSizeMode = 'small' | 'default' | 'large' | 'extra-large';
 type WeekStart = 'system' | 'sunday' | 'monday' | 'saturday';

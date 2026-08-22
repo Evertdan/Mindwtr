@@ -1,5 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { SETTINGS_DENSITY_VALUES, SETTINGS_DENSITY_VALUE_SET } from './settings-options';
+import { SETTINGS_DENSITY_VALUES, SETTINGS_DENSITY_VALUE_SET, SETTINGS_THEME_VALUES } from './settings-options';
+import { THEME_DESCRIPTORS } from './theme-scheme';
+
+describe('settings theme options', () => {
+    // Two exhaustive-over-AppTheme tables, one for validation and one for
+    // per-platform behavior. They can only drift if someone teaches one of them
+    // about a theme the other has never heard of.
+    it('offers exactly the themes the descriptor registry describes, plus system', () => {
+        expect([...SETTINGS_THEME_VALUES].sort()).toEqual(
+            ['system', ...Object.keys(THEME_DESCRIPTORS)].sort(),
+        );
+    });
+});
 
 describe('settings density options', () => {
     it('exposes comfortable, compact, and condensed as valid density values', () => {

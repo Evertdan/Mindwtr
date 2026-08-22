@@ -15,17 +15,51 @@ export type ThemeStatusPreset = 'eink' | 'nord' | 'sepia' | 'oled' | 'catppuccin
 export type StatusColorSet = { bg: string; text: string; border: string };
 export type StatusPalette = Record<TaskStatus, StatusColorSet>;
 
-const DARK_THEMES = new Set<AppTheme>(['dark', 'nord', 'oled', 'material3-dark', 'catppuccin-macchiato', 'dracula']);
-const LIGHT_THEMES = new Set<AppTheme>(['light', 'eink', 'sepia', 'material3-light']);
+export type ThemeDescriptor = {
+    /** The scheme this theme renders in, whatever the platform preference says. */
+    scheme: ThemeColorScheme;
+    /** Its bespoke status palette, or `null` to use the plain scheme palette. */
+    statusPreset: ThemeStatusPreset | null;
+    /** Whether desktop ships CSS for it; the rest collapse to `scheme` there. */
+    desktop: boolean;
+};
+
+/**
+ * Every concrete `AppTheme` and what each platform needs to know about it.
+ * `satisfies Record<Exclude<AppTheme, 'system'>, …>` is the point: a twelfth
+ * theme cannot compile until it has answered all three questions here, and the
+ * desktop mode union, the mobile preset, and the dark/light classification are
+ * all read off this one table instead of being hand-copied per platform.
+ */
+export const THEME_DESCRIPTORS = {
+    'light': { scheme: 'light', statusPreset: null, desktop: true },
+    'dark': { scheme: 'dark', statusPreset: null, desktop: true },
+    'eink': { scheme: 'light', statusPreset: 'eink', desktop: true },
+    'nord': { scheme: 'dark', statusPreset: 'nord', desktop: true },
+    'sepia': { scheme: 'light', statusPreset: 'sepia', desktop: true },
+    'material3-light': { scheme: 'light', statusPreset: null, desktop: false },
+    'material3-dark': { scheme: 'dark', statusPreset: null, desktop: false },
+    'oled': { scheme: 'dark', statusPreset: 'oled', desktop: true },
+    'catppuccin-macchiato': { scheme: 'dark', statusPreset: 'catppuccin-macchiato', desktop: true },
+    'dracula': { scheme: 'dark', statusPreset: 'dracula', desktop: true },
+} as const satisfies Record<Exclude<AppTheme, 'system'>, ThemeDescriptor>;
+
+const DESCRIPTOR_BY_THEME = THEME_DESCRIPTORS as Record<string, ThemeDescriptor | undefined>;
+
+/**
+ * The descriptor for a concrete theme, or `undefined` for `'system'` and for
+ * any value that isn't a theme (stored preferences are untrusted strings).
+ */
+export function themeDescriptor(theme: string | null | undefined): ThemeDescriptor | undefined {
+    return theme ? DESCRIPTOR_BY_THEME[theme] : undefined;
+}
 
 /**
  * Resolves an `AppTheme` to the color scheme it renders in. `'system'` (and any
  * value this function doesn't recognize) defers to `systemScheme`.
  */
 export function resolveThemeColorScheme(theme: AppTheme, systemScheme: ThemeColorScheme): ThemeColorScheme {
-    if (DARK_THEMES.has(theme)) return 'dark';
-    if (LIGHT_THEMES.has(theme)) return 'light';
-    return systemScheme;
+    return themeDescriptor(theme)?.scheme ?? systemScheme;
 }
 
 const TASK_STATUSES: TaskStatus[] = ['inbox', 'next', 'waiting', 'someday', 'reference', 'done', 'archived'];

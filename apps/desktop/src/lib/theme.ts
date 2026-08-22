@@ -1,9 +1,14 @@
-import type { AppData, AppTheme } from '@mindwtr/core';
-import { resolveThemeColorScheme } from '@mindwtr/core';
+import type { AppData } from '@mindwtr/core';
+import { THEME_DESCRIPTORS, resolveThemeColorScheme, themeDescriptor } from '@mindwtr/core';
 
 import { invokeNative } from './tauri-invoke';
 
-export type DesktopThemeMode = 'system' | 'light' | 'dark' | 'eink' | 'nord' | 'sepia' | 'oled' | 'catppuccin-macchiato' | 'dracula';
+// The themes desktop ships CSS for, read off core's registry rather than
+// hand-listed here: `desktop: false` themes (material3-*) collapse below.
+type DesktopThemeName = {
+    [K in keyof typeof THEME_DESCRIPTORS]: (typeof THEME_DESCRIPTORS)[K]['desktop'] extends true ? K : never;
+}[keyof typeof THEME_DESCRIPTORS];
+export type DesktopThemeMode = 'system' | DesktopThemeName;
 export type SystemThemePreference = 'light' | 'dark' | null;
 type NativeThemePreference = Exclude<SystemThemePreference, null>;
 type NativeThemeSetter = (theme?: NativeThemePreference | null) => Promise<void>;
@@ -27,24 +32,14 @@ const COMMAND_THEME_POLL_INTERVAL_MS = 2000;
 let cachedSystemThemePreference: SystemThemePreference = null;
 
 const isDesktopThemeMode = (value: string | null | undefined): value is DesktopThemeMode => (
-    value === 'system'
-    || value === 'light'
-    || value === 'dark'
-    || value === 'eink'
-    || value === 'nord'
-    || value === 'sepia'
-    || value === 'oled'
-    || value === 'catppuccin-macchiato'
-    || value === 'dracula'
+    value === 'system' || themeDescriptor(value)?.desktop === true
 );
 
-// Desktop has no material3-* theme of its own; collapse those into the
-// plain light/dark mode they render as. Classification comes from core so this
-// stays in lockstep with mobile and the iOS widget.
-const collapseUnsupportedDesktopTheme = (value: string): DesktopThemeMode | null => {
-    if (value !== 'material3-dark' && value !== 'material3-light') return null;
-    return resolveThemeColorScheme(value as AppTheme, 'light');
-};
+// A theme core knows but desktop has no CSS for (material3-*) collapses into
+// the plain light/dark mode it renders as; anything else is not a theme at all.
+const collapseUnsupportedDesktopTheme = (value: string): DesktopThemeMode | null => (
+    themeDescriptor(value)?.scheme ?? null
+);
 
 export const coerceDesktopThemeMode = (value: string | null | undefined): DesktopThemeMode | null => {
     if (!value) return null;
