@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildTaskUpdatesFromSpeechResult } from './task-utils';
+import { buildTaskUpdatesFromSpeechResult } from './task-speech';
 
 describe('buildTaskUpdatesFromSpeechResult', () => {
     it('maps a smart-parse result into task field updates', () => {
