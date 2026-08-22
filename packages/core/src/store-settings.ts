@@ -370,22 +370,12 @@ export const createSettingsActions = ({
                         }
                         setProducerMs = Date.now() - producerStartedAt;
                         return {
-                            tasks: visibleTasks,
-                            projects: visibleProjects,
-                            sections: visibleSections,
-                            areas: visibleAreas,
-                            people: visiblePeople,
                             settings: settingsForState,
                             _allTasks: nextTasks.items,
                             _allProjects: nextProjects.items,
                             _allSections: nextSections.items,
                             _allAreas: nextAreas.items,
                             _allPeople: nextPeople.items,
-                            _tasksById: nextTasks.byId,
-                            _projectsById: nextProjects.byId,
-                            _sectionsById: nextSections.byId,
-                            _areasById: nextAreas.byId,
-                            _peopleById: nextPeople.byId,
                             isLoading: false,
                             lastDataChangeAt: nextLastDataChangeAt,
                         };
