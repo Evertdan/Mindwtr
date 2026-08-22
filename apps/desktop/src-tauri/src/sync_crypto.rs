@@ -93,11 +93,25 @@ pub fn random_salt() -> [u8; SALT_LEN] {
     salt
 }
 
+/// Shared by `parse_header` (header-declared params, before decrypt) and
+/// `derive_sync_key_material` (caller-supplied params, e.g. from the desktop
+/// `derive_sync_encryption_key` command) -- both are reachable with attacker-controlled or
+/// merely corrupt cost params, and both must run Argon2 before authentication is possible.
+fn check_kdf_cost_ceiling(params: SyncCryptoKdfParams) -> Result<(), SyncCryptoError> {
+    if params.m_kib > KDF_COST_CEILING_M_KIB || params.t > KDF_COST_CEILING_T || params.p > KDF_COST_CEILING_P {
+        return Err(SyncCryptoError::Unsupported(format!(
+            "MWENC1 KDF cost exceeds accepted ceiling (m_kib<={KDF_COST_CEILING_M_KIB}, t<={KDF_COST_CEILING_T}, p<={KDF_COST_CEILING_P})"
+        )));
+    }
+    Ok(())
+}
+
 pub fn derive_sync_key_material(
     passphrase: &str,
     salt: [u8; SALT_LEN],
     params: SyncCryptoKdfParams,
 ) -> Result<SyncKeyMaterial, SyncCryptoError> {
+    check_kdf_cost_ceiling(params)?;
     // NFC normalization ensures the same passphrase typed with a precomposed accent or a
     // decomposed one derives the identical key, and matches packages/core's `.normalize('NFC')`.
     let normalized: String = passphrase.nfc().collect();
@@ -163,11 +177,7 @@ fn parse_header(bytes: &[u8]) -> Result<ParsedHeaderFields, SyncCryptoError> {
     let m_kib = read_u32_le(bytes, 8);
     let t = read_u32_le(bytes, 12);
     let p = bytes[16];
-    if m_kib > KDF_COST_CEILING_M_KIB || t > KDF_COST_CEILING_T || p > KDF_COST_CEILING_P {
-        return Err(SyncCryptoError::Unsupported(format!(
-            "MWENC1 KDF cost exceeds accepted ceiling (m_kib<={KDF_COST_CEILING_M_KIB}, t<={KDF_COST_CEILING_T}, p<={KDF_COST_CEILING_P})"
-        )));
-    }
+    check_kdf_cost_ceiling(SyncCryptoKdfParams { m_kib, t, p })?;
     let mut salt = [0u8; SALT_LEN];
     salt.copy_from_slice(&bytes[18..34]);
     let mut nonce = [0u8; NONCE_LEN];
@@ -564,6 +574,31 @@ mod tests {
         let hostile = hostile_header(999_999_999, 1, 1);
         let key = [0u8; KEY_LEN];
         match decrypt_sync_artifact(&hostile, &key) {
+            Err(SyncCryptoError::Unsupported(_)) => {}
+            other => panic!("expected Unsupported error, got {other:?}"),
+        }
+    }
+
+    // derive_sync_key_material is also reachable directly with caller-supplied params (the
+    // desktop `derive_sync_encryption_key` command), not only via parse_header -- the ceiling
+    // must hold there too, or that seam can be wedged/OOM'd the same way (A3).
+    #[test]
+    fn derive_sync_key_material_rejects_params_over_the_kdf_cost_ceiling() {
+        let salt = [0u8; SALT_LEN];
+        let over_m_kib = SyncCryptoKdfParams { m_kib: 262145, t: 1, p: 1 };
+        match derive_sync_key_material("x", salt, over_m_kib) {
+            Err(SyncCryptoError::Unsupported(_)) => {}
+            other => panic!("expected Unsupported error, got {other:?}"),
+        }
+
+        let over_t = SyncCryptoKdfParams { m_kib: 64, t: 17, p: 1 };
+        match derive_sync_key_material("x", salt, over_t) {
+            Err(SyncCryptoError::Unsupported(_)) => {}
+            other => panic!("expected Unsupported error, got {other:?}"),
+        }
+
+        let over_p = SyncCryptoKdfParams { m_kib: 64, t: 1, p: 9 };
+        match derive_sync_key_material("x", salt, over_p) {
             Err(SyncCryptoError::Unsupported(_)) => {}
             other => panic!("expected Unsupported error, got {other:?}"),
         }
