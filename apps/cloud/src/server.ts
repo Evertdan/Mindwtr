@@ -11,6 +11,7 @@ import {
     filterProjectsBySearch,
     filterTasksBySearch,
     generateUUID,
+    getNextProjectOrder,
     isTaskFinished,
     mergeAppDataWithStats,
     normalizeTaskUpdate,
@@ -362,6 +363,15 @@ function finalizeCloudDataForWrite(
     return repaired;
 }
 
+// Mirrors the store's stampNewRecurringFollowUp (packages/core/src/store-tasks.ts):
+// a follow-up is a fresh task, so it needs a reserved project order (missing sorts
+// as +Infinity in compareTasksByProjectOrder, dumping it below its siblings) and a
+// zeroed push count, same as every other task-creation path.
+const stampRecurringFollowUp = (task: Task, existingTasks: Task[]): Task => {
+    const order = getNextProjectOrder(task.projectId, existingTasks);
+    return { ...task, pushCount: 0, order, orderNum: order };
+};
+
 type CloudEntity = {
     id: string;
     deletedAt?: string;
@@ -665,7 +675,7 @@ const ENTITY_ROUTES: Array<EntityRouteDefinition<any>> = [
                 },
                 nowIso,
             );
-            if (nextRecurringTask) data.tasks.push(nextRecurringTask);
+            if (nextRecurringTask) data.tasks.push(stampRecurringFollowUp(nextRecurringTask, data.tasks));
             return updatedTask;
         },
     },
@@ -1194,7 +1204,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                                     nowIso,
                                 );
                                 data.tasks[idx] = updatedTask;
-                                if (nextRecurringTask) data.tasks.push(nextRecurringTask);
+                                if (nextRecurringTask) data.tasks.push(stampRecurringFollowUp(nextRecurringTask, data.tasks));
                                 const finalized = finalizeCloudDataForWrite(data, nowIso, FINALIZE_REJECT_INVALID_REST_WRITE);
                                 if ('error' in finalized) return finalized.error;
                                 const finalizedTask = finalized.tasks.find((item) => item.id === updatedTask.id) || updatedTask;

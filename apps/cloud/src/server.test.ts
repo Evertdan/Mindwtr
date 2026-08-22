@@ -3154,6 +3154,85 @@ describe('cloud server api', () => {
         expect(archiveJson.task.revBy).toBe('cloud');
     });
 
+    test('reserves a project order for a recurring follow-up created via /complete', async () => {
+        const projectResponse = await fetch(`${baseUrl}/v1/projects`, {
+            method: 'POST',
+            headers: { ...authHeaders, 'content-type': 'application/json' },
+            body: JSON.stringify({ title: 'Recurring Project' }),
+        });
+        expect(projectResponse.status).toBe(201);
+        const projectId = (await projectResponse.json()).project.id as string;
+
+        const taskResponse = await fetch(`${baseUrl}/v1/tasks`, {
+            method: 'POST',
+            headers: { ...authHeaders, 'content-type': 'application/json' },
+            body: JSON.stringify({
+                title: 'Recurring Task',
+                props: {
+                    projectId,
+                    dueDate: '2026-08-20',
+                    recurrence: { rule: 'daily' },
+                },
+            }),
+        });
+        expect(taskResponse.status).toBe(201);
+        const taskId = (await taskResponse.json()).task.id as string;
+
+        const completeResponse = await fetch(`${baseUrl}/v1/tasks/${encodeURIComponent(taskId)}/complete`, {
+            method: 'POST',
+            headers: authHeaders,
+        });
+        expect(completeResponse.status).toBe(200);
+
+        const listResponse = await fetch(`${baseUrl}/v1/tasks?limit=100`, { headers: authHeaders });
+        expect(listResponse.status).toBe(200);
+        const listJson = await listResponse.json();
+        const followUp = (listJson.tasks as Task[]).find((task) => task.projectId === projectId && task.id !== taskId);
+        expect(followUp).toBeTruthy();
+        expect(Number.isFinite(followUp?.order)).toBe(true);
+        expect(followUp?.pushCount).toBe(0);
+    });
+
+    test('reserves a project order for a recurring follow-up created via a status PATCH', async () => {
+        const projectResponse = await fetch(`${baseUrl}/v1/projects`, {
+            method: 'POST',
+            headers: { ...authHeaders, 'content-type': 'application/json' },
+            body: JSON.stringify({ title: 'Recurring Project 2' }),
+        });
+        expect(projectResponse.status).toBe(201);
+        const projectId = (await projectResponse.json()).project.id as string;
+
+        const taskResponse = await fetch(`${baseUrl}/v1/tasks`, {
+            method: 'POST',
+            headers: { ...authHeaders, 'content-type': 'application/json' },
+            body: JSON.stringify({
+                title: 'Recurring Task 2',
+                props: {
+                    projectId,
+                    dueDate: '2026-08-20',
+                    recurrence: { rule: 'daily' },
+                },
+            }),
+        });
+        expect(taskResponse.status).toBe(201);
+        const taskId = (await taskResponse.json()).task.id as string;
+
+        const patchResponse = await fetch(`${baseUrl}/v1/tasks/${encodeURIComponent(taskId)}`, {
+            method: 'PATCH',
+            headers: { ...authHeaders, 'content-type': 'application/json' },
+            body: JSON.stringify({ status: 'done' }),
+        });
+        expect(patchResponse.status).toBe(200);
+
+        const listResponse = await fetch(`${baseUrl}/v1/tasks?limit=100`, { headers: authHeaders });
+        expect(listResponse.status).toBe(200);
+        const listJson = await listResponse.json();
+        const followUp = (listJson.tasks as Task[]).find((task) => task.projectId === projectId && task.id !== taskId);
+        expect(followUp).toBeTruthy();
+        expect(Number.isFinite(followUp?.order)).toBe(true);
+        expect(followUp?.pushCount).toBe(0);
+    });
+
     test('rejects reserved fields on task creation', async () => {
         const createResponse = await fetch(`${baseUrl}/v1/tasks`, {
             method: 'POST',
