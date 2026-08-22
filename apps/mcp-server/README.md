@@ -162,7 +162,7 @@ Stop:
 ```bash
 # from repo root
 bun run --filter mindwtr-mcp build
-node apps/mcp-server/dist/index.js --db "/path/to/mindwtr.db"
+node apps/mcp-server/dist/cli.js --db "/path/to/mindwtr.db"
 ```
 
 Stop:
@@ -182,7 +182,7 @@ bun run mindwtr:mcp -- --db "/path/to/mindwtr.db"
 
 # ✅ build then run
 bun run --filter mindwtr-mcp build
-node apps/mcp-server/dist/index.js --db "/path/to/mindwtr.db"
+node apps/mcp-server/dist/cli.js --db "/path/to/mindwtr.db"
 ```
 
 ### Optional: create a global `mindwtr-mcp` command
@@ -225,7 +225,7 @@ MCP clients run the server as a subprocess. You point them to **the command** an
     "mindwtr": {
       "command": "bun",
       "args": [
-        "/absolute/path/to/Mindwtr/apps/mcp-server/src/index.ts",
+        "/absolute/path/to/Mindwtr/apps/mcp-server/src/cli.ts",
         "--db",
         "~/.local/share/mindwtr/mindwtr.db"
       ]
@@ -249,7 +249,7 @@ cd /path/to/Mindwtr && bun run --filter mindwtr-mcp build
     "mindwtr": {
       "command": "node",
       "args": [
-        "/absolute/path/to/Mindwtr/apps/mcp-server/dist/index.js",
+        "/absolute/path/to/Mindwtr/apps/mcp-server/dist/cli.js",
         "--db",
         "~/.local/share/mindwtr/mindwtr.db"
       ]
@@ -276,7 +276,7 @@ Add a server via the CLI:
 
 ```bash
 claude mcp add mindwtr -- \
-  bun /path/to/Mindwtr/apps/mcp-server/src/index.ts --db "/path/to/mindwtr.db" --write
+  bun /path/to/Mindwtr/apps/mcp-server/src/cli.ts --db "/path/to/mindwtr.db" --write
 ```
 
 Or edit `~/.claude.json` directly:
@@ -290,7 +290,7 @@ Or edit `~/.claude.json` directly:
           "type": "stdio",
           "command": "bun",
           "args": [
-            "/absolute/path/to/Mindwtr/apps/mcp-server/src/index.ts",
+            "/absolute/path/to/Mindwtr/apps/mcp-server/src/cli.ts",
             "--db",
             "~/.local/share/mindwtr/mindwtr.db",
             "--write"
@@ -311,7 +311,7 @@ Codex stores MCP config in `~/.codex/config.toml`. Add:
 ```toml
 [mcp_servers.mindwtr]
 command = "bun"
-args = ["/absolute/path/to/Mindwtr/apps/mcp-server/src/index.ts", "--db", "/path/to/mindwtr.db", "--write"]
+args = ["/absolute/path/to/Mindwtr/apps/mcp-server/src/cli.ts", "--db", "/path/to/mindwtr.db", "--write"]
 
 # Optional: pass env vars to the server
 [mcp_servers.mindwtr.env]
@@ -332,7 +332,7 @@ You can add Mindwtr MCP two ways:
 
 ```bash
 gemini mcp add mindwtr \
-  bun /absolute/path/to/Mindwtr/apps/mcp-server/src/index.ts \
+  bun /absolute/path/to/Mindwtr/apps/mcp-server/src/cli.ts \
   --db "/path/to/mindwtr.db" --write
 ```
 
@@ -343,7 +343,7 @@ gemini mcp add mindwtr \
   "mcpServers": {
     "mindwtr": {
       "command": "bun",
-      "args": ["/absolute/path/to/Mindwtr/apps/mcp-server/src/index.ts", "--db", "/path/to/mindwtr.db", "--write"]
+      "args": ["/absolute/path/to/Mindwtr/apps/mcp-server/src/cli.ts", "--db", "/path/to/mindwtr.db", "--write"]
     }
   }
 }
@@ -506,7 +506,7 @@ If these succeed, the stdio transport is working end-to-end.
 1) Add the server:
 ```bash
 claude mcp add mindwtr -- \
-  bun /path/to/Mindwtr/apps/mcp-server/src/index.ts --db "/path/to/mindwtr.db" --write
+  bun /path/to/Mindwtr/apps/mcp-server/src/cli.ts --db "/path/to/mindwtr.db" --write
 ```
 2) Restart Claude Code, run `/mcp`, and verify **mindwtr** is connected.
 3) Ask the model to call:

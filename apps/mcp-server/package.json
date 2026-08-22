@@ -7,10 +7,11 @@
   "mcpName": "io.github.dongdongbh/mindwtr",
   "main": "dist/index.js",
   "bin": {
-    "mindwtr-mcp": "dist/index.js"
+    "mindwtr-mcp": "dist/cli.js"
   },
   "files": [
     "dist/index.js",
+    "dist/cli.js",
     "README.md"
   ],
   "publishConfig": {
@@ -36,11 +37,11 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "bun src/index.ts",
-    "build": "bun build src/index.ts --target node --format esm --outfile dist/index.js --define process.env.NODE_ENV='\"production\"' --external=better-sqlite3 --external=bun:sqlite",
+    "dev": "bun src/cli.ts",
+    "build": "bun build src/index.ts --target node --format esm --outfile dist/index.js --define process.env.NODE_ENV='\"production\"' --external=better-sqlite3 --external=bun:sqlite && bun build src/cli.ts --target node --format esm --outfile dist/cli.js --define process.env.NODE_ENV='\"production\"' --external=better-sqlite3 --external=bun:sqlite",
     "lint": "eslint -c eslint.config.mjs . --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "start": "node dist/index.js",
+    "start": "node dist/cli.js",
     "test": "bun test",
     "test:coverage": "bun test --coverage --coverage-reporter=lcov"
   },

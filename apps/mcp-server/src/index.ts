@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { readFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -75,7 +74,7 @@ const writeLog = (entry: LogEntry) => {
   process.stderr.write(line);
 };
 
-const logError = (message: string, error?: unknown) => {
+export const logError = (message: string, error?: unknown) => {
   const context: Record<string, unknown> = {};
   if (error instanceof Error) {
     context.error = error.message;
@@ -887,11 +886,4 @@ export async function startMcpServer(argv: string[] = process.argv.slice(2)) {
     process.stdin.on('end', () => process.exit(0));
     setInterval(() => {}, 1 << 30);
   }
-}
-
-if (import.meta.main) {
-  startMcpServer().catch((error) => {
-    logError('Failed to start server', error);
-    process.exit(1);
-  });
 }
