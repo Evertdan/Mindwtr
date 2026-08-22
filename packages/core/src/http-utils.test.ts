@@ -257,6 +257,52 @@ describe('fetchWithTimeout', () => {
         )).rejects.toThrow('Request timed out');
     });
 
+    it.each(['PUT', 'POST', 'PATCH', 'DELETE'])(
+        'refuses to follow a redirect on %s so the body is never replayed to another origin',
+        async (method) => {
+            const calls: string[] = [];
+            const fetcher: typeof fetch = async (input, init) => {
+                calls.push(String(input));
+                // Mirrors undici/browser fetch: redirect:'error' rejects instead of
+                // re-issuing the request (with its body) at the Location target.
+                if (init?.redirect === 'error') throw new TypeError('unexpected redirect');
+                return new Response(null, {
+                    status: 307,
+                    headers: { location: 'https://attacker.example/steal' },
+                });
+            };
+
+            await expect(fetchWithTimeout(
+                'https://dav.example.com/data.json',
+                { method, body: '{"tasks":[]}' },
+                1_000,
+                fetcher,
+                'Request timed out',
+            )).rejects.toThrow('unexpected redirect');
+            expect(calls).toEqual(['https://dav.example.com/data.json']);
+        },
+    );
+
+    it.each(['GET', 'HEAD', 'PROPFIND', 'MKCOL', undefined])(
+        'leaves %s on the default redirect policy',
+        async (method) => {
+            let receivedInit: RequestInit | undefined;
+
+            await fetchWithTimeout(
+                'https://dav.example.com/data.json',
+                method === undefined ? {} : { method },
+                1_000,
+                async (_input, init) => {
+                    receivedInit = init;
+                    return new Response(null, { status: 200 });
+                },
+                'Request timed out',
+            );
+
+            expect(receivedInit?.redirect).toBeUndefined();
+        },
+    );
+
     it('preserves nested transport causes for fetch failures', async () => {
         const certificateError = new Error('invalid peer certificate: UnknownIssuer');
         const connectError = new Error('client error (Connect)');

@@ -1141,7 +1141,7 @@ fn blocking_http_client(proxy_url: Option<&str>) -> Result<reqwest::blocking::Cl
         .map_err(|error| format!("Failed to create HTTP client: {error}"))
 }
 
-fn is_webdav_https_downgrade(next: &reqwest::Url, previous: &[reqwest::Url]) -> bool {
+fn is_https_downgrade(next: &reqwest::Url, previous: &[reqwest::Url]) -> bool {
     previous
         .last()
         .is_some_and(|previous| previous.scheme() == "https" && next.scheme() == "http")
@@ -1152,7 +1152,7 @@ fn webdav_redirect_security_error(
     previous: &[reqwest::Url],
     allow_insecure_http: bool,
 ) -> Option<&'static str> {
-    if is_webdav_https_downgrade(next, previous) {
+    if is_https_downgrade(next, previous) {
         Some("WebDAV refused an HTTPS to HTTP redirect")
     } else if assert_webdav_url_allowed(next.as_str(), allow_insecure_http).is_err() {
         Some("WebDAV refused an insecure redirect target")
@@ -1161,17 +1161,36 @@ fn webdav_redirect_security_error(
     }
 }
 
-fn webdav_blocking_http_client(
-    proxy_url: Option<&str>,
+fn cloud_redirect_security_error(
+    next: &reqwest::Url,
+    previous: &[reqwest::Url],
     allow_insecure_http: bool,
+) -> Option<&'static str> {
+    if is_https_downgrade(next, previous) {
+        Some("Cloud sync refused an HTTPS to HTTP redirect")
+    } else if assert_cloud_url_allowed(next.as_str(), allow_insecure_http).is_err() {
+        Some("Cloud sync refused an insecure redirect target")
+    } else {
+        None
+    }
+}
+
+/// reqwest's default `Policy::limited(10)` re-sends the request -- body included -- at
+/// whatever host the Location points at. Sync requests carry the whole document, so both
+/// backends check the redirect target against their own URL rule before following.
+fn redirect_guarded_blocking_http_client(
+    proxy_url: Option<&str>,
+    label: &'static str,
+    security_error: impl Fn(&reqwest::Url, &[reqwest::Url]) -> Option<&'static str>
+        + Send
+        + Sync
+        + 'static,
 ) -> Result<reqwest::blocking::Client, String> {
     let redirect_policy = reqwest::redirect::Policy::custom(move |attempt| {
-        if let Some(error) =
-            webdav_redirect_security_error(attempt.url(), attempt.previous(), allow_insecure_http)
-        {
+        if let Some(error) = security_error(attempt.url(), attempt.previous()) {
             attempt.error(error)
         } else if attempt.previous().len() > 10 {
-            attempt.error("too many WebDAV redirects")
+            attempt.error(format!("too many {label} redirects"))
         } else {
             attempt.follow()
         }
@@ -1179,7 +1198,25 @@ fn webdav_blocking_http_client(
     blocking_http_client_builder(proxy_url)?
         .redirect(redirect_policy)
         .build()
-        .map_err(|error| format!("Failed to create WebDAV HTTP client: {error}"))
+        .map_err(|error| format!("Failed to create {label} HTTP client: {error}"))
+}
+
+fn webdav_blocking_http_client(
+    proxy_url: Option<&str>,
+    allow_insecure_http: bool,
+) -> Result<reqwest::blocking::Client, String> {
+    redirect_guarded_blocking_http_client(proxy_url, "WebDAV", move |next, previous| {
+        webdav_redirect_security_error(next, previous, allow_insecure_http)
+    })
+}
+
+fn cloud_blocking_http_client(
+    proxy_url: Option<&str>,
+    allow_insecure_http: bool,
+) -> Result<reqwest::blocking::Client, String> {
+    redirect_guarded_blocking_http_client(proxy_url, "Cloud", move |next, previous| {
+        cloud_redirect_security_error(next, previous, allow_insecure_http)
+    })
 }
 
 fn app_blocking_http_client(app: &tauri::AppHandle) -> Result<reqwest::blocking::Client, String> {
@@ -3312,7 +3349,7 @@ fn cloud_get_json_blocking(app: &tauri::AppHandle) -> Result<Value, String> {
     assert_cloud_url_allowed(&url, allow_insecure_http)?;
 
     let token = token.unwrap_or_default();
-    let client = blocking_http_client(config.proxy_url.as_deref())?;
+    let client = cloud_blocking_http_client(config.proxy_url.as_deref(), allow_insecure_http)?;
     let response = cloud_request_builder(&client, reqwest::Method::GET, &url, &token)
         .send()
         .map_err(|e| format_reqwest_send_error("Cloud request failed", &e))?;
@@ -3357,7 +3394,7 @@ fn cloud_put_json_blocking(
     let token = token.unwrap_or_default();
     let payload = serde_json::to_string_pretty(data)
         .map_err(|e| format!("Failed to encode Cloud payload: {e}"))?;
-    let client = blocking_http_client(config.proxy_url.as_deref())?;
+    let client = cloud_blocking_http_client(config.proxy_url.as_deref(), allow_insecure_http)?;
     let response = cloud_request_builder(&client, reqwest::Method::PUT, &url, &token)
         .header("Content-Type", "application/json")
         .body(payload)
@@ -3580,6 +3617,29 @@ mod tests {
         )
         .is_some());
         assert!(webdav_redirect_security_error(&next_http, &[initial_http], true).is_none());
+    }
+
+    #[test]
+    fn cloud_redirect_security_rejects_downgrades_and_unapproved_public_http() {
+        let https = reqwest::Url::parse("https://cloud.example.com/v1/data").unwrap();
+        let next_https = reqwest::Url::parse("https://other.example.com/v1/data").unwrap();
+        let next_http = reqwest::Url::parse("http://cloud.example.com/v1/data").unwrap();
+        let initial_http = reqwest::Url::parse("http://nas.local:8787/v1/data").unwrap();
+
+        assert!(
+            cloud_redirect_security_error(&next_https, std::slice::from_ref(&https), false)
+                .is_none()
+        );
+        assert!(
+            cloud_redirect_security_error(&next_http, std::slice::from_ref(&https), true).is_some()
+        );
+        assert!(cloud_redirect_security_error(
+            &next_http,
+            std::slice::from_ref(&initial_http),
+            false,
+        )
+        .is_some());
+        assert!(cloud_redirect_security_error(&next_http, &[initial_http], true).is_none());
     }
 
     #[test]

@@ -316,6 +316,16 @@ export const createProgressStream = (bytes: Uint8Array, onProgress: (loaded: num
     });
 };
 
+/**
+ * Methods whose request carries a body worth stealing. `fetch` drops the Authorization
+ * header cross-origin but replays the BODY, so a compromised endpoint answering a PUT
+ * with `307 Location: attacker.example` would be handed the whole sync document. Reads
+ * keep the default `follow` -- WebDAV servers legitimately 301 collection URLs.
+ * Known ceiling: React Native's XHR-backed fetch ignores `redirect`, so this only binds
+ * on undici/browser fetch (desktop, cloud, MCP).
+ */
+const NO_REDIRECT_METHODS = new Set(['PUT', 'POST', 'PATCH', 'DELETE']);
+
 export const fetchWithTimeout = async (
     url: string,
     init: RequestInit,
@@ -346,6 +356,9 @@ export const fetchWithTimeout = async (
 
     try {
         const requestInit: RequestInit & { duplex?: 'half' } = { ...init, signal };
+        if (NO_REDIRECT_METHODS.has((init.method ?? 'GET').toUpperCase())) {
+            requestInit.redirect = 'error';
+        }
         const body = requestInit.body;
         const isReadableStreamBody = typeof ReadableStream === 'function'
             && body instanceof ReadableStream;
