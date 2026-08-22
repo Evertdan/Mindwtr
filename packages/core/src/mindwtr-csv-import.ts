@@ -771,10 +771,19 @@ export const applyMindwtrCsvImport = (
     ]));
     const currentProjectTaskScopes = currentData.projects.map((project) => {
         const areaSourceKey = project.areaId ? currentAreaSourceKeyById.get(project.areaId) : undefined;
+        const projectSourceKey = normalizeSourceKey(project.title);
+        const colonProjectSourceKey = colonProjectSourceKeyFor(areaSourceKey, project.title);
         return {
             areaSourceKey,
-            colonProjectSourceKey: colonProjectSourceKeyFor(areaSourceKey, project.title),
-            projectSourceKey: normalizeSourceKey(project.title),
+            colonProjectSourceKey,
+            projectSourceKey,
+            // Precomputed once per project (not once per row × project) so the
+            // per-row historical-id scan below only appends the row's sourceId
+            // instead of rebuilding these via encodeSourceKeyTuple's
+            // array-spread/map/join on every (row, project) pair (BUG-12).
+            tuplePrefix: `${encodeSourceKeyTuple(...(areaSourceKey ? [areaSourceKey] : []), projectSourceKey)}:`,
+            colonPrefix: `${colonProjectSourceKey}:`,
+            plainPrefix: `${projectSourceKey}:`,
         };
     });
     const resolvedIds = {
@@ -954,17 +963,12 @@ export const applyMindwtrCsvImport = (
                 .filter((sourceKey) => sourceKey !== task.sourceKey),
         );
         if (historicalCandidates.length === 0 && currentTaskById.size > 0) {
-            const priorContainerSourceKeys = currentProjectTaskScopes.flatMap((scope) => {
-                return [
-                    encodeSourceKeyTuple(
-                        ...(scope.areaSourceKey ? [scope.areaSourceKey] : []),
-                        scope.projectSourceKey,
-                        task.sourceId,
-                    ),
-                    `${scope.colonProjectSourceKey}:${task.sourceId}`,
-                    `${scope.projectSourceKey}:${task.sourceId}`,
-                ];
-            });
+            const encodedSourceId = encodeURIComponent(task.sourceId);
+            const priorContainerSourceKeys = currentProjectTaskScopes.flatMap((scope) => [
+                `${scope.tuplePrefix}${encodedSourceId}`,
+                `${scope.colonPrefix}${task.sourceId}`,
+                `${scope.plainPrefix}${task.sourceId}`,
+            ]);
             historicalCandidates = historicalTaskCandidatesFor(priorContainerSourceKeys);
         }
         const ownedCandidate = historicalCandidates.find(({ task: historicalTask }) => (
