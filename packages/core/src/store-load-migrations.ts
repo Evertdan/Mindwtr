@@ -687,7 +687,22 @@ export const runLoadMigrations = (data: AppData, ctx: LoadContext): { data: AppD
     const applied: string[] = [];
     for (const migration of LOAD_MIGRATIONS) {
         if (migration.shouldRun && !migration.shouldRun(ctx)) continue;
-        const result = migration.run(current, ctx);
+        let result: AppData | null;
+        try {
+            result = migration.run(current, ctx);
+        } catch (error) {
+            // One malformed row must not cost the user their whole document: the
+            // caller's outer catch would leave the store empty on every launch.
+            // Skipping keeps the pre-migration state, which the later steps and
+            // the next load both still see.
+            logWarn('Load migration failed; continuing without it', {
+                scope: 'store',
+                category: 'storage',
+                context: { migration: migration.name },
+                error,
+            });
+            continue;
+        }
         if (result) {
             current = result;
             applied.push(migration.name);

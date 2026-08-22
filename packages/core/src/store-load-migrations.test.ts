@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { consoleLogger, setLogger, type LogPayload } from './logger';
 import {
     buildLoadContext,
     runLoadMigrations,
@@ -269,6 +270,30 @@ describe('runLoadMigrations', () => {
         expect(applied).toEqual(['bump-tombstone-cleanup-timestamp', 'promote-scheduled-tasks', 'purge-expired-tombstones']);
         expect(result.tasks.map((task) => task.id)).toEqual(['t-due']);
         expect(result.tasks[0].status).toBe('next');
+    });
+
+    // One malformed row used to take the whole pipeline down, and the load path's
+    // outer catch leaves the store empty forever after that -- every launch.
+    it('isolates a throwing migration so the rest of the pipeline still runs', () => {
+        const logs: LogPayload[] = [];
+        setLogger((payload) => logs.push(payload));
+        try {
+            const data = settledData({ areas: [null as unknown as Area] });
+            data.settings = { ...data.settings, gtd: { ...data.settings.gtd, taskEditor: { hidden: [], defaultsVersion: 4 } } };
+
+            const { data: result, applied } = runLoadMigrations(data, ctxFor(data));
+
+            expect(applied).not.toContain('normalize-area-timestamps');
+            expect(applied).toContain('task-editor-defaults');
+            expect(result.settings.gtd?.taskEditor?.defaultsVersion).toBe(5);
+            expect(logs.some((log) => (
+                log.level === 'warn'
+                && log.message.includes('Load migration failed')
+                && JSON.stringify(log.context).includes('normalize-area-timestamps')
+            ))).toBe(true);
+        } finally {
+            setLogger(consoleLogger);
+        }
     });
 
     it('idempotence: running the pipeline twice over the same data applies nothing the second time', () => {
