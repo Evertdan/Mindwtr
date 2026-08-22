@@ -1,11 +1,10 @@
 import {
     DEFAULT_TIMEOUT_MS,
     assertConnectionAllowed,
-    concatChunks,
     createProgressStream,
     fetchWithTimeout,
+    readResponseBody,
     SYNC_LOCAL_INSECURE_URL_OPTIONS,
-    toArrayBuffer,
     toUint8Array,
 } from './http-utils';
 import { logWarn } from './logger';
@@ -688,26 +687,7 @@ export async function webdavGetFile(
         throw error;
     }
 
-    const onProgress = options.onProgress;
-    if (!onProgress || !res.body || typeof res.body.getReader !== 'function') {
-        return await res.arrayBuffer();
-    }
-
-    const reader = res.body.getReader();
-    const total = Number(res.headers.get('content-length') || 0);
-    const chunks: Uint8Array[] = [];
-    let received = 0;
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (value) {
-            chunks.push(value);
-            received += value.length;
-            onProgress(received, total);
-        }
-    }
-    const merged = concatChunks(chunks, total || received);
-    return toArrayBuffer(merged);
+    return await readResponseBody(res, options.onProgress);
 }
 
 export async function webdavDeleteFile(

@@ -1,3 +1,5 @@
+import { DEFAULT_MAX_FILE_SIZE_BYTES } from './attachment-validation';
+
 export type InsecureUrlOptions = {
     allowAndroidEmulator?: boolean;
     allowAndroidEmulatorInDev?: boolean;
@@ -235,6 +237,64 @@ export const concatChunks = (chunks: Uint8Array[], total: number): Uint8Array =>
         offset += chunk.length;
     }
     return merged;
+};
+
+/**
+ * Ceiling on anything we download from a sync remote. 2x the per-attachment upload
+ * cap because the same getters also fetch the sync document itself, which is not an
+ * attachment and so is not bounded by that cap -- it needs headroom above it.
+ */
+export const MAX_DOWNLOAD_BYTES = 2 * DEFAULT_MAX_FILE_SIZE_BYTES;
+
+export class ResponseTooLargeError extends Error {
+    readonly limitBytes: number;
+
+    constructor(limitBytes: number) {
+        super(`Response exceeds the ${limitBytes} byte download limit`);
+        this.name = 'ResponseTooLargeError';
+        this.limitBytes = limitBytes;
+    }
+}
+
+/**
+ * Reads a response body with a hard byte ceiling. A server-declared Content-Length is
+ * only ever used to reject early and to report progress -- never to size an allocation,
+ * so a lying or absent header still aborts once the running total passes the limit.
+ */
+export const readResponseBody = async (
+    res: Response,
+    onProgress?: (loaded: number, total: number) => void,
+    limitBytes: number = MAX_DOWNLOAD_BYTES,
+): Promise<ArrayBuffer> => {
+    const declared = Number(res.headers?.get('content-length') || 0);
+    const total = Number.isFinite(declared) && declared > 0 ? declared : 0;
+    if (total > limitBytes) throw new ResponseTooLargeError(limitBytes);
+
+    const body = res.body;
+    if (!body || typeof body.getReader !== 'function') {
+        const buffer = await res.arrayBuffer();
+        if (buffer.byteLength > limitBytes) throw new ResponseTooLargeError(limitBytes);
+        return buffer;
+    }
+
+    const reader = body.getReader();
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (!value) continue;
+            received += value.length;
+            if (received > limitBytes) throw new ResponseTooLargeError(limitBytes);
+            chunks.push(value);
+            onProgress?.(received, total);
+        }
+    } catch (error) {
+        await reader.cancel().catch(() => {});
+        throw error;
+    }
+    return toArrayBuffer(concatChunks(chunks, received));
 };
 
 export const createProgressStream = (bytes: Uint8Array, onProgress: (loaded: number, total: number) => void) => {

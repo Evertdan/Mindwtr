@@ -12,6 +12,7 @@ import {
     getCloudCalendarFeedEndpoint,
     isValidCloudSyncToken,
 } from './cloud';
+import { MAX_DOWNLOAD_BYTES, ResponseTooLargeError } from './http-utils';
 
 const okResponse = (text: string) =>
     ({
@@ -307,5 +308,46 @@ describe('calendar feed URLs', () => {
     it('keeps a reverse-proxy path prefix', () => {
         expect(buildCloudCalendarFeedUrl('https://example.com/mindwtr/v1/data', 'abc'))
             .toBe('https://example.com/mindwtr/v1/calendar/abc.ics');
+    });
+});
+
+describe('cloudGetFile download cap', () => {
+    const fileResponse = (chunks: Uint8Array[], headers: Record<string, string>) => {
+        const read = vi.fn(async () => {
+            const value = chunks.shift();
+            return value ? { done: false, value } : { done: true, value: undefined };
+        });
+        const res = {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            headers: { get: (name: string) => headers[name.toLowerCase()] ?? null },
+            body: { getReader: () => ({ read, cancel: async () => {} }) },
+            arrayBuffer: vi.fn(async () => new ArrayBuffer(0)),
+        } as unknown as Response;
+        return { res, read };
+    };
+
+    it('rejects a hostile content-length without reading the body', async () => {
+        const { res, read } = fileResponse([new Uint8Array([1])], {
+            'content-length': String(MAX_DOWNLOAD_BYTES + 1),
+        });
+        await expect(
+            cloudGetFile('https://example.com/v1/files/a', { fetcher: async () => res }),
+        ).rejects.toBeInstanceOf(ResponseTooLargeError);
+        expect(read).not.toHaveBeenCalled();
+    });
+
+    it('still streams a normal download and reports progress', async () => {
+        const { res } = fileResponse([new Uint8Array([9, 9]), new Uint8Array([9])], {
+            'content-length': '3',
+        });
+        const onProgress = vi.fn();
+        const buffer = await cloudGetFile('https://example.com/v1/files/a', {
+            fetcher: async () => res,
+            onProgress,
+        });
+        expect(Array.from(new Uint8Array(buffer))).toEqual([9, 9, 9]);
+        expect(onProgress.mock.calls).toEqual([[2, 3], [3, 3]]);
     });
 });

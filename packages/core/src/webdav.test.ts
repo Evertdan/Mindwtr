@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { __webdavTestUtils, webdavGetJson, webdavHeadFile, webdavPutFile, webdavPutJson } from './webdav';
+import { __webdavTestUtils, webdavGetFile, webdavGetJson, webdavHeadFile, webdavPutFile, webdavPutJson } from './webdav';
+import { MAX_DOWNLOAD_BYTES, ResponseTooLargeError } from './http-utils';
 import { consoleLogger, setLogger, type LogPayload } from './logger';
 
 const makeResponse = (overrides: Partial<Response> & { status: number; ok: boolean }): Response => ({
@@ -414,5 +415,45 @@ describe('webdav http helpers', () => {
         );
 
         expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'MKCOL')).toHaveLength(33);
+    });
+});
+
+describe('webdavGetFile download cap', () => {
+    const fileResponse = (chunks: Uint8Array[], headers: Record<string, string>) => {
+        const read = vi.fn(async () => {
+            const value = chunks.shift();
+            return value ? { done: false, value } : { done: true, value: undefined };
+        });
+        const res = makeResponse({
+            ok: true,
+            status: 200,
+            headers: { get: (name: string) => headers[name.toLowerCase()] ?? null } as unknown as Headers,
+            body: { getReader: () => ({ read, cancel: async () => {} }) } as unknown as ReadableStream<Uint8Array>,
+            arrayBuffer: vi.fn(async () => new ArrayBuffer(0)),
+        });
+        return { res, read };
+    };
+
+    it('rejects a hostile content-length without reading the body', async () => {
+        const { res, read } = fileResponse([new Uint8Array([1])], {
+            'content-length': String(MAX_DOWNLOAD_BYTES + 1),
+        });
+        await expect(
+            webdavGetFile('https://example.com/dav/a.bin', { fetcher: async () => res }),
+        ).rejects.toBeInstanceOf(ResponseTooLargeError);
+        expect(read).not.toHaveBeenCalled();
+    });
+
+    it('still streams a normal download and reports progress', async () => {
+        const { res } = fileResponse([new Uint8Array([4, 5]), new Uint8Array([6])], {
+            'content-length': '3',
+        });
+        const onProgress = vi.fn();
+        const buffer = await webdavGetFile('https://example.com/dav/a.bin', {
+            fetcher: async () => res,
+            onProgress,
+        });
+        expect(Array.from(new Uint8Array(buffer))).toEqual([4, 5, 6]);
+        expect(onProgress.mock.calls).toEqual([[2, 3], [3, 3]]);
     });
 });

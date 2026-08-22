@@ -1,10 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
     fetchWithTimeout,
     isAllowedInsecureUrl,
     isConnectionAllowed,
+    MAX_DOWNLOAD_BYTES,
+    readResponseBody,
+    ResponseTooLargeError,
     SYNC_LOCAL_INSECURE_URL_OPTIONS,
 } from './http-utils';
+import { DEFAULT_MAX_FILE_SIZE_BYTES } from './attachment-validation';
 
 describe('isAllowedInsecureUrl', () => {
     it('allows HTTPS URLs', () => {
@@ -271,5 +275,80 @@ describe('fetchWithTimeout', () => {
         )).rejects.toThrow(
             'error sending request for url (https://files.internal/mindwtr/attachments/) (caused by: client error (Connect) -> invalid peer certificate: UnknownIssuer)',
         );
+    });
+});
+
+describe('readResponseBody', () => {
+    const streamingResponse = (
+        chunks: Uint8Array[],
+        headers: Record<string, string> = {},
+    ) => {
+        const read = vi.fn(async () => {
+            const value = chunks.shift();
+            return value ? { done: false, value } : { done: true, value: undefined };
+        });
+        const cancel = vi.fn(async () => {});
+        const arrayBuffer = vi.fn(async () => new ArrayBuffer(0));
+        const res = {
+            headers: { get: (name: string) => headers[name.toLowerCase()] ?? null },
+            body: { getReader: () => ({ read, cancel }) },
+            arrayBuffer,
+        } as unknown as Response;
+        return { res, read, cancel, arrayBuffer };
+    };
+
+    it('caps downloads at twice the attachment upload limit', () => {
+        expect(MAX_DOWNLOAD_BYTES).toBe(2 * DEFAULT_MAX_FILE_SIZE_BYTES);
+    });
+
+    it('rejects a huge content-length before reading a single byte', async () => {
+        const { res, read, arrayBuffer } = streamingResponse([new Uint8Array([1, 2, 3])], {
+            'content-length': String(MAX_DOWNLOAD_BYTES + 1),
+        });
+        await expect(readResponseBody(res)).rejects.toBeInstanceOf(ResponseTooLargeError);
+        await expect(readResponseBody(res)).rejects.toThrow(String(MAX_DOWNLOAD_BYTES));
+        expect(read).not.toHaveBeenCalled();
+        expect(arrayBuffer).not.toHaveBeenCalled();
+    });
+
+    it('aborts a body that streams past the cap despite an honest-looking header', async () => {
+        const chunk = new Uint8Array(64);
+        const chunks = Array.from({ length: 10 }, () => chunk);
+        const { res, cancel } = streamingResponse(chunks, { 'content-length': '64' });
+        await expect(readResponseBody(res, undefined, 256)).rejects.toBeInstanceOf(ResponseTooLargeError);
+        expect(cancel).toHaveBeenCalled();
+    });
+
+    it('aborts a body with no content-length header at all', async () => {
+        const chunks = Array.from({ length: 10 }, () => new Uint8Array(64));
+        const { res, cancel } = streamingResponse(chunks);
+        await expect(readResponseBody(res, undefined, 256)).rejects.toBeInstanceOf(ResponseTooLargeError);
+        expect(cancel).toHaveBeenCalled();
+    });
+
+    it('returns the streamed bytes and reports progress unchanged', async () => {
+        const { res } = streamingResponse([new Uint8Array([1, 2]), new Uint8Array([3])], {
+            'content-length': '3',
+        });
+        const onProgress = vi.fn();
+        const buffer = await readResponseBody(res, onProgress);
+        expect(Array.from(new Uint8Array(buffer))).toEqual([1, 2, 3]);
+        expect(onProgress.mock.calls).toEqual([[2, 3], [3, 3]]);
+    });
+
+    it('falls back to arrayBuffer when the body is not readable', async () => {
+        const res = {
+            headers: { get: () => null },
+            arrayBuffer: async () => new Uint8Array([7, 8]).buffer,
+        } as unknown as Response;
+        expect(Array.from(new Uint8Array(await readResponseBody(res)))).toEqual([7, 8]);
+    });
+
+    it('rejects an oversized arrayBuffer fallback', async () => {
+        const res = {
+            headers: { get: () => null },
+            arrayBuffer: async () => new ArrayBuffer(512),
+        } as unknown as Response;
+        await expect(readResponseBody(res, undefined, 256)).rejects.toBeInstanceOf(ResponseTooLargeError);
     });
 });
