@@ -1260,6 +1260,58 @@ describe('runSharedSyncCycle', () => {
         expect(harness.fastStates.size).toBe(0);
     });
 
+    it('runs cleanup before the interval elapses when an attachment was just removed (#1064)', async () => {
+        const task = createTask('t-local', 'Local task');
+        task.attachments = [{
+            id: 'attachment-1',
+            kind: 'file',
+            title: 'removed',
+            uri: '/tmp/removed.pdf',
+            createdAt: STAMP,
+            updatedAt: STAMP,
+            deletedAt: STAMP,
+        }];
+        // The throttle only blocks while the interval has not elapsed, and it
+        // compares against the real clock — stamp the last cleanup as "now".
+        const local = createData([task], {
+            attachments: { lastCleanupAt: new Date().toISOString() },
+        });
+        const runAttachmentCleanup = vi.fn(async (data: AppData) => ({
+            data: cloneAppData(data),
+            invalidateFastSyncState: false,
+        }));
+        const { run } = createHarness({
+            local,
+            remote: createData([createTask('t-remote', 'Remote task')]),
+            hooks: { runAttachmentCleanup },
+        });
+
+        const result = await run();
+
+        expect(result.success).toBe(true);
+        expect(runAttachmentCleanup).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the cleanup interval throttle when there is no orphaned attachment work', async () => {
+        const local = createData([createTask('t-local', 'Local task')], {
+            attachments: { lastCleanupAt: new Date().toISOString() },
+        });
+        const runAttachmentCleanup = vi.fn(async (data: AppData) => ({
+            data: cloneAppData(data),
+            invalidateFastSyncState: false,
+        }));
+        const { run } = createHarness({
+            local,
+            remote: createData([createTask('t-remote', 'Remote task')]),
+            hooks: { runAttachmentCleanup },
+        });
+
+        const result = await run();
+
+        expect(result.success).toBe(true);
+        expect(runAttachmentCleanup).not.toHaveBeenCalled();
+    });
+
     it('keeps local purge metadata through merge until attachment cleanup removes it', async () => {
         const local = createData([{
             id: 'purged-task',

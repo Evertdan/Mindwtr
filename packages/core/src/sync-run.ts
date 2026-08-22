@@ -18,6 +18,7 @@ import type {
 } from './sync-run-ports';
 import { SyncRemoteWriteConflict } from './sync-run-ports';
 import { LocalSyncAbort, ensureFreshLocalSyncSnapshot, getInMemoryAppDataSnapshot, shouldRunAttachmentCleanup } from './sync-client-helpers';
+import { hasFreshAttachmentCleanupWork } from './attachment-cleanup';
 import { flushPendingSave, useTaskStore } from './store';
 import {
     assertNoPendingAttachmentUploads,
@@ -883,7 +884,12 @@ class SharedSyncRunMachine {
 
         if (this.policy.attachmentPhasesEnabled
             && this.hooks.runAttachmentCleanup
-            && shouldRunAttachmentCleanup(mergedData.settings.attachments?.lastCleanupAt, this.cleanupIntervalMs)) {
+            && (
+                shouldRunAttachmentCleanup(mergedData.settings.attachments?.lastCleanupAt, this.cleanupIntervalMs)
+                // Removing an attachment must not leave its files sitting in the
+                // local and sync folders until the daily pass (#1064).
+                || hasFreshAttachmentCleanupWork(mergedData)
+            )) {
             const cleanupResult = await this.hooks.runAttachmentCleanup(mergedData, {
                 setStep: (step) => this.setStep(step),
                 ensureLocalSnapshotFresh: (expectedData) => this.ensureLocalSnapshotFresh(expectedData),

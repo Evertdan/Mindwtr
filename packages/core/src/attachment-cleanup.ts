@@ -39,6 +39,18 @@ export function findOrphanedAttachments(appData: AppData): Attachment[] {
     return Array.from(allAttachments.values()).filter((attachment) => !activeReferenceIds.has(attachment.id));
 }
 
+/**
+ * Whether cleanup has work it should not wait the daily interval for. Orphaned
+ * records (which include every soft-deleted attachment) are removed by the
+ * cleanup pass itself, so their presence always means unprocessed work and
+ * this goes quiet once a pass has run (#1064). Failed remote deletes move to
+ * pendingRemoteDeletes, which deliberately waits for the interval so retries
+ * don't burn the attempt budget in minutes.
+ */
+export function hasFreshAttachmentCleanupWork(appData: AppData): boolean {
+    return findOrphanedAttachments(appData).length > 0;
+}
+
 export function findDeletedAttachmentsForFileCleanup(appData: AppData): Attachment[] {
     const deleted = new Map<string, Attachment>();
 
