@@ -80,7 +80,7 @@ describe('encrypted sync cycle convergence (S4, required test 4)', () => {
         const initial = mockAppData([createMockTask('t1', '2026-08-01T00:00:00.000Z')]);
         remote.store.set('data.json', utf8(JSON.stringify(initial)));
 
-        await runEnableSyncEncryptionOverRemote('correct horse', remote, keyCache, localState);
+        await runEnableSyncEncryptionOverRemote('correct horse', remote, keyCache, localState, undefined, undefined, { mKib: 8, t: 1, p: 1 });
         const material: SyncKeyMaterial = {
             key: (await keyCache.getKey())!,
             salt: new Uint8Array(16),
@@ -115,7 +115,7 @@ describe('encrypted sync cycle convergence (S4, required test 4)', () => {
         // Two devices that happen to hold byte-identical data (e.g. a fresh clone) —
         // the remote is seeded with the SAME content this "device" already has locally.
         remote.store.set('data.json', utf8(JSON.stringify(aligned)));
-        await runEnableSyncEncryptionOverRemote('correct horse', remote, keyCache, localState);
+        await runEnableSyncEncryptionOverRemote('correct horse', remote, keyCache, localState, undefined, undefined, { mKib: 8, t: 1, p: 1 });
         const material: SyncKeyMaterial = {
             key: (await keyCache.getKey())!,
             salt: new Uint8Array(16),

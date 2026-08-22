@@ -123,7 +123,7 @@ describe('runEnableSyncEncryptionOverRemote', () => {
         const keyCache = createFakeKeyCache();
         const localState = createFakeLocalState();
 
-        await runEnableSyncEncryptionOverRemote('correct horse', remote, keyCache, localState, undefined, undefined);
+        await runEnableSyncEncryptionOverRemote('correct horse', remote, keyCache, localState, undefined, undefined, FAST_KDF);
 
         // plaintext gone, .enc present, attachment rewritten in place under the same name
         expect(remote.store.has('data.json')).toBe(false);
@@ -162,7 +162,7 @@ describe('runEnableSyncEncryptionOverRemote', () => {
         // plaintext .bak intentionally left in place — this is the "both generations
         // present" state a crash would leave.
 
-        await runEnableSyncEncryptionOverRemote('correct horse', remote, keyCache, localState, undefined, undefined);
+        await runEnableSyncEncryptionOverRemote('correct horse', remote, keyCache, localState, undefined, undefined, FAST_KDF);
 
         expect(remote.store.has('data.json.bak')).toBe(false);
         expect(remote.store.has('data.json')).toBe(false);
@@ -192,7 +192,7 @@ describe('runEnableSyncEncryptionOverRemote', () => {
         const abandonedMaterial = await deriveSyncKeyMaterial('correct horse', new Uint8Array(16).fill(42), FAST_KDF);
         remote.store.set('attachments/a1.png', await encryptSyncArtifact(utf8('PNGBYTES'), abandonedMaterial));
 
-        await runEnableSyncEncryptionOverRemote('correct horse', remote, keyCache, localState, undefined, undefined);
+        await runEnableSyncEncryptionOverRemote('correct horse', remote, keyCache, localState, undefined, undefined, FAST_KDF);
 
         const key = (await keyCache.getKey())!;
         // The attachment must be readable under the key this run actually settled on —
@@ -215,7 +215,7 @@ describe('runEnableSyncEncryptionOverRemote', () => {
         const keyCache = createFakeKeyCache();
         const localState = createFakeLocalState();
 
-        await expect(runEnableSyncEncryptionOverRemote('pw', remote, keyCache, localState)).rejects.toThrow('simulated transport failure');
+        await expect(runEnableSyncEncryptionOverRemote('pw', remote, keyCache, localState, undefined, undefined, FAST_KDF)).rejects.toThrow('simulated transport failure');
         expect(calls).toBe(1);
         expect(remote.store.has('data.json')).toBe(true); // plaintext untouched
         expect(remote.store.has('data.json.enc')).toBe(false);
@@ -231,7 +231,7 @@ describe('runDisableSyncEncryptionOverRemote', () => {
         });
         const keyCache = createFakeKeyCache();
         const localState = createFakeLocalState();
-        await runEnableSyncEncryptionOverRemote('pw', remote, keyCache, localState);
+        await runEnableSyncEncryptionOverRemote('pw', remote, keyCache, localState, undefined, undefined, FAST_KDF);
 
         await runDisableSyncEncryptionOverRemote(remote, keyCache, localState);
 
@@ -259,10 +259,10 @@ describe('runChangeSyncEncryptionPassphraseOverRemote', () => {
         });
         const keyCache = createFakeKeyCache();
         const localState = createFakeLocalState();
-        await runEnableSyncEncryptionOverRemote('old-pw', remote, keyCache, localState);
+        await runEnableSyncEncryptionOverRemote('old-pw', remote, keyCache, localState, undefined, undefined, FAST_KDF);
         const oldSalt = localState.value!.discoveredSalt;
 
-        await runChangeSyncEncryptionPassphraseOverRemote('old-pw', 'new-pw', remote, keyCache, localState);
+        await runChangeSyncEncryptionPassphraseOverRemote('old-pw', 'new-pw', remote, keyCache, localState, undefined, undefined, FAST_KDF);
 
         expect(localState.value!.discoveredSalt).not.toBe(oldSalt);
         const key = (await keyCache.getKey())!;
@@ -277,14 +277,14 @@ describe('runChangeSyncEncryptionPassphraseOverRemote', () => {
         });
         const keyCache = createFakeKeyCache();
         const localState = createFakeLocalState();
-        await runEnableSyncEncryptionOverRemote('old-pw', remote, keyCache, localState);
+        await runEnableSyncEncryptionOverRemote('old-pw', remote, keyCache, localState, undefined, undefined, FAST_KDF);
 
         // Simulate a first change-passphrase attempt that re-wrapped the attachment under
         // an abandoned intermediate salt, then crashed before touching data.json.enc.
         const abandonedMaterial = await deriveSyncKeyMaterial('new-pw', new Uint8Array(16).fill(99), FAST_KDF);
         remote.store.set('attachments/a1.png', await encryptSyncArtifact(utf8('PNGBYTES'), abandonedMaterial));
 
-        await runChangeSyncEncryptionPassphraseOverRemote('old-pw', 'new-pw', remote, keyCache, localState);
+        await runChangeSyncEncryptionPassphraseOverRemote('old-pw', 'new-pw', remote, keyCache, localState, undefined, undefined, FAST_KDF);
 
         const key = (await keyCache.getKey())!;
         expect(text(await decryptRemoteArtifactOrThrow(remote.store.get('attachments/a1.png')!, key))).toBe('PNGBYTES');
@@ -319,7 +319,7 @@ describe('remote-encrypted-no-key discovery and passphrase provisioning', () => 
         const remote = createFakeRemote({ 'data.json': { bytes: utf8('{"tasks":[]}'), kind: 'document' } });
         const keyCache = createFakeKeyCache();
         const localState = createFakeLocalState();
-        await runEnableSyncEncryptionOverRemote('right-pw', remote, keyCache, localState);
+        await runEnableSyncEncryptionOverRemote('right-pw', remote, keyCache, localState, undefined, undefined, FAST_KDF);
         await keyCache.clearKey(); // simulate a fresh device with no cached key
         const before = new Map(remote.store);
 
@@ -334,7 +334,7 @@ describe('remote-encrypted-no-key discovery and passphrase provisioning', () => 
         const remote = createFakeRemote({ 'data.json': { bytes: utf8('{"tasks":[]}'), kind: 'document' } });
         const keyCache = createFakeKeyCache();
         const localState = createFakeLocalState();
-        await runEnableSyncEncryptionOverRemote('right-pw', remote, keyCache, localState);
+        await runEnableSyncEncryptionOverRemote('right-pw', remote, keyCache, localState, undefined, undefined, FAST_KDF);
         await keyCache.clearKey();
         markRemoteEncryptionDiscovered(localState, { salt: new Uint8Array(16), params: SYNC_CRYPTO_DEFAULT_KDF_PARAMS });
 

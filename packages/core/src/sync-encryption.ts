@@ -268,6 +268,9 @@ export async function runEnableSyncEncryptionOverRemote(
     localState: SyncEncryptionLocalStatePort,
     onProgress?: (progress: SyncEncryptionTransitionProgress) => void,
     prims: SyncCryptoPrimitives = defaultSyncCryptoPrimitives,
+    // Writer-side KDF cost for the fresh salt. Readers always honor header params, so this
+    // only affects newly written artifacts; tests inject cheap params to stay under timeouts.
+    kdfParams: SyncCryptoKdfParams = SYNC_CRYPTO_DEFAULT_KDF_PARAMS,
 ): Promise<EnableRemoteEncryptionResult> {
     const entries = await remote.list();
 
@@ -287,7 +290,7 @@ export async function runEnableSyncEncryptionOverRemote(
     }
     if (!material) {
         const salt = prims.randomBytes(16);
-        material = await deriveSyncKeyMaterial(passphrase, salt, SYNC_CRYPTO_DEFAULT_KDF_PARAMS, prims);
+        material = await deriveSyncKeyMaterial(passphrase, salt, kdfParams, prims);
     }
 
     const isBaseDocument = (name: string) => !KNOWN_ARTIFACT_SUFFIXES.some((s) => name.endsWith(s));
@@ -444,6 +447,8 @@ export async function runChangeSyncEncryptionPassphraseOverRemote(
     localState: SyncEncryptionLocalStatePort,
     onProgress?: (progress: SyncEncryptionTransitionProgress) => void,
     prims: SyncCryptoPrimitives = defaultSyncCryptoPrimitives,
+    // Same writer-side-only knob as runEnableSyncEncryptionOverRemote.
+    kdfParams: SyncCryptoKdfParams = SYNC_CRYPTO_DEFAULT_KDF_PARAMS,
 ): Promise<void> {
     const oldKey = await keyCache.getKey();
     if (!oldKey) throw new Error('sync encryption passphrase change requires a cached key');
@@ -472,7 +477,7 @@ export async function runChangeSyncEncryptionPassphraseOverRemote(
         .sort((a, b) => Number(isBaseEncDocument(a.name)) - Number(isBaseEncDocument(b.name)));
 
     const newSalt = prims.randomBytes(16);
-    const newMaterial = await deriveSyncKeyMaterial(nextPassphrase, newSalt, SYNC_CRYPTO_DEFAULT_KDF_PARAMS, prims);
+    const newMaterial = await deriveSyncKeyMaterial(nextPassphrase, newSalt, kdfParams, prims);
 
     const total = attachments.length + encDocuments.length;
     let completed = 0;
