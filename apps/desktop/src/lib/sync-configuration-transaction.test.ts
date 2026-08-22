@@ -929,3 +929,214 @@ describe('commitProvenSyncConfiguration', () => {
         expect(harness.events[harness.events.length - 1]).toBe('backend:off');
     });
 });
+
+// Characterization goldens for the sync-configuration commit protocol. These
+// pin the complete observable call sequence — not just relative ordering — for
+// a scenario matrix that the mobile implementation can also express, so the two
+// platforms' protocols can be compared step by step. Treat a change here as a
+// protocol change, not a test update.
+describe('desktop commit protocol goldens', () => {
+    const goldenHarness = (
+        initial: PersistedDesktopSyncConfiguration,
+        failureStep?: FailureStep,
+        rollbackFailureStep?: Exclude<FailureStep, 'backend'>,
+    ) => {
+        const harness = createTransactionHarness(initial, failureStep, rollbackFailureStep);
+        harness.dependencies.recoverDropboxCredentialsBeforeConfiguration = async () => {
+            harness.events.push('recover-staged-credentials');
+        };
+        return harness;
+    };
+
+    const activeWebdav = (): PersistedDesktopSyncConfiguration => ({
+        ...baselineConfiguration(),
+        backend: 'webdav',
+    });
+
+    it('G1 file candidate over an active cloud backend', async () => {
+        const harness = goldenHarness(baselineConfiguration());
+
+        await commitProvenSyncConfiguration(
+            { backend: 'file', syncPath: '/golden/file-sync' },
+            harness.dependencies,
+        );
+
+        expect(harness.events).toEqual([
+            'recover-staged-credentials',
+            'read',
+            'backend:off',
+            'read',
+            'file:/golden/file-sync',
+            'read',
+            'backend:file',
+            'read',
+        ]);
+    });
+
+    it('G2 webdav candidate with a replacement password', async () => {
+        const harness = goldenHarness(activeWebdav());
+
+        await commitProvenSyncConfiguration({
+            backend: 'webdav',
+            webdav: {
+                url: 'https://golden-dav.example.com',
+                username: 'golden-user',
+                password: 'golden-password',
+            },
+        }, harness.dependencies);
+
+        expect(harness.events).toEqual([
+            'recover-staged-credentials',
+            'read',
+            'backend:off',
+            'read',
+            'webdav:https://golden-dav.example.com',
+            'read',
+            'backend:webdav',
+            'read',
+        ]);
+    });
+
+    it('G3 self-hosted cloud candidate with a replacement token', async () => {
+        const harness = goldenHarness(baselineConfiguration());
+
+        await commitProvenSyncConfiguration({
+            backend: 'cloud',
+            cloudProvider: 'selfhosted',
+            cloud: { url: 'https://golden-cloud.example.com', token: 'golden-token' },
+        }, harness.dependencies);
+
+        expect(harness.events).toEqual([
+            'recover-staged-credentials',
+            'read',
+            'backend:off',
+            'read',
+            'cloud:https://golden-cloud.example.com',
+            'provider:selfhosted',
+            'read',
+            'backend:cloud',
+            'read',
+        ]);
+    });
+
+    it('G4 dropbox candidate carrying a staged credential handle', async () => {
+        const initial = baselineConfiguration();
+        initial.cloudProvider = 'dropbox';
+        const harness = goldenHarness(initial);
+
+        await commitProvenSyncConfiguration({
+            backend: 'cloud',
+            cloudProvider: 'dropbox',
+            dropboxCredentialHandle: 'golden-handle',
+        }, harness.dependencies);
+
+        // A candidate that owns a staged handle skips reload-time recovery: it
+        // runs its own credential transaction instead.
+        expect(harness.events).toEqual([
+            'read',
+            'backend:off',
+            'read',
+            'provider:dropbox',
+            'read',
+            'dropbox:promote:golden-handle',
+            'read',
+            'backend:cloud',
+            'read',
+            'dropbox:finalize:golden-handle',
+        ]);
+    });
+
+    it('G5 transport write fails mid-candidate', async () => {
+        const harness = goldenHarness(activeWebdav(), 'webdav');
+
+        await expect(commitProvenSyncConfiguration({
+            backend: 'webdav',
+            webdav: {
+                url: 'https://golden-dav.example.com',
+                username: 'golden-user',
+                password: 'golden-password',
+            },
+        }, harness.dependencies)).rejects.toThrow('injected webdav failure');
+
+        // Two independent `backend:off` proofs: one for the containing rollback
+        // path, one inside the restore itself. Restore rewrites only the touched
+        // webdav slot, then reactivates and re-verifies the prior backend.
+        expect(harness.events).toEqual([
+            'recover-staged-credentials',
+            'read',
+            'backend:off',
+            'read',
+            'webdav:https://golden-dav.example.com',
+            'backend:off',
+            'read',
+            'backend:off',
+            'read',
+            'webdav:https://old-dav.example.com',
+            'read',
+            'backend:webdav',
+            'read',
+        ]);
+    });
+
+    it('G6 activation fails after the candidate verified', async () => {
+        const harness = goldenHarness(activeWebdav(), 'backend');
+
+        await expect(commitProvenSyncConfiguration({
+            backend: 'webdav',
+            webdav: {
+                url: 'https://golden-dav.example.com',
+                username: 'golden-user',
+                password: 'golden-password',
+            },
+        }, harness.dependencies)).rejects.toThrow('injected backend failure');
+
+        expect(harness.events).toEqual([
+            'recover-staged-credentials',
+            'read',
+            'backend:off',
+            'read',
+            'webdav:https://golden-dav.example.com',
+            'read',
+            'backend:webdav',
+            'backend:off',
+            'read',
+            'backend:off',
+            'read',
+            'webdav:https://old-dav.example.com',
+            'read',
+            'backend:webdav',
+            'read',
+        ]);
+    });
+
+    it('G7 restore itself fails and sync stays disabled', async () => {
+        const harness = goldenHarness(activeWebdav(), 'backend', 'webdav');
+
+        await expect(commitProvenSyncConfiguration({
+            backend: 'webdav',
+            webdav: {
+                url: 'https://golden-dav.example.com',
+                username: 'golden-user',
+                password: 'golden-password',
+            },
+        }, harness.dependencies)).rejects.toThrow(/sync remains disabled/i);
+
+        // A partly restored snapshot is never reactivated and never verified;
+        // the last write is unconditionally `off`.
+        expect(harness.events).toEqual([
+            'recover-staged-credentials',
+            'read',
+            'backend:off',
+            'read',
+            'webdav:https://golden-dav.example.com',
+            'read',
+            'backend:webdav',
+            'backend:off',
+            'read',
+            'backend:off',
+            'read',
+            'webdav:https://old-dav.example.com',
+            'backend:off',
+        ]);
+    });
+});

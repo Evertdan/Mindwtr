@@ -7,8 +7,13 @@ import {
     type MobileSyncConfigurationTransactionDependencies,
 } from './sync-configuration-transaction';
 import {
+    CLOUD_ALLOW_INSECURE_HTTP_KEY,
     CLOUD_PROVIDER_KEY,
+    CLOUD_TOKEN_KEY,
+    CLOUD_URL_KEY,
     SYNC_BACKEND_KEY,
+    SYNC_PATH_BOOKMARK_KEY,
+    SYNC_PATH_KEY,
     WEBDAV_ALLOW_INSECURE_HTTP_KEY,
     WEBDAV_PASSWORD_KEY,
     WEBDAV_URL_KEY,
@@ -176,5 +181,305 @@ describe('commitProvenMobileSyncConfiguration', () => {
         expect(harness.storage.get(SYNC_BACKEND_KEY)).toBe('off');
         expect(harness.getDropboxTokens()).toEqual(NEW_DROPBOX_TOKENS);
         expect(harness.events.at(-2)).toBe(`set:${SYNC_BACKEND_KEY}:off`);
+    });
+});
+
+// Characterization goldens for the sync-configuration commit protocol, matching
+// the desktop golden scenario matrix step for step so the two platforms'
+// protocols can be compared directly. Treat a change here as a protocol change,
+// not a test update.
+describe('mobile commit protocol goldens', () => {
+    type GoldenFailure = {
+        /** Throw on the candidate's transport write (before it is verified). */
+        transportWrite?: boolean;
+        /** Throw when the backend key is set to this value. */
+        activation?: string;
+        /** Throw on the transport write inside the restore path. */
+        transportRestore?: boolean;
+    };
+
+    // Decorates the shared harness so reads are recorded too — desktop's golden
+    // records every verification read, and the verify steps are the part of the
+    // protocol being compared.
+    const goldenHarness = (
+        initialStorage: Record<string, string>,
+        initialSecrets: Record<string, string> = {},
+        initialDropboxTokens: DropboxAuthTokens | null = null,
+        failure: GoldenFailure = {},
+    ) => {
+        const harness = createHarness(initialStorage, initialSecrets, initialDropboxTokens);
+        const { dependencies, events } = harness;
+        const { getDropboxTokens, getSecret, multiGet, multiSet, setItem } = dependencies;
+        let restoreStarted = false;
+
+        dependencies.multiGet = async (keys) => {
+            events.push(`read:${keys.join(',')}`);
+            return multiGet(keys);
+        };
+        dependencies.getSecret = async (key) => {
+            events.push(`read-secret:${key}`);
+            return getSecret(key);
+        };
+        dependencies.getDropboxTokens = async () => {
+            events.push('read-dropbox');
+            return getDropboxTokens();
+        };
+        dependencies.multiSet = async (entries) => {
+            if (failure.transportWrite && !restoreStarted) {
+                restoreStarted = true;
+                events.push(`multi-set:${entries.map(([key]) => key).join(',')}`);
+                throw new Error('injected transport failure');
+            }
+            if (failure.transportRestore && restoreStarted) {
+                events.push(`multi-set:${entries.map(([key]) => key).join(',')}`);
+                throw new Error('injected restore failure');
+            }
+            return multiSet(entries);
+        };
+        dependencies.setItem = async (key, value) => {
+            if (failure.activation && key === SYNC_BACKEND_KEY && value === failure.activation && !restoreStarted) {
+                restoreStarted = true;
+                events.push(`set:${key}:${value}`);
+                throw new Error('injected activation failure');
+            }
+            return setItem(key, value);
+        };
+
+        return harness;
+    };
+
+    const activeCloudStorage = () => ({
+        [SYNC_BACKEND_KEY]: 'cloud',
+        [CLOUD_PROVIDER_KEY]: 'selfhosted',
+    });
+    const activeWebdavStorage = () => ({
+        [SYNC_BACKEND_KEY]: 'webdav',
+        [WEBDAV_URL_KEY]: 'https://old-dav.example.com',
+        [WEBDAV_USERNAME_KEY]: 'old-user',
+        [WEBDAV_ALLOW_INSECURE_HTTP_KEY]: 'false',
+    });
+    const GOLDEN_WEBDAV = {
+        url: 'https://golden-dav.example.com',
+        username: 'golden-user',
+        password: 'golden-password',
+        allowInsecureHttp: false,
+    };
+
+    it('G1 file candidate over an active cloud backend', async () => {
+        const harness = goldenHarness(activeCloudStorage());
+
+        await commitProvenMobileSyncConfiguration(
+            { backend: 'file', syncPath: '/golden/file-sync' },
+            harness.dependencies,
+        );
+
+        expect(harness.events).toEqual([
+            `read:${SYNC_BACKEND_KEY},${SYNC_PATH_KEY},${SYNC_PATH_BOOKMARK_KEY}`,
+            `set:${SYNC_BACKEND_KEY}:off`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+            `multi-set:${SYNC_PATH_KEY}`,
+            `remove:${SYNC_PATH_BOOKMARK_KEY}`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+            `read:${SYNC_PATH_KEY},${SYNC_PATH_BOOKMARK_KEY}`,
+            `set:${SYNC_BACKEND_KEY}:file`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+        ]);
+    });
+
+    it('G2 webdav candidate with a replacement password', async () => {
+        const harness = goldenHarness(activeWebdavStorage(), {
+            [WEBDAV_PASSWORD_KEY]: 'old-password',
+        });
+
+        await commitProvenMobileSyncConfiguration(
+            { backend: 'webdav', webdav: GOLDEN_WEBDAV },
+            harness.dependencies,
+        );
+
+        expect(harness.events).toEqual([
+            `read:${SYNC_BACKEND_KEY},${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            `read-secret:${WEBDAV_PASSWORD_KEY}`,
+            `set:${SYNC_BACKEND_KEY}:off`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+            `multi-set:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            `set-secret:${WEBDAV_PASSWORD_KEY}:golden-password`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+            `read:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            `read-secret:${WEBDAV_PASSWORD_KEY}`,
+            `set:${SYNC_BACKEND_KEY}:webdav`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+        ]);
+    });
+
+    it('G3 self-hosted cloud candidate with a replacement token', async () => {
+        const harness = goldenHarness(activeCloudStorage());
+
+        await commitProvenMobileSyncConfiguration({
+            backend: 'cloud',
+            cloudProvider: 'selfhosted',
+            cloud: {
+                url: 'https://golden-cloud.example.com',
+                token: 'golden-token',
+                allowInsecureHttp: false,
+            },
+        }, harness.dependencies);
+
+        expect(harness.events).toEqual([
+            `read:${SYNC_BACKEND_KEY},${CLOUD_PROVIDER_KEY},${CLOUD_URL_KEY},${CLOUD_ALLOW_INSECURE_HTTP_KEY}`,
+            `read-secret:${CLOUD_TOKEN_KEY}`,
+            `set:${SYNC_BACKEND_KEY}:off`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+            `multi-set:${CLOUD_PROVIDER_KEY},${CLOUD_URL_KEY},${CLOUD_ALLOW_INSECURE_HTTP_KEY}`,
+            `set-secret:${CLOUD_TOKEN_KEY}:golden-token`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+            `read:${CLOUD_PROVIDER_KEY},${CLOUD_URL_KEY},${CLOUD_ALLOW_INSECURE_HTTP_KEY}`,
+            `read-secret:${CLOUD_TOKEN_KEY}`,
+            `set:${SYNC_BACKEND_KEY}:cloud`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+        ]);
+    });
+
+    it('G4 dropbox candidate carrying new tokens', async () => {
+        const harness = goldenHarness({
+            [SYNC_BACKEND_KEY]: 'cloud',
+            [CLOUD_PROVIDER_KEY]: 'dropbox',
+        }, {}, OLD_DROPBOX_TOKENS);
+
+        await commitProvenMobileSyncConfiguration({
+            backend: 'cloud',
+            cloudProvider: 'dropbox',
+            dropbox: { tokens: NEW_DROPBOX_TOKENS },
+        }, harness.dependencies);
+
+        expect(harness.events).toEqual([
+            `read:${SYNC_BACKEND_KEY},${CLOUD_PROVIDER_KEY}`,
+            'read-dropbox',
+            `set:${SYNC_BACKEND_KEY}:off`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+            `multi-set:${CLOUD_PROVIDER_KEY}`,
+            `save-dropbox:${NEW_DROPBOX_TOKENS.accessToken}`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+            `read:${CLOUD_PROVIDER_KEY}`,
+            'read-dropbox',
+            `set:${SYNC_BACKEND_KEY}:cloud`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+        ]);
+    });
+
+    it('G5 transport write fails mid-candidate', async () => {
+        const harness = goldenHarness(activeWebdavStorage(), {
+            [WEBDAV_PASSWORD_KEY]: 'old-password',
+        }, null, { transportWrite: true });
+
+        await expect(commitProvenMobileSyncConfiguration(
+            { backend: 'webdav', webdav: GOLDEN_WEBDAV },
+            harness.dependencies,
+        )).rejects.toThrow('injected transport failure');
+
+        expect(harness.events).toEqual([
+            `read:${SYNC_BACKEND_KEY},${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            `read-secret:${WEBDAV_PASSWORD_KEY}`,
+            `set:${SYNC_BACKEND_KEY}:off`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+            `multi-set:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            `set:${SYNC_BACKEND_KEY}:off`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+            `multi-set:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            `set-secret:${WEBDAV_PASSWORD_KEY}:old-password`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+            `read:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            `read-secret:${WEBDAV_PASSWORD_KEY}`,
+            `set:${SYNC_BACKEND_KEY}:webdav`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+        ]);
+    });
+
+    it('G6 activation fails after the candidate verified', async () => {
+        const harness = goldenHarness(activeWebdavStorage(), {
+            [WEBDAV_PASSWORD_KEY]: 'old-password',
+        }, null, { activation: 'webdav' });
+
+        await expect(commitProvenMobileSyncConfiguration(
+            { backend: 'webdav', webdav: GOLDEN_WEBDAV },
+            harness.dependencies,
+        )).rejects.toThrow('injected activation failure');
+
+        expect(harness.events).toEqual([
+            `read:${SYNC_BACKEND_KEY},${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            `read-secret:${WEBDAV_PASSWORD_KEY}`,
+            `set:${SYNC_BACKEND_KEY}:off`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+            `multi-set:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            `set-secret:${WEBDAV_PASSWORD_KEY}:golden-password`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+            `read:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            `read-secret:${WEBDAV_PASSWORD_KEY}`,
+            `set:${SYNC_BACKEND_KEY}:webdav`,
+            `set:${SYNC_BACKEND_KEY}:off`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+            `multi-set:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            `set-secret:${WEBDAV_PASSWORD_KEY}:old-password`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+            `read:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            `read-secret:${WEBDAV_PASSWORD_KEY}`,
+            `set:${SYNC_BACKEND_KEY}:webdav`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+        ]);
+    });
+
+    it('G7 restore itself fails and sync stays disabled', async () => {
+        const harness = goldenHarness(activeWebdavStorage(), {
+            [WEBDAV_PASSWORD_KEY]: 'old-password',
+        }, null, { activation: 'webdav', transportRestore: true });
+
+        await expect(commitProvenMobileSyncConfiguration(
+            { backend: 'webdav', webdav: GOLDEN_WEBDAV },
+            harness.dependencies,
+        )).rejects.toThrow(/sync remains disabled/i);
+
+        expect(harness.events).toEqual([
+            `read:${SYNC_BACKEND_KEY},${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            `read-secret:${WEBDAV_PASSWORD_KEY}`,
+            `set:${SYNC_BACKEND_KEY}:off`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+            `multi-set:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            `set-secret:${WEBDAV_PASSWORD_KEY}:golden-password`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+            `read:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            `read-secret:${WEBDAV_PASSWORD_KEY}`,
+            `set:${SYNC_BACKEND_KEY}:webdav`,
+            `set:${SYNC_BACKEND_KEY}:off`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+            `multi-set:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            `set-secret:${WEBDAV_PASSWORD_KEY}:old-password`,
+            'clear-cache',
+            `set:${SYNC_BACKEND_KEY}:off`,
+            'clear-cache',
+            `read:${SYNC_BACKEND_KEY}`,
+        ]);
     });
 });
