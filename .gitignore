@@ -26,6 +26,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 crash-logs/
+plans/
 
 # IDE
 .vscode/*
