@@ -7,11 +7,6 @@ import {
     normalizeTagId,
     persist,
     replaceEntitiesInArray,
-    replaceEntitiesInMap,
-    selectVisibleAreas,
-    selectVisiblePeople,
-    selectVisibleProjects,
-    selectVisibleSections,
 } from '../store-helpers';
 
 export type ProjectActions = Pick<
@@ -104,27 +99,11 @@ type MutateEntitiesOptions<K extends EntityCollection> = {
 };
 
 const collectionStateKeys = {
-    projects: { all: '_allProjects', map: '_projectsById' },
-    sections: { all: '_allSections', map: '_sectionsById' },
-    areas: { all: '_allAreas', map: '_areasById' },
-    people: { all: '_allPeople', map: '_peopleById' },
+    projects: '_allProjects',
+    sections: '_allSections',
+    areas: '_allAreas',
+    people: '_allPeople',
 } as const;
-
-const selectVisibleEntities = <K extends EntityCollection>(
-    collection: K,
-    entities: EntityByCollection[K][],
-): EntityByCollection[K][] => {
-    switch (collection) {
-        case 'projects':
-            return selectVisibleProjects(entities as Project[]) as EntityByCollection[K][];
-        case 'sections':
-            return selectVisibleSections(entities as Section[]) as EntityByCollection[K][];
-        case 'areas':
-            return selectVisibleAreas(entities as Area[]) as EntityByCollection[K][];
-        case 'people':
-            return selectVisiblePeople(entities as Person[]) as EntityByCollection[K][];
-    }
-};
 
 export const mutateEntities = async <K extends EntityCollection>(
     { set, debouncedSave }: Pick<ProjectActionContext, 'set' | 'debouncedSave'>,
@@ -156,10 +135,9 @@ export const mutateEntities = async <K extends EntityCollection>(
             rev: nextRevision(entity.rev),
             revBy: deviceState.deviceId,
         })) as EntityByCollection[K][];
-        const { all: allKey, map: mapKey } = collectionStateKeys[options.collection];
+        const allKey = collectionStateKeys[options.collection];
         const allEntities = state[allKey] as EntityByCollection[K][];
         const nextAllEntities = replaceEntitiesInArray(allEntities, changedEntities);
-        const nextVisibleEntities = selectVisibleEntities(options.collection, nextAllEntities);
         const nextSettings = settingsUpdates === undefined
             ? deviceState.settings
             : { ...deviceState.settings, ...settingsUpdates };
@@ -170,12 +148,7 @@ export const mutateEntities = async <K extends EntityCollection>(
             ...(settingsChanged ? { settings: nextSettings } : {}),
         });
         return {
-            [options.collection]: nextVisibleEntities,
             [allKey]: nextAllEntities,
-            [mapKey]: replaceEntitiesInMap(
-                state[mapKey] as Map<string, EntityByCollection[K]>,
-                changedEntities,
-            ),
             lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
             ...(settingsChanged ? { settings: nextSettings } : {}),
         } as Partial<TaskStore>;
