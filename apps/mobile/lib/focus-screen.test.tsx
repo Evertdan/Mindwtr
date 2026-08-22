@@ -141,8 +141,6 @@ vi.mock('@mindwtr/core', async (importOriginal) => {
       return Array.from(tokens).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
     },
     useTaskStore,
-    safeParseDate: (value?: string) => (value ? new Date(value) : null),
-    safeParseDueDate: (value?: string) => (value ? new Date(value) : null),
   };
 });
 
@@ -857,6 +855,33 @@ describe('FocusScreen', () => {
     vi.useRealTimers();
   });
 
+  it('classifies bare due dates against the local end of day, not UTC midnight', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 3, 10, 12, 0, 0, 0));
+    storeState.tasks = [
+      makeTask('due-today', { title: 'Due today', dueDate: '2026-04-10' }),
+      makeTask('due-tomorrow', { title: 'Due tomorrow', dueDate: '2026-04-11' }),
+    ];
+
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<FocusScreen />);
+    });
+
+    const sections = tree.root.findByType(SectionList).props.sections as {
+      title: string;
+      data: { type: string; task?: Task }[];
+    }[];
+    const idsIn = (title: string) => sections
+      .find((section) => section.title === title)?.data
+      .map((item) => item.task?.id) ?? [];
+
+    expect(idsIn('Today')).toEqual(['due-today']);
+    expect(idsIn('Next Actions')).toEqual(['due-tomorrow']);
+    vi.useRealTimers();
+  });
+
   it('renders mobile Next Actions flat by default', () => {
     storeState.tasks = [
       makeTask('work-next', { title: 'Work next', contexts: ['@work'] }),
@@ -886,7 +911,8 @@ describe('FocusScreen', () => {
     storeState.projects = [
       makeProject('due-project', {
         title: 'Due project',
-        dueDate: '2026-04-10T17:00:00.000Z',
+        // Same instant as the fake clock, so "due today" holds in every timezone.
+        dueDate: '2026-04-10T12:00:00.000Z',
       }),
     ];
     storeState.tasks = [
