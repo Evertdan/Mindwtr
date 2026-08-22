@@ -1,5 +1,5 @@
 import * as nodeCrypto from 'node:crypto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Attachment } from '@mindwtr/core';
 
 // On-demand attachment fetch (`ensureAttachmentAvailable`) had no coverage at all: it is
@@ -112,6 +112,19 @@ const makeAttachment = (id: string, overrides: Partial<Attachment> = {}): Attach
 });
 
 describe('ensureAttachmentAvailable', () => {
+  // Loaded once, in a hook. The first import pulls the real @mindwtr/core barrel through
+  // `importOriginal` and measured ~4s on its own (the call it sets up takes ~1ms). Inside a
+  // test body that cost lands on whichever test happens to run first and blows the 5s test
+  // timeout under parallel load — which is exactly how this file went red in CI. A hook is
+  // paid once and against hookTimeout, raised here because 4s of import has no headroom
+  // under a loaded machine. The work itself cannot be lightened: running the real core is
+  // the point of this suite (TEST-01).
+  let ensureAttachmentAvailable: typeof import('./attachment-sync-availability')['ensureAttachmentAvailable'];
+
+  beforeAll(async () => {
+    ({ ensureAttachmentAvailable } = await import('./attachment-sync-availability'));
+  }, 30_000);
+
   beforeEach(() => {
     vi.clearAllMocks();
     asyncStorageMock.store.clear();
@@ -131,7 +144,6 @@ describe('ensureAttachmentAvailable', () => {
       size: 4,
     }));
 
-    const { ensureAttachmentAvailable } = await import('./attachment-sync-availability');
     const result = await ensureAttachmentAvailable(makeAttachment('a-file'));
 
     expect(result).toMatchObject({
@@ -152,7 +164,6 @@ describe('ensureAttachmentAvailable', () => {
     const dropbox = await import('./dropbox-sync');
     vi.mocked(dropbox.downloadDropboxFile).mockResolvedValue(toArrayBuffer(REMOTE_BYTES) as never);
 
-    const { ensureAttachmentAvailable } = await import('./attachment-sync-availability');
     const result = await ensureAttachmentAvailable(
       makeAttachment('a-dropbox', { fileHash: sha256Hex(REMOTE_BYTES) })
     );
@@ -176,7 +187,6 @@ describe('ensureAttachmentAvailable', () => {
     const core = await import('@mindwtr/core');
     vi.mocked(core.cloudGetFile).mockResolvedValue(toArrayBuffer(REMOTE_BYTES) as never);
 
-    const { ensureAttachmentAvailable } = await import('./attachment-sync-availability');
     const result = await ensureAttachmentAvailable(
       makeAttachment('a-cloud', { fileHash: sha256Hex(REMOTE_BYTES) })
     );
@@ -223,7 +233,6 @@ describe('ensureAttachmentAvailable', () => {
     asyncStorageMock.store.set('@mindwtr_cloud_token', 'cloud-token');
     vi.mocked(core.cloudGetFile).mockResolvedValue(toArrayBuffer(sealed) as never);
 
-    const { ensureAttachmentAvailable } = await import('./attachment-sync-availability');
     const result = await ensureAttachmentAvailable(
       // fileHash describes the PLAINTEXT — it is a plaintext-domain value inside the
       // synced document and must stay stable across re-encryptions.
@@ -251,7 +260,6 @@ describe('ensureAttachmentAvailable', () => {
     const core = await import('@mindwtr/core');
     vi.mocked(core.webdavGetFile).mockResolvedValue(toArrayBuffer(REMOTE_BYTES) as never);
 
-    const { ensureAttachmentAvailable } = await import('./attachment-sync-availability');
     const result = await ensureAttachmentAvailable(
       makeAttachment('a-dav', { fileHash: sha256Hex(REMOTE_BYTES) })
     );
@@ -273,7 +281,6 @@ describe('ensureAttachmentAvailable', () => {
     const core = await import('@mindwtr/core');
     vi.mocked(core.cloudGetFile).mockResolvedValue(toArrayBuffer(REMOTE_BYTES) as never);
 
-    const { ensureAttachmentAvailable } = await import('./attachment-sync-availability');
     const result = await ensureAttachmentAvailable(
       makeAttachment('a-tampered', { fileHash: sha256Hex(new Uint8Array([1, 1, 1, 1])) })
     );
@@ -294,7 +301,6 @@ describe('ensureAttachmentAvailable', () => {
       return toArrayBuffer(REMOTE_BYTES) as never;
     });
 
-    const { ensureAttachmentAvailable } = await import('./attachment-sync-availability');
     const attachment = makeAttachment('a-shared', { fileHash: sha256Hex(REMOTE_BYTES) });
     const first = ensureAttachmentAvailable(attachment);
     const second = ensureAttachmentAvailable(attachment);
