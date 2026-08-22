@@ -61,13 +61,12 @@ async function appendLogLine(entry: LogEntry, options?: AppendLogOptions): Promi
         try {
             return await invokeNative<string>('append_log_line', { line });
         } catch (error) {
+            // No non-append retry: writeTextFile without `append` replaces the
+            // whole file, so a failed append used to throw away every line
+            // logged so far to save the one that just failed.
             const logDir = await ensureLogDir();
             const logFile = await join(logDir, LOG_FILE_NAME);
-            try {
-                await writeTextFile(logFile, line, { append: true });
-            } catch (writeError) {
-                await writeTextFile(logFile, line);
-            }
+            await writeTextFile(logFile, line, { append: true });
             return logFile;
         }
     } catch (error) {

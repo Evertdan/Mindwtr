@@ -65,10 +65,19 @@ pub(crate) fn append_log_line(app: tauri::AppHandle, line: String) -> Result<Str
 
 #[tauri::command(async)]
 pub(crate) fn clear_log_file(app: tauri::AppHandle) -> Result<String, String> {
-    let log_path = get_data_dir(&app).join("logs").join("mindwtr.log");
-    if log_path.exists() {
-        if let Err(err) = std::fs::remove_file(&log_path) {
-            return Err(err.to_string());
+    clear_log_files(&get_data_dir(&app).join("logs"))
+}
+
+// Both files, not just the live one: write_log_line rotates at 5 MB, so
+// clearing only mindwtr.log left the whole rotated history on disk — the user
+// asked for the log to be gone.
+fn clear_log_files(log_dir: &Path) -> Result<String, String> {
+    let log_path = log_dir.join("mindwtr.log");
+    for path in [&log_path, &log_dir.join("mindwtr.log.1")] {
+        if path.exists() {
+            if let Err(err) = std::fs::remove_file(path) {
+                return Err(err.to_string());
+            }
         }
     }
     Ok(log_path.to_string_lossy().to_string())
@@ -76,7 +85,28 @@ pub(crate) fn clear_log_file(app: tauri::AppHandle) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::native_log_line;
+    use super::{clear_log_files, native_log_line};
+
+    #[test]
+    fn clearing_the_log_removes_the_rotated_history_too() {
+        let temp = tempfile::tempdir().expect("should create temp log dir");
+        let log_path = temp.path().join("mindwtr.log");
+        let rotated_path = temp.path().join("mindwtr.log.1");
+        std::fs::write(&log_path, "live\n").expect("should write live log");
+        std::fs::write(&rotated_path, "rotated\n").expect("should write rotated log");
+
+        let cleared = clear_log_files(temp.path()).expect("should clear the log");
+
+        assert_eq!(cleared, log_path.to_string_lossy());
+        assert!(!log_path.exists());
+        assert!(!rotated_path.exists());
+    }
+
+    #[test]
+    fn clearing_an_already_empty_log_directory_succeeds() {
+        let temp = tempfile::tempdir().expect("should create temp log dir");
+        clear_log_files(temp.path()).expect("should clear nothing without erroring");
+    }
 
     #[test]
     fn native_log_line_is_valid_jsonl() {
