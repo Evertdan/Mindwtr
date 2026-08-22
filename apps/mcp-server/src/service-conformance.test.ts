@@ -173,6 +173,96 @@ describe('MindwtrService conformance: local SQLite vs cloud REST', () => {
     });
   });
 
+  // BUG-13/BUG-25: the cloud adapter used to ignore `view` entirely, matched `search` with a
+  // literal substring instead of core's operator language, and bucketed dueDate by slicing the
+  // raw string instead of the UTC calendar day. Own fixture (not `fixtureTasks`/`sharedCases`
+  // above) so a project with an isSequential chain and a future-dated task don't change any of
+  // the existing sort/pagination fixture's expected id lists.
+  describe('view/search/dueDate-range parity between adapters', () => {
+    let viewTempDir = '';
+    let viewLocal: MindwtrService;
+    let viewCloud: MindwtrService;
+
+    const viewFixtureProjects = [{
+      id: 'proj-seq', title: 'Sequential Project', status: 'active' as const, color: '#000000',
+      order: 0, tagIds: [], isSequential: true, createdAt: iso('01'), updatedAt: iso('01'),
+    }];
+
+    const viewFixtureTasks: Task[] = [
+      { id: 'view-available', title: 'Available task', status: 'next', tags: [], contexts: [], createdAt: iso('01'), updatedAt: iso('01') },
+      // Far future so this stays "deferred" regardless of when the suite runs.
+      { id: 'view-deferred', title: 'Deferred until 2099', status: 'next', tags: [], contexts: [], startTime: '2099-01-01', createdAt: iso('01'), updatedAt: iso('01') },
+      { id: 'view-seq-first', title: 'Sequential first step', status: 'next', projectId: 'proj-seq', order: 0, tags: [], contexts: [], createdAt: iso('01'), updatedAt: iso('01') },
+      { id: 'view-seq-blocked', title: 'Sequential second step', status: 'next', projectId: 'proj-seq', order: 1, tags: [], contexts: [], createdAt: iso('02'), updatedAt: iso('01') },
+      { id: 'view-search-meeting', title: 'Schedule a team meeting', status: 'next', tags: [], contexts: [], createdAt: iso('01'), updatedAt: iso('01') },
+      // 2026-03-10T02:00+05:00 is 2026-03-09T21:00Z - a naive first-10-characters read names
+      // the 10th; the correct UTC calendar day is the 9th (BUG-25).
+      { id: 'view-date-boundary', title: 'Late night cutover task', status: 'next', tags: [], contexts: [], dueDate: '2026-03-10T02:00:00+05:00', createdAt: iso('01'), updatedAt: iso('01') },
+    ];
+
+    const viewFixtureData: AppData = {
+      tasks: viewFixtureTasks,
+      projects: viewFixtureProjects,
+      sections: [],
+      areas: [],
+      people: [],
+      settings: {},
+    };
+
+    const viewCases: ConformanceCase[] = [
+      {
+        name: "view:'available' returns eligible tasks (unblocked, not deferred) across the whole set",
+        input: { view: 'available', sortBy: 'title', sortOrder: 'asc' },
+        expected: ['view-available', 'view-date-boundary', 'view-search-meeting', 'view-seq-first'],
+      },
+      {
+        name: "view:'deferred' returns only tasks whose start is in the future",
+        input: { view: 'deferred', sortBy: 'title', sortOrder: 'asc' },
+        expected: ['view-deferred'],
+      },
+      {
+        name: "view:'blocked' returns only the non-first task of a sequential project",
+        input: { view: 'blocked', sortBy: 'title', sortOrder: 'asc' },
+        expected: ['view-seq-blocked'],
+      },
+      {
+        name: 'search runs the operator language (status:/negation), not a literal substring match',
+        input: { search: 'status:next -meeting', sortBy: 'title', sortOrder: 'asc' },
+        expected: ['view-available', 'view-deferred', 'view-date-boundary', 'view-seq-first', 'view-seq-blocked'],
+      },
+      {
+        name: 'dueDateFrom/dueDateTo bucket an offset-bearing dueDate by its UTC calendar day, not its literal date substring',
+        input: { dueDateFrom: '2026-03-09', dueDateTo: '2026-03-09' },
+        expected: ['view-date-boundary'],
+      },
+    ];
+
+    beforeAll(async () => {
+      viewTempDir = mkdtempSync(join(tmpdir(), 'mindwtr-mcp-conformance-view-'));
+      writeFileSync(join(viewTempDir, 'data.json'), JSON.stringify(viewFixtureData));
+      viewLocal = createService({ dbPath: join(viewTempDir, 'mindwtr.db'), readonly: false });
+      viewCloud = createCloudService({
+        url: 'https://mindwtr.example.com',
+        token: 'conformance-test-token',
+        fetcher: async () => new Response(JSON.stringify(viewFixtureData), { status: 200 }),
+      });
+    });
+
+    afterAll(async () => {
+      await viewLocal.close();
+      rmSync(viewTempDir, { recursive: true, force: true });
+    });
+
+    for (const { name, input, expected } of viewCases) {
+      test(`local: ${name}`, async () => {
+        expect((await viewLocal.listTasks(input)).map((task) => task.id)).toEqual(expected);
+      });
+      test(`cloud: ${name}`, async () => {
+        expect((await viewCloud.listTasks(input)).map((task) => task.id)).toEqual(expected);
+      });
+    }
+  });
+
   // core-adapter.ts used to throw a plain Error for a missing id on update/delete/rename,
   // which fell through getMindwtrToolErrorCode to 'internal_error' — while cloud-service.ts's
   // mapCloudError already mapped its own 404s to NotFoundError ('not_found'). Same user

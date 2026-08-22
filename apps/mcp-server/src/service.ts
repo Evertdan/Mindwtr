@@ -404,10 +404,10 @@ export type MindwtrService = {
    * - Equal sort keys break ties by `id` ascending, and that tie-break does not flip with
    *   `sortOrder` (a stable sort shouldn't reverse just because the primary key did).
    * - `limit`/`offset` clamp to 1..1000 / >=0 identically on both adapters.
-   * - `search` is an intentional capability difference, not a bug: local matches via SQLite
-   *   FTS5 (token/prefix semantics) when available, cloud matches via a JS substring check.
-   *   A query that matches mid-word on one adapter may not match on the other — this is
-   *   pinned by tests on both sides, not unified.
+   * - `search` runs @mindwtr/core's `filterTasksBySearch` operator language (status:/context:/
+   *   due:<=7d/negation/quotes/free text) identically on both adapters.
+   * - `view` (`available`/`deferred`/`blocked`) runs @mindwtr/core's `getTaskFocusEligibility`
+   *   against the whole task/project set on both adapters, not a paginated slice.
    */
   listTasks: (input: ListTasksInput) => Promise<TaskRow[]>;
   listProjects: () => Promise<Project[]>;

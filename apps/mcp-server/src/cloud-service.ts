@@ -1,7 +1,10 @@
 import {
+  buildTaskFocusEligibilityContext,
   CloudHttpError,
   cloudGetJson,
   cloudRequestJson,
+  filterTasksBySearch,
+  getTaskFocusEligibility,
   normalizeCloudUrl,
   PRIORITY_RANK,
   taskMatchesQuery,
@@ -99,21 +102,14 @@ const normalizeOffset = (value: number | undefined): number => (
   Number.isFinite(value) ? Math.max(0, value as number) : 0
 );
 
-const dateKey = (value: string | undefined | null): string => (
-  typeof value === 'string' && value.length >= 10 ? value.slice(0, 10) : ''
-);
-
-const matchesSearch = (task: Task, search: string | undefined): boolean => {
-  const query = search?.trim().toLowerCase();
-  if (!query) return true;
-  const haystack = [
-    task.title,
-    task.description,
-  ]
-    .filter((value): value is string => typeof value === 'string')
-    .join(' ')
-    .toLowerCase();
-  return haystack.includes(query);
+// Matches the local adapter's `date(dueDate)` (queries.ts), which normalizes to the UTC
+// calendar day rather than slicing the string as written - an offset-bearing dueDate
+// (e.g. a time zone behind/ahead of UTC near midnight) can name a different day than its
+// first 10 characters. Falls back to the raw prefix only when the value doesn't parse.
+const dateKey = (value: string | undefined | null): string => {
+  if (typeof value !== 'string' || value.length < 10) return '';
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString().slice(0, 10) : value.slice(0, 10);
 };
 
 const taskSortValue = (task: Task, sortBy: NonNullable<ListTasksInput['sortBy']>): string | number => {
@@ -243,10 +239,21 @@ export const createCloudService = (options: CloudServiceOptions): MindwtrService
         const due = dateKey(task.dueDate);
         if (dueDateFrom && (!due || due < dueDateFrom)) return false;
         if (dueDateTo && (!due || due > dueDateTo)) return false;
-        return matchesSearch(task, input.search);
+        return true;
       });
+      // Same operator language (status:/context:/due:<=7d/negation/quotes) as the local
+      // adapter (queries.ts) - both route through core's filterTasksBySearch.
+      const searched = input.search ? filterTasksBySearch(filtered, data.projects, input.search) : filtered;
+      // GTD availability, same as the local adapter: derived from the WHOLE task/project
+      // set (a sequential project's slot depends on tasks outside this page/filter), not
+      // re-derived per platform - see getTaskFocusEligibility's own doc comment.
+      const viewed = input.view ? (() => {
+        const context = buildTaskFocusEligibilityContext({ tasks: data.tasks, projects: data.projects });
+        const wanted = input.view === 'blocked' ? 'sequential' : input.view === 'deferred' ? 'deferred' : 'eligible';
+        return searched.filter((task) => getTaskFocusEligibility(task, { tasks: data.tasks, ...context }).reason === wanted);
+      })() : searched;
       const offset = normalizeOffset(input.offset);
-      return sortTasks(filtered, input).slice(offset, offset + normalizeLimit(input.limit)).map(mapTask);
+      return sortTasks(viewed, input).slice(offset, offset + normalizeLimit(input.limit)).map(mapTask);
     },
     listProjects: async () => {
       const data = await readData();
