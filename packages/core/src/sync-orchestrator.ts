@@ -85,6 +85,10 @@ export const createSyncOrchestrator = <Arg, Result>(
             rejectDeferred(error);
         }
 
+        // .finally() returns a derived promise that rejects with `current`'s reason
+        // whenever this cycle throws. Nothing else holds onto that derived promise
+        // (callers hold `current`, returned below), so an unhandled rejection would
+        // fire for every failing cycle unless it's given a no-op handler here.
         current.finally(() => {
             if (inFlight !== current) return;
             inFlight = null;
@@ -116,7 +120,7 @@ export const createSyncOrchestrator = <Arg, Result>(
                 return;
             }
             startQueuedRun();
-        });
+        }).catch(() => {});
 
         return current;
     };
