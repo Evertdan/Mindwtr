@@ -55,6 +55,21 @@ export const validateAttachmentHash = async (attachment: Attachment, bytes: Uint
     }
 };
 
+/**
+ * Stats we already failed to hash, keyed by attachment id (BUG-16). A file whose stat
+ * moved but whose bytes could not be read would otherwise be re-read on every single
+ * cycle — up to the 50 MB attachment cap each time — with nothing to show for it. The
+ * marker is deliberately in-memory and device-local: it describes this device's failed
+ * read, not synced content. Ceiling: cleared on restart, which costs one extra read.
+ */
+const unhashableStats = new Map<string, string>();
+
+const statMarker = (stat: LocalFileStat): string => `${stat.mtimeMs}:${stat.size}`;
+
+export const resetUnhashableAttachmentStatsForTests = (): void => {
+    unhashableStats.clear();
+};
+
 export const reportProgress = (
     attachmentId: string,
     operation: 'upload' | 'download',
@@ -306,8 +321,12 @@ export async function runAttachmentTransferLifecycle(
                 const check = await checkAttachmentContentChange(
                     attachment,
                     stat,
-                    () => (options.computeLocalFileHash ? options.computeLocalFileHash(localPath, attachment) : Promise.resolve(null)),
+                    () => {
+                        if (unhashableStats.get(attachment.id) === statMarker(stat)) return Promise.resolve(null);
+                        return options.computeLocalFileHash ? options.computeLocalFileHash(localPath, attachment) : Promise.resolve(null);
+                    },
                 );
+                if (check.hash) unhashableStats.delete(attachment.id);
                 if (!check.changed) {
                     if (check.stat.mtimeMs !== attachment.contentMtimeMs || check.stat.size !== attachment.contentSize) {
                         applyAttachmentContentStat(attachment, check.stat, check.hash);
@@ -317,7 +336,20 @@ export async function runAttachmentTransferLifecycle(
                     // The stat mismatched but no hash could be computed to confirm it (review
                     // S2) — do nothing this cycle rather than bump/upload/download on an
                     // unconfirmed guess, which could publish a `fileHash` that describes the
-                    // wrong content or overwrite a file for no real reason. Retried next cycle.
+                    // wrong content or overwrite a file for no real reason. Remember the stat
+                    // we failed on so the retry waits for the file to move again instead of
+                    // re-reading it every cycle (BUG-16).
+                    unhashableStats.set(attachment.id, statMarker(check.stat));
+                } else if (!attachment.fileHash && options.contentChangePhase === 'post-merge') {
+                    // Nothing to compare the fresh hash against — an attachment uploaded by a
+                    // client that predates `fileHash`, so the merge cannot have adopted newer
+                    // remote content either (`fileHash` is synced). Record what is on disk as
+                    // the baseline (BUG-16) instead of downloading over the local file on the
+                    // strength of a bare stat move. The prepare pass still treats the same
+                    // state as this device's edit and re-uploads it, which is where the
+                    // missing hash gets published.
+                    applyAttachmentContentStat(attachment, check.stat, check.hash);
+                    didMutate = true;
                 } else if (options.contentChangePhase === 'prepare') {
                     // This device's own edit, detected before this cycle's remote pull.
                     // Review B2: attempt the re-upload FIRST — only a *confirmed success*

@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppData, Attachment, Project, Task } from './types';
 import {
     collectAttachmentsById,
     normalizePendingRemoteDeletes,
+    resetUnhashableAttachmentStatsForTests,
     runAttachmentTransferLifecycle,
     validateAttachmentHash,
 } from './attachment-transfer';
@@ -783,6 +784,77 @@ describe('upload source containment (SEC-07)', () => {
         });
 
         expect(onUpload).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('missing fileHash and unhashable files (BUG-16)', () => {
+    beforeEach(() => {
+        resetUnhashableAttachmentStatsForTests();
+    });
+
+    const baseOptions = {
+        localFileExists: vi.fn(async () => true),
+        onUploadError: vi.fn(),
+        onDownloadError: vi.fn(),
+    };
+
+    it('backfills a missing fileHash instead of guessing a transfer', async () => {
+        // An attachment uploaded by a client that predates fileHash: it has a cloud copy
+        // and a local file, but no baseline hash, so a bare stat mismatch is not evidence
+        // of anything and must not trigger a download.
+        const attachment = makeAttachment({ cloudKey: 'attachments/attachment-1.txt' });
+        const onDownload = vi.fn(async () => true);
+        const onUpload = vi.fn(async () => true);
+
+        const didMutate = await runAttachmentTransferLifecycle({
+            ...baseOptions,
+            attachmentsById: new Map([[attachment.id, attachment]]),
+            getLocalFileStat: vi.fn(async () => ({ mtimeMs: 2000, size: 20 })),
+            computeLocalFileHash: vi.fn(async () => 'backfilled-hash'),
+            contentChangePhase: 'post-merge',
+            onUpload,
+            onDownload,
+        });
+
+        expect(didMutate).toBe(true);
+        expect(onDownload).not.toHaveBeenCalled();
+        expect(onUpload).not.toHaveBeenCalled();
+        expect(attachment.fileHash).toBe('backfilled-hash');
+        expect(attachment.contentMtimeMs).toBe(2000);
+        expect(attachment.contentSize).toBe(20);
+        expect(attachment.contentRev).toBeUndefined();
+    });
+
+    it('re-reads a file it could not hash only once per observed stat', async () => {
+        const attachment = makeAttachment({
+            cloudKey: 'attachments/attachment-1.txt',
+            fileHash: 'old-hash',
+            contentMtimeMs: 1000,
+            contentSize: 10,
+        });
+        const computeLocalFileHash = vi.fn(async () => null);
+        let stat = { mtimeMs: 2000, size: 20 };
+        const runCycle = () => runAttachmentTransferLifecycle({
+            ...baseOptions,
+            attachmentsById: new Map([[attachment.id, attachment]]),
+            getLocalFileStat: vi.fn(async () => stat),
+            computeLocalFileHash,
+            contentChangePhase: 'prepare',
+            onUpload: vi.fn(async () => true),
+            onDownload: vi.fn(async () => true),
+        });
+
+        await runCycle();
+        expect(computeLocalFileHash).toHaveBeenCalledTimes(1);
+
+        await runCycle();
+        expect(computeLocalFileHash).toHaveBeenCalledTimes(1);
+
+        stat = { mtimeMs: 3000, size: 30 };
+        await runCycle();
+        expect(computeLocalFileHash).toHaveBeenCalledTimes(2);
+        expect(attachment.fileHash).toBe('old-hash');
+        expect(attachment.contentMtimeMs).toBe(1000);
     });
 });
 
