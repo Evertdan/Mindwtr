@@ -692,7 +692,11 @@ fn normalize_project_task_sort_by(value: Option<&str>) -> Option<&str> {
 
 fn is_retryable_storage_error(message: &str) -> bool {
     let normalized = message.to_ascii_lowercase();
-    normalized.contains("database is locked")
+    // "is locked", not "database is locked": SQLite words the same contention
+    // three ways — "database is locked" (SQLITE_BUSY with a message), "the
+    // database file is locked" (bare SQLITE_BUSY), "a table in the database is
+    // locked" (SQLITE_LOCKED) — and the narrower match retried only the first.
+    normalized.contains("is locked")
         || normalized.contains("database is busy")
         || normalized.contains("resource busy")
         || normalized.contains("temporarily unavailable")
@@ -4907,6 +4911,60 @@ mod tests {
     use super::*;
     use rusqlite::Connection;
     use std::sync::{Arc, Barrier};
+
+    // The three retry loops in this file gate entirely on this classifier, and
+    // it matches on message text — so pin it against the strings SQLite really
+    // produces, not against strings someone wrote from memory.
+    #[test]
+    fn classifies_a_real_contended_sqlite_write_as_retryable() {
+        let temp = tempfile::tempdir().expect("should create temp dir");
+        let db_path = temp.path().join("contended.db");
+
+        let holder = Connection::open(&db_path).expect("should open the holding connection");
+        holder
+            .execute_batch("PRAGMA journal_mode=WAL; CREATE TABLE t(id INTEGER);")
+            .expect("should initialize the database");
+        let blocked = Connection::open(&db_path).expect("should open the blocked connection");
+        blocked
+            .busy_timeout(Duration::from_millis(0))
+            .expect("should disable the busy timeout");
+
+        holder
+            .execute_batch("BEGIN EXCLUSIVE;")
+            .expect("should take the write lock");
+        let error = blocked
+            .execute_batch("BEGIN IMMEDIATE; INSERT INTO t VALUES (1); COMMIT;")
+            .expect_err("the second writer should be locked out")
+            .to_string();
+
+        assert!(
+            is_retryable_storage_error(&error),
+            "a contended write should be retryable, got {error:?}"
+        );
+    }
+
+    #[test]
+    fn classifies_sqlite_lock_codes_as_retryable_and_real_faults_as_final() {
+        // rusqlite renders a bare result code as "Error code N: <errstr>".
+        let busy = rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(5), None).to_string();
+        let locked = rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(6), None).to_string();
+        assert!(is_retryable_storage_error(&busy), "SQLITE_BUSY: {busy:?}");
+        assert!(
+            is_retryable_storage_error(&locked),
+            "SQLITE_LOCKED: {locked:?}"
+        );
+        assert!(is_retryable_storage_error("Resource busy"));
+        assert!(is_retryable_storage_error(
+            "Resource temporarily unavailable (os error 11)"
+        ));
+
+        // Retrying these only delays the error the caller has to see.
+        assert!(!is_retryable_storage_error("no such table: tasks"));
+        assert!(!is_retryable_storage_error("unable to open database file"));
+        assert!(!is_retryable_storage_error("disk I/O error"));
+        assert!(!is_retryable_storage_error("database disk image is malformed"));
+        assert!(!is_retryable_storage_error(""));
+    }
 
     #[test]
     fn rust_task_mapper_matches_core_schema_fixture() {
