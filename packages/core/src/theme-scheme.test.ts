@@ -53,6 +53,9 @@ describe('themeDescriptor', () => {
         expect(themeDescriptor('system')).toBeUndefined();
         expect(themeDescriptor('draculaa')).toBeUndefined();
         expect(themeDescriptor(undefined)).toBeUndefined();
+        // Inherited Object.prototype keys must not read as themes.
+        expect(themeDescriptor('constructor')).toBeUndefined();
+        expect(themeDescriptor('toString')).toBeUndefined();
     });
 
     it('points every theme at a status palette that exists', () => {

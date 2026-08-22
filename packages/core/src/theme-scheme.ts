@@ -44,14 +44,16 @@ export const THEME_DESCRIPTORS = {
     'dracula': { scheme: 'dark', statusPreset: 'dracula', desktop: true },
 } as const satisfies Record<Exclude<AppTheme, 'system'>, ThemeDescriptor>;
 
-const DESCRIPTOR_BY_THEME = THEME_DESCRIPTORS as Record<string, ThemeDescriptor | undefined>;
+// A Map so inherited Object.prototype keys ('constructor', 'toString', …) in an
+// untrusted stored string can never resolve to a descriptor.
+const DESCRIPTOR_BY_THEME = new Map<string, ThemeDescriptor>(Object.entries(THEME_DESCRIPTORS));
 
 /**
  * The descriptor for a concrete theme, or `undefined` for `'system'` and for
  * any value that isn't a theme (stored preferences are untrusted strings).
  */
 export function themeDescriptor(theme: string | null | undefined): ThemeDescriptor | undefined {
-    return theme ? DESCRIPTOR_BY_THEME[theme] : undefined;
+    return theme ? DESCRIPTOR_BY_THEME.get(theme) : undefined;
 }
 
 /**
