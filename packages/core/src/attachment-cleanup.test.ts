@@ -336,6 +336,62 @@ describe('findLiveAttachmentResourceReferences', () => {
             cloudKey: 'attachments/other.txt',
         }, references)).toBe(false);
     });
+
+    const buildLiveReferences = (uri: string) => {
+        const data = buildData();
+        data.tasks.push({
+            id: 'live-task',
+            title: 'Live',
+            status: 'inbox',
+            contexts: [],
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+            attachments: [{
+                id: 'live',
+                kind: 'file',
+                title: 'live',
+                uri,
+                createdAt: '2026-01-01T00:00:00.000Z',
+                updatedAt: '2026-01-01T00:00:00.000Z',
+            }],
+        });
+        return findLiveAttachmentResourceReferences(data);
+    };
+
+    const orphanWithUri = (uri: string) => ({
+        id: 'orphan',
+        kind: 'file' as const,
+        title: 'orphan',
+        uri,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    it('matches percent-encoded and decoded spellings of the same local uri', () => {
+        expect(isAttachmentLocalResourceReferenced(
+            orphanWithUri('/a/My File.pdf'),
+            buildLiveReferences('file:///a/My%20File.pdf'),
+        )).toBe(true);
+        expect(isAttachmentLocalResourceReferenced(
+            orphanWithUri('file:///a/My%20File.pdf'),
+            buildLiveReferences('/a/My File.pdf'),
+        )).toBe(true);
+    });
+
+    it('matches a backslash-separated windows path against its forward-slash twin', () => {
+        expect(isAttachmentLocalResourceReferenced(
+            orphanWithUri('C:/Users/me/Docs/report.pdf'),
+            buildLiveReferences('C:\\Users\\me\\Docs\\report.pdf'),
+        )).toBe(true);
+    });
+
+    it('tolerates malformed percent sequences without throwing', () => {
+        expect(() => buildLiveReferences('/a/100%.pdf')).not.toThrow();
+        expect(isAttachmentLocalResourceReferenced(
+            orphanWithUri('/a/100%.pdf'),
+            buildLiveReferences('/a/100%.pdf'),
+        )).toBe(true);
+    });
 });
 
 describe('removeOrphanedAttachmentsFromData', () => {
@@ -670,6 +726,59 @@ describe('runAttachmentCleanupLifecycle', () => {
         expect(deleteRemoteAttachment).not.toHaveBeenCalled();
         expect(result.appData.settings.attachments?.pendingRemoteDeletes).toBeUndefined();
         expect(result.appData.tasks[0].attachments).toHaveLength(1);
+    });
+
+    it('keeps a live cloud key that needs sanitizing out of the remote delete queue', async () => {
+        const data = buildData();
+        data.tasks.push(
+            {
+                id: 'purged',
+                title: 'Purged',
+                status: 'done',
+                contexts: [],
+                createdAt: now,
+                updatedAt: now,
+                deletedAt: now,
+                purgedAt: now,
+                attachments: [{
+                    id: 'orphan',
+                    kind: 'file',
+                    title: 'shared',
+                    uri: '/managed/orphan-copy.pdf',
+                    cloudKey: 'attachments/shared.pdf',
+                    createdAt: now,
+                    updatedAt: now,
+                }],
+            },
+            {
+                id: 'live',
+                title: 'Live',
+                status: 'next',
+                contexts: [],
+                createdAt: now,
+                updatedAt: now,
+                attachments: [{
+                    id: 'live-copy',
+                    kind: 'file',
+                    title: 'shared',
+                    uri: '/managed/shared.pdf',
+                    cloudKey: '  attachments/shared.pdf  ',
+                    createdAt: now,
+                    updatedAt: now,
+                }],
+            },
+        );
+        const deleteRemoteAttachment = vi.fn(async () => undefined);
+
+        const result = await runAttachmentCleanupLifecycle({
+            appData: data,
+            now: () => now,
+            deleteLocalAttachment: vi.fn(async () => undefined),
+            deleteRemoteAttachment,
+        });
+
+        expect(deleteRemoteAttachment).not.toHaveBeenCalled();
+        expect(result.appData.settings.attachments?.pendingRemoteDeletes).toBeUndefined();
     });
 
     it('treats remote 404 as terminal instead of scheduling another retry', async () => {

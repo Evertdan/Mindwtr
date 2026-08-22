@@ -100,10 +100,18 @@ const isLocalSyncAbortError = (error: unknown): boolean => (
     error instanceof Error && error.name === 'LocalSyncAbort'
 );
 
+// Both spellings of the same file reach us: percent-encoded (file:// URIs) and
+// decoded (plain paths), plus `\` separators on Windows. Collapsing them keeps a
+// live reference from being missed, which would delete a file still in use.
 export function normalizeAttachmentCleanupUri(uri?: string): string | undefined {
     if (!uri) return undefined;
     if (/^https?:\/\//i.test(uri) || uri.startsWith('content://')) return undefined;
-    return uri.replace(/^file:\/\//i, '');
+    const path = uri.replace(/^file:\/\//i, '').replace(/\\/g, '/');
+    try {
+        return decodeURIComponent(path);
+    } catch {
+        return path;
+    }
 }
 
 export function findLiveAttachmentResourceReferences(appData: AppData): LiveAttachmentResourceReferences {
@@ -116,7 +124,9 @@ export function findLiveAttachmentResourceReferences(appData: AppData): LiveAtta
             if (attachment.deletedAt) continue;
             const localUri = normalizeAttachmentCleanupUri(attachment.uri);
             if (localUri) localUris.add(localUri);
-            if (attachment.cloudKey) cloudKeys.add(attachment.cloudKey);
+            // Lookups sanitize before comparing, so the live set must too.
+            const cloudKey = sanitizeAttachmentCloudKeyForSyncMerge(attachment.cloudKey);
+            if (cloudKey) cloudKeys.add(cloudKey);
         }
     };
 
