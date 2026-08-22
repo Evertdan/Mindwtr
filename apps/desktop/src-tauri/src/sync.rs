@@ -1219,6 +1219,31 @@ fn cloud_blocking_http_client(
     })
 }
 
+// The Dropbox token endpoint is a fixed, non-configurable host -- unlike WebDAV/Cloud
+// there is no "allow insecure http" knob, and no reason to ever follow a redirect off
+// api.dropboxapi.com since the POST body carries the refresh token / client id.
+fn dropbox_redirect_security_error(
+    next: &reqwest::Url,
+    previous: &[reqwest::Url],
+) -> Option<&'static str> {
+    let allowed_host = reqwest::Url::parse(DROPBOX_TOKEN_ENDPOINT)
+        .ok()
+        .and_then(|url| url.host_str().map(str::to_string));
+    if is_https_downgrade(next, previous) {
+        Some("Dropbox refused an HTTPS to HTTP redirect")
+    } else if next.scheme() != "https" || Some(next.host_str().unwrap_or_default().to_string()) != allowed_host {
+        Some("Dropbox refused a redirect off the token endpoint")
+    } else {
+        None
+    }
+}
+
+fn dropbox_blocking_http_client(
+    proxy_url: Option<&str>,
+) -> Result<reqwest::blocking::Client, String> {
+    redirect_guarded_blocking_http_client(proxy_url, "Dropbox", dropbox_redirect_security_error)
+}
+
 fn app_blocking_http_client(app: &tauri::AppHandle) -> Result<reqwest::blocking::Client, String> {
     blocking_http_client(read_config(app).proxy_url.as_deref())
 }
@@ -1552,7 +1577,7 @@ fn exchange_dropbox_auth_code(
     redirect_uri: &str,
     proxy_url: Option<&str>,
 ) -> Result<DropboxTokenBundle, String> {
-    let client = blocking_http_client(proxy_url)?;
+    let client = dropbox_blocking_http_client(proxy_url)?;
     let response = client
         .post(DROPBOX_TOKEN_ENDPOINT)
         .header("Content-Type", "application/x-www-form-urlencoded")
@@ -1600,7 +1625,7 @@ fn refresh_dropbox_token(
     refresh_token: &str,
     proxy_url: Option<&str>,
 ) -> Result<(String, i64), String> {
-    let client = blocking_http_client(proxy_url)?;
+    let client = dropbox_blocking_http_client(proxy_url)?;
     let response = client
         .post(DROPBOX_TOKEN_ENDPOINT)
         .header("Content-Type", "application/x-www-form-urlencoded")
@@ -3660,6 +3685,26 @@ mod tests {
         )
         .is_some());
         assert!(cloud_redirect_security_error(&next_http, &[initial_http], true).is_none());
+    }
+
+    #[test]
+    fn dropbox_redirect_security_rejects_downgrades_and_off_host_redirects() {
+        let https = reqwest::Url::parse(DROPBOX_TOKEN_ENDPOINT).unwrap();
+        let next_same_host = reqwest::Url::parse(DROPBOX_TOKEN_ENDPOINT).unwrap();
+        let next_other_host = reqwest::Url::parse("https://evil.example.com/oauth2/token").unwrap();
+        let next_http = reqwest::Url::parse("http://api.dropboxapi.com/oauth2/token").unwrap();
+
+        assert!(
+            dropbox_redirect_security_error(&next_same_host, std::slice::from_ref(&https))
+                .is_none()
+        );
+        assert!(
+            dropbox_redirect_security_error(&next_other_host, std::slice::from_ref(&https))
+                .is_some()
+        );
+        assert!(
+            dropbox_redirect_security_error(&next_http, std::slice::from_ref(&https)).is_some()
+        );
     }
 
     #[test]
