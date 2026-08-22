@@ -2,14 +2,17 @@ import { describe, expect, it, afterEach } from 'vitest';
 import * as nodeCrypto from 'node:crypto';
 import { argon2id } from '@noble/hashes/argon2.js';
 import {
+  computeSha256Hex,
   decryptSyncArtifact,
   defaultSyncCryptoPrimitives,
   deriveSyncKeyMaterial,
   encryptSyncArtifact,
+  setSha256HexProvider,
   SyncCryptoAuthError,
 } from '@mindwtr/core';
 
 import {
+  mobileSha256Hex,
   mobileSyncCryptoPrimitives,
   setSyncCryptoNativeModuleForTests,
   type SyncCryptoNativeModule,
@@ -49,6 +52,7 @@ const nodeBackedQuickCrypto: SyncCryptoNativeModule = {
   },
   createCipheriv: (algorithm, key, iv) => nodeCrypto.createCipheriv(algorithm, key, iv) as never,
   createDecipheriv: (algorithm, key, iv) => nodeCrypto.createDecipheriv(algorithm, key, iv) as never,
+  createHash: (algorithm) => nodeCrypto.createHash(algorithm) as never,
   randomBytes: (size) => new Uint8Array(nodeCrypto.randomBytes(size)),
 };
 
@@ -167,5 +171,27 @@ describe('mobileSyncCryptoPrimitives', () => {
     await expect(
       mobileSyncCryptoPrimitives.argon2id(new Uint8Array(1), new Uint8Array(16), { mKib: 8, t: 1, p: 0 }, 32),
     ).rejects.toBeInstanceOf(RangeError);
+  });
+});
+
+describe('mobileSha256Hex', () => {
+  setSyncCryptoNativeModuleForTests(nodeBackedQuickCrypto);
+  afterEach(() => setSyncCryptoNativeModuleForTests(nodeBackedQuickCrypto));
+
+  it('produces the canonical sha256 digest of the bytes it is given', () => {
+    expect(mobileSha256Hex(new Uint8Array([0x61, 0x62, 0x63]))).toBe(
+      'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+    );
+  });
+
+  it('satisfies core as an attachment digest provider', async () => {
+    setSha256HexProvider(mobileSha256Hex);
+    try {
+      expect(await computeSha256Hex(new Uint8Array([0x61, 0x62, 0x63]))).toBe(
+        'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+      );
+    } finally {
+      setSha256HexProvider(null);
+    }
   });
 });

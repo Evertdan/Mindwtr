@@ -1,10 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AppData, Attachment, Project, Task } from './types';
 import {
     collectAttachmentsById,
     normalizePendingRemoteDeletes,
     runAttachmentTransferLifecycle,
+    validateAttachmentHash,
 } from './attachment-transfer';
+import { setSha256HexProvider } from './attachment-hash';
 
 const makeAttachment = (overrides: Partial<Attachment>): Attachment => ({
     id: 'attachment-1',
@@ -697,6 +699,50 @@ describe('collectAttachmentsById', () => {
         });
 
         expect([...collectAttachmentsById(data).keys()]).toEqual(['task-attachment', 'project-attachment']);
+    });
+});
+
+describe('validateAttachmentHash', () => {
+    // sha256("abc")
+    const ABC_SHA256 = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
+    const abcBytes = new Uint8Array([0x61, 0x62, 0x63]);
+
+    afterEach(() => {
+        setSha256HexProvider(null);
+    });
+
+    it('passes when the computed digest matches the recorded fileHash', async () => {
+        await expect(validateAttachmentHash(
+            makeAttachment({ fileHash: ABC_SHA256.toUpperCase() }),
+            abcBytes,
+        )).resolves.toBeUndefined();
+    });
+
+    it('rejects when the bytes do not match the recorded fileHash', async () => {
+        await expect(validateAttachmentHash(
+            makeAttachment({ fileHash: ABC_SHA256 }),
+            new Uint8Array([0x61, 0x62, 0x64]),
+        )).rejects.toThrow(/Integrity validation failed/);
+    });
+
+    it('fails closed when no digest can be computed at all', async () => {
+        setSha256HexProvider(() => 'no-digest-available');
+        await expect(validateAttachmentHash(
+            makeAttachment({ fileHash: ABC_SHA256 }),
+            abcBytes,
+        )).rejects.toThrow(/Integrity validation/);
+    });
+
+    it('skips validation when the attachment carries no fileHash', async () => {
+        setSha256HexProvider(() => 'no-digest-available');
+        await expect(validateAttachmentHash(makeAttachment({}), abcBytes)).resolves.toBeUndefined();
+    });
+
+    it('skips validation when the recorded fileHash is not a syntactically valid digest', async () => {
+        await expect(validateAttachmentHash(
+            makeAttachment({ fileHash: ABC_SHA256.slice(0, 32) }),
+            abcBytes,
+        )).resolves.toBeUndefined();
     });
 });
 

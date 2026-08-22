@@ -1,4 +1,5 @@
 import type { AppData, Area, Attachment, Person, Project, Task } from './types';
+import { isSha256Hex } from './attachment-hash';
 import { normalizePersonName, normalizePersonNote, normalizePersonReferenceLink } from './people';
 import { normalizeProjectSequentialScope, normalizeProjectTaskSortBy } from './project-utils';
 import { normalizeTaskForLoad } from './task-status';
@@ -98,7 +99,12 @@ export const sanitizeAttachmentCloudKeyForSyncMerge = (value: unknown): string |
     return ATTACHMENT_CLOUD_KEY_PATTERN.test(trimmed) ? trimmed : undefined;
 };
 
-const normalizeAttachmentsForSyncMerge = (attachments: Attachment[] | undefined): Attachment[] | undefined => {
+/** A malformed digest can never match real bytes, so keeping it would either strand the
+ *  attachment or (before the fail-closed check) disable validation entirely. Drop it. */
+export const sanitizeAttachmentFileHashForSyncMerge = (value: unknown): string | undefined =>
+    (isSha256Hex(value) ? value : undefined);
+
+export const normalizeAttachmentsForSyncMerge = (attachments: Attachment[] | undefined): Attachment[] | undefined => {
     if (!attachments) return attachments;
     return attachments.map((attachment) => {
         if (attachment.kind !== 'file') return attachment;
@@ -106,6 +112,7 @@ const normalizeAttachmentsForSyncMerge = (attachments: Attachment[] | undefined)
             ...attachment,
             uri: sanitizeAttachmentUriForSyncMerge(attachment.uri) ?? '',
             cloudKey: sanitizeAttachmentCloudKeyForSyncMerge(attachment.cloudKey),
+            fileHash: sanitizeAttachmentFileHashForSyncMerge(attachment.fileHash),
         };
     });
 };

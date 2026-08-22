@@ -31,6 +31,7 @@ import {
   recordUpdateReminderChecked,
   recordUpdateReminderDismissed,
   recordUpdateReminderShown,
+  setSha256HexProvider,
   setStorageAdapter,
   setLogger,
   shouldCheckUpdateReminder,
@@ -46,6 +47,7 @@ import {
   type UserPromptState,
 } from '@mindwtr/core';
 import { mobileStorage } from '../lib/storage-adapter';
+import { mobileSha256Hex } from '../lib/sync-crypto-native';
 import { keepPersistentCaptureNotificationArmed } from '../lib/persistent-capture-notification';
 import { markStartupPhase } from '../lib/startup-profiler';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -319,6 +321,10 @@ const getViewBreadcrumb = (pathname: string | null): string | null => {
 let storageInitError: Error | null = null;
 
 installCoreLoggerBridge();
+
+// Hermes has no crypto.subtle, so core's attachment integrity checks have nothing to
+// digest with until this is registered (see mobileSha256Hex).
+setSha256HexProvider(mobileSha256Hex);
 
 try {
   setStorageAdapter(mobileStorage);

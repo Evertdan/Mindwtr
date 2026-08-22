@@ -62,6 +62,7 @@ const nodeQuickCrypto: SyncCryptoNativeModule = {
   },
   createCipheriv: (a, k, i) => nodeCrypto.createCipheriv(a, k, i) as never,
   createDecipheriv: (a, k, i) => nodeCrypto.createDecipheriv(a, k, i) as never,
+  createHash: (a) => nodeCrypto.createHash(a) as never,
   randomBytes: (size) => new Uint8Array(nodeCrypto.randomBytes(size)),
 };
 

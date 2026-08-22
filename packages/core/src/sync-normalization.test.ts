@@ -400,6 +400,38 @@ describe('sync normalization', () => {
         expect(normalized.attachments?.[1]?.cloudKey).toBe('attachments/att-2.txt');
     });
 
+    it('drops a malformed synced attachment fileHash so integrity validation stays enforceable', () => {
+        const digest = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
+        const task = {
+            ...createMockTask('task-1', '2026-01-01T00:00:00.000Z'),
+            attachments: [
+                {
+                    id: 'att-1',
+                    kind: 'file',
+                    title: 'Truncated digest',
+                    uri: '/local/a.txt',
+                    fileHash: digest.slice(0, 32),
+                    createdAt: '2026-01-01T00:00:00.000Z',
+                    updatedAt: '2026-01-01T00:00:00.000Z',
+                },
+                {
+                    id: 'att-2',
+                    kind: 'file',
+                    title: 'Real digest',
+                    uri: '/local/b.txt',
+                    fileHash: digest.toUpperCase(),
+                    createdAt: '2026-01-01T00:00:00.000Z',
+                    updatedAt: '2026-01-01T00:00:00.000Z',
+                },
+            ],
+        } satisfies Task;
+
+        const normalized = normalizeTaskForSyncMerge(task, '2026-04-20T10:00:00.000Z');
+
+        expect(normalized.attachments?.[0]?.fileHash).toBeUndefined();
+        expect(normalized.attachments?.[1]?.fileHash).toBe(digest.toUpperCase());
+    });
+
     it('sanitizes synced project attachment cloud keys during normalization', () => {
         const project = {
             ...createMockProject('project-1', '2026-01-01T00:00:00.000Z'),

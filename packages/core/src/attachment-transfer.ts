@@ -4,7 +4,7 @@ import {
     checkAttachmentContentChange,
     type LocalFileStat,
 } from './attachment-change-detection';
-import { computeSha256Hex } from './attachment-hash';
+import { computeSha256Hex, isSha256Hex } from './attachment-hash';
 import { globalProgressTracker } from './attachment-progress';
 import type { AppData, Attachment, AttachmentSettings } from './types';
 
@@ -35,11 +35,21 @@ export const normalizePendingRemoteDeletes = (
     return Array.from(deduped.values());
 };
 
+/**
+ * Fail closed: once an attachment carries a usable digest, bytes that don't match it —
+ * and bytes we cannot digest at all — are both rejected. Silently skipping either turns
+ * the whole integrity check off on any platform without a digest (Hermes has no
+ * WebCrypto; see setSha256HexProvider). A `fileHash` that is not a syntactically valid
+ * digest is the one thing left unvalidated, because there is nothing to compare against;
+ * the sync-merge normalizer drops those before they reach here.
+ */
 export const validateAttachmentHash = async (attachment: Attachment, bytes: Uint8Array): Promise<void> => {
     const expected = attachment.fileHash;
-    if (!expected || expected.length !== 64) return;
+    if (!isSha256Hex(expected)) return;
     const computed = await computeSha256Hex(bytes);
-    if (!computed) return;
+    if (!computed) {
+        throw new Error('Integrity validation unavailable: no SHA-256 implementation');
+    }
     if (computed.toLowerCase() !== expected.toLowerCase()) {
         throw new Error('Integrity validation failed');
     }

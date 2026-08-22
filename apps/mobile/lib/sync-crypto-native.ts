@@ -28,6 +28,11 @@ type CipherLike = {
     setAuthTag(tag: Uint8Array): unknown;
 };
 
+type HashLike = {
+    update(data: Uint8Array): HashLike;
+    digest(encoding: 'hex'): string;
+};
+
 /** The slice of react-native-quick-crypto's surface this adapter uses. Deliberately
  *  structural and Node-`crypto`-shaped so tests can substitute node's implementation. */
 export type SyncCryptoNativeModule = {
@@ -45,6 +50,7 @@ export type SyncCryptoNativeModule = {
     ): void;
     createCipheriv(algorithm: 'aes-256-gcm', key: Uint8Array, iv: Uint8Array): CipherLike;
     createDecipheriv(algorithm: 'aes-256-gcm', key: Uint8Array, iv: Uint8Array): CipherLike;
+    createHash(algorithm: 'sha256'): HashLike;
     randomBytes(size: number): Uint8Array;
 };
 
@@ -139,3 +145,13 @@ export const mobileSyncCryptoPrimitives: SyncCryptoPrimitives = {
         return bytes;
     },
 };
+
+/**
+ * Core's attachment integrity digest (#1057 / SEC-05). Hermes has no `crypto.subtle`, so
+ * without this core computes nothing and every hash check on mobile is a no-op — which,
+ * now that validation fails closed, would strand every downloaded attachment. Same native
+ * module, same Node-shaped API, so the node-environment vitest suite exercises it against
+ * node's own `crypto`.
+ */
+export const mobileSha256Hex = (bytes: Uint8Array): string =>
+    getNativeModule().createHash('sha256').update(bytes).digest('hex');
