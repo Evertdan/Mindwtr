@@ -3054,6 +3054,14 @@ fn encrypted_webdav_url(url: &str) -> String {
 
 /// Classifies MWENC1 bytes found where JSON was expected. Ciphertext is never "invalid JSON"
 /// to repair (decision #4); an off-state device instead learns the remote is encrypted.
+/// A non-empty, non-MWENC1 artifact — a plaintext sync document sitting where a keyed device
+/// expects ciphertext. Mirrors core's `isPlaintextSyncArtifact`; an empty or whitespace-only
+/// file is evidence of nothing.
+fn is_plaintext_sync_artifact(bytes: &[u8]) -> bool {
+    matches!(inspect_sync_artifact(bytes), SyncArtifactInspection::Plaintext)
+        && bytes.iter().any(|byte| *byte > 0x20)
+}
+
 fn webdav_encrypted_discovery(bytes: &[u8]) -> Option<String> {
     match inspect_sync_artifact(bytes) {
         SyncArtifactInspection::Encrypted(header) => Some(format!(
@@ -3090,17 +3098,24 @@ fn webdav_get_json_blocking(
             .send()
             .map_err(|e| format_reqwest_send_error("WebDAV request failed", &e))
     };
+    let fetch = |target: &str| -> Result<Option<Vec<u8>>, String> {
+        let response = get(target)?;
+        if !response.status().is_success() {
+            return Ok(None);
+        }
+        let bytes = response
+            .bytes()
+            .map_err(|e| format!("Invalid WebDAV response: error reading response body: {e}"))?;
+        Ok(Some(bytes.to_vec()))
+    };
     let response = get(&url)?;
 
     if response.status() == reqwest::StatusCode::NOT_FOUND {
-        // Detection (decision #2): only an off-state device, and only once the plain read has
-        // already come back missing — a populated plaintext remote's steady reads succeed and
-        // never issue this probe, so an existing install sees zero extra requests (invariant
-        // #1, and no `.enc` probing that a strict server could reject).
-        if material.is_none() {
-            if let Some(discovery) = webdav_probe_encrypted_document(&get, &plain_url)? {
-                return Err(discovery);
-            }
+        // Detection (decision #2): only once the read at this device's own name has already come
+        // back missing — a populated remote's steady reads succeed and never issue this probe, so
+        // an existing install sees zero extra requests (invariant #1).
+        if let Some(discovery) = webdav_absent_document_discovery(&fetch, &plain_url, material)? {
+            return Err(discovery);
         }
         return Ok(Value::Null);
     }
@@ -3128,7 +3143,7 @@ fn webdav_get_json_blocking(
     let body = String::from_utf8_lossy(&body_bytes);
     let normalized_body = body.trim_start_matches('\u{feff}').trim();
     if normalized_body.is_empty() {
-        if let Some(discovery) = webdav_probe_encrypted_document(&get, &plain_url)? {
+        if let Some(discovery) = webdav_absent_document_discovery(&fetch, &plain_url, None)? {
             return Err(discovery);
         }
         return Ok(Value::Null);
@@ -3140,18 +3155,28 @@ fn webdav_get_json_blocking(
     })
 }
 
-fn webdav_probe_encrypted_document<Get>(get: &Get, plain_url: &str) -> Result<Option<String>, String>
+/// What a document missing at THIS device's own artifact name means, given its posture. Taking
+/// the fetch as a bytes-or-nothing closure keeps the decision unit-testable without a server.
+fn webdav_absent_document_discovery<Fetch>(
+    fetch: &Fetch,
+    plain_url: &str,
+    material: Option<&SyncKeyMaterial>,
+) -> Result<Option<String>, String>
 where
-    Get: Fn(&str) -> Result<reqwest::blocking::Response, String>,
+    Fetch: Fn(&str) -> Result<Option<Vec<u8>>, String>,
 {
-    let response = get(&encrypted_webdav_url(plain_url))?;
-    if !response.status().is_success() {
-        return Ok(None);
+    match material {
+        // Off-state: ciphertext a peer wrote, which this device needs the passphrase for.
+        None => Ok(fetch(&encrypted_webdav_url(plain_url))?
+            .as_deref()
+            .and_then(webdav_encrypted_discovery)),
+        // Keyed: the plaintext a peer's disable transition restored. Reporting an empty remote
+        // here would merge this device's whole store into a fresh plaintext generation and fork
+        // the folder — and this device never follows the remote down to plaintext on its own.
+        Some(_) => Ok(fetch(plain_url)?
+            .filter(|bytes| is_plaintext_sync_artifact(bytes))
+            .map(|_| SYNC_ENCRYPTION_REMOTE_PLAINTEXT.to_string())),
     }
-    let bytes = response.bytes().map_err(|e| {
-        format!("Invalid WebDAV response: error reading response body: {e}")
-    })?;
-    Ok(webdav_encrypted_discovery(&bytes))
 }
 
 #[tauri::command]
@@ -4751,6 +4776,38 @@ mod tests {
         assert!(is_terminal_error(&error), "unexpected error: {error}");
 
         assert!(webdav_encrypted_discovery(br#"{"tasks":[]}"#).is_none());
+    }
+
+    #[test]
+    fn a_missing_webdav_document_is_classified_per_this_device_s_posture() {
+        const PLAIN: &str = "https://host/dav/data.json";
+        let material = test_material(5);
+        let serving = |served: &'static str, bytes: Vec<u8>| {
+            move |target: &str| -> Result<Option<Vec<u8>>, String> {
+                Ok((target == served).then(|| bytes.clone()))
+            }
+        };
+
+        // Keyed device, `.enc` gone, plaintext back: a peer disabled encryption at the sync
+        // location. Reading that as an empty remote merges into a fresh generation and forks.
+        let plaintext_restored = serving(PLAIN, br#"{"tasks":[]}"#.to_vec());
+        let discovery = webdav_absent_document_discovery(&plaintext_restored, PLAIN, Some(&material))
+            .expect("probe")
+            .expect("a plaintext-restored remote must not read as empty");
+        assert_eq!(discovery, SYNC_ENCRYPTION_REMOTE_PLAINTEXT);
+        assert!(is_terminal_error(&discovery), "the sentinel must classify as terminal");
+
+        // Genuinely empty remote: nothing at either name, for either posture.
+        let empty = |_: &str| -> Result<Option<Vec<u8>>, String> { Ok(None) };
+        assert!(webdav_absent_document_discovery(&empty, PLAIN, Some(&material)).expect("probe").is_none());
+        assert!(webdav_absent_document_discovery(&empty, PLAIN, None).expect("probe").is_none());
+
+        // Off-state device still discovers the ciphertext a peer wrote.
+        let sealed = serving("https://host/dav/data.json.enc", seal(br#"{"tasks":[]}"#, &material));
+        let off_state = webdav_absent_document_discovery(&sealed, PLAIN, None)
+            .expect("probe")
+            .expect("an off-state device must discover the encrypted remote");
+        assert!(parse_encrypted_discovery(&off_state).is_some(), "unexpected error: {off_state}");
     }
 
     #[test]
@@ -9333,11 +9390,7 @@ fn classify_encrypted_bytes(path: &Path) -> Option<String> {
 /// True when a non-empty, non-MWENC1 sync document sits at the plaintext name. Mirrors core's
 /// `isPlaintextSyncArtifact`; an empty or whitespace-only file is evidence of nothing.
 fn plaintext_sync_document_exists(sync_dir: &Path) -> bool {
-    let Ok(bytes) = fs::read(sync_dir.join(DATA_FILE_NAME)) else {
-        return false;
-    };
-    matches!(inspect_sync_artifact(&bytes), SyncArtifactInspection::Plaintext)
-        && bytes.iter().any(|byte| *byte > 0x20)
+    fs::read(sync_dir.join(DATA_FILE_NAME)).is_ok_and(|bytes| is_plaintext_sync_artifact(&bytes))
 }
 
 fn detect_encrypted_sync_document(sync_dir: &Path) -> Option<String> {
