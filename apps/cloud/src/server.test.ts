@@ -2139,6 +2139,40 @@ describe('cloud server api', () => {
         expect(readFileSync(filePath, 'utf8')).toBe(corruptPayload);
     });
 
+    test('refuses REST entity reads and search when stored namespace data is corrupt, but an absent namespace still reads empty', async () => {
+        const key = tokenToKey(integrationToken);
+        const filePath = join(dataDir, `${key}.json`);
+        expect(existsSync(filePath)).toBe(false);
+
+        const emptyTasks = await fetch(`${baseUrl}/v1/tasks`, { headers: authHeaders });
+        expect(emptyTasks.status).toBe(200);
+        expect((await emptyTasks.json()).tasks).toEqual([]);
+        const emptySearch = await fetch(`${baseUrl}/v1/search?query=anything`, { headers: authHeaders });
+        expect(emptySearch.status).toBe(200);
+        expect((await emptySearch.json()).tasks).toEqual([]);
+
+        const corruptPayload = '{"tasks":[';
+        writeFileSync(filePath, corruptPayload);
+
+        const tasksResponse = await fetch(`${baseUrl}/v1/tasks`, { headers: authHeaders });
+        expect(tasksResponse.status).toBe(500);
+        expect((await tasksResponse.json()).error).toBe('Stored data failed validation');
+
+        const projectsResponse = await fetch(`${baseUrl}/v1/projects`, { headers: authHeaders });
+        expect(projectsResponse.status).toBe(500);
+        expect((await projectsResponse.json()).error).toBe('Stored data failed validation');
+
+        const singleTaskResponse = await fetch(`${baseUrl}/v1/tasks/${crypto.randomUUID()}`, { headers: authHeaders });
+        expect(singleTaskResponse.status).toBe(500);
+        expect((await singleTaskResponse.json()).error).toBe('Stored data failed validation');
+
+        const searchResponse = await fetch(`${baseUrl}/v1/search?query=anything`, { headers: authHeaders });
+        expect(searchResponse.status).toBe(500);
+        expect((await searchResponse.json()).error).toBe('Stored data failed validation');
+
+        expect(readFileSync(filePath, 'utf8')).toBe(corruptPayload);
+    });
+
     test('first write to a namespace with no stored data still succeeds', async () => {
         const key = tokenToKey(integrationToken);
         const filePath = join(dataDir, `${key}.json`);

@@ -86,7 +86,6 @@ import {
     getDataFileMetadata,
     isTrustedValidatedDataFile,
     jsonFileResponse,
-    loadAppData,
     loadAppDataForWrite,
     rememberValidatedDataFile,
     writeCloudData,
@@ -445,7 +444,9 @@ const handleEntityRoute = async <T extends CloudEntity>(
         throwIfRequestAborted(context.signal);
         const pagination = parsePagination(url.searchParams);
         if ('error' in pagination) return errorResponse(pagination.error, 400);
-        const data = loadAppData(context.filePath);
+        const dataResult = loadAppDataForWriteOrError(context.filePath);
+        if ('error' in dataResult) return dataResult.error;
+        const data = dataResult;
         const items = route.listItems(data, url);
         if (isResponse(items)) return items;
         const total = items.length;
@@ -486,7 +487,9 @@ const handleEntityRoute = async <T extends CloudEntity>(
     if (!entityId) return errorResponse(route.invalidIdMessage, 400);
 
     if (req.method === 'GET') {
-        const data = loadAppData(context.filePath);
+        const dataResult = loadAppDataForWriteOrError(context.filePath);
+        if ('error' in dataResult) return dataResult.error;
+        const data = dataResult;
         const entity = getEntityCollection(data, route).find((item) => item.id === entityId && !item.deletedAt);
         if (!entity) return errorResponse(`${route.label} not found`, 404);
         return jsonResponse({ [route.itemKey]: entity });
@@ -1238,7 +1241,9 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                             if (typeof taskLimit !== 'number') return errorResponse(taskLimit.error, 400);
                             const projectLimit = parseSearchPaginationValue(url.searchParams, 'projectLimit', pagination.limit);
                             if (typeof projectLimit !== 'number') return errorResponse(projectLimit.error, 400);
-                            const data = loadAppData(ctx.filePath);
+                            const dataResult = loadAppDataForWriteOrError(ctx.filePath);
+                            if ('error' in dataResult) return dataResult.error;
+                            const data = dataResult;
                             const tasks = filterNotDeleted(data.tasks);
                             const projects = filterNotDeleted(data.projects);
                             // filterTasksBySearch/filterProjectsBySearch are the same matchers
