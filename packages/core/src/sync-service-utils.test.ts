@@ -68,6 +68,16 @@ describe('sync-service-utils', () => {
         expect(sanitized).toContain('[redacted]');
     });
 
+    it('strips URL userinfo from sync error messages', () => {
+        const sanitized = sanitizeSyncErrorMessage(
+            'WebDAV PUT failed (403) at https://alice:hunter2@dav.example.com/mindwtr/data.json'
+        );
+
+        expect(sanitized).not.toContain('hunter2');
+        expect(sanitized).not.toContain('alice');
+        expect(sanitized).toContain('dav.example.com/mindwtr/data.json');
+    });
+
     it('formats readonly file sync errors with actionable guidance', () => {
         const message = formatSyncErrorMessage(new Error("File '/tmp/data.json' is not writable"), 'file');
 

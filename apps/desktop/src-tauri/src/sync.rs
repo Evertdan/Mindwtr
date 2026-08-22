@@ -2979,6 +2979,24 @@ pub(crate) fn assert_webdav_url_allowed(
     }
 }
 
+/// A configured WebDAV URL may carry `user:pass@` userinfo, and these messages reach the
+/// user's error toast. Mirrors core's `sanitizeUrl`: drop the userinfo, keep the rest.
+fn redact_url_userinfo(url: &str) -> String {
+    match reqwest::Url::parse(url) {
+        Ok(mut parsed) if !parsed.username().is_empty() || parsed.password().is_some() => {
+            let cleared = parsed
+                .set_password(None)
+                .and_then(|_| parsed.set_username(""));
+            if cleared.is_ok() {
+                parsed.to_string()
+            } else {
+                "[redacted-url]".to_string()
+            }
+        }
+        _ => url.to_string(),
+    }
+}
+
 fn resolve_webdav_request_url(config: &AppConfigToml) -> Result<String, String> {
     let url = normalize_webdav_url(config.webdav_url.as_deref().unwrap_or_default());
     if url.trim().is_empty() {
@@ -3161,7 +3179,8 @@ fn webdav_get_json_blocking(
         let status = response.status();
         let body = response.text().unwrap_or_default();
         return Err(format!(
-            "WebDAV GET failed ({status}) at {url}{}",
+            "WebDAV GET failed ({status}) at {}{}",
+            redact_url_userinfo(&url),
             webdav_error_body_snippet(&body)
         ));
     }
@@ -3283,7 +3302,8 @@ fn webdav_put_json_blocking(
         let status = response.status();
         let body = response.text().unwrap_or_default();
         return Err(format!(
-            "WebDAV PUT failed ({status}) at {url}{}",
+            "WebDAV PUT failed ({status}) at {}{}",
+            redact_url_userinfo(&url),
             webdav_error_body_snippet(&body)
         ));
     }
@@ -3640,6 +3660,19 @@ mod tests {
         )
         .is_some());
         assert!(cloud_redirect_security_error(&next_http, &[initial_http], true).is_none());
+    }
+
+    #[test]
+    fn webdav_error_messages_drop_url_userinfo() {
+        assert_eq!(
+            redact_url_userinfo("https://alice:hunter2@dav.example.com/mindwtr/data.json"),
+            "https://dav.example.com/mindwtr/data.json"
+        );
+        assert_eq!(
+            redact_url_userinfo("https://dav.example.com/mindwtr/data.json"),
+            "https://dav.example.com/mindwtr/data.json"
+        );
+        assert_eq!(redact_url_userinfo("not a url"), "not a url");
     }
 
     #[test]

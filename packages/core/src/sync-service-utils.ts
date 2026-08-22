@@ -1,3 +1,4 @@
+import { sanitizeLogMessage } from './log-sanitize';
 import { isWebdavRateLimitedError } from './sync-runtime-utils';
 
 export type SyncBackend = 'off' | 'file' | 'webdav' | 'cloud' | 'cloudkit';
@@ -20,8 +21,6 @@ const AI_KEY_PATTERNS = [
     /rk-[A-Za-z0-9]{10,}/g,
     /AIza[0-9A-Za-z\-_]{10,}/g,
 ];
-const TOKEN_PATTERN = /(password|pass|token|access_token|api_key|apikey|authorization|username|user|secret|session|cookie)=([^\s&]+)/gi;
-const AUTH_HEADER_PATTERN = /(Authorization:\s*)(Basic|Bearer)\s+[A-Za-z0-9+/=._-]+/gi;
 const READONLY_ERROR_PATTERN = /isn't writable|not writable|read-only|read only|permission denied|EACCES/i;
 const OFFLINE_ERROR_PATTERNS = [
     /offline state detected/i,
@@ -99,9 +98,10 @@ export const getFileSyncDir = (
 };
 
 export const sanitizeSyncErrorMessage = (value: string): string => {
-    let result = value;
-    result = result.replace(AUTH_HEADER_PATTERN, '$1$2 [redacted]');
-    result = result.replace(TOKEN_PATTERN, '$1=[redacted]');
+    // One redactor: sanitizeLogMessage already covers the auth header, query-string
+    // credentials and URL userinfo. Only the AI-key patterns stay on top of it -- these
+    // span hyphens (sk-ant-api03-...), log-sanitize's stop at the first one.
+    let result = sanitizeLogMessage(value);
     for (const pattern of AI_KEY_PATTERNS) {
         result = result.replace(pattern, '[redacted]');
     }
