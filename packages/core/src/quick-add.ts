@@ -409,6 +409,21 @@ function resolveChronoDate(
     return isValid(parsed) ? { date: parsed, hasExplicitTime } : null;
 }
 
+// chrono's locale bundles ship a single numeric order each (day-first for
+// de/es/fr/pt, month-first for it/ja) and no way to flip it, while the English
+// instances already follow the date-format setting (#1006). A letter-free
+// value like "10/8" carries no locale signal, so those decide it; anything
+// with words stays the locale parser's call.
+const CONTAINS_LETTER_RE = /\p{L}/u;
+
+function orderedChronoInstances(text: string): chrono.Chrono[] {
+    const localeChrono = getLocaleQuickAddChrono();
+    if (!localeChrono) return [getQuickAddChrono()];
+    return CONTAINS_LETTER_RE.test(text)
+        ? [localeChrono, getQuickAddChrono()]
+        : [getQuickAddChrono(), localeChrono];
+}
+
 // A result only counts if it spans the whole input — used for both the
 // locale attempt and the English fallback so the acceptance rule lives once.
 function parseWholeTextResult(chronoInstance: chrono.Chrono, text: string, now: Date): chrono.ParsedResult | null {
@@ -424,12 +439,12 @@ function parseNaturalDate(raw: string, now: Date, defaultTimeMode: DateDefaultTi
     const text = raw.trim();
     if (!text) return { date: buildDefaultDate(now, defaultTimeMode), hasExplicitTime: defaultTimeMode === 'now' };
 
-    const localeChrono = getLocaleQuickAddChrono();
-    const result = (localeChrono && parseWholeTextResult(localeChrono, text, now))
-        ?? parseWholeTextResult(getQuickAddChrono(), text, now);
-    if (!result) return null;
-
-    return resolveChronoDate(result, now, defaultTimeMode);
+    for (const instance of orderedChronoInstances(text)) {
+        const result = parseWholeTextResult(instance, text, now);
+        const parsed = result && resolveChronoDate(result, now, defaultTimeMode);
+        if (parsed) return parsed;
+    }
+    return null;
 }
 
 function formatDueDateValue(parsed: ParsedNaturalDate): string {
@@ -474,14 +489,17 @@ function detectTrailingDate(title: string, now: Date): QuickAddDetectedDate | un
     if (!trimmed) return undefined;
 
     const localeChrono = getLocaleQuickAddChrono();
+    let localeDetected: QuickAddDetectedDate | undefined;
     if (localeChrono) {
         const localeResults = localeChrono.parse(trimmed, { instant: now }, { forwardDate: true });
-        const localeDetected = findTrailingDateInResults(localeResults, trimmed, now, getActiveLanguage());
-        if (localeDetected) return localeDetected;
+        localeDetected = findTrailingDateInResults(localeResults, trimmed, now, getActiveLanguage());
+        // Same rule as parseNaturalDate: a letter-free match is the English
+        // instances' call because only they follow the date-format setting.
+        if (localeDetected && CONTAINS_LETTER_RE.test(localeDetected.matchedText)) return localeDetected;
     }
 
     const results = getQuickAddChrono().parse(trimmed, { instant: now }, { forwardDate: true });
-    return findTrailingDateInResults(results, trimmed, now, 'en');
+    return findTrailingDateInResults(results, trimmed, now, 'en') ?? localeDetected;
 }
 
 function stripToken(source: string, token: string): string {

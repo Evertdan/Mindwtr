@@ -531,6 +531,49 @@ describe('quick-add', () => {
         });
     });
 
+    // A purely numeric date carries no locale signal, so the date-format
+    // setting decides it in every language, not the locale parser's own
+    // convention (#1006 x #1059) — chrono's locale bundles ship one numeric
+    // order each (day-first for de/es/fr/pt, month-first for it/ja).
+    describe('locale numeric dates follow the date format setting', () => {
+        afterEach(() => {
+            configureDateFormatting({});
+        });
+
+        it('reads a day-first locale month-first under the mdy setting', () => {
+            configureDateFormatting({ language: 'de', dateFormat: 'mdy' });
+            const now = new Date('2026-08-04T10:00:00');
+            expect(parseQuickAdd('Miete zahlen /due:10/8', undefined, now).props.dueDate).toContain('2026-10-08');
+            expect(parseQuickAdd('Miete zahlen 10/8', undefined, now).detectedDate?.date).toContain('2026-10-08');
+        });
+
+        it('keeps a day-first locale day-first under the dmy setting', () => {
+            configureDateFormatting({ language: 'fr', dateFormat: 'dmy' });
+            const now = new Date('2026-08-04T10:00:00');
+            expect(parseQuickAdd('Payer le loyer /due:10/8', undefined, now).props.dueDate).toContain('2026-08-10');
+            expect(parseQuickAdd('Payer le loyer 10/8', undefined, now).detectedDate?.date).toContain('2026-08-10');
+        });
+
+        it('reads a month-first locale day-first under the dmy setting', () => {
+            configureDateFormatting({ language: 'it', dateFormat: 'dmy' });
+            const now = new Date('2026-08-04T10:00:00');
+            expect(parseQuickAdd('Pagare affitto /due:10/8', undefined, now).props.dueDate).toContain('2026-08-10');
+            expect(parseQuickAdd('Pagare affitto 10/8', undefined, now).detectedDate?.date).toContain('2026-08-10');
+        });
+
+        it('still parses word-based locale phrases under either setting', () => {
+            const now = new Date('2026-08-04T10:00:00');
+            for (const dateFormat of ['mdy', 'dmy'] as const) {
+                configureDateFormatting({ language: 'de', dateFormat });
+                const bare = parseQuickAdd('Zahnarzt anrufen nächsten Freitag', undefined, now);
+                expect(bare.detectedDate?.date, dateFormat).toContain('2026-08-14');
+                configureDateFormatting({ language: 'fr', dateFormat });
+                const command = parseQuickAddDateCommands('Payer le loyer /due:demain', now);
+                expect(command.props.dueDate, dateFormat).toBe('2026-08-05');
+            }
+        });
+    });
+
     describe('naturalLanguageDates toggle', () => {
         const now = new Date('2026-07-16T10:00:00Z');
 
