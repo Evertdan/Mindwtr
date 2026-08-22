@@ -13,7 +13,7 @@ Mindwtr is a local-first GTD system built as a Bun workspace monorepo. The share
 - `apps/cloud`
   Self-hosted sync endpoint. Stores one JSON namespace plus attachments per bearer token and merges incoming app data using the same shared sync semantics.
 - `apps/mcp-server`
-  Local stdio server for AI tools. Reads and optionally mutates the local SQLite database with explicit `--write` opt-in.
+  MCP server for AI tools, over stdio by default or streamable HTTP when `--http` is set (bearer-token authenticated). It reads and optionally mutates the local SQLite database with explicit `--write` opt-in, or talks to a self-hosted `apps/cloud` endpoint instead when pointed at one. See [MCP integration](https://docs.mindwtr.app/power-users/mcp) for the user-facing setup.
 
 ## Data flow
 
