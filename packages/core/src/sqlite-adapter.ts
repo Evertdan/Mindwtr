@@ -250,6 +250,10 @@ const getTaskRowEntry = (task: Task): TaskRowEntry => {
     return entry;
 };
 
+const isFts5SyntaxError = (error: unknown): boolean => (
+    error instanceof Error && /fts5: syntax error/i.test(error.message)
+);
+
 const READ_PAGE_SIZE = 1000;
 const FTS_LOCK_TTL_MS = 5 * 60 * 1000;
 const FTS_LOCK_REFRESH_INTERVAL_MS = Math.max(15_000, Math.floor(FTS_LOCK_TTL_MS / 3));
@@ -995,7 +999,10 @@ export class SqliteAdapter {
         if (tokens.length === 0) {
             return { tasks: [], projects: [] };
         }
-        const ftsQuery = tokens.map((token) => `${token}*`).join(' ');
+        // Quoted so a token that survived cleaning with a leading '#'/'@' (contexts,
+        // tags) is a valid FTS5 string literal instead of punctuation FTS5 rejects
+        // as a syntax error (e.g. bare `@home*`).
+        const ftsQuery = tokens.map((token) => `"${token.replace(/"/g, '""')}"*`).join(' ');
         const runSearch = async (): Promise<SearchResults> => {
             const [taskRows, projectRows] = await Promise.all([
                 this.client.all<Record<string, unknown>>(
@@ -1019,6 +1026,13 @@ export class SqliteAdapter {
         try {
             return await runSearch();
         } catch (error) {
+            if (isFts5SyntaxError(error)) {
+                // Quoting above makes this impossible by construction; if it still
+                // happens, it's a bad query, not a corrupt index — rebuilding
+                // (full delete-and-reinsert) would just repeat the same error.
+                logWarn('Search failed', { scope: 'sqlite', category: 'fts', error });
+                return { tasks: [], projects: [] };
+            }
             try {
                 await this.ensureFtsPopulated(true);
                 return await runSearch();

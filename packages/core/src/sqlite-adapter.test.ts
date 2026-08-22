@@ -1060,14 +1060,14 @@ describeSqlite('SqliteAdapter', () => {
         expect(allMock.mock.calls[0]?.[0]).toContain('SELECT t.id AS id');
         expect(allMock.mock.calls[0]?.[0]).toContain('ORDER BY bm25(tasks_fts)');
         expect(allMock.mock.calls[0]?.[0]).toContain('LIMIT ?');
-        expect(allMock.mock.calls[0]?.[1]).toEqual(['Searchable*', 201]);
+        expect(allMock.mock.calls[0]?.[1]).toEqual(['"Searchable"*', 201]);
         expect(allMock.mock.calls[0]?.[0]).not.toContain('t.attachments');
         expect(allMock.mock.calls[0]?.[0]).not.toContain('t.description');
         expect(allMock.mock.calls[0]?.[0]).not.toContain("t.status != 'archived'");
         expect(allMock.mock.calls[1]?.[0]).toContain('SELECT p.id AS id');
         expect(allMock.mock.calls[1]?.[0]).toContain('ORDER BY bm25(projects_fts)');
         expect(allMock.mock.calls[1]?.[0]).toContain('LIMIT ?');
-        expect(allMock.mock.calls[1]?.[1]).toEqual(['Searchable*', 201]);
+        expect(allMock.mock.calls[1]?.[1]).toEqual(['"Searchable"*', 201]);
         expect(allMock.mock.calls[1]?.[0]).not.toContain('p.supportNotes');
 
         expect(results.tasks).toHaveLength(1);
@@ -1173,6 +1173,57 @@ describeSqlite('SqliteAdapter', () => {
         const results = await adapter.searchAll('shuttle');
 
         expect(results.tasks.map((task) => task.id)).toEqual(['task-checklist']);
+    });
+
+    it('finds tasks by context and tag search terms', async () => {
+        const now = new Date().toISOString();
+        await adapter.saveData({
+            tasks: [
+                {
+                    id: 'task-context',
+                    title: 'Unrelated task',
+                    status: 'next',
+                    contexts: ['@home'],
+                    tags: ['#errand'],
+                    createdAt: now,
+                    updatedAt: now,
+                },
+            ],
+            projects: [],
+            areas: [],
+            sections: [],
+            settings: {},
+        });
+
+        const byContext = await adapter.searchAll('@home');
+        expect(byContext.tasks.map((task) => task.id)).toEqual(['task-context']);
+
+        const byTag = await adapter.searchAll('#errand');
+        expect(byTag.tasks.map((task) => task.id)).toEqual(['task-context']);
+    });
+
+    it('does not rebuild the FTS index for a search syntax-class failure', async () => {
+        const allMock = vi.fn().mockRejectedValue(new Error('fts5: syntax error near "@"'));
+        const client: SqliteClient = {
+            run: vi.fn().mockResolvedValue(undefined),
+            get: vi.fn().mockResolvedValue(undefined),
+            exec: vi.fn().mockResolvedValue(undefined),
+            all: allMock,
+        };
+        const lightweightAdapter = new SqliteAdapter(client);
+        (lightweightAdapter as unknown as { ensureSchema: () => Promise<void> }).ensureSchema = async () => {};
+
+        const results = await lightweightAdapter.searchAll('anything');
+
+        expect(results).toEqual({ tasks: [], projects: [] });
+        // A syntax-class failure must not retry via a rebuild: one attempt, two
+        // parallel queries (tasks + projects), no second runSearch() pass.
+        expect(allMock).toHaveBeenCalledTimes(2);
+
+        // A second syntax-class failure behaves the same way — still no retry.
+        const secondResults = await lightweightAdapter.searchAll('anything else');
+        expect(secondResults).toEqual({ tasks: [], projects: [] });
+        expect(allMock).toHaveBeenCalledTimes(4);
     });
 
     it('derives stable fallback order when project/section orderNum is null', async () => {
