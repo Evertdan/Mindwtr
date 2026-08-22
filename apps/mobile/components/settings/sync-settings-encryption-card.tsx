@@ -224,7 +224,7 @@ export function SyncEncryptionCard({ appData, t, tc }: SyncEncryptionCardProps) 
 
     const renderRevealToggle = () => (
         <TouchableOpacity
-            accessibilityRole="button"
+            accessibilityRole="switch"
             accessibilityState={{ checked: revealed }}
             onPress={() => setRevealed((shown) => !shown)}
             style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: tc.border }]}
@@ -364,14 +364,14 @@ export function SyncEncryptionCard({ appData, t, tc }: SyncEncryptionCardProps) 
 
                 {progressLabel && (
                     <View style={[styles.settingRowColumn, { borderTopWidth: 1, borderTopColor: tc.border }]}>
-                        <Text accessibilityRole="text" style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                        <Text accessibilityLiveRegion="polite" style={[styles.settingDescription, { color: tc.secondaryText }]}>
                             {progressLabel}
                         </Text>
                     </View>
                 )}
                 {errorMessage && (
                     <View style={[styles.settingRowColumn, { borderTopWidth: 1, borderTopColor: tc.border }]}>
-                        <Text style={[styles.settingDescription, { color: tc.danger }]}>{errorMessage}</Text>
+                        <Text accessibilityLiveRegion="polite" style={[styles.settingDescription, { color: tc.danger }]}>{errorMessage}</Text>
                     </View>
                 )}
             </View>

@@ -270,6 +270,19 @@ describe('SyncEncryptionCard', () => {
     await press(tree, 'settings.syncEncryptionEnable');
     const error = findText(tree, 'settings.syncEncryptionErrorMismatch');
     expect(flatStyle(error?.props.style).color).toBe(tc.danger);
+    // Errors arrive without focus moving, so they have to be announced.
+    expect(error?.props.accessibilityLiveRegion).toBe('polite');
   });
 
+  it('announces the passphrase reveal as a switch', async () => {
+    const tree = await renderCard();
+    await press(tree, 'settings.syncEncryptionEnable');
+    const toggle = tree.root
+      .findAllByType(TouchableOpacity)
+      .find((node) => node.findAllByType(Text)
+        .some((child) => child.props.children === 'settings.syncEncryptionShowPassphrase'));
+    // accessibilityState.checked is only announced for switch/checkbox roles.
+    expect(toggle?.props.accessibilityRole).toBe('switch');
+    expect(toggle?.props.accessibilityState).toEqual({ checked: false });
+  });
 });
