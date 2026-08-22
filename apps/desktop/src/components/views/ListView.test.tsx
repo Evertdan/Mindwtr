@@ -75,7 +75,8 @@ describe('ListView', () => {
       },
       listOptions: {
         showDetails: false,
-        nextGroupBy: 'none',
+        focusGroupBy: 'none', inboxGroupBy: 'none', nextGroupBy: 'none',
+        waitingGroupBy: 'none', somedayGroupBy: 'none',
         referenceGroupBy: 'area', doneGroupBy: 'none', archivedGroupBy: 'none',
         focusTop3Only: false,
       },
@@ -505,7 +506,7 @@ describe('ListView', () => {
       ...state,
       listOptions: {
         ...state.listOptions,
-        nextGroupBy: 'tag',
+        inboxGroupBy: 'tag',
       },
     }));
 
@@ -516,6 +517,24 @@ describe('ListView', () => {
     expect(queryByText('#beta')).toBeInTheDocument();
     expect(queryByText('No tags')).toBeInTheDocument();
     expect(getAllByText('Dual-tag inbox')).toHaveLength(2);
+  });
+
+  it('keeps each list grouping to its own view (#1063)', () => {
+    useTaskStore.setState({
+      _allTasks: [makeTask('1', { title: 'Inbox item', status: 'inbox', contexts: ['@work'] })],
+      lastDataChangeAt: 1,
+    });
+
+    const inbox = renderListView('inbox', 'Inbox');
+    selectToolbarOption('Group', 'Context', inbox);
+
+    expect(useUiStore.getState().listOptions.inboxGroupBy).toBe('context');
+    expect(useUiStore.getState().listOptions.nextGroupBy).toBe('none');
+    expect(useUiStore.getState().listOptions.focusGroupBy).toBe('none');
+    inbox.unmount();
+
+    const next = renderListView('next', 'Next');
+    expect(next.getByRole('combobox', { name: 'Group' })).toHaveTextContent('No grouping');
   });
 
   it('groups reference tasks by context when context grouping is selected', () => {

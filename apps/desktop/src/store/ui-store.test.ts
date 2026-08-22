@@ -50,7 +50,13 @@ describe('useUiStore list options', () => {
 
         expect(useUiStore.getState().listOptions).toEqual({
             showDetails: true,
+            // Written before the per-view split (#1063): every list seeds from
+            // the one axis the blob has, so nothing looks reset after upgrade.
+            focusGroupBy: 'project',
+            inboxGroupBy: 'project',
             nextGroupBy: 'project',
+            waitingGroupBy: 'project',
+            somedayGroupBy: 'project',
             referenceGroupBy: 'context',
             // Written by a build that predates the Done and Archive axes:
             // defaulted, not undefined.
@@ -65,7 +71,11 @@ describe('useUiStore list options', () => {
 
         useUiStore.getState().setListOptions({
             showDetails: true,
+            focusGroupBy: 'energy',
+            inboxGroupBy: 'context',
             nextGroupBy: 'project',
+            waitingGroupBy: 'person',
+            somedayGroupBy: 'area',
             referenceGroupBy: 'tag',
             doneGroupBy: 'completedDate',
             doneSortBy: 'completed',
@@ -76,7 +86,11 @@ describe('useUiStore list options', () => {
 
         expect(JSON.parse(window.localStorage.getItem(LIST_OPTIONS_STORAGE_KEY) || '{}')).toEqual({
             showDetails: true,
+            focusGroupBy: 'energy',
+            inboxGroupBy: 'context',
             nextGroupBy: 'project',
+            waitingGroupBy: 'person',
+            somedayGroupBy: 'area',
             referenceGroupBy: 'tag',
             doneGroupBy: 'completedDate',
             doneSortBy: 'completed',
@@ -119,6 +133,50 @@ describe('useUiStore list options', () => {
 
         expect(options.nextGroupBy).toBe('none');
         expect(options.referenceGroupBy).toBe('area');
+    });
+});
+
+describe('useUiStore per-view grouping axes (#1063)', () => {
+    beforeEach(() => {
+        window.localStorage.clear();
+        vi.resetModules();
+    });
+
+    it('round-trips a separate axis per list', async () => {
+        const options = await hydrate({
+            focusGroupBy: 'energy',
+            inboxGroupBy: 'context',
+            nextGroupBy: 'project',
+            waitingGroupBy: 'person',
+            somedayGroupBy: 'area',
+        });
+
+        expect(options).toMatchObject({
+            focusGroupBy: 'energy',
+            inboxGroupBy: 'context',
+            nextGroupBy: 'project',
+            waitingGroupBy: 'person',
+            somedayGroupBy: 'area',
+        });
+    });
+
+    // Before the split every list read nextGroupBy, so an upgrade that ignored
+    // it would read as "the app forgot my grouping" on four views at once.
+    it('seeds every new axis from the legacy shared key', async () => {
+        const options = await hydrate({ nextGroupBy: 'project' });
+
+        expect(options.focusGroupBy).toBe('project');
+        expect(options.inboxGroupBy).toBe('project');
+        expect(options.nextGroupBy).toBe('project');
+        expect(options.waitingGroupBy).toBe('project');
+        expect(options.somedayGroupBy).toBe('project');
+    });
+
+    it('falls back to the default for a new axis outside the roster', async () => {
+        const options = await hydrate({ nextGroupBy: 'project', inboxGroupBy: 'status' });
+
+        expect(options.inboxGroupBy).toBe('none');
+        expect(options.nextGroupBy).toBe('project');
     });
 });
 

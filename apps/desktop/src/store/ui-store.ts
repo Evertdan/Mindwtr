@@ -13,7 +13,14 @@ type ListReferenceGroupBy = ReferenceGroupBy;
 type ListDoneGroupBy = DoneGroupBy;
 type ListOptions = {
     showDetails: boolean;
+    // One axis per list: these all share FOCUS_AXES, but "group Focus by
+    // project" and "group my Inbox by context" are different questions, so a
+    // single shared key made changing one list silently regroup four (#1063).
+    focusGroupBy: ListNextGroupBy;
+    inboxGroupBy: ListNextGroupBy;
     nextGroupBy: ListNextGroupBy;
+    waitingGroupBy: ListNextGroupBy;
+    somedayGroupBy: ListNextGroupBy;
     referenceGroupBy: ListReferenceGroupBy;
     // Done keeps its own axis rather than sharing nextGroupBy: 'completedDate'
     // is not in FOCUS_AXES, so that sanitizer would reset it on every launch.
@@ -37,7 +44,11 @@ export const PROJECT_LAYOUTS_STORAGE_KEY = 'mindwtr:project-layouts:v1';
 
 const DEFAULT_LIST_OPTIONS: ListOptions = {
     showDetails: false,
+    focusGroupBy: 'none',
+    inboxGroupBy: 'none',
     nextGroupBy: 'none',
+    waitingGroupBy: 'none',
+    somedayGroupBy: 'none',
     referenceGroupBy: 'area',
     doneGroupBy: 'none',
     archivedGroupBy: 'none',
@@ -66,9 +77,16 @@ function readStoredListOptions(): ListOptions {
         const archivedSortBy = DONE_SORT_OPTIONS.includes(parsed?.archivedSortBy as TaskSortBy)
             ? parsed?.archivedSortBy as TaskSortBy
             : undefined;
+        // Every list shared nextGroupBy before #1063, so a key the blob does not
+        // have yet seeds from it — otherwise the split would read as a reset.
+        const perViewAxis = (value: unknown) => sanitizeAxis(FOCUS_AXES, value ?? parsed?.nextGroupBy, DEFAULT_LIST_OPTIONS.nextGroupBy);
         return {
             showDetails: typeof parsed?.showDetails === 'boolean' ? parsed.showDetails : DEFAULT_LIST_OPTIONS.showDetails,
+            focusGroupBy: perViewAxis(parsed?.focusGroupBy),
+            inboxGroupBy: perViewAxis(parsed?.inboxGroupBy),
             nextGroupBy: sanitizeAxis(FOCUS_AXES, parsed?.nextGroupBy, DEFAULT_LIST_OPTIONS.nextGroupBy),
+            waitingGroupBy: perViewAxis(parsed?.waitingGroupBy),
+            somedayGroupBy: perViewAxis(parsed?.somedayGroupBy),
             referenceGroupBy: sanitizeAxis(REFERENCE_AXES, parsed?.referenceGroupBy, DEFAULT_LIST_OPTIONS.referenceGroupBy),
             doneGroupBy: sanitizeAxis(DONE_AXES, parsed?.doneGroupBy, DEFAULT_LIST_OPTIONS.doneGroupBy),
             ...(doneSortBy ? { doneSortBy } : {}),

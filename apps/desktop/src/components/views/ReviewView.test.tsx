@@ -85,7 +85,8 @@ describe('ReviewView', () => {
         useUiStore.setState({
             listOptions: {
                 showDetails: false,
-                nextGroupBy: 'none',
+                focusGroupBy: 'none', inboxGroupBy: 'none', nextGroupBy: 'none',
+                waitingGroupBy: 'none', somedayGroupBy: 'none',
                 referenceGroupBy: 'area', doneGroupBy: 'none', archivedGroupBy: 'none',
                 focusTop3Only: false,
             },

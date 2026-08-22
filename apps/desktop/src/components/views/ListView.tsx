@@ -102,6 +102,17 @@ const NEXT_WARNING_THRESHOLD = 15;
 const getListViewStateStorageKey = (statusFilter: string) => (
     statusFilter === 'reference' ? 'mindwtr:view:reference:v1' : `mindwtr:view:list:${statusFilter}:v1`
 );
+// Same idea for the grouping axis: each list picks its own, so changing "Group
+// by" on one no longer regroups the others (#1063).
+const LIST_GROUP_BY_KEYS = {
+    inbox: 'inboxGroupBy',
+    next: 'nextGroupBy',
+    waiting: 'waitingGroupBy',
+    someday: 'somedayGroupBy',
+} as const;
+const getListGroupByKey = (statusFilter: string) => (
+    LIST_GROUP_BY_KEYS[statusFilter as keyof typeof LIST_GROUP_BY_KEYS] ?? 'nextGroupBy'
+);
 type ShowToast = (
     message: string,
     tone?: 'success' | 'error' | 'info',
@@ -193,7 +204,8 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
         return resolveI18nText(t, key, { fallback });
     }, [t]);
     const showListDetails = useUiStore((state) => state.listOptions.showDetails);
-    const nextGroupBy = useUiStore((state) => state.listOptions.nextGroupBy);
+    const groupByKey = getListGroupByKey(statusFilter);
+    const nextGroupBy = useUiStore((state) => state.listOptions[groupByKey]);
     const referenceGroupBy = useUiStore((state) => state.listOptions.referenceGroupBy);
     const doneGroupBy = useUiStore((state) => state.listOptions.doneGroupBy);
     const doneSortBy = useUiStore((state) => state.listOptions.doneSortBy);
@@ -946,7 +958,7 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
                                 setListOptions({ doneGroupBy: value as DoneGroupBy });
                                 return;
                             }
-                            setListOptions({ nextGroupBy: value as NextGroupBy });
+                            setListOptions({ [groupByKey]: value as NextGroupBy });
                         }}
                         showFiltersButton={showFilters}
                         filtersOpen={showFiltersPanel}

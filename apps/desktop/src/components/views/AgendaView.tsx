@@ -258,9 +258,9 @@ export function AgendaView() {
     const { t } = useLanguage();
     const { requestConfirmation, confirmModal } = useConfirmDialog();
     const localDayKey = useLocalDayKey();
-    const { showListDetails, nextGroupBy, top3Only, setListOptions, collapseAllTaskDetails, setProjectView, showToast } = useUiStore((state) => ({
+    const { showListDetails, focusGroupBy, top3Only, setListOptions, collapseAllTaskDetails, setProjectView, showToast } = useUiStore((state) => ({
         showListDetails: state.listOptions.showDetails,
-        nextGroupBy: state.listOptions.nextGroupBy,
+        focusGroupBy: state.listOptions.focusGroupBy,
         top3Only: state.listOptions.focusTop3Only,
         setListOptions: state.setListOptions,
         collapseAllTaskDetails: state.collapseAllTaskDetails,
@@ -387,7 +387,7 @@ export function AgendaView() {
     const activePriorities = showPriorityFilters ? selectedPriorities : [];
     const activeTimeEstimates = showTimeEstimateFilters ? selectedTimeEstimates : [];
     const effectiveFocusSortBy = activeSavedFilter?.sortBy ?? focusSortBy;
-    const effectiveNextGroupBy = normalizeAgendaGroupBy(activeSavedFilter?.groupBy ?? nextGroupBy);
+    const effectiveNextGroupBy = normalizeAgendaGroupBy(activeSavedFilter?.groupBy ?? focusGroupBy);
     const effectiveContextMatchMode = effectiveFilterCriteria.contextMatchMode ?? 'all';
     const effectiveTagMatchMode = effectiveFilterCriteria.tagMatchMode ?? 'all';
     const canSaveFocusPerspective = activeSavedFilterId === null
@@ -578,7 +578,7 @@ export function AgendaView() {
     }, [unbindSavedFilter]);
     const updateFocusGroupBy = useCallback((value: NextGroupBy) => {
         unbindSavedFilter();
-        setListOptions({ nextGroupBy: value });
+        setListOptions({ focusGroupBy: value });
     }, [setListOptions, unbindSavedFilter]);
     const applySavedFocusFilter = useCallback((filter: SavedFilter) => {
         applySavedSelections(filter);
