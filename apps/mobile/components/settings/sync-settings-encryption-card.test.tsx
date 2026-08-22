@@ -256,6 +256,13 @@ describe('SyncEncryptionCard', () => {
     });
   });
 
+  it('renders nothing when the status read fails rather than claiming encryption is off', async () => {
+    // 'off' offers "Enable encryption" — for a location that may already be
+    // encrypted, that is the one answer a failed read must not give.
+    encryptionMocks.getSyncEncryptionStatus.mockRejectedValue(new Error('keyring unavailable'));
+    const tree = await renderCard();
+    expect(tree.root.findAllByType(Text)).toHaveLength(0);
+  });
 
   it('draws warnings and errors from the theme tokens, not hardcoded hexes', async () => {
     const tree = await renderCard();

@@ -34,12 +34,15 @@ export function useSyncEncryptionSettings(
     const [progress, setProgress] = useState<SyncEncryptionTransitionProgress | null>(null);
     const [error, setError] = useState<SyncEncryptionErrorKind | null>(null);
 
-    const readState = useCallback(async () => {
+    // A status read that failed says nothing about the folder; reporting 'off'
+    // would offer "Enable encryption" for a folder that may already be encrypted.
+    // null renders the section empty until a later read succeeds.
+    const readState = useCallback(async (): Promise<SyncEncryptionController['state']> => {
         try {
             return (await SyncService.getSyncEncryptionStatus()).state;
         } catch (failure) {
             void logError(failure, { scope: 'sync-encryption', step: 'status' });
-            return 'off' as const;
+            return null;
         }
     }, []);
 

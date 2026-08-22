@@ -56,12 +56,15 @@ export function SyncEncryptionCard({ appData, t, tc }: SyncEncryptionCardProps) 
     const [revealed, setRevealed] = useState(false);
     const [generated, setGenerated] = useState(false);
 
-    const readState = useCallback(async (): Promise<SyncEncryptionState> => {
+    // A status read that failed says nothing about the folder; reporting 'off'
+    // would offer "Enable encryption" for a folder that may already be encrypted.
+    // null renders the card empty until a later read succeeds.
+    const readState = useCallback(async (): Promise<SyncEncryptionState | null> => {
         try {
             return (await getSyncEncryptionStatus()).state;
         } catch (failure) {
             logSettingsError(failure);
-            return 'off';
+            return null;
         }
     }, []);
 
