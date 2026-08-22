@@ -468,7 +468,9 @@ function findTrailingDateInResults(
         if (PURE_TIME_ONLY_RE.test(matchedText) || isBareMonthName(matchedText, language)) continue;
 
         const beforeDate = trimmed.slice(0, result.index).replace(TRAILING_DATE_SEPARATOR_RE, '').trim();
-        const titleWithoutDate = stripTrailingDateIntroWords(beforeDate, language);
+        // Always the active language, never the pass's: an English-instance
+        // match ("10/8") still sits in a Spanish title that ends in "el".
+        const titleWithoutDate = stripTrailingDateIntroWords(beforeDate, getActiveLanguage());
         if (!titleWithoutDate) continue;
 
         const parsed = resolveChronoDate(result, now, 'now');

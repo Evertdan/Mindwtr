@@ -554,6 +554,23 @@ describe('quick-add', () => {
             expect(parseQuickAdd('Payer le loyer 10/8', undefined, now).detectedDate?.date).toContain('2026-08-10');
         });
 
+        // The English instances resolve these, but the title cleanup still
+        // belongs to the active language.
+        it('still drops the date-introducing word ahead of a numeric date', () => {
+            const now = new Date('2026-08-04T10:00:00');
+            const cases: Array<{ language: 'es' | 'fr' | 'pt' | 'it'; input: string; title: string }> = [
+                { language: 'es', input: 'Llamar al dentista el 10/8', title: 'Llamar al dentista' },
+                { language: 'fr', input: 'Payer le loyer le 10/8', title: 'Payer le loyer' },
+                { language: 'pt', input: 'Pagar aluguel no dia 10/8', title: 'Pagar aluguel' },
+                { language: 'it', input: 'Pagare affitto il 10/8', title: 'Pagare affitto' },
+            ];
+            for (const { language, input, title } of cases) {
+                configureDateFormatting({ language });
+                const result = parseQuickAdd(input, undefined, now);
+                expect(result.detectedDate?.titleWithoutDate, input).toBe(title);
+            }
+        });
+
         it('reads a month-first locale day-first under the dmy setting', () => {
             configureDateFormatting({ language: 'it', dateFormat: 'dmy' });
             const now = new Date('2026-08-04T10:00:00');
