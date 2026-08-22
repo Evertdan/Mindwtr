@@ -2,11 +2,13 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AppData } from '@mindwtr/core';
 import {
     ensureCloudKitReady,
     readRemoteCloudKit,
     writeRemoteCloudKit,
 } from './cloudkit-sync';
+import { CLOUDKIT_CHANGE_TOKEN_KEY } from './sync-constants';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const swiftMapperSource = readFileSync(
@@ -30,9 +32,9 @@ const {
     asyncStorageSetItem,
     cloudKitSync,
 } = vi.hoisted(() => ({
-    asyncStorageGetItem: vi.fn(async () => null as string | null),
-    asyncStorageRemoveItem: vi.fn(async () => undefined),
-    asyncStorageSetItem: vi.fn(async () => undefined),
+    asyncStorageGetItem: vi.fn(async (_key: string) => null as string | null),
+    asyncStorageRemoveItem: vi.fn(async (_key: string) => undefined),
+    asyncStorageSetItem: vi.fn(async (_key: string, _value: string) => undefined),
     cloudKitSync: {
         addListener: vi.fn(),
         consumePendingRemoteChange: vi.fn(async () => false),
@@ -192,5 +194,123 @@ describe('cloudkit-sync abort handling', () => {
         await expect(ensureCloudKitReady({ signal: controller.signal })).rejects.toThrow('Already cancelled');
         expect(cloudKitSync.ensureZone).not.toHaveBeenCalled();
         expect(cloudKitSync.ensureSubscription).not.toHaveBeenCalled();
+    });
+});
+
+describe('cloudkit-sync change token and purge invariants', () => {
+    // Real AsyncStorage semantics: the token the write path reads back is the
+    // one the read path stored, so a wrongly-advanced token is observable.
+    const storage = new Map<string, string>();
+
+    const makeTask = (id: string, overrides: Record<string, unknown> = {}) => ({
+        id,
+        title: `Task ${id}`,
+        status: 'inbox',
+        tags: [],
+        contexts: [],
+        createdAt: '2026-05-01T00:00:00.000Z',
+        updatedAt: '2026-05-01T00:00:00.000Z',
+        ...overrides,
+    });
+
+    const makeAppData = (overrides: Partial<AppData> = {}): AppData => ({
+        tasks: [makeTask('task-1')],
+        projects: [],
+        sections: [],
+        areas: [],
+        settings: {},
+        ...overrides,
+    } as unknown as AppData);
+
+    beforeEach(() => {
+        storage.clear();
+        asyncStorageGetItem.mockReset();
+        asyncStorageGetItem.mockImplementation(async (key: string) => storage.get(key) ?? null);
+        asyncStorageSetItem.mockReset();
+        asyncStorageSetItem.mockImplementation(async (key: string, value: string) => {
+            storage.set(key, value);
+        });
+        asyncStorageRemoveItem.mockReset();
+        asyncStorageRemoveItem.mockImplementation(async (key: string) => {
+            storage.delete(key);
+        });
+        cloudKitSync.deleteRecords.mockReset();
+        cloudKitSync.deleteRecords.mockResolvedValue(true);
+        cloudKitSync.fetchAllRecords.mockReset();
+        cloudKitSync.fetchAllRecords.mockResolvedValue([]);
+        cloudKitSync.fetchChanges.mockReset();
+        cloudKitSync.saveRecords.mockReset();
+        cloudKitSync.saveRecords.mockResolvedValue([]);
+    });
+
+    it('keeps the change token unchanged when a save reports conflicts', async () => {
+        storage.set(CLOUDKIT_CHANGE_TOKEN_KEY, 'token-1');
+        cloudKitSync.saveRecords.mockResolvedValue(['task-1']);
+        cloudKitSync.fetchChanges.mockResolvedValue({ records: {}, deletedIDs: {}, changeToken: 'token-2' });
+
+        await writeRemoteCloudKit(makeAppData());
+
+        // Advancing past a conflicted save would skip those records forever.
+        expect(storage.get(CLOUDKIT_CHANGE_TOKEN_KEY)).toBe('token-1');
+        expect(cloudKitSync.fetchChanges).not.toHaveBeenCalled();
+    });
+
+    it('advances the change token after a clean save', async () => {
+        storage.set(CLOUDKIT_CHANGE_TOKEN_KEY, 'token-1');
+        cloudKitSync.saveRecords.mockResolvedValue([]);
+        cloudKitSync.fetchChanges.mockResolvedValue({ records: {}, deletedIDs: {}, changeToken: 'token-2' });
+
+        await writeRemoteCloudKit(makeAppData());
+
+        expect(cloudKitSync.fetchChanges).toHaveBeenCalledWith('token-1');
+        expect(storage.get(CLOUDKIT_CHANGE_TOKEN_KEY)).toBe('token-2');
+    });
+
+    it('deletes only purged records from CloudKit', async () => {
+        cloudKitSync.saveRecords.mockResolvedValue([]);
+        cloudKitSync.fetchChanges.mockResolvedValue({ records: {}, deletedIDs: {} });
+
+        await writeRemoteCloudKit(makeAppData({
+            tasks: [
+                makeTask('task-live'),
+                makeTask('task-deleted', { deletedAt: '2026-05-02T00:00:00.000Z' }),
+                makeTask('task-purged', { deletedAt: '2026-05-02T00:00:00.000Z', purgedAt: '2026-05-03T00:00:00.000Z' }),
+            ],
+            projects: [
+                { id: 'project-live', title: 'Live' },
+                { id: 'project-purged', title: 'Purged', purgedAt: '2026-05-03T00:00:00.000Z' },
+            ],
+        } as unknown as Partial<AppData>));
+
+        expect(cloudKitSync.deleteRecords).toHaveBeenCalledTimes(2);
+        expect(cloudKitSync.deleteRecords).toHaveBeenCalledWith('MindwtrTask', ['task-purged']);
+        expect(cloudKitSync.deleteRecords).toHaveBeenCalledWith('MindwtrProject', ['project-purged']);
+    });
+
+    it('clears an expired change token and falls back to a full fetch', async () => {
+        storage.set(CLOUDKIT_CHANGE_TOKEN_KEY, 'stale-token');
+        cloudKitSync.fetchChanges.mockResolvedValue({ records: {}, deletedIDs: {}, tokenExpired: true });
+
+        const result = await readRemoteCloudKit();
+
+        expect(cloudKitSync.fetchChanges).toHaveBeenCalledWith('stale-token');
+        expect(storage.has(CLOUDKIT_CHANGE_TOKEN_KEY)).toBe(false);
+        expect(cloudKitSync.fetchAllRecords).toHaveBeenCalled();
+        expect(result).not.toBeNull();
+    });
+
+    it('returns null without a full fetch when the incremental fetch reports no changes', async () => {
+        storage.set(CLOUDKIT_CHANGE_TOKEN_KEY, 'token-1');
+        cloudKitSync.fetchChanges.mockResolvedValue({
+            records: { MindwtrTask: [] },
+            deletedIDs: { MindwtrTask: [] },
+            changeToken: 'token-2',
+        });
+
+        const result = await readRemoteCloudKit();
+
+        expect(result).toBeNull();
+        expect(cloudKitSync.fetchAllRecords).not.toHaveBeenCalled();
+        expect(storage.get(CLOUDKIT_CHANGE_TOKEN_KEY)).toBe('token-2');
     });
 });
