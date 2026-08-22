@@ -868,6 +868,14 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
                 attachments: duplicatedAttachments.length > 0 ? duplicatedAttachments : undefined,
                 completedAt: undefined,
                 isFocusedToday: false,
+                // A copy is not in Today's Focus and was never archived with a
+                // project, so neither the focus position nor the restore
+                // metadata of the source belongs to it.
+                focusOrder: undefined,
+                statusBeforeProjectArchive: undefined,
+                completedAtBeforeProjectArchive: undefined,
+                isFocusedTodayBeforeProjectArchive: undefined,
+                projectArchivedAt: undefined,
                 deletedAt: undefined,
                 purgedAt: undefined,
                 createdAt: now,

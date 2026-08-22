@@ -665,6 +665,31 @@ describe('TaskStore', () => {
         expect(copy?.checklist?.every((item) => item.isCompleted === false)).toBe(true);
     });
 
+    // focusOrder is a synced field and the *BeforeProjectArchive trio only means
+    // something for the instance that was actually archived, so a copy must start
+    // without either: it is not in Today's Focus and was never archived.
+    it('drops focus position and project-archive metadata from the copy', async () => {
+        const { addTask, duplicateTask } = useTaskStore.getState();
+        const source = await addTask('Ship release', {
+            status: 'next',
+            isFocusedToday: true,
+            focusOrder: 3,
+            statusBeforeProjectArchive: 'next',
+            completedAtBeforeProjectArchive: null,
+            isFocusedTodayBeforeProjectArchive: true,
+            projectArchivedAt: '2026-02-01T00:00:00.000Z',
+        });
+        const copy = await duplicateTask(source.id!, false);
+
+        const copied = useTaskStore.getState()._tasksById.get(copy.id!);
+        expect(copied?.isFocusedToday).toBe(false);
+        expect(copied?.focusOrder).toBeUndefined();
+        expect(copied?.statusBeforeProjectArchive).toBeUndefined();
+        expect(copied?.completedAtBeforeProjectArchive).toBeUndefined();
+        expect(copied?.isFocusedTodayBeforeProjectArchive).toBeUndefined();
+        expect(copied?.projectArchivedAt).toBeUndefined();
+    });
+
     it('keeps the source status when duplicating a task that is not done', async () => {
         const { addTask, duplicateTask } = useTaskStore.getState();
         const someday = await addTask('Packing list template', { status: 'someday' });
