@@ -175,15 +175,21 @@ export function SyncEncryptionSection({ encryption, t }: SyncEncryptionSectionPr
                     </>
                 )}
 
-                {state === 'enabled' && (
+                {(state === 'enabled' || state === 'remote-plaintext') && (
                     <>
                         <p className="text-sm font-medium">{t.syncEncryptionStatusOn}</p>
-                        <p className="text-sm text-muted-foreground">{t.syncEncryptionDesc}</p>
+                        <p className="text-sm text-muted-foreground">
+                            {state === 'remote-plaintext' ? t.syncEncryptionRemotePlaintextDesc : t.syncEncryptionDesc}
+                        </p>
                         {flow === 'none' && (
                             <div className="flex flex-wrap items-center justify-end gap-2">
-                                <button type="button" onClick={() => openFlow('change')} className={SECONDARY_BUTTON_CLS}>
-                                    {t.syncEncryptionChange}
-                                </button>
+                                {/* Changing the passphrase would run against a location that no
+                                    longer holds ciphertext — disabling here is the only remedy. */}
+                                {state === 'enabled' && (
+                                    <button type="button" onClick={() => openFlow('change')} className={SECONDARY_BUTTON_CLS}>
+                                        {t.syncEncryptionChange}
+                                    </button>
+                                )}
                                 <button type="button" onClick={() => openFlow('disable')} className={SECONDARY_BUTTON_CLS}>
                                     {t.syncEncryptionDisable}
                                 </button>

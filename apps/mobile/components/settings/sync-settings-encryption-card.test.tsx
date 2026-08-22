@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppData } from '@mindwtr/core';
 import type { ThemeColors } from '@/hooks/use-theme-colors';
 
-type EncryptionState = 'off' | 'enabled' | 'remote-encrypted-no-key';
+type EncryptionState = 'off' | 'enabled' | 'remote-encrypted-no-key' | 'remote-plaintext';
 type TransitionOptions = { appData?: unknown; onProgress?: (progress: unknown) => void };
 
 const encryptionMocks = vi.hoisted(() => ({
@@ -241,6 +241,19 @@ describe('SyncEncryptionCard', () => {
     expect(encryptionMocks.declineSyncEncryptionPassphrase).toHaveBeenCalled();
     expect(texts(tree)).toContain('settings.syncEncryptionPausedDesc');
     expect(inputLabels(tree)).not.toContain('settings.syncEncryptionPassphrase');
+  });
+
+  it('surfaces a peer-disabled sync location with the disable remedy and no passphrase change', async () => {
+    encryptionMocks.getSyncEncryptionStatus.mockResolvedValue({ state: 'remote-plaintext' });
+    const tree = await renderCard();
+
+    expect(texts(tree)).toContain('settings.syncEncryptionRemotePlaintextDesc');
+    // Rotating a passphrase against a location that no longer holds ciphertext is not a remedy.
+    expect(texts(tree)).not.toContain('settings.syncEncryptionChange');
+
+    await press(tree, 'settings.syncEncryptionDisable');
+    await press(tree, 'settings.syncEncryptionDisable');
+    expect(encryptionMocks.disableSyncEncryption).toHaveBeenCalled();
   });
 
   it('renders nothing until the first status read resolves', () => {

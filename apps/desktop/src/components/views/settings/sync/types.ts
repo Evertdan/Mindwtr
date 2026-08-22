@@ -186,6 +186,7 @@ export type SettingsSyncLabels = {
     syncEncryptionChange: string;
     syncEncryptionDisable: string;
     syncEncryptionDisableWarning: string;
+    syncEncryptionRemotePlaintextDesc: string;
     syncEncryptionLockedTitle: string;
     syncEncryptionLockedDesc: string;
     syncEncryptionUnlock: string;

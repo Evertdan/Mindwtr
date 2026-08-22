@@ -202,6 +202,19 @@ describe('SyncEncryptionSection', () => {
         expect(screen.queryByLabelText(t.syncEncryptionPassphrase)).toBeNull();
     });
 
+    it('surfaces a peer-disabled sync location with the disable remedy and no passphrase change', async () => {
+        const encryption = controller({ state: 'remote-plaintext' });
+        render(<SyncEncryptionSection t={t} encryption={encryption} />);
+
+        expect(screen.getByText(t.syncEncryptionRemotePlaintextDesc)).toBeTruthy();
+        // Rotating a passphrase against a location that no longer holds ciphertext is not a remedy.
+        expect(screen.queryByRole('button', { name: t.syncEncryptionChange })).toBeNull();
+
+        fireEvent.click(screen.getByRole('button', { name: t.syncEncryptionDisable }));
+        fireEvent.click(lastButton(t.syncEncryptionDisable));
+        await waitFor(() => expect(encryption.disable).toHaveBeenCalled());
+    });
+
     it('toggles passphrase visibility', () => {
         render(<SyncEncryptionSection t={t} encryption={controller()} />);
         fireEvent.click(screen.getByRole('button', { name: t.syncEncryptionEnable }));

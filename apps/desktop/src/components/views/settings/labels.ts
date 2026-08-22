@@ -406,6 +406,7 @@ export const SETTINGS_LABEL_KEYS = [
     'syncEncryptionChange',
     'syncEncryptionDisable',
     'syncEncryptionDisableWarning',
+    'syncEncryptionRemotePlaintextDesc',
     'syncEncryptionLockedTitle',
     'syncEncryptionLockedDesc',
     'syncEncryptionUnlock',

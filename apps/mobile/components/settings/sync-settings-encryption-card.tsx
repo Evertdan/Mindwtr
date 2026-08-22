@@ -287,19 +287,23 @@ export function SyncEncryptionCard({ appData, t, tc }: SyncEncryptionCardProps) 
                     </>
                 )}
 
-                {state === 'enabled' && (
+                {(state === 'enabled' || state === 'remote-plaintext') && (
                     <>
                         <View style={styles.settingRowColumn}>
                             <Text style={[styles.settingLabel, { color: tc.text }]}>
                                 {t('settings.syncEncryptionStatusOn')}
                             </Text>
                             <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
-                                {t('settings.syncEncryptionDesc')}
+                                {state === 'remote-plaintext'
+                                    ? t('settings.syncEncryptionRemotePlaintextDesc')
+                                    : t('settings.syncEncryptionDesc')}
                             </Text>
                         </View>
                         {flow === 'none' && (
                             <>
-                                {renderAction(t('settings.syncEncryptionChange'), () => openFlow('change'))}
+                                {/* Changing the passphrase would run against a location that no
+                                    longer holds ciphertext — disabling here is the only remedy. */}
+                                {state === 'enabled' && renderAction(t('settings.syncEncryptionChange'), () => openFlow('change'))}
                                 {renderAction(t('settings.syncEncryptionDisable'), () => openFlow('disable'))}
                             </>
                         )}
