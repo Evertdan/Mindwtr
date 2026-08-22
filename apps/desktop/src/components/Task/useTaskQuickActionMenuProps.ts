@@ -19,7 +19,7 @@ import { reportError } from '../../lib/report-error';
 import { registerUndoableAction } from '../../lib/undo-registry';
 import { undoTaskCompletion } from '../../lib/undo-task-completion';
 import { useUiStore } from '../../store/ui-store';
-import { formatTaskMarkedDoneMessage, formatTaskMovedMessage } from '../views/list/task-list-scope';
+import { formatTaskMarkedDoneMessage, formatTaskMovedMessage } from '@mindwtr/core';
 import { TaskQuickActionMenu, type TaskQuickActionMenuProps } from './TaskQuickActionMenu';
 import { useTaskItemProjectContext } from './useTaskItemProjectContext';
 

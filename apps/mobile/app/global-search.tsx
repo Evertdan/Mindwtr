@@ -31,6 +31,7 @@ import { useTaskStore,
     PRESET_TAGS,
     shallow,
     undoTaskCompletion,
+    formatTaskMarkedDoneMessage,
     translateWithFallback, tFallback, } from '@mindwtr/core';
 import { computeGlobalSearchResults } from '@mindwtr/core/global-search-filter';
 import { useThemeColors } from '@/hooks/use-theme-colors';
@@ -328,7 +329,7 @@ export default function SearchScreen() {
                     return;
                 }
                 showToast({
-                    message: tFallback(t, 'task.markedDone', '{title} marked Done').replace('{title}', task.title),
+                    message: formatTaskMarkedDoneMessage(t, task.title),
                     tone: 'info',
                     actionLabel: tFallback(t, 'common.undo', 'Undo'),
                     onAction: () => {

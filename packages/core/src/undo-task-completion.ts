@@ -1,6 +1,23 @@
 import { normalizeFocusTaskLimit } from './focus-utils';
+import { translateWithFallback } from './i18n';
 import { useTaskStore } from './store';
 import type { TaskStatus } from './types';
+
+type TranslateFn = (key: string) => string;
+
+// One copy of the completion/move toast text for every surface that completes a
+// task on either platform: keyboard scopes, the row's own done button, the status
+// chord, mobile search. The copies had already drifted, one of them untranslated.
+// The single/double brace split follows the keys as they already ship.
+export function formatTaskMarkedDoneMessage(t: TranslateFn, title: string): string {
+    return translateWithFallback(t, 'task.markedDone', '{title} marked Done').replace('{title}', title);
+}
+
+export function formatTaskMovedMessage(t: TranslateFn, title: string, status: TaskStatus): string {
+    return translateWithFallback(t, 'task.movedToStatus', '{{title}} moved to {{status}}')
+        .replace('{{title}}', title)
+        .replace('{{status}}', translateWithFallback(t, `status.${status}`, status));
+}
 
 // Completing a task force-clears its Today star (applyTaskUpdates), so
 // undoing a completion must restore the star along with the status. The star

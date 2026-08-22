@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
-import { translateWithFallback, useTaskStore } from '@mindwtr/core';
+import { formatTaskMarkedDoneMessage, formatTaskMovedMessage, translateWithFallback, useTaskStore } from '@mindwtr/core';
 import type { StoreActionResult, Task, TaskStatus } from '@mindwtr/core';
 
 import { useOptionalKeybindings, type TaskListScope } from '../../../contexts/keybinding-context';
@@ -9,19 +9,6 @@ import { undoTaskCompletion } from '../../../lib/undo-task-completion';
 import { requestTaskRowAction, type TaskRowAction } from '../../../lib/task-row-actions';
 
 type TranslateFn = (key: string) => string;
-
-// One copy of the completion/move toast text for every surface that completes a
-// task: keyboard scopes, the row's own done button, and the status chord. Three
-// hand-rolled copies had already drifted apart, one of them untranslated.
-export function formatTaskMarkedDoneMessage(t: TranslateFn, title: string): string {
-    return translateWithFallback(t, 'task.markedDone', '{title} marked Done').replace('{title}', title);
-}
-
-export function formatTaskMovedMessage(t: TranslateFn, title: string, status: TaskStatus): string {
-    return translateWithFallback(t, 'task.movedToStatus', '{{title}} moved to {{status}}')
-        .replace('{{title}}', title)
-        .replace('{{status}}', translateWithFallback(t, `status.${status}`, status));
-}
 
 export type TaskListScopeDeps = {
     /** The view's visible tasks, in display order. */

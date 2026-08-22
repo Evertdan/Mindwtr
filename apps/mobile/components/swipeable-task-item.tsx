@@ -1,5 +1,6 @@
 import { Swipeable } from 'react-native-gesture-handler';
 import {
+    formatTaskMarkedDoneMessage,
     getFocusStarBlockedText,
     formatRecurrenceLabel,
     formatI18nTemplate,
@@ -340,7 +341,7 @@ function SwipeableTaskItemInner({
                     // No title: the one-line message plus Undo is the whole point,
                     // and a "Notice" header just makes the toast taller (#1044).
                     showToast({
-                        message: (tFallback(t, 'task.markedDone', '{title} marked Done')).replace('{title}', task.title),
+                        message: formatTaskMarkedDoneMessage(t, task.title),
                         tone: 'info',
                         actionLabel: tFallback(t, 'common.undo', 'Undo'),
                         onAction: () => {
