@@ -106,6 +106,19 @@ describe('cloud sync http helpers', () => {
         expect(JSON.parse(String(init.body))).toEqual({ title: 'hi' });
     });
 
+    it('parses a successful response body larger than the error-message cap', async () => {
+        const bigDescription = 'x'.repeat(150 * 1024);
+        const fetcher = vi.fn(async () => okResponse(JSON.stringify({ task: { id: 't1', description: bigDescription } })));
+        const result = await cloudRequestJson<{ task: { id: string; description: string } }>(
+            'POST',
+            'https://example.com/v1/tasks',
+            { title: 'hi' },
+            { fetcher, token: 'abc123' },
+        );
+        expect(result?.task.id).toBe('t1');
+        expect(result?.task.description).toHaveLength(150 * 1024);
+    });
+
     it('omits body and content type on request json without a body', async () => {
         const fetcher = vi.fn(async () => okResponse(JSON.stringify({ ok: true })));
         await cloudRequestJson('DELETE', 'https://example.com/v1/tasks/t1', undefined, { fetcher });

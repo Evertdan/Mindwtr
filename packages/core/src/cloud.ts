@@ -204,7 +204,11 @@ export async function cloudRequestJson<T>(
         CLOUD_TIMEOUT_ERROR,
     );
 
-    const text = await readResponseText(res, MAX_ERROR_BODY_BYTES).catch(() => '');
+    // Success bodies are real entities and may be large; only an error body is
+    // truncated down to message size.
+    const text = res.ok
+        ? await readResponseText(res, MAX_SYNC_DOCUMENT_BYTES)
+        : await readResponseText(res, MAX_ERROR_BODY_BYTES).catch(() => '');
     if (!res.ok) {
         let serverMessage = '';
         try {
