@@ -86,6 +86,7 @@ import {
     isTrustedValidatedDataFile,
     jsonFileResponse,
     loadAppData,
+    loadAppDataForWrite,
     rememberValidatedDataFile,
     writeCloudData,
 } from './server-data-cache';
@@ -226,6 +227,25 @@ const loadExistingDataForMerge = (filePath: string): AppData | { error: Response
         return { error: errorResponse('Stored data failed validation', 500) };
     }
     return validateStoredAppData(filePath, rawData);
+};
+
+/**
+ * Guards the REST entity write routes (POST/PATCH/DELETE tasks/projects/sections/areas,
+ * the task complete/archive action, and orphan-attachment GC) against the same class of
+ * bug loadExistingDataForMerge already closes for PUT /v1/data: a namespace file that
+ * exists but can't be read/parsed (EIO/EACCES/corrupt JSON) must 500, never silently
+ * fall back to an empty document that then gets written back over the real data.
+ */
+const loadAppDataForWriteOrError = (filePath: string): AppData | { error: Response } => {
+    const result = loadAppDataForWrite(filePath);
+    if (result.state === 'unreadable') {
+        logFailureWarn('Stored cloud data failed validation', {
+            failureClass: 'validation',
+            failureCode: 'stored_data_invalid_json',
+        });
+        return { error: errorResponse('Stored data failed validation', 500) };
+    }
+    return result.data;
 };
 
 type BunServer = {
@@ -433,7 +453,9 @@ const handleEntityRoute = async <T extends CloudEntity>(
 
         return await context.withWriteLock(context.key, async () => {
             throwIfRequestAborted(context.signal);
-            const data = loadAppData(context.filePath);
+            const dataResult = loadAppDataForWriteOrError(context.filePath);
+            if ('error' in dataResult) return dataResult.error;
+            const data = dataResult;
             const nowIso = new Date().toISOString();
             const entity = route.createEntity(bodyResult.body, data, nowIso);
             if (isResponse(entity)) return entity;
@@ -466,7 +488,9 @@ const handleEntityRoute = async <T extends CloudEntity>(
 
         return await context.withWriteLock(context.key, async () => {
             throwIfRequestAborted(context.signal);
-            const data = loadAppData(context.filePath);
+            const dataResult = loadAppDataForWriteOrError(context.filePath);
+            if ('error' in dataResult) return dataResult.error;
+            const data = dataResult;
             const collection = getEntityCollection(data, route);
             const idx = collection.findIndex((item) => (
                 item.id === entityId
@@ -489,7 +513,9 @@ const handleEntityRoute = async <T extends CloudEntity>(
     if (req.method === 'DELETE') {
         return await context.withWriteLock(context.key, async () => {
             throwIfRequestAborted(context.signal);
-            const data = loadAppData(context.filePath);
+            const dataResult = loadAppDataForWriteOrError(context.filePath);
+            if ('error' in dataResult) return dataResult.error;
+            const data = dataResult;
             const collection = getEntityCollection(data, route);
             const idx = collection.findIndex((item) => item.id === entityId && !item.deletedAt);
             if (idx < 0) return errorResponse(`${route.label} not found`, 404);
@@ -1150,7 +1176,9 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
 
                             return await withRequestWriteLock(ctx.key, async () => {
                                 throwIfRequestAborted(requestAbortController.signal);
-                                const data = loadAppData(ctx.filePath);
+                                const dataResult = loadAppDataForWriteOrError(ctx.filePath);
+                                if ('error' in dataResult) return dataResult.error;
+                                const data = dataResult;
                                 const idx = data.tasks.findIndex((t) => t.id === taskId && !t.deletedAt);
                                 if (idx < 0) return errorResponse('Task not found', 404);
 

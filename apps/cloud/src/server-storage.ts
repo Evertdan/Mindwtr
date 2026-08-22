@@ -589,12 +589,7 @@ export function readData(filePath: string): AppData | null {
     }
 }
 
-// Raw, uncached disk read. server-data-cache.ts wraps this as the process-local-cached
-// `loadAppData` that the rest of the server imports; this uncached name stays distinct
-// so an import site can tell at a glance which one it's getting.
-export function loadAppDataUncached(filePath: string): AppData {
-    const raw = readData(filePath);
-    if (!raw) return createDefaultData();
+function normalizeLoadedAreas(raw: AppData): AppData {
     const nowIso = new Date().toISOString();
     const normalizedAreas = raw.areas.map((area) => {
         if (!isObjectRecord(area)) return area;
@@ -614,6 +609,31 @@ export function loadAppDataUncached(filePath: string): AppData {
         ...raw,
         areas: normalizedAreas,
     };
+}
+
+export type AppDataForWriteResult =
+    | { state: 'ok'; data: AppData }
+    | { state: 'unreadable' };
+
+/**
+ * Discriminates "no namespace document yet" (fine, callers write a fresh default) from
+ * "the document exists but couldn't be read/parsed" (EIO/EACCES/corrupt JSON) so a write
+ * path never mistakes the latter for an empty namespace and silently replaces real data —
+ * see loadExistingDataForMerge in server.ts, which already does this for PUT /v1/data.
+ */
+export function loadAppDataForWriteUncached(filePath: string): AppDataForWriteResult {
+    if (!existsSync(filePath)) return { state: 'ok', data: createDefaultData() };
+    const raw = readData(filePath);
+    if (!raw) return { state: 'unreadable' };
+    return { state: 'ok', data: normalizeLoadedAreas(raw) };
+}
+
+// Raw, uncached disk read. server-data-cache.ts wraps this as the process-local-cached
+// `loadAppData` that the rest of the server imports; this uncached name stays distinct
+// so an import site can tell at a glance which one it's getting.
+export function loadAppDataUncached(filePath: string): AppData {
+    const result = loadAppDataForWriteUncached(filePath);
+    return result.state === 'ok' ? result.data : createDefaultData();
 }
 
 export function writeData(filePath: string, data: unknown) {

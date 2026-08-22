@@ -3,8 +3,10 @@ import type { AppData } from '@mindwtr/core';
 
 import { corsOrigin, logFailureWarn } from './server-config';
 import {
+    loadAppDataForWriteUncached,
     loadAppDataUncached,
     writeData,
+    type AppDataForWriteResult,
 } from './server-storage';
 
 const DATA_CACHE_MAX_ENTRIES = 64;
@@ -137,6 +139,31 @@ export const loadAppData = (filePath: string): AppData => {
     return data;
 };
 
+/**
+ * Same cache as loadAppData, but for write paths that must not treat "the document
+ * exists but couldn't be read" as an empty namespace (see loadAppDataForWriteUncached
+ * in server-storage.ts). A cache hit already proves the file parsed cleanly on a
+ * previous read, so only an actual cache miss touches disk through the discriminated
+ * loader.
+ */
+export const loadAppDataForWrite = (filePath: string): AppDataForWriteResult => {
+    const identity = getDataFileIdentity(filePath);
+    const cached = parsedDataCache.get(filePath);
+    if (cached && sameDataFileIdentity(cached, identity)) {
+        const data = tryCloneAppData(cached.data);
+        if (data) {
+            promoteCacheEntry(parsedDataCache, filePath, cached);
+            return { state: 'ok', data };
+        }
+        parsedDataCache.delete(filePath);
+    }
+
+    const result = loadAppDataForWriteUncached(filePath);
+    if (result.state === 'unreadable') return result;
+    rememberParsedDataFile(filePath, result.data);
+    return result;
+};
+
 export const rememberValidatedDataFile = (filePath: string): void => {
     const identity = getDataFileIdentity(filePath);
     if (identity) {
@@ -255,6 +282,7 @@ export const __serverDataCacheTestUtils = {
     hasValidatedDataCacheEntry: (filePath: string) => validatedDataCache.has(filePath),
     isTrustedValidatedDataFile,
     loadAppData,
+    loadAppDataForWrite,
     rememberValidatedDataFile,
     writeCloudData,
 };

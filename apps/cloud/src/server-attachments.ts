@@ -12,7 +12,7 @@ import {
     type Project,
 } from '@mindwtr/core';
 import { corsOrigin, errorResponse, jsonResponse, logFailureWarn } from './server-config';
-import { loadAppData } from './server-data-cache';
+import { loadAppDataForWrite } from './server-data-cache';
 import {
     durablyRemoveDirectory,
     durablyRemoveFile,
@@ -219,7 +219,15 @@ export function garbageCollectOrphanAttachments(
 
 /** Route body for POST/DELETE /v1/attachments/orphans, once withNamespace + the write lock have already run. */
 export function handleOrphanAttachmentGcRequest(dataDir: string, key: string, filePath: string): Response {
-    const data = loadAppData(filePath);
+    const dataResult = loadAppDataForWrite(filePath);
+    if (dataResult.state === 'unreadable') {
+        logFailureWarn('Stored cloud data failed validation before attachment GC', {
+            failureClass: 'validation',
+            failureCode: 'stored_data_invalid_json',
+        });
+        return errorResponse('Stored data failed validation', 500);
+    }
+    const data = dataResult.data;
     const validated = validateAppData(data);
     if (!validated.ok) {
         logFailureWarn('Stored cloud data failed validation before attachment GC', {

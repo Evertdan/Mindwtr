@@ -2077,6 +2077,69 @@ describe('cloud server api', () => {
         expect(readFileSync(filePath, 'utf8')).toBe(corruptPayload);
     });
 
+    test('refuses REST entity writes and attachment GC when stored namespace data is corrupt', async () => {
+        const key = tokenToKey(integrationToken);
+        const filePath = join(dataDir, `${key}.json`);
+        const corruptPayload = '{"tasks":[';
+        writeFileSync(filePath, corruptPayload);
+
+        const postResponse = await fetch(`${baseUrl}/v1/tasks`, {
+            method: 'POST',
+            headers: { ...authHeaders, 'content-type': 'application/json' },
+            body: JSON.stringify({ input: 'Task from POST' }),
+        });
+        expect(postResponse.status).toBe(500);
+        expect((await postResponse.json()).error).toBe('Stored data failed validation');
+        expect(readFileSync(filePath, 'utf8')).toBe(corruptPayload);
+
+        const patchResponse = await fetch(`${baseUrl}/v1/tasks/${crypto.randomUUID()}`, {
+            method: 'PATCH',
+            headers: { ...authHeaders, 'content-type': 'application/json' },
+            body: JSON.stringify({ title: 'Should not apply' }),
+        });
+        expect(patchResponse.status).toBe(500);
+        expect((await patchResponse.json()).error).toBe('Stored data failed validation');
+
+        const deleteResponse = await fetch(`${baseUrl}/v1/tasks/${crypto.randomUUID()}`, {
+            method: 'DELETE',
+            headers: authHeaders,
+        });
+        expect(deleteResponse.status).toBe(500);
+        expect((await deleteResponse.json()).error).toBe('Stored data failed validation');
+
+        const completeResponse = await fetch(`${baseUrl}/v1/tasks/${crypto.randomUUID()}/complete`, {
+            method: 'POST',
+            headers: authHeaders,
+        });
+        expect(completeResponse.status).toBe(500);
+        expect((await completeResponse.json()).error).toBe('Stored data failed validation');
+
+        const gcResponse = await fetch(`${baseUrl}/v1/attachments/orphans`, {
+            method: 'POST',
+            headers: authHeaders,
+        });
+        expect(gcResponse.status).toBe(500);
+        expect((await gcResponse.json()).error).toBe('Stored data failed validation');
+
+        expect(readFileSync(filePath, 'utf8')).toBe(corruptPayload);
+    });
+
+    test('first write to a namespace with no stored data still succeeds', async () => {
+        const key = tokenToKey(integrationToken);
+        const filePath = join(dataDir, `${key}.json`);
+        expect(existsSync(filePath)).toBe(false);
+
+        const postResponse = await fetch(`${baseUrl}/v1/tasks`, {
+            method: 'POST',
+            headers: { ...authHeaders, 'content-type': 'application/json' },
+            body: JSON.stringify({ input: 'First task' }),
+        });
+        expect(postResponse.status).toBe(201);
+        const created = await postResponse.json();
+        expect(created.task?.title).toBe('First task');
+    });
+
+
     test('preserves people across /v1/data server-side merges', async () => {
         const seedData: AppData = {
             tasks: [],
