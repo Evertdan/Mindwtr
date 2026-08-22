@@ -42,7 +42,7 @@ const localData: AppData = {
                     id: 'att-1',
                     kind: 'file',
                     title: 'doc.txt',
-                    uri: '/local/doc.txt',
+                    uri: '/data/mindwtr/attachments/doc.txt',
                     createdAt: '2026-01-01T00:00:00.000Z',
                     updatedAt: '2026-01-01T00:00:00.000Z',
                 },
@@ -207,7 +207,7 @@ describe('desktop sync-service runtime', () => {
         });
         writeRemoteCloudKitMock.mockResolvedValue(undefined);
 
-        fsMocks.exists.mockImplementation(async (path: string) => path === '/local/doc.txt');
+        fsMocks.exists.mockImplementation(async (path: string) => path === 'mindwtr/attachments/doc.txt');
         fsMocks.mkdir.mockResolvedValue(undefined);
         fsMocks.readFile.mockResolvedValue(new Uint8Array([1, 2, 3]));
         fsMocks.writeFile.mockResolvedValue(undefined);
@@ -215,7 +215,7 @@ describe('desktop sync-service runtime', () => {
         fsMocks.rename.mockResolvedValue(undefined);
         fsMocks.remove.mockResolvedValue(undefined);
         fsMocks.readDir.mockResolvedValue([]);
-        syncFsMocks.exists.mockImplementation(async (path: string) => path === '/local/doc.txt');
+        syncFsMocks.exists.mockImplementation(async (path: string) => path === 'mindwtr/attachments/doc.txt');
         syncFsMocks.mkdir.mockResolvedValue(undefined);
         syncFsMocks.rename.mockResolvedValue(undefined);
         syncFsMocks.remove.mockResolvedValue(undefined);
@@ -348,7 +348,7 @@ describe('desktop sync-service runtime', () => {
                 ...mergedData.tasks[0],
                 attachments: [{
                     ...mergedData.tasks[0].attachments?.[0],
-                    uri: '/local/doc.txt',
+                    uri: '/data/mindwtr/attachments/doc.txt',
                     localStatus: 'available',
                 } as NonNullable<AppData['tasks'][number]['attachments']>[number]],
             }],
@@ -765,7 +765,7 @@ describe('desktop sync-service runtime', () => {
                     id: 'att-1',
                     kind: 'file',
                     title: 'doc.txt',
-                    uri: '/local/doc.txt',
+                    uri: '/data/mindwtr/attachments/doc.txt',
                     cloudKey: 'attachments/att-1.txt',
                     localStatus: 'available',
                     createdAt: '2026-01-01T00:00:00.000Z',
@@ -837,7 +837,7 @@ describe('desktop sync-service runtime', () => {
             data: structuredClone(localData),
         });
         fsMocks.readFile.mockImplementation(async (path: string) => {
-            if (path === '/local/doc.txt') {
+            if (path === 'mindwtr/attachments/doc.txt') {
                 storeStateRef.current = {
                     ...storeStateRef.current,
                     _allTasks: storeStateRef.current._allTasks.map((task) =>
@@ -1347,7 +1347,7 @@ describe('desktop sync-service runtime', () => {
         }) => {
             const candidateLocal = await io.readLocal();
             expect(candidateLocal.tasks[0]?.attachments?.[0]).toMatchObject({
-                uri: '/local/doc.txt',
+                uri: '/data/mindwtr/attachments/doc.txt',
             });
             await io.readRemote();
             const provenCandidate = await io.prepareRemoteWrite(candidateLocal);
