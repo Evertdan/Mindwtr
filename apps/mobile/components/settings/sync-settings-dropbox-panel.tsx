@@ -54,12 +54,12 @@ export function SyncDropboxBackendPanel({
                         {tr('settings.dropboxRedirectUri')}: {redirectUri}
                     </Text>
                     {!dropboxConfigured && (
-                        <Text style={[styles.settingDescription, { color: '#EF4444', marginTop: 8 }]}>
+                        <Text style={[styles.settingDescription, { color: tc.danger, marginTop: 8 }]}>
                             {tr('settings.syncMobile.dropboxAppKeyIsNotConfiguredForThisBuild')}
                         </Text>
                     )}
                     {isExpoGo && (
-                        <Text style={[styles.settingDescription, { color: '#EF4444', marginTop: 8 }]}>
+                        <Text style={[styles.settingDescription, { color: tc.danger, marginTop: 8 }]}>
                             {tr('settings.syncMobile.expoGoIsNotSupportedForDropboxOauthUseA')}
                         </Text>
                     )}

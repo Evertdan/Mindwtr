@@ -84,7 +84,7 @@ export function SyncSelfHostedBackendPanel({
                     <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>{t('settings.cloudHint')}</Text>
                     <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>{t('settings.cloudBaseUrlHint')}</Text>
                     {urlError && (
-                        <Text style={[styles.settingDescription, { color: '#EF4444' }]}>{t('settings.invalidUrlHttp')}</Text>
+                        <Text style={[styles.settingDescription, { color: tc.danger }]}>{t('settings.invalidUrlHttp')}</Text>
                     )}
                 </View>
                 <View style={[styles.inputGroup, { borderTopWidth: 1, borderTopColor: tc.border }]}>
@@ -113,7 +113,7 @@ export function SyncSelfHostedBackendPanel({
                         style={[styles.textInput, { backgroundColor: tc.inputBg, borderColor: tc.border, color: tc.text }]}
                     />
                     {tokenError && (
-                        <Text style={[styles.settingDescription, { color: '#EF4444' }]}>{t('settings.cloudTokenInvalid')}</Text>
+                        <Text style={[styles.settingDescription, { color: tc.danger }]}>{t('settings.cloudTokenInvalid')}</Text>
                     )}
                 </View>
                 <TouchableOpacity

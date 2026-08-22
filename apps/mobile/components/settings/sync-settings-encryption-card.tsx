@@ -255,10 +255,10 @@ export function SyncEncryptionCard({ appData, t, tc }: SyncEncryptionCardProps) 
                             : (
                                 <>
                                     <View style={[styles.settingRowColumn, { borderTopWidth: 1, borderTopColor: tc.border }]}>
-                                        <Text style={[styles.settingDescription, { color: '#F59E0B' }]}>
+                                        <Text style={[styles.settingDescription, { color: tc.warning }]}>
                                             {t('settings.syncEncryptionWarningLost')}
                                         </Text>
-                                        <Text style={[styles.settingDescription, { color: '#F59E0B', marginTop: 8 }]}>
+                                        <Text style={[styles.settingDescription, { color: tc.warning, marginTop: 8 }]}>
                                             {t('settings.syncEncryptionWarningDevices')}
                                         </Text>
                                     </View>
@@ -325,7 +325,7 @@ export function SyncEncryptionCard({ appData, t, tc }: SyncEncryptionCardProps) 
                         {flow === 'disable' && (
                             <>
                                 <View style={[styles.settingRowColumn, { borderTopWidth: 1, borderTopColor: tc.border }]}>
-                                    <Text style={[styles.settingDescription, { color: '#F59E0B' }]}>
+                                    <Text style={[styles.settingDescription, { color: tc.warning }]}>
                                         {t('settings.syncEncryptionDisableWarning')}
                                     </Text>
                                 </View>
@@ -371,7 +371,7 @@ export function SyncEncryptionCard({ appData, t, tc }: SyncEncryptionCardProps) 
                 )}
                 {errorMessage && (
                     <View style={[styles.settingRowColumn, { borderTopWidth: 1, borderTopColor: tc.border }]}>
-                        <Text style={[styles.settingDescription, { color: '#EF4444' }]}>{errorMessage}</Text>
+                        <Text style={[styles.settingDescription, { color: tc.danger }]}>{errorMessage}</Text>
                     </View>
                 )}
             </View>

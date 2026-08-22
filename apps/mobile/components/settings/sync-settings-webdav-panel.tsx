@@ -87,7 +87,7 @@ export function SyncWebDavBackendPanel({
                     />
                     <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>{t('settings.webdavHint')}</Text>
                     {urlError && (
-                        <Text style={[styles.settingDescription, { color: '#EF4444' }]}>{t('settings.invalidUrlHttp')}</Text>
+                        <Text style={[styles.settingDescription, { color: tc.danger }]}>{t('settings.invalidUrlHttp')}</Text>
                     )}
                 </View>
                 <View style={[styles.inputGroup, { borderTopWidth: 1, borderTopColor: tc.border }]}>
@@ -129,7 +129,7 @@ export function SyncWebDavBackendPanel({
                     />
                 </View>
                 {Platform.OS === 'web' && (
-                    <Text style={[styles.settingDescription, { color: '#F59E0B' }]}>
+                    <Text style={[styles.settingDescription, { color: tc.warning }]}>
                         {t('settings.webdavBrowserStorageWarning')}
                     </Text>
                 )}

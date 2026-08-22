@@ -89,7 +89,7 @@ export function SyncLastStatusCard({
             </Text>
           )}
           {lastSyncStatus === 'error' && lastSyncError && (
-            <Text style={[styles.settingDescription, { color: '#EF4444' }]}>{lastSyncError}</Text>
+            <Text style={[styles.settingDescription, { color: tc.danger }]}>{lastSyncError}</Text>
           )}
           {historyContent}
         </View>

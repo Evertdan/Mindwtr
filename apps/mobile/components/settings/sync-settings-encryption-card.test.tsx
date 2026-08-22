@@ -44,7 +44,16 @@ const tc = {
   text: '#f8fafc',
   secondaryText: '#94a3b8',
   tint: '#3b82f6',
+  warning: '#8C5A00',
+  danger: '#BA1A1A',
 } as unknown as ThemeColors;
+
+const findText = (tree: renderer.ReactTestRenderer, content: string) =>
+  tree.root.findAllByType(Text).find((node) => node.props.children === content);
+
+const flatStyle = (style: unknown): Record<string, unknown> => (
+  Array.isArray(style) ? Object.assign({}, ...style.filter(Boolean)) : (style as Record<string, unknown>)
+);
 
 const t = (key: string) => key;
 
@@ -246,4 +255,21 @@ describe('SyncEncryptionCard', () => {
       tree.unmount();
     });
   });
+
+
+  it('draws warnings and errors from the theme tokens, not hardcoded hexes', async () => {
+    const tree = await renderCard();
+    await press(tree, 'settings.syncEncryptionEnable');
+    expect(flatStyle(findText(tree, 'settings.syncEncryptionWarningLost')?.props.style).color)
+      .toBe(tc.warning);
+    expect(flatStyle(findText(tree, 'settings.syncEncryptionWarningDevices')?.props.style).color)
+      .toBe(tc.warning);
+
+    await typeInto(tree, 'settings.syncEncryptionPassphrase', 'correct horse');
+    await typeInto(tree, 'settings.syncEncryptionPassphraseConfirm', 'battery staple');
+    await press(tree, 'settings.syncEncryptionEnable');
+    const error = findText(tree, 'settings.syncEncryptionErrorMismatch');
+    expect(flatStyle(error?.props.style).color).toBe(tc.danger);
+  });
+
 });
