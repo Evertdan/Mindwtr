@@ -25,7 +25,6 @@ Sponsorship does **not** purchase control over the roadmap, issue priority, proj
 | **Bronze** | $250/month | Company name + link in the Mindwtr README |
 | **Silver** | $500/month | Company logo + link in the Mindwtr README |
 | **Gold** | $1,000/month | Silver benefits + logo and link on [mindwtr.app](https://mindwtr.app) |
-| **Platinum** | $2,500/month | Prominent README + website placement |
 | **Strategic / Product Partner** | Contact us | Custom partnerships, integrations, co-marketing |
 
 Corporate sponsorships run for a minimum of **3 months**. Placements go live after the sponsor and creative are approved and payment for the first term is received.
