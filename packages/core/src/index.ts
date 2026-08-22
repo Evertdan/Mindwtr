@@ -50,6 +50,7 @@ export * from './sync-run';
 export * from './sync-run-ports';
 export * from './sync-backend-io';
 export * from './sync-fast-sync';
+export * from './sync-crypto';
 export * from './task-utils';
 export * from './completion-grouping';
 export * from './filter-criteria';

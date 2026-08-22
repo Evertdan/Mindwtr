@@ -52,6 +52,7 @@ mod obsidian_writer;
 mod platform;
 mod storage;
 mod sync;
+mod sync_crypto;
 mod ui;
 mod window_state;
 

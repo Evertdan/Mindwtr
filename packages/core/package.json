@@ -38,6 +38,7 @@
   "type": "module",
   "dependencies": {
     "@babel/runtime": "^7.28.4",
+    "@noble/hashes": "^2.3.0",
     "chrono-node": "^2.9.0",
     "date-fns": "^4.1.0",
     "date-fns-jalali": "4.4.0-0",

@@ -1,0 +1,563 @@
+//! Sync encryption container format "MWENC1" (issue #1056, phase 1 of 3). The byte layout below
+//! is pinned in the task handoff and mirrored byte-for-byte by the TypeScript implementation in
+//! packages/core/src/sync-crypto.ts; the two are proven interoperable by the shared fixtures in
+//! packages/core/src/__fixtures__/sync-crypto/vectors.json. This module implements ONLY the
+//! format -- no sync wiring, no settings, no UI. Later phases build on this API.
+//!
+//! Container layout, all integers little-endian:
+//!   0   6  magic "MWENC1"
+//!   6   1  format_version = 0x01
+//!   7   1  kdf_id = 0x01 (Argon2id v1.3)
+//!   8   4  argon2 m_cost in KiB, u32
+//!   12  4  argon2 t_cost, u32
+//!   16  1  argon2 parallelism, u8
+//!   17  1  cipher_id = 0x01 (AES-256-GCM, 16-byte tag)
+//!   18  16 KDF salt
+//!   34  12 AES-GCM nonce
+//!   46  8  ciphertext_len, u64 (INCLUDES the 16-byte GCM tag)
+//!   54  .. ciphertext || tag
+//! AAD is the full 54-byte header. Bytes past 54+ciphertext_len are ignored on read
+//! (non-truncating sync providers pad files). Magic missing means "plaintext", not an error --
+//! callers use inspect_sync_artifact to tell unencrypted files from encrypted ones.
+
+use aes_gcm::aead::{Aead, KeyInit, OsRng, Payload};
+use aes_gcm::aead::rand_core::RngCore;
+use aes_gcm::{Aes256Gcm, Key, Nonce};
+use argon2::{Algorithm, Argon2, Params, Version};
+use unicode_normalization::UnicodeNormalization;
+
+pub const SALT_LEN: usize = 16;
+pub const NONCE_LEN: usize = 12;
+pub const GCM_TAG_LEN: usize = 16;
+pub const KEY_LEN: usize = 32;
+pub const HEADER_LEN: usize = 54;
+
+const MAGIC: &[u8; 6] = b"MWENC1";
+const FORMAT_VERSION: u8 = 0x01;
+const KDF_ID_ARGON2ID: u8 = 0x01;
+const CIPHER_ID_AES_256_GCM: u8 = 0x01;
+
+// Sanity ceiling on header-declared Argon2id cost. A reader has no choice but to run Argon2 at
+// the header's cost before the GCM tag can even be checked (the key is needed to authenticate),
+// so an attacker-controlled or merely corrupt header could otherwise wedge or OOM the process
+// before any authentication happens (an allocation failure aborts the process outright in Rust).
+// This does not change the pinned byte layout, only which headers a reader accepts. Writer
+// defaults (SYNC_CRYPTO_DEFAULT_KDF_PARAMS) are far below this ceiling. Must match
+// packages/core/src/sync-crypto.ts's KDF_COST_CEILING_* exactly.
+const KDF_COST_CEILING_M_KIB: u32 = 262144; // 256 MiB
+const KDF_COST_CEILING_T: u32 = 16;
+const KDF_COST_CEILING_P: u8 = 8;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SyncCryptoKdfParams {
+    pub m_kib: u32,
+    pub t: u32,
+    pub p: u8,
+}
+
+/// Writer-default Argon2id cost. Readers always use the params recorded in the file's header.
+pub const SYNC_CRYPTO_DEFAULT_KDF_PARAMS: SyncCryptoKdfParams = SyncCryptoKdfParams { m_kib: 19456, t: 2, p: 1 };
+
+#[derive(Debug, Clone)]
+pub struct SyncKeyMaterial {
+    pub key: [u8; KEY_LEN],
+    pub salt: [u8; SALT_LEN],
+    pub params: SyncCryptoKdfParams,
+}
+
+/// Wrong passphrase and corrupted data are indistinguishable by design at the cipher layer --
+/// never claim which one it was. A header present but unreadable (unknown version/kdf/cipher id,
+/// or truncated/inconsistent) is `Unsupported`, never a "repair"/"partial read" affordance.
+#[derive(Debug)]
+pub enum SyncCryptoError {
+    Auth,
+    Unsupported(String),
+}
+
+impl std::fmt::Display for SyncCryptoError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SyncCryptoError::Auth => write!(f, "wrong passphrase or corrupted data"),
+            SyncCryptoError::Unsupported(reason) => write!(f, "{reason}"),
+        }
+    }
+}
+
+impl std::error::Error for SyncCryptoError {}
+
+pub fn derive_sync_key_material(
+    passphrase: &str,
+    salt: [u8; SALT_LEN],
+    params: SyncCryptoKdfParams,
+) -> Result<SyncKeyMaterial, SyncCryptoError> {
+    // NFC normalization ensures the same passphrase typed with a precomposed accent or a
+    // decomposed one derives the identical key, and matches packages/core's `.normalize('NFC')`.
+    let normalized: String = passphrase.nfc().collect();
+    let argon2_params = Params::new(params.m_kib, params.t, u32::from(params.p), Some(KEY_LEN))
+        .map_err(|err| SyncCryptoError::Unsupported(format!("invalid Argon2id params: {err}")))?;
+    let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, argon2_params);
+    let mut key = [0u8; KEY_LEN];
+    argon2
+        .hash_password_into(normalized.as_bytes(), &salt, &mut key)
+        .map_err(|err| SyncCryptoError::Unsupported(format!("Argon2id derivation failed: {err}")))?;
+    Ok(SyncKeyMaterial { key, salt, params })
+}
+
+fn read_u32_le(bytes: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap())
+}
+
+fn write_u32_le(bytes: &mut [u8], offset: usize, value: u32) {
+    bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+}
+
+fn read_u64_le(bytes: &[u8], offset: usize) -> u64 {
+    u64::from_le_bytes(bytes[offset..offset + 8].try_into().unwrap())
+}
+
+fn write_u64_le(bytes: &mut [u8], offset: usize, value: u64) {
+    bytes[offset..offset + 8].copy_from_slice(&value.to_le_bytes());
+}
+
+fn has_magic(bytes: &[u8]) -> bool {
+    bytes.len() >= MAGIC.len() && &bytes[..MAGIC.len()] == MAGIC
+}
+
+#[derive(Debug, Clone)]
+pub struct ParsedHeaderFields {
+    pub format_version: u8,
+    pub kdf_id: u8,
+    pub params: SyncCryptoKdfParams,
+    pub cipher_id: u8,
+    pub salt: [u8; SALT_LEN],
+    pub nonce: [u8; NONCE_LEN],
+    pub ciphertext_len: u64,
+}
+
+/// Assumes the magic has already been checked by the caller. Returns `Unsupported` for anything
+/// wrong with the header itself (never for a missing magic -- that's "plaintext").
+fn parse_header(bytes: &[u8]) -> Result<ParsedHeaderFields, SyncCryptoError> {
+    if bytes.len() < HEADER_LEN {
+        return Err(SyncCryptoError::Unsupported("MWENC1 header truncated".into()));
+    }
+    let format_version = bytes[6];
+    let kdf_id = bytes[7];
+    let cipher_id = bytes[17];
+    if format_version != FORMAT_VERSION {
+        return Err(SyncCryptoError::Unsupported(format!("unsupported MWENC1 format_version {format_version}")));
+    }
+    if kdf_id != KDF_ID_ARGON2ID {
+        return Err(SyncCryptoError::Unsupported(format!("unsupported MWENC1 kdf_id {kdf_id}")));
+    }
+    if cipher_id != CIPHER_ID_AES_256_GCM {
+        return Err(SyncCryptoError::Unsupported(format!("unsupported MWENC1 cipher_id {cipher_id}")));
+    }
+    let m_kib = read_u32_le(bytes, 8);
+    let t = read_u32_le(bytes, 12);
+    let p = bytes[16];
+    if m_kib > KDF_COST_CEILING_M_KIB || t > KDF_COST_CEILING_T || p > KDF_COST_CEILING_P {
+        return Err(SyncCryptoError::Unsupported(format!(
+            "MWENC1 KDF cost exceeds accepted ceiling (m_kib<={KDF_COST_CEILING_M_KIB}, t<={KDF_COST_CEILING_T}, p<={KDF_COST_CEILING_P})"
+        )));
+    }
+    let mut salt = [0u8; SALT_LEN];
+    salt.copy_from_slice(&bytes[18..34]);
+    let mut nonce = [0u8; NONCE_LEN];
+    nonce.copy_from_slice(&bytes[34..46]);
+    let ciphertext_len = read_u64_le(bytes, 46);
+    let remaining = (bytes.len() - HEADER_LEN) as u64;
+    if ciphertext_len > remaining {
+        return Err(SyncCryptoError::Unsupported("MWENC1 ciphertext_len exceeds available bytes".into()));
+    }
+    Ok(ParsedHeaderFields {
+        format_version,
+        kdf_id,
+        params: SyncCryptoKdfParams { m_kib, t, p },
+        cipher_id,
+        salt,
+        nonce,
+        ciphertext_len,
+    })
+}
+
+#[derive(Debug, Clone)]
+pub enum SyncArtifactInspection {
+    Encrypted(ParsedHeaderFields),
+    Unsupported(String),
+    Plaintext,
+}
+
+/// Pure, never panics on malformed input -- callers use this to tell an unencrypted file from an
+/// encrypted one, and an encrypted-but-unreadable one from either, before deciding what to do.
+pub fn inspect_sync_artifact(bytes: &[u8]) -> SyncArtifactInspection {
+    if !has_magic(bytes) {
+        return SyncArtifactInspection::Plaintext;
+    }
+    match parse_header(bytes) {
+        Ok(header) => SyncArtifactInspection::Encrypted(header),
+        Err(SyncCryptoError::Unsupported(reason)) => SyncArtifactInspection::Unsupported(reason),
+        Err(SyncCryptoError::Auth) => unreachable!("parse_header never returns Auth"),
+    }
+}
+
+pub fn encrypt_sync_artifact(plaintext: &[u8], material: &SyncKeyMaterial) -> Result<Vec<u8>, SyncCryptoError> {
+    // m_kib/t/p already fit u32/u32/u8 by the type system; p == 0 is the one in-range-but-invalid
+    // value left (Argon2id needs >=1 lane) -- reject it here rather than silently writing a header
+    // whose params don't match how the key was actually derived.
+    if material.params.p == 0 {
+        return Err(SyncCryptoError::Unsupported("sync key material params.p must be >= 1".into()));
+    }
+    let mut nonce_bytes = [0u8; NONCE_LEN];
+    OsRng.fill_bytes(&mut nonce_bytes);
+    encrypt_sync_artifact_with_nonce(plaintext, material, nonce_bytes)
+}
+
+/// Nonce-taking seam so tests (and fixture generation on the TS side) can reproduce a known
+/// ciphertext byte-for-byte. Not exported outside this module -- the public API above always
+/// draws its nonce from the OS CSPRNG.
+fn encrypt_sync_artifact_with_nonce(
+    plaintext: &[u8],
+    material: &SyncKeyMaterial,
+    nonce_bytes: [u8; NONCE_LEN],
+) -> Result<Vec<u8>, SyncCryptoError> {
+    let ciphertext_len = (plaintext.len() + GCM_TAG_LEN) as u64;
+    let mut header = [0u8; HEADER_LEN];
+    header[..6].copy_from_slice(MAGIC);
+    header[6] = FORMAT_VERSION;
+    header[7] = KDF_ID_ARGON2ID;
+    write_u32_le(&mut header, 8, material.params.m_kib);
+    write_u32_le(&mut header, 12, material.params.t);
+    header[16] = material.params.p;
+    header[17] = CIPHER_ID_AES_256_GCM;
+    header[18..34].copy_from_slice(&material.salt);
+    header[34..46].copy_from_slice(&nonce_bytes);
+    write_u64_le(&mut header, 46, ciphertext_len);
+
+    let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&material.key));
+    let nonce = Nonce::from_slice(&nonce_bytes);
+    let ct_and_tag = cipher
+        .encrypt(nonce, Payload { msg: plaintext, aad: &header })
+        .map_err(|_| SyncCryptoError::Auth)?;
+
+    let mut out = Vec::with_capacity(HEADER_LEN + ct_and_tag.len());
+    out.extend_from_slice(&header);
+    out.extend_from_slice(&ct_and_tag);
+    Ok(out)
+}
+
+pub fn decrypt_sync_artifact(bytes: &[u8], key: &[u8; KEY_LEN]) -> Result<Vec<u8>, SyncCryptoError> {
+    if !has_magic(bytes) {
+        return Err(SyncCryptoError::Unsupported("missing MWENC1 magic".into()));
+    }
+    let header = parse_header(bytes)?;
+    let aad = &bytes[..HEADER_LEN];
+    let ct_and_tag = &bytes[HEADER_LEN..HEADER_LEN + header.ciphertext_len as usize];
+
+    let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key));
+    let nonce = Nonce::from_slice(&header.nonce);
+    cipher
+        .decrypt(nonce, Payload { msg: ct_and_tag, aad })
+        .map_err(|_| SyncCryptoError::Auth)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    struct Vector {
+        name: String,
+        passphrase: String,
+        #[serde(rename = "saltB64")]
+        salt_b64: String,
+        params: VectorParams,
+        #[serde(rename = "nonceB64")]
+        nonce_b64: String,
+        #[serde(rename = "plaintextB64")]
+        plaintext_b64: String,
+        #[serde(rename = "encryptedB64")]
+        encrypted_b64: String,
+    }
+
+    #[derive(Deserialize)]
+    struct VectorParams {
+        #[serde(rename = "mKib")]
+        m_kib: u32,
+        t: u32,
+        p: u8,
+    }
+
+    // Same vectors.json the TS suite (packages/core/src/sync-crypto.test.ts) consumes -- the
+    // whole point of this task is proving both implementations agree on it byte-for-byte.
+    const VECTORS_JSON: &str = include_str!("../../../../packages/core/src/__fixtures__/sync-crypto/vectors.json");
+
+    fn load_vectors() -> Vec<Vector> {
+        serde_json::from_str(VECTORS_JSON).expect("vectors.json must parse")
+    }
+
+    fn b64_decode(s: &str) -> Vec<u8> {
+        use base64::Engine;
+        base64::engine::general_purpose::STANDARD.decode(s).expect("valid base64 fixture")
+    }
+
+    fn array16(bytes: &[u8]) -> [u8; SALT_LEN] {
+        bytes.try_into().expect("16-byte salt")
+    }
+
+    fn array12(bytes: &[u8]) -> [u8; NONCE_LEN] {
+        bytes.try_into().expect("12-byte nonce")
+    }
+
+    #[test]
+    fn default_kdf_params_are_pinned() {
+        assert_eq!(SYNC_CRYPTO_DEFAULT_KDF_PARAMS, SyncCryptoKdfParams { m_kib: 19456, t: 2, p: 1 });
+    }
+
+    #[test]
+    fn round_trips_a_fresh_encrypt_decrypt() {
+        let salt = [9u8; SALT_LEN];
+        let params = SyncCryptoKdfParams { m_kib: 64, t: 1, p: 1 };
+        let material = derive_sync_key_material("a fresh passphrase", salt, params).unwrap();
+        let plaintext = b"round trip payload";
+        let encrypted = encrypt_sync_artifact(plaintext, &material).unwrap();
+        let decrypted = decrypt_sync_artifact(&encrypted, &material.key).unwrap();
+        assert_eq!(decrypted, plaintext);
+
+        match inspect_sync_artifact(&encrypted) {
+            SyncArtifactInspection::Encrypted(header) => {
+                assert_eq!(header.params, params);
+                assert_eq!(header.format_version, 1);
+                assert_eq!(header.kdf_id, 1);
+                assert_eq!(header.cipher_id, 1);
+            }
+            other => panic!("expected Encrypted, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn decrypts_every_fixture_vector() {
+        for vector in load_vectors() {
+            let salt = array16(&b64_decode(&vector.salt_b64));
+            let params = SyncCryptoKdfParams { m_kib: vector.params.m_kib, t: vector.params.t, p: vector.params.p };
+            let material = derive_sync_key_material(&vector.passphrase, salt, params).unwrap();
+            let encrypted = b64_decode(&vector.encrypted_b64);
+            let decrypted = decrypt_sync_artifact(&encrypted, &material.key)
+                .unwrap_or_else(|err| panic!("fixture {} failed to decrypt: {err}", vector.name));
+            assert_eq!(decrypted, b64_decode(&vector.plaintext_b64), "fixture {} plaintext mismatch", vector.name);
+        }
+    }
+
+    #[test]
+    fn re_encrypts_every_fixture_vector_byte_exactly() {
+        // Proves write-side compatibility: given the fixture's own salt/nonce/params, Rust
+        // reproduces the exact bytes the TS implementation produced.
+        for vector in load_vectors() {
+            let salt = array16(&b64_decode(&vector.salt_b64));
+            let nonce = array12(&b64_decode(&vector.nonce_b64));
+            let params = SyncCryptoKdfParams { m_kib: vector.params.m_kib, t: vector.params.t, p: vector.params.p };
+            let material = derive_sync_key_material(&vector.passphrase, salt, params).unwrap();
+            let plaintext = b64_decode(&vector.plaintext_b64);
+            let re_encrypted = encrypt_sync_artifact_with_nonce(&plaintext, &material, nonce).unwrap();
+            assert_eq!(re_encrypted, b64_decode(&vector.encrypted_b64), "fixture {} re-encrypt mismatch", vector.name);
+        }
+    }
+
+    #[test]
+    fn ignores_trailing_garbage_bytes() {
+        let vector = load_vectors().into_iter().find(|v| v.name == "small-json-default-params").unwrap();
+        let salt = array16(&b64_decode(&vector.salt_b64));
+        let params = SyncCryptoKdfParams { m_kib: vector.params.m_kib, t: vector.params.t, p: vector.params.p };
+        let material = derive_sync_key_material(&vector.passphrase, salt, params).unwrap();
+        let mut padded = b64_decode(&vector.encrypted_b64);
+        padded.extend_from_slice(&[0x20, 0x20, 0x00, 0x00, 0x20]);
+
+        let decrypted = decrypt_sync_artifact(&padded, &material.key).unwrap();
+        assert_eq!(decrypted, b64_decode(&vector.plaintext_b64));
+    }
+
+    #[test]
+    fn rejects_wrong_key_with_auth_error() {
+        let vector = load_vectors().into_iter().find(|v| v.name == "small-json-default-params").unwrap();
+        let salt = array16(&b64_decode(&vector.salt_b64));
+        let params = SyncCryptoKdfParams { m_kib: vector.params.m_kib, t: vector.params.t, p: vector.params.p };
+        let wrong_material = derive_sync_key_material("not the right passphrase", salt, params).unwrap();
+        let encrypted = b64_decode(&vector.encrypted_b64);
+        match decrypt_sync_artifact(&encrypted, &wrong_material.key) {
+            Err(SyncCryptoError::Auth) => {}
+            other => panic!("expected Auth error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn rejects_tampered_header_byte_via_aad_binding() {
+        let vector = load_vectors().into_iter().find(|v| v.name == "small-json-default-params").unwrap();
+        let salt = array16(&b64_decode(&vector.salt_b64));
+        let params = SyncCryptoKdfParams { m_kib: vector.params.m_kib, t: vector.params.t, p: vector.params.p };
+        let material = derive_sync_key_material(&vector.passphrase, salt, params).unwrap();
+        let mut tampered = b64_decode(&vector.encrypted_b64);
+        tampered[20] ^= 0xff; // inside the KDF salt field, part of the 54-byte AAD
+
+        match decrypt_sync_artifact(&tampered, &material.key) {
+            Err(SyncCryptoError::Auth) => {}
+            other => panic!("expected Auth error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn reports_truncated_file_as_unsupported() {
+        let vector = load_vectors().into_iter().find(|v| v.name == "small-json-default-params").unwrap();
+        let encrypted = b64_decode(&vector.encrypted_b64);
+        let truncated = &encrypted[..encrypted.len() - 4];
+        let salt = array16(&b64_decode(&vector.salt_b64));
+        let params = SyncCryptoKdfParams { m_kib: vector.params.m_kib, t: vector.params.t, p: vector.params.p };
+        let material = derive_sync_key_material(&vector.passphrase, salt, params).unwrap();
+
+        match decrypt_sync_artifact(truncated, &material.key) {
+            Err(SyncCryptoError::Unsupported(_)) => {}
+            other => panic!("expected Unsupported error, got {other:?}"),
+        }
+        match inspect_sync_artifact(truncated) {
+            SyncArtifactInspection::Unsupported(_) => {}
+            other => panic!("expected Unsupported inspection, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn reports_header_shorter_than_54_bytes_as_unsupported() {
+        let mut tiny = MAGIC.to_vec();
+        tiny.extend_from_slice(&[0x01, 0x01]);
+        match inspect_sync_artifact(&tiny) {
+            SyncArtifactInspection::Unsupported(_) => {}
+            other => panic!("expected Unsupported, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn classifies_plaintext_json_as_plaintext() {
+        let plain_json = br#"{"tasks":[]}"#;
+        assert!(matches!(inspect_sync_artifact(plain_json), SyncArtifactInspection::Plaintext));
+        assert!(matches!(inspect_sync_artifact(&[]), SyncArtifactInspection::Plaintext));
+    }
+
+    #[test]
+    fn rejects_unknown_version_kdf_or_cipher_as_unsupported() {
+        let vector = load_vectors().into_iter().find(|v| v.name == "small-json-default-params").unwrap();
+        let encrypted = b64_decode(&vector.encrypted_b64);
+        let salt = array16(&b64_decode(&vector.salt_b64));
+        let params = SyncCryptoKdfParams { m_kib: vector.params.m_kib, t: vector.params.t, p: vector.params.p };
+        let material = derive_sync_key_material(&vector.passphrase, salt, params).unwrap();
+
+        let mut bad_version = encrypted.clone();
+        bad_version[6] = 0x02;
+        assert!(matches!(inspect_sync_artifact(&bad_version), SyncArtifactInspection::Unsupported(_)));
+        assert!(matches!(decrypt_sync_artifact(&bad_version, &material.key), Err(SyncCryptoError::Unsupported(_))));
+
+        let mut bad_kdf = encrypted.clone();
+        bad_kdf[7] = 0x02;
+        assert!(matches!(inspect_sync_artifact(&bad_kdf), SyncArtifactInspection::Unsupported(_)));
+        assert!(matches!(decrypt_sync_artifact(&bad_kdf, &material.key), Err(SyncCryptoError::Unsupported(_))));
+
+        let mut bad_cipher = encrypted.clone();
+        bad_cipher[17] = 0x02;
+        assert!(matches!(inspect_sync_artifact(&bad_cipher), SyncArtifactInspection::Unsupported(_)));
+        assert!(matches!(decrypt_sync_artifact(&bad_cipher, &material.key), Err(SyncCryptoError::Unsupported(_))));
+    }
+
+    #[test]
+    fn nfc_composed_and_decomposed_passphrases_derive_the_same_key() {
+        let salt = [7u8; SALT_LEN];
+        let params = SyncCryptoKdfParams { m_kib: 64, t: 1, p: 1 };
+        let composed = "caf\u{00e9}"; // single precomposed e-acute codepoint
+        let decomposed = "cafe\u{0301}"; // plain e + combining acute accent
+        assert_ne!(composed, decomposed);
+        let composed_material = derive_sync_key_material(composed, salt, params).unwrap();
+        let decomposed_material = derive_sync_key_material(decomposed, salt, params).unwrap();
+        assert_eq!(composed_material.key, decomposed_material.key);
+    }
+
+    #[test]
+    fn nfc_fixture_actually_exercises_normalization() {
+        // The stored passphrase must be the decomposed form so a normalization skip on either
+        // side fails this fixture instead of silently passing (it's NFC(the same passphrase)
+        // that must match, not the raw bytes).
+        let vector = load_vectors().into_iter().find(|v| v.name == "nfc-normalization-cafe").unwrap();
+        assert_eq!(vector.passphrase, "cafe\u{0301}");
+    }
+
+    #[test]
+    fn rejects_p_zero_on_the_write_path() {
+        // m_kib/t already fit u32 and p fits u8 by the type system; p == 0 is the one
+        // in-range-but-invalid value left (Argon2id needs >=1 lane).
+        let salt = [2u8; SALT_LEN];
+        let valid_params = SyncCryptoKdfParams { m_kib: 64, t: 1, p: 1 };
+        let material = derive_sync_key_material("x", salt, valid_params).unwrap();
+        let bogus_material = SyncKeyMaterial { params: SyncCryptoKdfParams { p: 0, ..valid_params }, ..material };
+        match encrypt_sync_artifact(b"x", &bogus_material) {
+            Err(SyncCryptoError::Unsupported(_)) => {}
+            other => panic!("expected Unsupported error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn draws_a_fresh_nonce_per_encrypt_call_never_reused() {
+        let salt = [3u8; SALT_LEN];
+        let params = SyncCryptoKdfParams { m_kib: 64, t: 1, p: 1 };
+        let material = derive_sync_key_material("nonce pin test", salt, params).unwrap();
+        let plaintext = b"same plaintext both times";
+
+        let first = encrypt_sync_artifact(plaintext, &material).unwrap();
+        let second = encrypt_sync_artifact(plaintext, &material).unwrap();
+
+        assert_ne!(&first[34..46], &second[34..46], "nonces must differ between encrypt calls");
+        assert_ne!(first, second, "GCM nonce reuse would otherwise be silent");
+    }
+
+    // A minimal, otherwise-valid 54-byte header with no ciphertext -- enough to exercise
+    // parse_header's cost-ceiling check without needing a real fixture.
+    fn hostile_header(m_kib: u32, t: u32, p: u8) -> Vec<u8> {
+        let mut header = vec![0u8; HEADER_LEN];
+        header[..6].copy_from_slice(MAGIC);
+        header[6] = FORMAT_VERSION;
+        header[7] = KDF_ID_ARGON2ID;
+        header[17] = CIPHER_ID_AES_256_GCM;
+        write_u32_le(&mut header, 8, m_kib);
+        write_u32_le(&mut header, 12, t);
+        header[16] = p;
+        header
+    }
+
+    #[test]
+    fn accepts_a_header_at_the_kdf_cost_ceiling() {
+        let at_ceiling = hostile_header(262144, 16, 8);
+        assert!(matches!(inspect_sync_artifact(&at_ceiling), SyncArtifactInspection::Encrypted(_)));
+    }
+
+    #[test]
+    fn rejects_m_kib_over_the_kdf_cost_ceiling() {
+        let hostile = hostile_header(262145, 1, 1);
+        assert!(matches!(inspect_sync_artifact(&hostile), SyncArtifactInspection::Unsupported(_)));
+    }
+
+    #[test]
+    fn rejects_t_over_the_kdf_cost_ceiling() {
+        let hostile = hostile_header(64, 17, 1);
+        assert!(matches!(inspect_sync_artifact(&hostile), SyncArtifactInspection::Unsupported(_)));
+    }
+
+    #[test]
+    fn rejects_p_over_the_kdf_cost_ceiling() {
+        let hostile = hostile_header(64, 1, 9);
+        assert!(matches!(inspect_sync_artifact(&hostile), SyncArtifactInspection::Unsupported(_)));
+    }
+
+    #[test]
+    fn rejects_over_ceiling_header_via_decrypt_too() {
+        let hostile = hostile_header(999_999_999, 1, 1);
+        let key = [0u8; KEY_LEN];
+        match decrypt_sync_artifact(&hostile, &key) {
+            Err(SyncCryptoError::Unsupported(_)) => {}
+            other => panic!("expected Unsupported error, got {other:?}"),
+        }
+    }
+}

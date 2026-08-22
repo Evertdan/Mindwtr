@@ -71,6 +71,16 @@ tauri-plugin-autostart = "2.5.1"
 # a saved position now off-screen, per-monitor DPI — so this uses the official
 # plugin rather than a hand-rolled save/restore that would get those wrong.
 tar = "0.4"
+# Sync encryption format v1 (#1056 phase 1): Argon2id KDF + AES-256-GCM AEAD, matching the
+# TypeScript implementation in packages/core/src/sync-crypto.ts byte-for-byte (see sync_crypto.rs).
+aes-gcm = "0.10.3"
+argon2 = "0.5.3"
+# The format requires NFC-normalizing the passphrase before hashing so the same passphrase typed
+# on a platform whose IME emits decomposed accents (macOS) derives the same key as one typed where
+# it emits precomposed accents (Windows/Linux) -- and matches packages/core's `.normalize('NFC')`.
+# There is no std facility for this; unicode-normalization is the standard, dependency-free
+# implementation used throughout the Rust ecosystem (idna, url, ...).
+unicode-normalization = "0.1.25"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.61", features = ["ApplicationModel", "Foundation", "Foundation_Collections", "Services_Store"] }
