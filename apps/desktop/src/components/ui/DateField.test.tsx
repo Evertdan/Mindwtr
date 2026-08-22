@@ -97,11 +97,19 @@ describe('DateField', () => {
 
         const input = screen.getByRole('textbox', { name: 'Due' });
         fireEvent.change(input, { target: { value: 'saasdjfasdj' } });
-        expect(input).toHaveAttribute('aria-invalid', 'true');
+        // The visual cue is immediate, but a half-typed date is unparseable on
+        // nearly every keystroke — announcing "invalid" that often is noise, so
+        // aria-invalid waits until the field is left.
+        expect(input.className).toContain('border-warning');
+        expect(input).not.toHaveAttribute('aria-invalid');
         expect(onDateChange).not.toHaveBeenCalled();
+
+        fireEvent.blur(input);
+        expect(input).toHaveAttribute('aria-invalid', 'true');
 
         fireEvent.change(input, { target: { value: '04/20/2026' } });
         expect(input).not.toHaveAttribute('aria-invalid');
+        expect(input.className).not.toContain('border-warning');
         expect(onDateChange).toHaveBeenCalledWith('2026-04-20');
     });
 

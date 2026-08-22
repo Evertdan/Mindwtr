@@ -234,6 +234,7 @@ export function DateField({
     const [draftDateValue, setDraftDateValue] = useState(() => (
         formatDateInputDisplay(dateValue, dateInputOrder, calendarSystem)
     ));
+    const [announceDraftInvalid, setAnnounceDraftInvalid] = useState(false);
     const weekStartIndex = getWeekStartIndex(nativeDateInputLocale);
     const calendarLocale = getCalendarLocale(nativeDateInputLocale);
     const monthLabel = new Intl.DateTimeFormat(calendarLocale, { month: 'long', year: 'numeric' }).format(calendarMonth);
@@ -267,6 +268,7 @@ export function DateField({
 
     const resetFieldState = useCallback(() => {
         setIsCalendarOpen(false);
+        setAnnounceDraftInvalid(false);
         setDraftDateValue(formatDateInputDisplay(dateValue, dateInputOrder, calendarSystem));
     }, [calendarSystem, dateInputOrder, dateValue]);
 
@@ -314,6 +316,7 @@ export function DateField({
 
     const handleDateInputChange = (value: string) => {
         setDraftDateValue(value);
+        setAnnounceDraftInvalid(false);
         const parsed = parseDateInputDisplay(value, dateInputOrder, calendarSystem);
         if (parsed === null) return;
         if (!parsed) {
@@ -326,6 +329,11 @@ export function DateField({
     // without a signal it looked accepted while typed (#1050).
     const isDraftInvalid = draftDateValue.trim() !== ''
         && parseDateInputDisplay(draftDateValue, dateInputOrder, calendarSystem) === null;
+    // The border turns while typing, but `aria-invalid` only after the field is
+    // left: a half-typed date is invalid on nearly every keystroke, and flipping
+    // the attribute each time makes a screen reader call the field invalid before
+    // the user has finished entering a date that will parse fine.
+    const announceInvalid = isDraftInvalid && announceDraftInvalid;
     const applyCalendarDate = (date: Date) => {
         const nextDateValue = safeFormatDate(date, 'yyyy-MM-dd');
         setDraftDateValue(formatDateInputDisplay(nextDateValue, dateInputOrder, calendarSystem));
@@ -374,8 +382,9 @@ export function DateField({
                         aria-haspopup="dialog"
                         aria-expanded={isCalendarOpen}
                         value={draftDateValue}
-                        aria-invalid={isDraftInvalid || undefined}
+                        aria-invalid={announceInvalid || undefined}
                         onChange={(event) => handleDateInputChange(event.target.value)}
+                        onBlur={() => setAnnounceDraftInvalid(true)}
                         // The calendar icon is a small target, so the whole field opens the
                         // popover (#896). openCalendar only positions and shows it — it never
                         // moves focus — so the caret stays where it was clicked and the date
