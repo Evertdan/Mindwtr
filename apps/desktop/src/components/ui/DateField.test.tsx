@@ -138,6 +138,76 @@ describe('DateField', () => {
         await waitFor(() => expect(input.value).toBe('04/19/2026'));
     });
 
+    it('parses year-less and 2-digit-year entry (#1050)', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(2026, 7, 22));
+        try {
+            const onDateChange = vi.fn();
+            render(
+                <DateField
+                    t={t}
+                    dateAriaLabel="Due"
+                    dateValue="2026-04-19"
+                    selectedDate={new Date(2026, 3, 19)}
+                    dateFormatSetting="mdy"
+                    nativeDateInputLocale="en-US"
+                    dateInputClassName="border"
+                    onDateChange={onDateChange}
+                />
+            );
+
+            const input = screen.getByLabelText('Due');
+            fireEvent.change(input, { target: { value: '1/1' } });
+            expect(onDateChange).toHaveBeenLastCalledWith('2027-01-01');
+
+            // Still ahead this year, so no rollover.
+            fireEvent.change(input, { target: { value: '12/25' } });
+            expect(onDateChange).toHaveBeenLastCalledWith('2026-12-25');
+
+            fireEvent.change(input, { target: { value: '4/20' } });
+            expect(onDateChange).toHaveBeenLastCalledWith('2027-04-20');
+
+            fireEvent.change(input, { target: { value: '1/1/27' } });
+            expect(onDateChange).toHaveBeenLastCalledWith('2027-01-01');
+
+            fireEvent.change(input, { target: { value: '04/20/2026' } });
+            expect(onDateChange).toHaveBeenLastCalledWith('2026-04-20');
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('reads year-less entry day-first under a d/m/y format, and still rejects 31/2', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(2026, 7, 22));
+        try {
+            const onDateChange = vi.fn();
+            render(
+                <DateField
+                    t={t}
+                    dateAriaLabel="Due"
+                    dateValue="2026-04-19"
+                    selectedDate={new Date(2026, 3, 19)}
+                    dateFormatSetting="dmy"
+                    nativeDateInputLocale="en-GB"
+                    dateInputClassName="border"
+                    onDateChange={onDateChange}
+                />
+            );
+
+            const input = screen.getByLabelText('Due') as HTMLInputElement;
+            fireEvent.change(input, { target: { value: '20/4' } });
+            expect(onDateChange).toHaveBeenLastCalledWith('2027-04-20');
+
+            onDateChange.mockClear();
+            fireEvent.change(input, { target: { value: '31/2' } });
+            expect(onDateChange).not.toHaveBeenCalled();
+            expect(input.className).toContain('border-warning');
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it('shows and parses Jalali dates when the resolved locale is the Persian calendar', () => {
         const onDateChange = vi.fn();
         render(

@@ -47,6 +47,22 @@ function parseDateInputDate(value: string): Date | null {
     return parsed;
 }
 
+/**
+ * A year-less entry ("1/1") means the next occurrence of that day and month:
+ * this year while it is still ahead, next year once it has passed (#1050).
+ */
+function resolveYearlessDate(month: string, day: string): string | null {
+    if (month.length > 2 || day.length > 2) return null;
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    for (const year of [now.getFullYear(), now.getFullYear() + 1]) {
+        const candidate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        const parsed = parseDateInputDate(candidate);
+        if (parsed && parsed >= today) return candidate;
+    }
+    return null;
+}
+
 function getCalendarLocale(locale: string): string | undefined {
     const normalized = locale.trim();
     if (!normalized) return undefined;
@@ -139,7 +155,14 @@ function parseDateInputDisplay(value: string, order: DateInputOrder, calendarSys
     }
 
     const parts = trimmed.match(/\d{1,4}/g);
-    if (!parts || parts.length !== 3) return null;
+    if (!parts) return null;
+    if (parts.length === 2) {
+        // ymd has no year to lead with here, so its two-part form reads month/day.
+        return order === 'dmy'
+            ? resolveYearlessDate(parts[1], parts[0])
+            : resolveYearlessDate(parts[0], parts[1]);
+    }
+    if (parts.length !== 3) return null;
 
     let year: string;
     let month: string;
@@ -154,6 +177,8 @@ function parseDateInputDisplay(value: string, order: DateInputOrder, calendarSys
         [year, month, day] = parts;
     }
 
+    // A 2-digit year is read as the 2000s: "1/1/27" is 2027 (#1050).
+    if (year.length === 2) year = String(2000 + Number(year));
     if (year.length !== 4) return null;
     const normalized = normalizeDateInputValue(
         `${year.padStart(4, '0')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`

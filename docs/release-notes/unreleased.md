@@ -7,6 +7,7 @@ Changes collected after `v1.2.1` and before the next version tag.
 ## Full Change List
 
 - Removing an attachment now deletes its local and synced file copies on the next sync cycle instead of leaving them until a once-a-day cleanup pass. (#1064)
+- Desktop date fields now accept a date without a year — "1/1" means the next January 1st — and a 2-digit year, so "1/1/27" reads as 2027. (#1050)
 - Mobile reminder rescheduling no longer rewrites its stored alarms or queries the system alarm list after every edit, and very large libraries stop re-serializing the whole library for a backup they already know is too big to keep. (#766)
 - Large libraries: editing, completing, or adding a task now redraws lists noticeably faster. Sorting a list and rebuilding the counts behind it were re-reading the same dates thousands of times per keystroke-sized change; both now read each date once. (#766)
 - Desktop: right-clicking one task and then another no longer leaves the first row wearing the highlight ring — dismissing a context menu with the pointer no longer snaps keyboard focus back to the old row. Closing the menu with Escape still returns focus to where you were. (#999)
