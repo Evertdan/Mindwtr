@@ -6,14 +6,14 @@
  * the sync auth token: rotating or revoking the feed never touches sync, and a
  * leaked feed URL grants nothing but read access to the calendar events.
  */
-import { existsSync, readFileSync, readdirSync, unlinkSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 import { join } from 'path';
 import { buildCalendarFeed } from '@mindwtr/core';
 
 import { corsOrigin } from './server-config';
 import { loadAppData } from './server-data-cache';
-import { writeData } from './server-storage';
+import { durablyRemoveFile, writeData, type DurableRemovalFileSystem } from './server-storage';
 
 const FEED_FILE_SUFFIX = '.ics.json';
 const FEED_TOKEN_PATTERN = /^[a-f0-9]{64}$/;
@@ -54,12 +54,11 @@ export const rotateCalendarFeed = (dataDir: string, key: string): CalendarFeedRe
     return record;
 };
 
-export const revokeCalendarFeed = (dataDir: string, key: string): boolean => {
-    const filePath = feedFilePath(dataDir, key);
-    if (!existsSync(filePath)) return false;
-    unlinkSync(filePath);
-    return true;
-};
+export const revokeCalendarFeed = (
+    dataDir: string,
+    key: string,
+    removalFileSystem?: DurableRemovalFileSystem,
+): boolean => durablyRemoveFile(feedFilePath(dataDir, key), removalFileSystem);
 
 const digest = (value: string): Buffer => createHash('sha256').update(value).digest();
 
@@ -101,7 +100,8 @@ export type PruneOrphanedCalendarFeedsResult = { pruned: number; failed: number 
 
 export const pruneOrphanedCalendarFeeds = (
     dataDir: string,
-    allowedKeys: ReadonlySet<string>
+    allowedKeys: ReadonlySet<string>,
+    removalFileSystem?: DurableRemovalFileSystem,
 ): PruneOrphanedCalendarFeedsResult => {
     let entries: string[];
     try {
@@ -115,12 +115,14 @@ export const pruneOrphanedCalendarFeeds = (
         if (!entry.endsWith(FEED_FILE_SUFFIX)) continue;
         const key = entry.slice(0, -FEED_FILE_SUFFIX.length);
         if (allowedKeys.has(key)) continue;
-        // Best-effort (I4): a permission error, an in-flight delete racing
-        // another process, or an unexpected directory at this path must never
-        // stop the server from starting - only the count is worth knowing.
+        // Best-effort (I4): a permission error or an unexpected directory at this
+        // path must never stop the server from starting - only the count is worth
+        // knowing. durablyRemoveFile already tolerates an in-flight-delete race
+        // (ENOENT) as "nothing left to prune" rather than a failure.
         try {
-            unlinkSync(join(dataDir, entry));
-            pruned += 1;
+            if (durablyRemoveFile(join(dataDir, entry), removalFileSystem)) {
+                pruned += 1;
+            }
         } catch {
             failed += 1;
         }

@@ -1,6 +1,20 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { spawn, type ChildProcess } from 'child_process';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'fs';
+import {
+    closeSync,
+    existsSync,
+    fsyncSync,
+    mkdtempSync,
+    mkdirSync,
+    openSync,
+    readFileSync,
+    readdirSync,
+    rmSync,
+    symlinkSync,
+    unlinkSync,
+    utimesSync,
+    writeFileSync,
+} from 'fs';
 import { dirname, join } from 'path';
 import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
@@ -50,6 +64,7 @@ import {
     readJsonBody,
     resolveAttachmentPath,
     writeData,
+    type DurableRemovalFileSystem,
 } from './server-storage';
 import {
     asStatus,
@@ -63,7 +78,7 @@ import {
     startCloudServer,
     type CloudRequestCompletion,
 } from './server';
-import { pruneOrphanedCalendarFeeds } from './server-calendar-feed';
+import { pruneOrphanedCalendarFeeds, revokeCalendarFeed } from './server-calendar-feed';
 
 const expireFileForOrphanGc = (path: string): void => {
     const staleTime = new Date(Date.now() - 10 * 60 * 1000);
@@ -2138,7 +2153,6 @@ describe('cloud server api', () => {
         const created = await postResponse.json();
         expect(created.task?.title).toBe('First task');
     });
-
 
     test('preserves people across /v1/data server-side merges', async () => {
         const seedData: AppData = {
@@ -4476,6 +4490,73 @@ describe('cloud server calendar feed', () => {
             expect(existsSync(join(dataDir, `${allowedKey}.ics.json`))).toBe(true);
             expect(existsSync(join(dataDir, `${orphanedKey}.ics.json`))).toBe(false);
             expect(existsSync(join(dataDir, `${undeletableKey}.ics.json`))).toBe(true);
+        } finally {
+            rmSync(dataDir, { recursive: true, force: true });
+        }
+    });
+
+    // SEC-15a: a bare unlinkSync (no parent-directory fsync) can leave a revoked
+    // feed's removal un-published — a crash between the unlink and the next fsync
+    // resurrects the revoked token on restart. Route through the shared
+    // durablyRemoveFile helper instead, and confirm it publishes the removal by
+    // recording every directory it fsyncs.
+    test('revokeCalendarFeed durably removes the feed file and tolerates an already-removed feed', () => {
+        const dataDir = mkdtempSync(join(tmpdir(), 'mindwtr-cloud-calendar-feed-'));
+        try {
+            const key = 'd'.repeat(64);
+            const feedPath = join(dataDir, `${key}.ics.json`);
+            writeFileSync(feedPath, '{}');
+            const fsyncedDirs: string[] = [];
+            const trackingFileSystem: DurableRemovalFileSystem = {
+                existsSync,
+                unlinkSync,
+                rmdirSync: () => { throw new Error('unused in this test'); },
+                openSync: (path, flags) => {
+                    fsyncedDirs.push(path);
+                    return openSync(path, flags);
+                },
+                fsyncSync,
+                closeSync,
+            };
+
+            expect(revokeCalendarFeed(dataDir, key, trackingFileSystem)).toBe(true);
+            expect(existsSync(feedPath)).toBe(false);
+            expect(fsyncedDirs).toContain(dataDir);
+
+            // A second revoke races an already-removed feed (e.g. a retry after a
+            // dropped response) — durablyRemoveFile tolerates ENOENT instead of the
+            // bare unlinkSync this replaces throwing and becoming an uncaught 500.
+            expect(revokeCalendarFeed(dataDir, key, trackingFileSystem)).toBe(false);
+        } finally {
+            rmSync(dataDir, { recursive: true, force: true });
+        }
+    });
+
+    test('pruneOrphanedCalendarFeeds durably removes orphaned feed files', () => {
+        const dataDir = mkdtempSync(join(tmpdir(), 'mindwtr-cloud-calendar-feed-'));
+        try {
+            const allowedKey = 'e'.repeat(64);
+            const orphanedKey = 'f'.repeat(64);
+            writeFileSync(join(dataDir, `${allowedKey}.ics.json`), '{}');
+            writeFileSync(join(dataDir, `${orphanedKey}.ics.json`), '{}');
+            const fsyncedDirs: string[] = [];
+            const trackingFileSystem: DurableRemovalFileSystem = {
+                existsSync,
+                unlinkSync,
+                rmdirSync: () => { throw new Error('unused in this test'); },
+                openSync: (path, flags) => {
+                    fsyncedDirs.push(path);
+                    return openSync(path, flags);
+                },
+                fsyncSync,
+                closeSync,
+            };
+
+            const result = pruneOrphanedCalendarFeeds(dataDir, new Set([allowedKey]), trackingFileSystem);
+
+            expect(result).toEqual({ pruned: 1, failed: 0 });
+            expect(existsSync(join(dataDir, `${orphanedKey}.ics.json`))).toBe(false);
+            expect(fsyncedDirs).toContain(dataDir);
         } finally {
             rmSync(dataDir, { recursive: true, force: true });
         }
