@@ -32,6 +32,8 @@ Budgets are intentionally explicit and conservative. They should only change in 
 
 The suite also runs the real Zustand `updateTask` mutation and incremental persistence path at every dataset size. Its absolute budgets are 100ms at 1k, 250ms at 10k, and 1000ms at 50k, with a maximum 12x growth from 10k to 50k. Like the pure hot-path rows, this path uses the best of three measured runs to reduce runner and garbage-collection noise. Fingerprint cases assert both deterministic no-op behavior for aligned data and sensitivity to a synced revision change.
 
+The bulk-mutation path (`batchMoveTasks` over every task in the store, what "Select all -> Move" dispatches) is budgeted at 75ms at 1k, 250ms at 10k, and 2000ms at 50k, with a maximum 15x growth from 10k to 50k, taking the best of two runs. It is the largest mutation a user can trigger in one synchronous store write.
+
 The absolute budgets catch obvious regressions. The growth guard catches bad scaling, especially O(n^2) patterns that may still pass on small datasets. Growth comparisons use a 5ms denominator floor so very fast 10k measurements do not fail only because of runner timing noise.
 
 ## Platform Render Budgets

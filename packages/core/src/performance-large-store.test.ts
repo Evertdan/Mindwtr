@@ -97,6 +97,17 @@ const STORE_MUTATION_BUDGETS_MS: Record<LargeStoreSize, number> = {
 const STORE_MUTATION_MAX_GROWTH_FROM_10K_TO_50K = 12;
 const STORE_MUTATION_ATTEMPTS = 3;
 
+// "Select all -> Move" hands batchUpdateTasks every visible task in one
+// synchronous set(), the largest mutation a user can trigger.
+const BATCH_MUTATION_BUDGETS_MS: Record<LargeStoreSize, number> = {
+    1_000: 75,
+    10_000: 250,
+    50_000: 2_000,
+};
+
+const BATCH_MUTATION_MAX_GROWTH_FROM_10K_TO_50K = 15;
+const BATCH_MUTATION_ATTEMPTS = 2;
+
 function createProject(index: number, selectedProjectId: string): Project {
     const id = index === 0 ? selectedProjectId : `project-${index}`;
     return {
@@ -457,6 +468,79 @@ describePerf('large-store performance budgets', () => {
             resetForTests();
         }
     });
+
+    it('moves every task through the production batch path within absolute and growth budgets', async () => {
+        const measurements = new Map<LargeStoreSize, number>();
+
+        for (const size of DATASET_SIZES) {
+            const fixture = createLargeStoreFixture(size);
+            const ids = fixture.tasks.map((task) => task.id);
+            let bestDurationMs = Number.POSITIVE_INFINITY;
+
+            for (let attempt = 0; attempt < BATCH_MUTATION_ATTEMPTS; attempt += 1) {
+                resetForTests();
+                setStorageAdapter({
+                    getData: async () => fixture.data,
+                    saveData: async () => undefined,
+                });
+                useTaskStore.setState({
+                    tasks: fixture.tasks,
+                    projects: fixture.projects,
+                    sections: fixture.sections,
+                    areas: fixture.areas,
+                    people: [],
+                    settings: fixture.data.settings,
+                    isLoading: false,
+                    error: null,
+                    _allTasks: fixture.tasks,
+                    _allProjects: fixture.projects,
+                    _allSections: fixture.sections,
+                    _allAreas: fixture.areas,
+                    _allPeople: [],
+                    _tasksById: buildEntityMap(fixture.tasks),
+                    _projectsById: buildEntityMap(fixture.projects),
+                    _sectionsById: buildEntityMap(fixture.sections),
+                    _areasById: buildEntityMap(fixture.areas),
+                    _peopleById: new Map(),
+                });
+
+                try {
+                    const startedAt = performance.now();
+                    const result = await useTaskStore.getState().batchMoveTasks(ids, 'next');
+                    const durationMs = performance.now() - startedAt;
+                    await flushPendingSave();
+
+                    expect(result).toEqual({ success: true });
+                    const moved = useTaskStore.getState()._allTasks;
+                    expect(moved).toHaveLength(size);
+                    expect(moved.every((task) => task.status === 'next')).toBe(true);
+                    bestDurationMs = Math.min(bestDurationMs, durationMs);
+                } finally {
+                    await flushPendingSave();
+                    resetForTests();
+                }
+            }
+
+            expectWithinBudget(
+                'Production select-all batch move',
+                size,
+                bestDurationMs,
+                BATCH_MUTATION_BUDGETS_MS[size],
+            );
+            measurements.set(size, bestDurationMs);
+        }
+
+        const tenKDuration = measurements.get(10_000);
+        const fiftyKDuration = measurements.get(50_000);
+        if (tenKDuration === undefined || fiftyKDuration === undefined) {
+            throw new Error('Missing production batch mutation measurements');
+        }
+        const growth = fiftyKDuration / Math.max(tenKDuration, GROWTH_BASELINE_FLOOR_MS);
+        expect(
+            growth,
+            `Production batch mutation grew ${growth.toFixed(2)}x from 10k to 50k tasks; max allowed is ${BATCH_MUTATION_MAX_GROWTH_FROM_10K_TO_50K}x`,
+        ).toBeLessThanOrEqual(BATCH_MUTATION_MAX_GROWTH_FROM_10K_TO_50K);
+    }, 180_000);
 
     it('persists one task through the production incremental path within absolute and growth budgets', async () => {
         const measurements = new Map<LargeStoreSize, number>();
