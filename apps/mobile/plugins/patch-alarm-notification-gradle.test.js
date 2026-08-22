@@ -5,7 +5,11 @@ import path from 'path';
 
 const plugin = require('./patch-alarm-notification-gradle');
 
-const { PATCHES, applyPatches } = plugin.__testables;
+const { PATCHES, applyPatches, applyAlarmManifestEntries } = plugin.__testables;
+
+const ALARM_RECEIVER = 'com.emekalites.react.alarm.notification.AlarmReceiver';
+const ALARM_DISMISS_RECEIVER = 'com.emekalites.react.alarm.notification.AlarmDismissReceiver';
+const ALARM_BOOT_RECEIVER = 'com.emekalites.react.alarm.notification.AlarmBootReceiver';
 
 // Every pure transform used to be its own named export in `__testables`; now
 // each one lives on its PATCHES entry instead. Pulling them out by id keeps
@@ -1098,6 +1102,54 @@ describe('applyPatches (registry-driven fixture tree)', () => {
     } finally {
       fs.rmSync(tmpRoot, { recursive: true, force: true });
     }
+  });
+});
+
+describe('alarm manifest entries', () => {
+  const receiverNamed = (manifest, name) => (
+    manifest.manifest.application[0].receiver.find((entry) => entry?.$?.['android:name'] === name)
+  );
+
+  it('keeps the alarm action receivers unexported and the boot receiver exported', () => {
+    const manifest = { manifest: { application: [{}] } };
+
+    applyAlarmManifestEntries(manifest);
+
+    expect(receiverNamed(manifest, ALARM_RECEIVER).$['android:exported']).toBe('false');
+    expect(receiverNamed(manifest, ALARM_DISMISS_RECEIVER).$['android:exported']).toBe('false');
+    // BOOT_COMPLETED is a protected broadcast, so this one has to stay exported
+    // or reminders never survive a reboot.
+    expect(receiverNamed(manifest, ALARM_BOOT_RECEIVER).$['android:exported']).toBe('true');
+  });
+
+  it('flips an already-exported alarm receiver back to unexported', () => {
+    const manifest = {
+      manifest: {
+        application: [
+          {
+            receiver: [
+              { $: { 'android:name': ALARM_RECEIVER, 'android:enabled': 'true', 'android:exported': 'true' } },
+              { $: { 'android:name': ALARM_DISMISS_RECEIVER, 'android:enabled': 'true', 'android:exported': 'true' } },
+            ],
+          },
+        ],
+      },
+    };
+
+    applyAlarmManifestEntries(manifest);
+
+    expect(receiverNamed(manifest, ALARM_RECEIVER).$['android:exported']).toBe('false');
+    expect(receiverNamed(manifest, ALARM_DISMISS_RECEIVER).$['android:exported']).toBe('false');
+  });
+
+  it('still registers the action filters our own PendingIntents target', () => {
+    const manifest = { manifest: { application: [{}] } };
+
+    applyAlarmManifestEntries(manifest);
+
+    const actions = receiverNamed(manifest, ALARM_RECEIVER)['intent-filter'][0].action
+      .map((action) => action.$['android:name']);
+    expect(actions).toEqual(['ACTION_DISMISS', 'ACTION_SNOOZE', 'ACTION_COMPLETE']);
   });
 });
 

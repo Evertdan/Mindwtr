@@ -1499,52 +1499,61 @@ const ensureReceiver = (application, name, attrs, actions = []) => {
   mergeIntentActions(receiver, actions);
 };
 
+const applyAlarmManifestEntries = (manifest) => {
+  const application = manifest.manifest.application?.[0];
+  if (!application) {
+    return;
+  }
+
+  ensurePermission(manifest, 'android.permission.RECEIVE_BOOT_COMPLETED');
+  ensurePermission(manifest, 'android.permission.SCHEDULE_EXACT_ALARM');
+
+  // Every alarm PendingIntent is created by this app, so AlarmManager and our
+  // own notification actions reach these receivers on the creator's identity
+  // and do not need them exported. Exported they would let any installed app
+  // cancel reminders or fire stored alarms early — AlarmIds are small and
+  // sequential.
+  ensureReceiver(
+    application,
+    'com.emekalites.react.alarm.notification.AlarmReceiver',
+    {
+      'android:enabled': 'true',
+      'android:exported': 'false',
+    },
+    ['ACTION_DISMISS', 'ACTION_SNOOZE', 'ACTION_COMPLETE']
+  );
+
+  ensureReceiver(
+    application,
+    'com.emekalites.react.alarm.notification.AlarmDismissReceiver',
+    {
+      'android:enabled': 'true',
+      'android:exported': 'false',
+    }
+  );
+
+  // Stays exported: BOOT_COMPLETED is a protected broadcast only the system
+  // can send, and reminders have to be rescheduled after a reboot.
+  ensureReceiver(
+    application,
+    'com.emekalites.react.alarm.notification.AlarmBootReceiver',
+    {
+      'android:directBootAware': 'true',
+      'android:enabled': 'false',
+      'android:exported': 'true',
+    },
+    [
+      'android.intent.action.BOOT_COMPLETED',
+      'android.intent.action.QUICKBOOT_POWERON',
+      'com.htc.intent.action.QUICKBOOT_POWERON',
+      'android.intent.action.LOCKED_BOOT_COMPLETED',
+    ]
+  );
+};
+
 function withAlarmNotificationGradlePatch(config) {
   const withManifestEntries = withAndroidManifest(config, (cfg) => {
-    const manifest = cfg.modResults;
-    const application = manifest.manifest.application?.[0];
-    if (!application) {
-      return cfg;
-    }
-
-    ensurePermission(manifest, 'android.permission.RECEIVE_BOOT_COMPLETED');
-    ensurePermission(manifest, 'android.permission.SCHEDULE_EXACT_ALARM');
-
-    ensureReceiver(
-      application,
-      'com.emekalites.react.alarm.notification.AlarmReceiver',
-      {
-        'android:enabled': 'true',
-        'android:exported': 'true',
-      },
-      ['ACTION_DISMISS', 'ACTION_SNOOZE', 'ACTION_COMPLETE']
-    );
-
-    ensureReceiver(
-      application,
-      'com.emekalites.react.alarm.notification.AlarmDismissReceiver',
-      {
-        'android:enabled': 'true',
-        'android:exported': 'true',
-      }
-    );
-
-    ensureReceiver(
-      application,
-      'com.emekalites.react.alarm.notification.AlarmBootReceiver',
-      {
-        'android:directBootAware': 'true',
-        'android:enabled': 'false',
-        'android:exported': 'true',
-      },
-      [
-        'android.intent.action.BOOT_COMPLETED',
-        'android.intent.action.QUICKBOOT_POWERON',
-        'com.htc.intent.action.QUICKBOOT_POWERON',
-        'android.intent.action.LOCKED_BOOT_COMPLETED',
-      ]
-    );
-
+    applyAlarmManifestEntries(cfg.modResults);
     return cfg;
   });
 
@@ -1567,6 +1576,7 @@ function withAlarmNotificationGradlePatch(config) {
 
 module.exports = withAlarmNotificationGradlePatch;
 module.exports.__testables = {
+  applyAlarmManifestEntries,
   patchFile,
   getAndroidSourceCandidates,
   getIosSourceCandidates,
