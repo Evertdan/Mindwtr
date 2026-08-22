@@ -8,7 +8,7 @@
 // KDF itself is already pinned by the shared TS/Rust interop fixtures.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { inspectSyncArtifact, SyncEncryptionTerminalError } from '@mindwtr/core';
+import { decryptRemoteArtifactOrThrow, deriveSyncKeyMaterial, encryptSyncArtifact, inspectSyncArtifact, SyncEncryptionTerminalError } from '@mindwtr/core';
 
 type NativeState = {
     state: 'off' | 'enabled' | 'remote-encrypted-no-key' | 'remote-plaintext';
@@ -27,6 +27,9 @@ const bytesToBase64 = (bytes: Uint8Array): string => {
     for (const byte of bytes) binary += String.fromCharCode(byte);
     return btoa(binary);
 };
+
+const base64ToBytes = (value: string): Uint8Array =>
+    Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
 
 vi.mock('./tauri-invoke', () => {
     const derive = async (passphrase: string, saltHex: string) => {
@@ -98,8 +101,10 @@ const {
     clearSyncEncryptionMaterialCache,
     createDropboxRemotePort,
     createWebdavRemotePort,
+    desktopSyncCryptoPrimitives,
     getSyncEncryptionStatus,
     markRemoteSyncEncryptionPlaintext,
+    runChangePassphraseOverRemote,
     openAttachmentBytes,
     runDisableOverRemote,
     runEnableOverRemote,
@@ -340,6 +345,43 @@ describe('attachment bytes', () => {
         clearSyncEncryptionMaterialCache();
         await expect(openAttachmentBytes(sealed)).rejects.toBeInstanceOf(SyncEncryptionTerminalError);
         expect(native.state.state).toBe('remote-encrypted-no-key');
+    });
+});
+
+describe('passphrase-change resume', () => {
+    it('finishes after an earlier attempt already rewrapped the base document under an abandoned salt', async () => {
+        const store = seedRemote();
+        const fetcher = createDropboxFetch(store);
+        await runEnableOverRemote('old-pw', createDropboxRemotePort((o) => o('token'), fetcher));
+        const enabledKey = base64ToBytes(native.state.key!);
+
+        // The interrupted attempt: attachments run first, then the documents, so a crash after
+        // the base document means EVERY artifact is already sealed under that attempt's own
+        // (now abandoned) salt, and the cached key opens none of them.
+        const abandoned = await deriveSyncKeyMaterial(
+            'new-pw',
+            new Uint8Array(16).fill(0xab),
+            { mKib: 19456, t: 2, p: 1 },
+            desktopSyncCryptoPrimitives,
+        );
+        const sealedNames = ['attachments/a1.png', 'data.json.enc', 'data.json.enc.bak'];
+        for (const name of sealedNames) {
+            const plain = await decryptRemoteArtifactOrThrow(store.files.get(name)!, enabledKey, desktopSyncCryptoPrimitives);
+            store.files.set(name, await encryptSyncArtifact(plain, abandoned, desktopSyncCryptoPrimitives));
+        }
+
+        await runChangePassphraseOverRemote('old-pw', 'new-pw', createDropboxRemotePort((o) => o('token'), fetcher));
+
+        const finalKey = base64ToBytes(native.state.key!);
+        // Every artifact — the attachment included — must be readable under the key the run
+        // settled on. An enumeration that silently returned no attachments would leave
+        // attachments/a1.png stranded under a salt nothing ever derives again.
+        for (const name of sealedNames) {
+            await expect(
+                decryptRemoteArtifactOrThrow(store.files.get(name)!, finalKey, desktopSyncCryptoPrimitives),
+            ).resolves.toBeInstanceOf(Uint8Array);
+        }
+        expect(store.files.get('attachments/a1.png')).not.toEqual(await encryptSyncArtifact(new Uint8Array([1, 2, 3, 4, 5]), abandoned, desktopSyncCryptoPrimitives));
     });
 });
 

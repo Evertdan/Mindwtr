@@ -16,6 +16,7 @@ import {
     decryptRemoteArtifactOrThrow,
     defaultSyncCryptoPrimitives,
     deleteDropboxFile,
+    deriveSyncKeyMaterial,
     downloadDropboxFile,
     encryptSyncArtifact,
     inspectSyncArtifact,
@@ -262,25 +263,57 @@ const collectRemoteAttachmentKeys = (data: AppData | null): string[] => {
  *  already names would be a lot of new surface for no extra coverage.
  *  ponytail: an attachment orphaned on the remote (no record references it) is not converted;
  *  it is already invisible to every client. Add real listing if orphan cleanup ever needs it. */
-const decodeDocument = async (bytes: Uint8Array | null, key: Uint8Array | null): Promise<AppData | null> => {
+/** Never throws on a document it cannot open — enumerating attachment names is its only job,
+ *  and failing the listing aborts the whole transition before the recovery logic that would
+ *  have fixed the artifact ever runs (that is what bricked a passphrase-change resume: the
+ *  base document is rewrapped first, so the cached key stops opening it).
+ *
+ *  `recoveryPassphrase` is what keeps "returns null" from trading a hard abort for silent
+ *  data loss: on a resume the document is sealed under an ABANDONED intermediate salt, and a
+ *  null listing would enumerate zero attachments and leave every one of them behind under a
+ *  key nothing ever derives again. Re-deriving from the artifact's OWN header is the same
+ *  recovery core's `rewrap` performs on each artifact. */
+const decodeDocument = async (
+    bytes: Uint8Array | null,
+    key: Uint8Array | null,
+    recoveryPassphrase?: string,
+): Promise<AppData | null> => {
     if (!bytes) return null;
-    if (inspectSyncArtifact(bytes).kind === 'encrypted') {
-        if (!key) return null;
-        const plain = await decryptRemoteArtifactOrThrow(bytes, key, desktopSyncCryptoPrimitives);
-        return JSON.parse(new TextDecoder().decode(plain)) as AppData;
+    const inspected = inspectSyncArtifact(bytes);
+    if (inspected.kind !== 'encrypted') {
+        return JSON.parse(new TextDecoder().decode(bytes)) as AppData;
     }
-    return JSON.parse(new TextDecoder().decode(bytes)) as AppData;
+    const candidates: Uint8Array[] = key ? [key] : [];
+    if (recoveryPassphrase) {
+        const recovered = await deriveSyncKeyMaterial(
+            recoveryPassphrase,
+            inspected.salt,
+            inspected.params,
+            desktopSyncCryptoPrimitives,
+        );
+        candidates.push(recovered.key);
+    }
+    for (const candidate of candidates) {
+        try {
+            const plain = await decryptRemoteArtifactOrThrow(bytes, candidate, desktopSyncCryptoPrimitives);
+            return JSON.parse(new TextDecoder().decode(plain)) as AppData;
+        } catch (error) {
+            if (!(error instanceof SyncEncryptionTerminalError)) throw error;
+        }
+    }
+    return null;
 };
 
 /** The key is resolved here rather than taken as a parameter: a caller that passed `null` by
  *  mistake would enumerate zero attachments and a transition would silently skip all of them. */
 const listRemoteEntries = async (
     read: (name: string) => Promise<Uint8Array | null>,
+    recoveryPassphrase?: string,
 ): Promise<SyncEncryptionRemoteEntry[]> => {
     const key = (await getSyncEncryptionMaterial())?.key ?? null;
     const data =
-        (await decodeDocument(await read('data.json.enc'), key)) ??
-        (await decodeDocument(await read('data.json'), key));
+        (await decodeDocument(await read('data.json.enc'), key, recoveryPassphrase)) ??
+        (await decodeDocument(await read('data.json'), key, recoveryPassphrase));
     return [
         ...REMOTE_DOCUMENT_NAMES.map((name) => ({ name, kind: 'document' as const })),
         ...collectRemoteAttachmentKeys(data).map((name) => ({ name, kind: 'attachment' as const })),
@@ -378,6 +411,17 @@ export async function runDisableOverRemote(
     await ports.flush();
 }
 
+/** Re-lists through `nextPassphrase` so an interrupted earlier attempt — which left the base
+ *  document sealed under an abandoned intermediate salt the cached key cannot open — still
+ *  yields the full attachment worklist. */
+const withRecoveryListing = (
+    remote: SyncEncryptionRemotePort,
+    nextPassphrase: string,
+): SyncEncryptionRemotePort => ({
+    ...remote,
+    list: () => listRemoteEntries(remote.read, nextPassphrase),
+});
+
 export async function runChangePassphraseOverRemote(
     currentPassphrase: string,
     nextPassphrase: string,
@@ -388,7 +432,7 @@ export async function runChangePassphraseOverRemote(
     await runChangeSyncEncryptionPassphraseOverRemote(
         currentPassphrase,
         nextPassphrase,
-        remote,
+        withRecoveryListing(remote, nextPassphrase),
         ports.keyCache,
         ports.localState,
         onProgress,
