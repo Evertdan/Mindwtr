@@ -17,6 +17,19 @@ const recentlyHandledContextAutomation = new Map<string, number>();
 // accepted trigger wakes a headless task that runs a full fetchData(). The
 // per-key dedupe below is defeated by simply varying the context, so the number
 // of starts is capped per window regardless of what the payload says.
+//
+// Two accepted ceilings on this budget, both fine for the receiver's threat model
+// (a hostile automation app on-device) but worth knowing about:
+// - The counter is global, not per-source: `useRootLayoutContextAutomation` (the
+//   user's own foreground deep-link path, e.g. tapping a context:// link) and
+//   `runContextAutomationHeadlessTask` (the Android broadcast receiver's headless
+//   wake, open to any automation app) both call wasContextAutomationRecentlyHandled
+//   against this same array. A flood from the receiver can exhaust the window and
+//   block the user's own foreground automation for up to CONTEXT_AUTOMATION_RATE_WINDOW_MS.
+// - The counter is module-scoped, not persisted: the headless task dynamically
+//   imports this module fresh on each Android process start, so a wake that
+//   follows the RN instance being torn down (process death, not just backgrounding)
+//   starts counting from zero again rather than continuing the prior window.
 export const CONTEXT_AUTOMATION_RATE_WINDOW_MS = 60_000;
 export const CONTEXT_AUTOMATION_MAX_STARTS_PER_WINDOW = 12;
 let contextAutomationStarts: number[] = [];
