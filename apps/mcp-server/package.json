@@ -38,7 +38,7 @@
   },
   "scripts": {
     "dev": "bun src/cli.ts",
-    "build": "bun build src/index.ts --target node --format esm --outfile dist/index.js --define process.env.NODE_ENV='\"production\"' --external=better-sqlite3 --external=bun:sqlite && bun build src/cli.ts --target node --format esm --outfile dist/cli.js --define process.env.NODE_ENV='\"production\"' --external=better-sqlite3 --external=bun:sqlite",
+    "build": "bun build src/index.ts --target node --format esm --outfile dist/index.js --define process.env.NODE_ENV='\"production\"' --external=better-sqlite3 --external=bun:sqlite && cp src/cli.ts dist/cli.js && chmod +x dist/cli.js",
     "lint": "eslint -c eslint.config.mjs . --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "start": "node dist/cli.js",
