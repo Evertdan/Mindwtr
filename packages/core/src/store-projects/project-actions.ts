@@ -7,8 +7,6 @@ import {
     persist,
     restoreSectionFromProjectArchive,
     restoreTaskFromProjectArchive,
-    selectVisibleTasks,
-    toVisibleTask,
 } from '../store-helpers';
 import { logWarn } from '../logger';
 import { clearDerivedCache } from '../store-settings';
@@ -188,13 +186,11 @@ export const createProjectCoreActions = ({
             });
             createdProject = newProject;
             const newAllProjects = [...state._allProjects, newProject];
-            const newVisibleProjects = [...state.projects, newProject];
             persist(set, debouncedSave, state, {
                 projects: newAllProjects,
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             });
             return {
-                projects: newVisibleProjects,
                 _allProjects: newAllProjects,
                 lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
@@ -283,10 +279,6 @@ export const createProjectCoreActions = ({
                     : project
             );
 
-            const newVisibleProjects = newAllProjects.filter(p => !p.deletedAt);
-            const newVisibleTasks = selectVisibleTasks(newAllTasks);
-            const newVisibleSections = newAllSections.filter((section) => !section.deletedAt);
-
             persist(set, debouncedSave, state, {
                 tasks: newAllTasks,
                 projects: newAllProjects,
@@ -294,11 +286,8 @@ export const createProjectCoreActions = ({
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             });
             return {
-                projects: newVisibleProjects,
                 _allProjects: newAllProjects,
-                tasks: newVisibleTasks,
                 _allTasks: newAllTasks,
-                sections: newVisibleSections,
                 _allSections: newAllSections,
                 lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
@@ -369,9 +358,6 @@ export const createProjectCoreActions = ({
                     }
                     : task
             );
-            const newVisibleProjects = newAllProjects.filter(p => !p.deletedAt);
-            const newVisibleTasks = selectVisibleTasks(newAllTasks);
-            const newVisibleSections = newAllSections.filter((section) => !section.deletedAt);
             clearDerivedCache();
             persist(set, debouncedSave, state, {
                 tasks: newAllTasks,
@@ -380,9 +366,6 @@ export const createProjectCoreActions = ({
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             });
             return {
-                projects: newVisibleProjects,
-                tasks: newVisibleTasks,
-                sections: newVisibleSections,
                 _allProjects: newAllProjects,
                 _allTasks: newAllTasks,
                 _allSections: newAllSections,
@@ -469,9 +452,6 @@ export const createProjectCoreActions = ({
                     }
                     : task
             ));
-            const newVisibleProjects = newAllProjects.filter((project) => !project.deletedAt);
-            const newVisibleSections = newAllSections.filter((section) => !section.deletedAt);
-            const newVisibleTasks = selectVisibleTasks(newAllTasks);
             clearDerivedCache();
             persist(set, debouncedSave, state, {
                 tasks: newAllTasks,
@@ -480,9 +460,6 @@ export const createProjectCoreActions = ({
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             });
             return {
-                projects: newVisibleProjects,
-                sections: newVisibleSections,
-                tasks: newVisibleTasks,
                 _allProjects: newAllProjects,
                 _allSections: newAllSections,
                 _allTasks: newAllTasks,
@@ -551,9 +528,6 @@ export const createProjectCoreActions = ({
                     }
                     : task
             );
-            const newVisibleProjects = newAllProjects.filter((project) => !project.deletedAt);
-            const newVisibleSections = newAllSections.filter((section) => !section.deletedAt);
-            const newVisibleTasks = selectVisibleTasks(newAllTasks);
             clearDerivedCache();
             persist(set, debouncedSave, state, {
                 tasks: newAllTasks,
@@ -562,9 +536,6 @@ export const createProjectCoreActions = ({
                 ...(settingsChanged ? { settings: nextSettings } : {}),
             });
             return {
-                projects: newVisibleProjects,
-                sections: newVisibleSections,
-                tasks: newVisibleTasks,
                 _allProjects: newAllProjects,
                 _allSections: newAllSections,
                 _allTasks: newAllTasks,
@@ -641,9 +612,6 @@ export const createProjectCoreActions = ({
                     }
                     : task
             );
-            const newVisibleProjects = newAllProjects.filter((project) => !project.deletedAt);
-            const newVisibleSections = newAllSections.filter((section) => !section.deletedAt);
-            const newVisibleTasks = selectVisibleTasks(newAllTasks);
             clearDerivedCache();
             persist(set, debouncedSave, state, {
                 tasks: newAllTasks,
@@ -652,9 +620,6 @@ export const createProjectCoreActions = ({
                 ...(settingsChanged ? { settings: nextSettings } : {}),
             });
             return {
-                projects: newVisibleProjects,
-                sections: newVisibleSections,
-                tasks: newVisibleTasks,
                 _allProjects: newAllProjects,
                 _allSections: newAllSections,
                 _allTasks: newAllTasks,
@@ -764,9 +729,6 @@ export const createProjectCoreActions = ({
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             });
             return {
-                projects: [...state.projects, newProject],
-                sections: [...state.sections, ...newSections],
-                tasks: [...state.tasks, ...newTasks.map(toVisibleTask)],
                 _allProjects: newAllProjects,
                 _allSections: newAllSections,
                 _allTasks: newAllTasks,

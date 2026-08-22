@@ -318,11 +318,10 @@ export const runAutoArchive = (
     tasks: Task[],
     settings: AppData['settings'],
     context: { nowIso: string; nowMs: number; deviceId?: string; enabled?: boolean }
-): { allTasks: Task[]; visibleTasks?: Task[]; didAutoArchive: boolean } => {
+): { allTasks: Task[]; didAutoArchive: boolean } => {
     const result = autoArchiveStaleCompletedTasks(tasks, settings, context);
     return {
         allTasks: result.tasks,
-        // Caller recomputes the visible list itself when nothing changed.
         didAutoArchive: result.didAutoArchive,
     };
 };

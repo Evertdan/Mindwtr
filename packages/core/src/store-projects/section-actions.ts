@@ -1,4 +1,4 @@
-import { ensureDeviceId, getNextDataChangeAt, nextRevision, persist, selectVisibleTasks } from '../store-helpers';
+import { ensureDeviceId, getNextDataChangeAt, nextRevision, persist } from '../store-helpers';
 import { logWarn } from '../logger';
 import { generateUUID as uuidv4 } from '../uuid';
 import type { ProjectActionContext, Section, SectionActions } from './shared';
@@ -37,13 +37,11 @@ export const createSectionActions = ({
             };
             createdSection = newSection;
             const newAllSections = [...allSections, newSection];
-            const newVisibleSections = [...state.sections, newSection];
             persist(set, debouncedSave, state, {
                 sections: newAllSections,
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             });
             return {
-                sections: newVisibleSections,
                 _allSections: newAllSections,
                 lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
@@ -120,17 +118,13 @@ export const createSectionActions = ({
                     revBy: deviceState.deviceId,
                 };
             });
-            const newVisibleSections = newAllSections.filter((item) => !item.deletedAt);
-            const newVisibleTasks = selectVisibleTasks(newAllTasks);
             persist(set, debouncedSave, state, {
                 tasks: newAllTasks,
                 sections: newAllSections,
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             });
             return {
-                sections: newVisibleSections,
                 _allSections: newAllSections,
-                tasks: newVisibleTasks,
                 _allTasks: newAllTasks,
                 lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),

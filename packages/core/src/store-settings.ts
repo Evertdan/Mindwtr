@@ -583,7 +583,6 @@ export const createSettingsActions = ({
                 if (autoArchiveResult.didAutoArchive) {
                     persist(set, debouncedSave, state, { tasks: autoArchiveResult.allTasks, settings: newSettings });
                     return {
-                        tasks: autoArchiveResult.visibleTasks ?? selectVisibleTasks(autoArchiveResult.allTasks),
                         _allTasks: autoArchiveResult.allTasks,
                         settings: newSettings,
                         lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt),

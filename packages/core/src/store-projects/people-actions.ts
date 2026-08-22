@@ -3,8 +3,6 @@ import {
     getNextDataChangeAt,
     nextRevision,
     persist,
-    selectVisiblePeople,
-    selectVisibleTasks,
 } from '../store-helpers';
 import { logWarn } from '../logger';
 import { clearDerivedCache } from '../store-settings';
@@ -60,7 +58,6 @@ export const createPeopleActions = ({
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             });
             return {
-                people: selectVisiblePeople(newAllPeople),
                 _allPeople: newAllPeople,
                 lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
@@ -201,9 +198,7 @@ export const createPeopleActions = ({
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             });
             return {
-                people: selectVisiblePeople(nextAllPeople),
                 _allPeople: nextAllPeople,
-                tasks: selectVisibleTasks(nextAllTasks),
                 _allTasks: nextAllTasks,
                 lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),

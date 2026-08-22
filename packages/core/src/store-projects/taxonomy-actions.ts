@@ -1,4 +1,4 @@
-import { ensureDeviceId, getNextDataChangeAt, nextRevision, normalizeTagId, persist, selectVisibleTasks } from '../store-helpers';
+import { ensureDeviceId, getNextDataChangeAt, nextRevision, normalizeTagId, persist } from '../store-helpers';
 import type { ProjectActionContext, TaxonomyActions } from './shared';
 import { dedupeTagValuesLastWins, formatTagIdPreservingCase } from './shared';
 
@@ -39,17 +39,12 @@ export const createTaxonomyActions = ({
                 };
             });
 
-            const newVisibleTasks = selectVisibleTasks(newAllTasks);
-            const newVisibleProjects = newAllProjects.filter((p) => !p.deletedAt);
-
             persist(set, debouncedSave, state, {
                 tasks: newAllTasks,
                 projects: newAllProjects,
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             });
             return {
-                tasks: newVisibleTasks,
-                projects: newVisibleProjects,
                 _allTasks: newAllTasks,
                 _allProjects: newAllProjects,
                 lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
@@ -98,17 +93,12 @@ export const createTaxonomyActions = ({
                 };
             });
 
-            const newVisibleTasks = selectVisibleTasks(newAllTasks);
-            const newVisibleProjects = newAllProjects.filter((p) => !p.deletedAt);
-
             persist(set, debouncedSave, state, {
                 tasks: newAllTasks,
                 projects: newAllProjects,
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             });
             return {
-                tasks: newVisibleTasks,
-                projects: newVisibleProjects,
                 _allTasks: newAllTasks,
                 _allProjects: newAllProjects,
                 lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
@@ -137,14 +127,11 @@ export const createTaxonomyActions = ({
                 };
             });
 
-            const newVisibleTasks = selectVisibleTasks(newAllTasks);
-
             persist(set, debouncedSave, state, {
                 tasks: newAllTasks,
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             });
             return {
-                tasks: newVisibleTasks,
                 _allTasks: newAllTasks,
                 lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
@@ -183,14 +170,11 @@ export const createTaxonomyActions = ({
                 };
             });
 
-            const newVisibleTasks = selectVisibleTasks(newAllTasks);
-
             persist(set, debouncedSave, state, {
                 tasks: newAllTasks,
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             });
             return {
-                tasks: newVisibleTasks,
                 _allTasks: newAllTasks,
                 lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),

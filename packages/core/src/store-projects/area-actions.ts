@@ -1,5 +1,5 @@
 import { DEFAULT_PROJECT_COLOR } from '../color-constants';
-import { ensureDeviceId, getNextDataChangeAt, nextRevision, persist, selectVisibleTasks } from '../store-helpers';
+import { ensureDeviceId, getNextDataChangeAt, nextRevision, persist } from '../store-helpers';
 import { logWarn } from '../logger';
 import { clearDerivedCache } from '../store-settings';
 import { generateUUID as uuidv4 } from '../uuid';
@@ -51,13 +51,11 @@ export const createAreaActions = ({
             };
             createdArea = newArea;
             const newAllAreas = [...allAreas, newArea].sort((a, b) => a.order - b.order);
-            const newVisibleAreas = newAllAreas.filter((area) => !area.deletedAt);
             persist(set, debouncedSave, state, {
                 areas: newAllAreas,
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             });
             return {
-                areas: newVisibleAreas,
                 _allAreas: newAllAreas,
                 lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
@@ -159,8 +157,6 @@ export const createAreaActions = ({
                             revBy: deviceState.deviceId,
                         };
                     });
-                    const newVisibleProjects = newAllProjects.filter(p => !p.deletedAt);
-                    const newVisibleTasks = selectVisibleTasks(newAllTasks);
                     clearDerivedCache();
                     persist(set, debouncedSave, state, {
                         tasks: newAllTasks,
@@ -169,11 +165,8 @@ export const createAreaActions = ({
                         ...(deviceState.updated ? { settings: deviceState.settings } : {}),
                     });
                     return {
-                        areas: newAllAreas.filter((item) => !item.deletedAt),
                         _allAreas: newAllAreas,
-                        projects: newVisibleProjects,
                         _allProjects: newAllProjects,
-                        tasks: newVisibleTasks,
                         _allTasks: newAllTasks,
                         lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
                         ...(deviceState.updated ? { settings: deviceState.settings } : {}),
@@ -222,14 +215,8 @@ export const createAreaActions = ({
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             });
             return {
-                areas: newAllAreas.filter((item) => !item.deletedAt),
                 _allAreas: newAllAreas,
-                ...(projectsChanged
-                    ? {
-                        projects: newAllProjects.filter((item) => !item.deletedAt),
-                        _allProjects: newAllProjects,
-                    }
-                    : {}),
+                ...(projectsChanged ? { _allProjects: newAllProjects } : {}),
                 lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             };
@@ -298,9 +285,6 @@ export const createAreaActions = ({
                     revBy: deviceState.deviceId,
                 };
             });
-            const newVisibleProjects = newAllProjects.filter(p => !p.deletedAt);
-            const newVisibleTasks = selectVisibleTasks(newAllTasks);
-            const newVisibleAreas = newAllAreas.filter((item) => !item.deletedAt);
             clearDerivedCache();
             persist(set, debouncedSave, state, {
                 tasks: newAllTasks,
@@ -309,11 +293,8 @@ export const createAreaActions = ({
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             });
             return {
-                areas: newVisibleAreas,
                 _allAreas: newAllAreas,
-                projects: newVisibleProjects,
                 _allProjects: newAllProjects,
-                tasks: newVisibleTasks,
                 _allTasks: newAllTasks,
                 lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
@@ -417,10 +398,6 @@ export const createAreaActions = ({
                     revBy: deviceState.deviceId,
                 };
             });
-            const newVisibleAreas = newAllAreas.filter((item) => !item.deletedAt);
-            const newVisibleProjects = newAllProjects.filter((project) => !project.deletedAt);
-            const newVisibleSections = newAllSections.filter((section) => !section.deletedAt);
-            const newVisibleTasks = selectVisibleTasks(newAllTasks);
             clearDerivedCache();
             persist(set, debouncedSave, state, {
                 areas: newAllAreas,
@@ -430,13 +407,9 @@ export const createAreaActions = ({
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             });
             return {
-                areas: newVisibleAreas,
                 _allAreas: newAllAreas,
-                projects: newVisibleProjects,
                 _allProjects: newAllProjects,
-                sections: newVisibleSections,
                 _allSections: newAllSections,
-                tasks: newVisibleTasks,
                 _allTasks: newAllTasks,
                 lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),

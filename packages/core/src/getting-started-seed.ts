@@ -3,8 +3,6 @@ import {
     getNextDataChangeAt,
     nextRevision,
     persist,
-    selectVisibleProjects,
-    selectVisibleTasks,
 } from './store-helpers';
 import { generateUUID as uuidv4 } from './uuid';
 import { STARTER_SEED_STRINGS } from './i18n/starter-seed-strings';
@@ -418,8 +416,6 @@ export const createSeedGettingStartedAction = (
         });
 
         return {
-            tasks: selectVisibleTasks(nextTasks),
-            projects: selectVisibleProjects(nextProjects),
             _allTasks: nextTasks,
             _allProjects: nextProjects,
             ...(deviceState.updated ? { settings: deviceState.settings } : {}),
