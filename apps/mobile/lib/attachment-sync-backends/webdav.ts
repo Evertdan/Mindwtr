@@ -23,6 +23,7 @@ import {
   getAttachmentsDir,
   getWebdavDownloadBackoff,
   isHttpAttachmentUri,
+  describeAttachmentUriForLog,
   logAttachmentInfo,
   logAttachmentWarn,
   markAttachmentUnrecoverable,
@@ -143,8 +144,7 @@ export const syncWebdavAttachments = async (
     const existsLocally = hasLocalPath ? await fileExists(uri) : false;
     logAttachmentInfo('WebDAV attachment check', {
       id: attachment.id,
-      title: attachment.title || 'attachment',
-      uri,
+      uri: describeAttachmentUriForLog(uri),
       cloud: attachment.cloudKey ? 'set' : 'missing',
       local: hasLocalPath ? 'true' : 'false',
       exists: existsLocally ? 'true' : 'false',
@@ -248,7 +248,7 @@ export const syncWebdavAttachments = async (
         }
         const validation = await validateAttachmentForUpload(attachment, size);
         if (!validation.valid) {
-          logAttachmentWarn(`Attachment validation failed (${validation.error}) for ${attachment.title}`);
+          logAttachmentWarn(`Attachment validation failed (${validation.error}) for ${attachment.id}`);
           return false;
         }
         const cloudKey = buildCloudKey(attachment);
@@ -344,7 +344,7 @@ export const syncWebdavAttachments = async (
         if (error instanceof LocalReadFailure) {
           const mutated = markAttachmentUnrecoverable(attachment);
           logAttachmentWarn(
-            `Attachment local file is unreadable; marking unrecoverable (${attachment.title})`,
+            `Attachment local file is unreadable; marking unrecoverable (${attachment.id})`,
             error.cause
           );
           return mutated;
@@ -357,7 +357,7 @@ export const syncWebdavAttachments = async (
           'failed',
           error instanceof Error ? error.message : String(error)
         );
-        logAttachmentWarn(`Failed to upload attachment ${attachment.title}`, error);
+        logAttachmentWarn(`Failed to upload attachment ${attachment.id}`, error);
         return false;
       }
     },
@@ -430,7 +430,7 @@ export const syncWebdavAttachments = async (
         'failed',
         error instanceof Error ? error.message : String(error)
       );
-      logAttachmentWarn(`Failed to download attachment ${attachment.title}`, error);
+      logAttachmentWarn(`Failed to download attachment ${attachment.id}`, error);
     },
   });
 

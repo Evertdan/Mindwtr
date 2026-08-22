@@ -1437,6 +1437,29 @@ describe('attachment sync', () => {
       expect(attachment?.contentRev).toBe(1);
     });
 
+    it('never puts an attachment title or file name into a log line (SEC-16, #854)', async () => {
+      const appLog = await import('./app-log');
+      const { syncWebdavAttachments } = await import('./attachment-sync');
+      const core = await import('@mindwtr/core');
+      const appData = makeEditedAppData('logged-webdav');
+      const attachment = appData.tasks[0].attachments![0];
+      attachment.title = 'Divorce settlement draft.pdf';
+      attachment.uri = 'file://elsewhere/Divorce settlement draft.pdf';
+      fileSystemMock.getInfoAsync.mockResolvedValue({ exists: true, size: 4, modificationTime: 2 });
+      fileSystemMock.readAsStringAsync.mockResolvedValue(base64Of(NEW_BYTES));
+      vi.mocked(core.webdavFileExists).mockResolvedValue(true);
+
+      await syncWebdavAttachments(
+        appData,
+        { url: 'https://example.com/data.json', username: 'u', password: 'p' },
+        'https://example.com',
+      );
+
+      const logged = [...vi.mocked(appLog.logInfo).mock.calls, ...vi.mocked(appLog.logWarn).mock.calls];
+      expect(logged.length).toBeGreaterThan(0);
+      expect(JSON.stringify(logged)).not.toContain('Divorce settlement draft');
+    });
+
     it('refuses a public http WebDAV target before making any request (SEC-10a)', async () => {
       // The expo-file-system uploader talks to the server directly, so core's cleartext
       // guard never sees it; without the mobile guard this streamed Basic credentials

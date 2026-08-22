@@ -61,17 +61,17 @@ export const syncCloudAttachments = async (
 
   const pendingUploadMutations: PendingCloudUploadMutation[] = [];
 
-  const cleanupUploadedCloudFile = async (uploadUrl: string, title: string) => {
+  const cleanupUploadedCloudFile = async (uploadUrl: string, attachmentId: string) => {
     try {
       await cloudDeleteFile(uploadUrl, { token: cloudConfig.token });
     } catch (deleteError) {
-      logAttachmentWarn(`Failed to clean up aborted attachment upload ${title}`, deleteError);
+      logAttachmentWarn(`Failed to clean up aborted attachment upload ${attachmentId}`, deleteError);
     }
   };
 
   const cleanupPendingUploadMutations = async () => {
     for (const pending of pendingUploadMutations) {
-      await cleanupUploadedCloudFile(pending.uploadUrl, pending.attachment.title);
+      await cleanupUploadedCloudFile(pending.uploadUrl, pending.attachment.id);
     }
     pendingUploadMutations.length = 0;
   };
@@ -122,7 +122,7 @@ export const syncCloudAttachments = async (
 
         const validation = await validateAttachmentForUpload(attachment, fileSize);
         if (!validation.valid) {
-          logAttachmentWarn(`Attachment validation failed (${validation.error}) for ${attachment.title}`);
+          logAttachmentWarn(`Attachment validation failed (${validation.error}) for ${attachment.id}`);
           continue;
         }
         const totalBytes = Math.max(0, Number(fileSize ?? 0));
@@ -177,19 +177,19 @@ export const syncCloudAttachments = async (
       } catch (error) {
         if (shouldPropagateError || isAbortLikeError(error, options.signal)) {
           if (uploadUrlForCleanup) {
-            await cleanupUploadedCloudFile(uploadUrlForCleanup, attachment.title);
+            await cleanupUploadedCloudFile(uploadUrlForCleanup, attachment.id);
           }
           await cleanupPendingUploadMutations();
           throw error;
         }
         if (uploadUrlForCleanup && !localReadFailed) {
-          await cleanupUploadedCloudFile(uploadUrlForCleanup, attachment.title);
+          await cleanupUploadedCloudFile(uploadUrlForCleanup, attachment.id);
         }
         if (localReadFailed) {
           if (markAttachmentUnrecoverable(attachment)) {
             didMutate = true;
           }
-          logAttachmentWarn(`Attachment local file is unreadable; marking unrecoverable (${attachment.title})`, error);
+          logAttachmentWarn(`Attachment local file is unreadable; marking unrecoverable (${attachment.id})`, error);
         }
         reportProgress(
           attachment.id,
@@ -199,7 +199,7 @@ export const syncCloudAttachments = async (
           'failed',
           error instanceof Error ? error.message : String(error)
         );
-        logAttachmentWarn(`Failed to upload attachment ${attachment.title}`, error);
+        logAttachmentWarn(`Failed to upload attachment ${attachment.id}`, error);
       }
     }
   }

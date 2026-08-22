@@ -167,7 +167,7 @@ export const syncCloudKitAttachments = async (
                 const validation = await validateAttachmentForUpload(attachment, assetFile.size ?? attachment.size);
                 if (!validation.valid) {
                     reportProgress(attachment.id, 'upload', 0, attachment.size ?? 0, 'failed', validation.error);
-                    logAttachmentWarn(`Attachment validation failed (${validation.error}) for ${attachment.title}`);
+                    logAttachmentWarn(`Attachment validation failed (${validation.error}) for ${attachment.id}`);
                     return assetFile.mutated;
                 }
 
@@ -195,7 +195,7 @@ export const syncCloudKitAttachments = async (
                     'failed',
                     error instanceof Error ? error.message : String(error),
                 );
-                logAttachmentWarn(`Failed to upload CloudKit attachment ${attachment.title}`, error);
+                logAttachmentWarn(`Failed to upload CloudKit attachment ${attachment.id}`, error);
                 return false;
             }
         },
@@ -227,7 +227,7 @@ export const syncCloudKitAttachments = async (
                     'failed',
                     error instanceof Error ? error.message : String(error),
                 );
-                logAttachmentWarn(`Failed to download CloudKit attachment ${attachment.title}`, error);
+                logAttachmentWarn(`Failed to download CloudKit attachment ${attachment.id}`, error);
                 return false;
             }
         },

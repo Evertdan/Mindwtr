@@ -134,7 +134,7 @@ export const syncFileAttachments = async (
       if (size != null) {
         const validation = await validateAttachmentForUpload(attachment, size, FILE_BACKEND_VALIDATION_CONFIG);
         if (!validation.valid) {
-          logAttachmentWarn(`Attachment validation failed (${validation.error}) for ${attachment.title}`);
+          logAttachmentWarn(`Attachment validation failed (${validation.error}) for ${attachment.id}`);
           return false;
         }
       }
@@ -182,7 +182,7 @@ export const syncFileAttachments = async (
       return true;
     },
     onUploadError: (attachment, error) => {
-      logAttachmentWarn(`Failed to copy attachment ${attachment.title} to sync folder`, error);
+      logAttachmentWarn(`Failed to copy attachment ${attachment.id} to sync folder`, error);
     },
   });
 

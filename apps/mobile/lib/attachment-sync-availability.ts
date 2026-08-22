@@ -82,7 +82,7 @@ const ensureFileAttachmentAvailable = async (
     await writeBytesSafely(targetUri, await openAttachmentBytesFromDownload(base64ToBytes(base64), material));
     return { ...attachment, uri: targetUri, localStatus: 'available' };
   } catch (error) {
-    logAttachmentWarn(`Failed to copy attachment ${attachment.title} from sync folder`, error);
+    logAttachmentWarn(`Failed to copy attachment ${attachment.id} from sync folder`, error);
     return null;
   }
 };
@@ -151,7 +151,7 @@ const ensureAttachmentAvailableInternal = async (attachment: Attachment): Promis
           'failed',
           error instanceof Error ? error.message : String(error)
         );
-        logAttachmentWarn(`Failed to download attachment ${localAttachment.title}`, error);
+        logAttachmentWarn(`Failed to download attachment ${localAttachment.id}`, error);
         return null;
       }
     }
@@ -180,7 +180,7 @@ const ensureAttachmentAvailableInternal = async (attachment: Attachment): Promis
         'failed',
         error instanceof Error ? error.message : String(error)
       );
-      logAttachmentWarn(`Failed to download attachment ${localAttachment.title}`, error);
+      logAttachmentWarn(`Failed to download attachment ${localAttachment.id}`, error);
       return null;
     }
   }
@@ -223,7 +223,7 @@ const ensureAttachmentAvailableInternal = async (attachment: Attachment): Promis
         'failed',
         error instanceof Error ? error.message : String(error)
       );
-      logAttachmentWarn(`Failed to download attachment ${localAttachment.title}`, error);
+      logAttachmentWarn(`Failed to download attachment ${localAttachment.id}`, error);
       return null;
     }
   }

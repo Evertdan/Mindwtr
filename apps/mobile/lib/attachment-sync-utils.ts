@@ -572,8 +572,7 @@ export const persistAttachmentLocallyDetailed = async (attachment: Attachment): 
   try {
     logAttachmentInfo('Cache attachment start', {
       id: attachment.id,
-      title: attachment.title || 'attachment',
-      uri,
+      uri: describeAttachmentUriForLog(uri),
       size: Number.isFinite(attachment.size ?? NaN) ? String(attachment.size) : 'unknown',
     });
     const alreadyExists = await fileExists(targetUri);
@@ -593,7 +592,7 @@ export const persistAttachmentLocallyDetailed = async (attachment: Attachment): 
     }
     logAttachmentInfo('Cache attachment done', {
       id: attachment.id,
-      uri: targetUri,
+      uri: describeAttachmentUriForLog(targetUri),
       size: Number.isFinite(size ?? NaN) ? String(size) : 'unknown',
     });
     return {
@@ -649,6 +648,18 @@ export const canUploadAttachmentFrom = (uri: string): boolean => {
   const attachmentsDir = getManagedAttachmentsDir();
   if (!attachmentsDir) return false;
   return uri.startsWith(attachmentsDir);
+};
+
+/**
+ * A uri is task content — the file name is the user's (#854: ids and field names only).
+ * Log the scheme, whether the file sits in our own storage, and the extension; those are
+ * what every attachment bug so far actually needed, and none of them is user text.
+ */
+export const describeAttachmentUriForLog = (uri?: string): string => {
+  if (!uri) return 'none';
+  const scheme = /^[A-Za-z][A-Za-z0-9+.-]*:/.exec(uri)?.[0] ?? '';
+  const location = canUploadAttachmentFrom(uri) ? 'managed' : 'external';
+  return `${scheme}${location}${extractExtension(uri.split('?')[0])}`;
 };
 
 export const attachmentNeedsManagedLocalCopy = (attachment: Attachment): boolean => {
