@@ -38,7 +38,20 @@ inline fun <T> startupSection(phase: String, block: () -> T): T {
 // writes them into the app's own package. android-manifest-fixes.js registers
 // them by fully-qualified name.
 
+const selfLaunchGuardFunction = `  private fun isSelfLaunchedIntent(intent: Intent?): Boolean {
+    // MainActivity is exported, so any app can start it carrying taskId /
+    // actionIdentifier extras. The referrer is the package that sent the
+    // launch — for our own notification PendingIntents that is us, and
+    // Instrumentation swaps it in for the duration of onNewIntent too. But
+    // getReferrer() prefers the caller-supplied EXTRA_REFERRER over it, so an
+    // intent carrying either referrer extra is disqualified outright.
+    if (intent == null) return false
+    if (intent.hasExtra(Intent.EXTRA_REFERRER) || intent.hasExtra(Intent.EXTRA_REFERRER_NAME)) return false
+    return referrer?.host == packageName
+  }`;
+
 const notificationCacheFunction = `  private fun cacheNotificationOpenPayload(intent: Intent?): LinkedHashMap<String, String>? {
+    if (!isSelfLaunchedIntent(intent)) return null
     val extras = intent?.extras ?: return null
     val payload = LinkedHashMap<String, String>()
     fun copyPayloadValue(key: String, value: Any?) {
@@ -317,7 +330,11 @@ const patchMainActivity = (source) => {
 
   if (
     next.includes('private fun cacheNotificationOpenPayload(intent: Intent?)')
-    && (!next.includes('copyNestedData(extras.get("data"))') || !next.includes('"projectId", "context", "kind"'))
+    && (
+      !next.includes('copyNestedData(extras.get("data"))')
+      || !next.includes('"projectId", "context", "kind"')
+      || !next.includes('if (!isSelfLaunchedIntent(intent)) return null')
+    )
   ) {
     next = next.replace(
       /  private fun cacheNotificationOpenPayload\(intent: Intent\?\): LinkedHashMap<String, String>\? \{[\s\S]*?\n  \}\n\n  private fun emitNotificationOpenPayload/,
@@ -332,6 +349,8 @@ const patchMainActivity = (source) => {
 ${createNoteIntentFunction}
 
 ${contextAutomationIntentFunction}
+
+${selfLaunchGuardFunction}
 
 ${notificationCacheFunction}
 
@@ -364,6 +383,16 @@ ${notificationCacheFunction}
     next = next.replace(
       '\n  private fun cacheNotificationOpenPayload(intent: Intent?)',
       `\n${contextAutomationIntentFunction}\n\n  private fun cacheNotificationOpenPayload(intent: Intent?)`
+    );
+  }
+
+  if (
+    next.includes('private fun cacheNotificationOpenPayload(intent: Intent?)')
+    && !next.includes('private fun isSelfLaunchedIntent(intent: Intent?)')
+  ) {
+    next = next.replace(
+      '\n  private fun cacheNotificationOpenPayload(intent: Intent?)',
+      `\n${selfLaunchGuardFunction}\n\n  private fun cacheNotificationOpenPayload(intent: Intent?)`
     );
   }
 

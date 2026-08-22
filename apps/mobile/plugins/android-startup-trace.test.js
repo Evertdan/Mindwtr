@@ -130,6 +130,120 @@ class MainActivity : ReactActivity() {
     expect(output).toContain('emit("OnNotificationOpened", JSONObject(payload).toString())');
   });
 
+  it('only accepts notification payloads from this app', () => {
+    const input = `package tech.dongdongbh.mindwtr
+import expo.modules.splashscreen.SplashScreenManager
+
+import android.os.Build
+import android.os.Bundle
+
+import com.facebook.react.ReactActivity
+import com.facebook.react.ReactActivityDelegate
+import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
+import com.facebook.react.defaults.DefaultReactActivityDelegate
+
+import expo.modules.ReactActivityDelegateWrapper
+
+class MainActivity : ReactActivity() {
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(null)
+  }
+
+  override fun getMainComponentName(): String = "main"
+}
+`;
+
+    const output = patchMainActivity(input);
+
+    // Both entry points run through cacheNotificationOpenPayload, so guarding it
+    // once covers the cold start and the onNewIntent replay.
+    expect(output).toContain('private fun isSelfLaunchedIntent(intent: Intent?): Boolean');
+    expect(output).toContain('if (!isSelfLaunchedIntent(intent)) return null');
+    expect(output).toContain('referrer?.host == packageName');
+    // getReferrer() prefers the caller-supplied extras, so those disqualify the intent.
+    expect(output).toContain('Intent.EXTRA_REFERRER');
+    expect(output).toContain('Intent.EXTRA_REFERRER_NAME');
+  });
+
+  it('adds the payload caller guard to an already-patched MainActivity', () => {
+    const input = `package tech.dongdongbh.mindwtr
+import expo.modules.splashscreen.SplashScreenManager
+
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+
+import com.facebook.react.ReactApplication
+import com.facebook.react.ReactActivity
+import com.facebook.react.ReactActivityDelegate
+import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
+import com.facebook.react.defaults.DefaultReactActivityDelegate
+import com.facebook.react.modules.core.DeviceEventManagerModule
+
+import org.json.JSONObject
+import tech.dongdongbh.mindwtr.notificationopenintents.NotificationOpenPayloadStore
+
+import expo.modules.ReactActivityDelegateWrapper
+
+class MainActivity : ReactActivity() {
+  override fun onCreate(savedInstanceState: Bundle?) {
+    startupMark("native.main_activity.on_create:start")
+    normalizeCreateNoteIntent(intent)
+    normalizeContextAutomationIntent(intent)
+    startupSection("native.main_activity.super_on_create") {
+      super.onCreate(null)
+    }
+    cacheNotificationOpenPayload(intent)
+    startupMark("native.main_activity.on_create:end")
+  }
+
+  override fun onNewIntent(intent: Intent) {
+    normalizeCreateNoteIntent(intent)
+    normalizeContextAutomationIntent(intent)
+    super.onNewIntent(intent)
+    setIntent(intent)
+    val payload = cacheNotificationOpenPayload(intent) ?: return
+    emitNotificationOpenPayload(payload)
+  }
+
+  override fun getMainComponentName(): String = "main"
+
+  private fun normalizeCreateNoteIntent(intent: Intent?) {
+  }
+
+  private fun normalizeContextAutomationIntent(intent: Intent?) {
+  }
+
+  private fun cacheNotificationOpenPayload(intent: Intent?): LinkedHashMap<String, String>? {
+    val extras = intent?.extras ?: return null
+    val payload = LinkedHashMap<String, String>()
+    fun copyPayloadValue(key: String, value: Any?) {
+      if (value != null && value != JSONObject.NULL) payload[key] = value.toString()
+    }
+    fun copyNestedData(value: Any?) {
+    }
+    listOf("alarmKey", "id", "taskId", "projectId", "context", "kind", "actionIdentifier").forEach { key ->
+      copyPayloadValue(key, extras.get(key))
+    }
+    copyNestedData(extras.get("data"))
+    if (payload.isEmpty()) return null
+    NotificationOpenPayloadStore.cache(payload)
+    return payload
+  }
+
+  private fun emitNotificationOpenPayload(payload: Map<String, String>) {
+  }
+}
+`;
+
+    const output = patchMainActivity(input);
+
+    expect(output).toContain('private fun isSelfLaunchedIntent(intent: Intent?): Boolean');
+    expect(output).toContain('if (!isSelfLaunchedIntent(intent)) return null');
+    expect(patchMainActivity(output)).toBe(output);
+  });
+
   it('keeps the MainActivity notification patch idempotent', () => {
     const input = `package tech.dongdongbh.mindwtr
 import expo.modules.splashscreen.SplashScreenManager
