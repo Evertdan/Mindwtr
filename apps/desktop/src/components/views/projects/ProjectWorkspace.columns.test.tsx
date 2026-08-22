@@ -388,6 +388,18 @@ describe('ProjectWorkspace section notes preview', () => {
         expect(previewTexts(container)).toEqual(['Kickoff scope']);
     });
 
+    it('strips markdown from the tooltip and ellipsises what it cut', () => {
+        const longNotes = `**Bold** [label](https://example.com) ${'x'.repeat(400)}`;
+        const { container } = renderWorkspace({ store: { sections: withNotes(longNotes) } });
+
+        const title = container.querySelector('[data-section-notes-preview]')?.getAttribute('title') ?? '';
+        // The tooltip is plain text: markers would be shown literally there.
+        expect(title).not.toContain('**');
+        expect(title).not.toContain('](');
+        expect(title.startsWith('Bold label ')).toBe(true);
+        expect(title.endsWith('…')).toBe(true);
+    });
+
     it('shows the preview in the columns layout too', () => {
         const { container } = renderWorkspace({
             layout: 'columns',

@@ -13,6 +13,7 @@ import { Attachment,
     type TaskSortBy,
     generateUUID,
     getInlineMarkdownPreview,
+    stripMarkdown,
     sortTasksBy,
     splitCompletedTasks, tFallback, } from '@mindwtr/core';
 import type { DragEndEvent } from '@dnd-kit/core';
@@ -1138,6 +1139,16 @@ export function ProjectWorkspace({
         const notesPreview = hasNotes && !notesOpen
             ? getInlineMarkdownPreview(group.section.description ?? '').slice(0, SECTION_NOTES_PREVIEW_MAX_CHARS)
             : '';
+        // The tooltip is plain text, so it gets the markers stripped rather than
+        // rendered, and an ellipsis where the preview cut the notes short.
+        const notesTooltip = notesPreview
+            ? (() => {
+                const stripped = stripMarkdown(getInlineMarkdownPreview(group.section.description ?? ''));
+                return stripped.length > SECTION_NOTES_PREVIEW_MAX_CHARS
+                    ? `${stripped.slice(0, SECTION_NOTES_PREVIEW_MAX_CHARS).trimEnd()}…`
+                    : stripped;
+            })()
+            : '';
         const disabledArrow = 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-muted-foreground';
 
         return (
@@ -1226,7 +1237,7 @@ export function ProjectWorkspace({
                 {notesPreview && (
                     <div
                         data-section-notes-preview
-                        title={notesPreview}
+                        title={notesTooltip}
                         className="w-full truncate text-xs font-normal text-muted-foreground"
                     >
                         <InlineMarkdown markdown={notesPreview} interactiveLinks={false} />
