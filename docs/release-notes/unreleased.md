@@ -4,10 +4,9 @@ Changes collected after `v1.2.1` and before the next version tag.
 
 ## Highlights
 
-- Mobile reminder rescheduling no longer rewrites its stored alarms or queries the system alarm list after every edit, and very large libraries stop re-serializing the whole library for a backup they already know is too big to keep.
-
 ## Full Change List
 
+- Mobile reminder rescheduling no longer rewrites its stored alarms or queries the system alarm list after every edit, and very large libraries stop re-serializing the whole library for a backup they already know is too big to keep. (#766)
 - Large libraries: editing, completing, or adding a task now redraws lists noticeably faster. Sorting a list and rebuilding the counts behind it were re-reading the same dates thousands of times per keystroke-sized change; both now read each date once. (#766)
 - Desktop: right-clicking one task and then another no longer leaves the first row wearing the highlight ring — dismissing a context menu with the pointer no longer snaps keyboard focus back to the old row. Closing the menu with Escape still returns focus to where you were. (#999)
 - Desktop: the sync backend state file in your profile folder is now called `sync-backend-state.json`. It tracks whichever sync backend you picked, not just Dropbox, so the old Dropbox-specific name was misleading; existing profiles are renamed automatically on the next launch. (#1007)
