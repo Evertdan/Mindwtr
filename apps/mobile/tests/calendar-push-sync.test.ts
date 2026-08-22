@@ -134,68 +134,6 @@ vi.mock('@mindwtr/core', async (importOriginal) => ({
         getState: mockGetState,
         subscribe: mockSubscribe,
     },
-    buildCalendarPushEventFields: (
-        task: { description?: string; attachments?: { kind?: string; uri?: string; deletedAt?: string }[] },
-        context: { leadingNote?: string | null } = {},
-    ) => {
-        const links = (task.attachments ?? [])
-            .filter((attachment) => !attachment.deletedAt && attachment.kind === 'link')
-            .map((attachment) => typeof attachment.uri === 'string' ? attachment.uri.trim() : '')
-            .filter((uri) => uri.startsWith('http://') || uri.startsWith('https://') || uri.startsWith('mailto:'));
-        const blocks = [
-            context.leadingNote?.trim() || '',
-            task.description?.trim() || '',
-            links.length > 0 ? links.map((uri) => 'Link: ' + uri).join('\n') : '',
-        ].filter(Boolean);
-        return { notes: blocks.join('\n\n'), url: links[0] ?? null };
-    },
-    getTaskCalendarOccurrenceDate: (task: { startTime?: string; dueDate?: string }): string | undefined =>
-        task.startTime ?? task.dueDate,
-    hasTimeComponent: (dateStr: string | null | undefined): boolean =>
-        Boolean(dateStr && /[T\s]\d{2}:\d{2}/.test(dateStr)),
-    timeEstimateToMinutes: (estimate?: string): number => {
-        if (typeof estimate === 'string' && estimate.startsWith('custom:')) {
-            const minutes = Number(estimate.slice('custom:'.length));
-            return Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes) : 30;
-        }
-        switch (estimate) {
-            case '5min': return 5;
-            case '10min': return 10;
-            case '15min': return 15;
-            case '30min': return 30;
-            case '1hr': return 60;
-            case '2hr': return 120;
-            case '3hr': return 180;
-            case '4hr':
-            case '4hr+': return 240;
-            default: return 30;
-        }
-    },
-    isProjectedRecurringTask: (task: unknown): boolean =>
-        Boolean(task && typeof task === 'object' && (task as { isProjectedRecurringTask?: unknown }).isProjectedRecurringTask === true),
-    safeFormatDate: (dateStr: string | Date | null | undefined, formatStr: string, fallback = ''): string => {
-        if (!dateStr) return fallback;
-        const date = typeof dateStr === 'string'
-            ? /^(\d{4})-(\d{2})-(\d{2})$/.test(dateStr)
-                ? new Date(Number(dateStr.slice(0, 4)), Number(dateStr.slice(5, 7)) - 1, Number(dateStr.slice(8, 10)))
-                : new Date(dateStr)
-            : dateStr;
-        if (Number.isNaN(date.getTime())) return fallback;
-        if (formatStr === 'PP') {
-            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        }
-        return date.toISOString();
-    },
-    // Real implementation: parses YYYY-MM-DD as LOCAL midnight (not UTC).
-    safeParseDate: (dateStr: string | null | undefined): Date | null => {
-        if (!dateStr) return null;
-        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
-        if (match) {
-            return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-        }
-        const d = new Date(dateStr);
-        return isNaN(d.getTime()) ? null : d;
-    },
 }));
 
 vi.mock('@/lib/storage-adapter', () => ({
@@ -246,6 +184,9 @@ function makeTask(overrides: Partial<{
     updatedAt: string;
     description: string;
     location: string | null;
+    projectId: string;
+    sectionId: string;
+    attachments: { id: string; kind: string; uri: string; deletedAt?: string | null }[];
 }> = {}) {
     return {
         id: 'task-1',
@@ -269,11 +210,15 @@ function setupEnabled(calendarId = 'cal-1', targetCalendarId: string | null = nu
     }
 }
 
-function setStoreTasks(tasks: unknown[], allTasks: unknown[] = tasks) {
+function setStoreTasks(
+    tasks: unknown[],
+    allTasks: unknown[] = tasks,
+    { projects = [], sections = [] }: Partial<Pick<MockCalendarStoreState, 'projects' | 'sections'>> = {},
+) {
     mockGetState.mockReturnValue({
         tasks,
-        projects: [],
-        sections: [],
+        projects,
+        sections,
         _allTasks: allTasks,
         _tasksById: new Map(allTasks.map((task) => [(task as { id: string }).id, task])),
     });
@@ -818,8 +763,42 @@ describe('buildEventDetails — date-only calendar events stay on the intended d
         await runFullCalendarSync();
 
         expect(mockCreateEventAsync).toHaveBeenCalledWith('cal-1', expect.objectContaining({
-            notes: 'Bring notes',
+            notes: 'Status: Next\n\nBring notes',
             location: 'Office 2A',
+        }));
+    });
+
+    it('pushes project, section, status, effort, and links into the event notes', async () => {
+        setupEnabled();
+        const task = makeTask({
+            status: 'waiting',
+            timeEstimate: 'custom:90',
+            projectId: 'proj-1',
+            sectionId: 'sec-1',
+            description: 'Bring notes',
+            attachments: [
+                { id: 'att-1', kind: 'link', uri: 'https://example.com/agenda' },
+                { id: 'att-2', kind: 'link', uri: 'mindwtr://task/other' },
+            ],
+        });
+        setStoreTasks([task], [task], {
+            projects: [{ id: 'proj-1', title: 'Launch' }],
+            sections: [{ id: 'sec-1', title: 'Prep' }],
+        });
+
+        await runFullCalendarSync();
+
+        expect(mockCreateEventAsync).toHaveBeenCalledWith('cal-1', expect.objectContaining({
+            notes: [
+                'Project: Launch › Prep',
+                'Status: Waiting',
+                'Effort: 1.5 h',
+                '',
+                'Bring notes',
+                '',
+                'Link: https://example.com/agenda',
+            ].join('\n'),
+            url: 'https://example.com/agenda',
         }));
     });
 
