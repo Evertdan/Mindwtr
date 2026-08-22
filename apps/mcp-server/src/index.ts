@@ -818,23 +818,27 @@ export const createMindwtrMcpServer = (service: MindwtrService, config: ServerCo
 };
 
 const attachLifecycleHandlers = (service: MindwtrService, onShutdown?: () => void) => {
-  const closeService = () => {
+  const closeService = async () => {
     onShutdown?.();
-    void service.close().catch((error) => {
+    try {
+      await service.close();
+    } catch (error) {
       logError('Failed to close database connection', error);
-    });
+    }
   };
 
   process.on('exit', () => {
-    closeService();
+    // 'exit' handlers must run synchronously - Node stops the event loop right after this
+    // callback returns, so an awaited close here would never actually finish. This is only a
+    // best-effort backstop for a process.exit() called from somewhere else; SIGINT/SIGTERM
+    // below are what actually wait for the close (and its WAL checkpoint) before exiting.
+    void closeService();
   });
   process.on('SIGINT', () => {
-    closeService();
-    process.exit(0);
+    void closeService().finally(() => process.exit(0));
   });
   process.on('SIGTERM', () => {
-    closeService();
-    process.exit(0);
+    void closeService().finally(() => process.exit(0));
   });
 };
 

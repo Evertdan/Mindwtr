@@ -5,7 +5,7 @@ import { join } from 'path';
 
 import { createService } from './service.js';
 import { parseQuickAdd } from '@mindwtr/core';
-import { runCoreService } from './core-adapter.js';
+import { closeCoreAdapter, runCoreService } from './core-adapter.js';
 import * as mcpDb from './db.js';
 import * as mcpQueries from './queries.js';
 
@@ -315,12 +315,16 @@ describe('mcp service', () => {
 
   test('maps updateTask inputs and closes shared db handle', async () => {
     let closedDbCount = 0;
+    let closedCoreAdapterCount = 0;
     let receivedUpdateInput: any = null;
     const fakeDb = {} as any;
     const deps = {
       openMindwtrDb: async () => ({ db: fakeDb }),
       closeDb: () => {
         closedDbCount += 1;
+      },
+      closeCoreAdapter: async () => {
+        closedCoreAdapterCount += 1;
       },
       listTasks: () => [],
       listProjects: () => [],
@@ -380,6 +384,7 @@ describe('mcp service', () => {
     expect(receivedUpdateInput.updates.energyLevel).toBe('low');
     expect(receivedUpdateInput.updates.assignedTo).toBeUndefined();
     expect(closedDbCount).toBe(1);
+    expect(closedCoreAdapterCount).toBe(1);
   });
 
   test('rejects addTask when token values are blank', async () => {
@@ -639,6 +644,7 @@ describe('mcp service', () => {
     const deps = {
       ...mcpDb,
       ...mcpQueries,
+      closeCoreAdapter,
       // The core parser, NOT queries.ts's narrowing wrapper of the same name.
       parseQuickAdd,
       runCoreService: (options: any, fn: any) => runCoreService(options, (core: any) => fn(

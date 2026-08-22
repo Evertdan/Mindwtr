@@ -55,7 +55,7 @@ import {
   type TaskRow,
   type UpdateTaskInput,
 } from './queries.js';
-import { runCoreService } from './core-adapter.js';
+import { closeCoreAdapter, runCoreService } from './core-adapter.js';
 import { pickDefinedTaskFields, TASK_CREATE_FIELD_NAMES, TASK_PATCH_FIELD_NAMES } from './task-write-fields.js';
 
 type ServiceDeps = {
@@ -72,6 +72,7 @@ type ServiceDeps = {
   getPerson: typeof getPerson;
   parseQuickAdd: typeof parseQuickAdd;
   runCoreService: typeof runCoreService;
+  closeCoreAdapter: typeof closeCoreAdapter;
 };
 
 const defaultServiceDeps: ServiceDeps = {
@@ -88,6 +89,7 @@ const defaultServiceDeps: ServiceDeps = {
   getPerson,
   parseQuickAdd,
   runCoreService,
+  closeCoreAdapter,
 };
 
 const SQLITE_WRITE_RETRY_ATTEMPTS = 7;
@@ -635,6 +637,12 @@ export const createService = (options: DbOptions, deps: ServiceDeps = defaultSer
         });
       }),
     deletePerson: async (id) => runCoreWriteWithRetries(options, deps, (core) => core.deletePerson(id)),
-    close,
+    // `close` above only closes the read-path db accessor (createDbAccessor/openMindwtrDb);
+    // writes go through core-adapter's separate module-level write client, which needs its
+    // own close call too (BUG-15) or its WAL checkpoint never runs at shutdown.
+    close: async () => {
+      await close();
+      await deps.closeCoreAdapter();
+    },
   };
 };

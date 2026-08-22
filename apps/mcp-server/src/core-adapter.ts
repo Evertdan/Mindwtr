@@ -76,6 +76,11 @@ let coreDbPath: string | undefined;
 let coreReadonly = false;
 let coreReady: Promise<void> | null = null;
 let coreQueue: SerializedAsyncQueue | null = null;
+// The write client's close, kept at module scope (unlike the ensureCoreReady-local
+// `closeClient`, which is only for closing on an init failure) so closeCoreAdapter can
+// actually close it later - this client otherwise stays open for the process's whole
+// lifetime with no close path at all (BUG-15).
+let coreClientClose: (() => void) | null = null;
 
 const CORE_SQLITE_BUSY_TIMEOUT_MS = 5000;
 
@@ -306,6 +311,7 @@ const ensureCoreReady = async (options: DbOptions) => {
     try {
       const { client, close } = await createSqliteClient(coreDbPath!, coreReadonly);
       closeClient = close;
+      coreClientClose = close;
       const ensureOrderNumColumn = async (tableName: 'tasks' | 'projects') => {
         let columns: Array<{ name?: string }> = [];
         try {
@@ -453,6 +459,7 @@ const ensureCoreReady = async (options: DbOptions) => {
     if (coreDbPath === resolvedPath && coreReadonly === Boolean(options.readonly)) {
       coreReady = null;
       coreService = null;
+      coreClientClose = null;
     }
     throw error;
   });
@@ -474,4 +481,26 @@ export const runCoreService = async <T>(options: DbOptions, fn: (service: CoreSe
     throw new Error('Core service queue failed to initialize.');
   }
   return coreQueue.run(() => fn(service));
+};
+
+/**
+ * Closes the module-level write client (BUG-15: it otherwise never closes, so its WAL
+ * checkpoint never runs and its -wal/-shm files linger - locked open on Windows). Waits for
+ * any in-flight write to finish first so a shutdown can't close out from under one. Safe to
+ * call when the adapter was never initialized (e.g. a cloud-backend process).
+ */
+export const closeCoreAdapter = async (): Promise<void> => {
+  if (coreReady) {
+    await coreReady.catch(() => undefined);
+  }
+  if (coreQueue) {
+    await coreQueue.run(() => undefined).catch(() => undefined);
+  }
+  const close = coreClientClose;
+  coreClientClose = null;
+  coreReady = null;
+  coreService = null;
+  coreDbPath = undefined;
+  coreQueue = null;
+  close?.();
 };

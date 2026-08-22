@@ -124,6 +124,11 @@ const readRequestBody = (req: IncomingMessage, maxBytes: number): Promise<BodyRe
     });
     req.on('end', () => finish({ status: 'ok', body: Buffer.concat(chunks) }));
     req.on('error', () => finish({ status: 'error' }));
+    // A client that disconnects mid-upload never fires 'end' or 'error' - only 'close'. Without
+    // this the returned promise never settles and the awaiting handleMcpPost frame is stranded
+    // forever (BUG-15). Harmless when the body already finished normally: finish() is a no-op
+    // once settled.
+    req.on('close', () => finish({ status: 'error' }));
   });
 
 const parseJsonBody = (buffer: Buffer): { ok: true; value: unknown } | { ok: false } => {
@@ -242,22 +247,6 @@ const handleMcpPost = async (
     return;
   }
 
-  const bodyResult = await readRequestBody(req, deps.maxBodyBytes);
-  if (bodyResult.status === 'too-large') {
-    sendJson(res, 413, { error: 'payload_too_large' });
-    return;
-  }
-  if (bodyResult.status === 'error') {
-    sendJson(res, 400, { error: 'bad_request' });
-    return;
-  }
-
-  const parsedBody = parseJsonBody(bodyResult.body);
-  if (!parsedBody.ok) {
-    sendJson(res, 400, { error: 'invalid_json' });
-    return;
-  }
-
   const mcpServer = deps.createServer();
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   let cleanedUp = false;
@@ -267,7 +256,35 @@ const handleMcpPost = async (
     void transport.close().catch(() => {});
     void mcpServer.close().catch(() => {});
   };
+  // Registered before the (awaited) body read, not after - a client that aborts mid-upload
+  // used to close the connection before this listener existed, leaking the transport/server
+  // (BUG-15). `res.closed` covers the case where the response has ALREADY closed by the time
+  // we get here (e.g. the client disconnected during the origin/auth checks above): a 'close'
+  // listener attached after the event already fired would never run.
+  if (res.closed) {
+    cleanup();
+    return;
+  }
   res.on('close', cleanup);
+
+  const bodyResult = await readRequestBody(req, deps.maxBodyBytes);
+  if (bodyResult.status === 'too-large') {
+    cleanup();
+    sendJson(res, 413, { error: 'payload_too_large' });
+    return;
+  }
+  if (bodyResult.status === 'error') {
+    cleanup();
+    sendJson(res, 400, { error: 'bad_request' });
+    return;
+  }
+
+  const parsedBody = parseJsonBody(bodyResult.body);
+  if (!parsedBody.ok) {
+    cleanup();
+    sendJson(res, 400, { error: 'invalid_json' });
+    return;
+  }
 
   try {
     await mcpServer.connect(transport);

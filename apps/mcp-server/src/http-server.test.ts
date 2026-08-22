@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { mkdtempSync, rmSync, writeFileSync } from 'fs';
 import type { AddressInfo } from 'net';
-import type { Server } from 'node:http';
+import http, { type Server } from 'node:http';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -316,6 +316,85 @@ describe('HTTP MCP transport (integration, real listening server)', () => {
     } finally {
       await client.close();
     }
+  });
+});
+
+// BUG-15: readRequestBody used to never settle on a client abort (no 'end'/'error' fires, only
+// 'close'), and handleMcpPost registered its res.on('close', cleanup) AFTER awaiting the body
+// read - so an abort mid-upload left the McpServer/transport pair leaked with nothing left that
+// would ever close them. This drives a real abort over a live socket and confirms the server
+// created for that request actually gets closed.
+describe('HTTP MCP transport: aborting mid-upload still closes the transport/server (BUG-15)', () => {
+  let baseUrl = '';
+  let httpServer: Server;
+  let service: MindwtrService;
+  let tempDir = '';
+  let closedServers = 0;
+
+  beforeAll(async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'mindwtr-mcp-http-abort-'));
+    writeFileSync(
+      join(tempDir, 'data.json'),
+      JSON.stringify({ tasks: [], projects: [], sections: [], areas: [], people: [], settings: {} })
+    );
+    const dbPath = join(tempDir, 'mindwtr.db');
+    service = createService({ dbPath, readonly: false });
+    const config: ServerConfig = { backend: 'local', dbPath, readonly: false, keepAlive: true };
+
+    httpServer = createMindwtrHttpServer({
+      createServer: () => {
+        const mcpServer = createMindwtrMcpServer(service, config);
+        const originalClose = mcpServer.close.bind(mcpServer);
+        mcpServer.close = async () => {
+          closedServers += 1;
+          return originalClose();
+        };
+        return mcpServer;
+      },
+      token: VALID_TOKEN,
+    });
+    await startHttpServer(httpServer, { host: '127.0.0.1', port: 0, token: VALID_TOKEN });
+    const address = httpServer.address() as AddressInfo;
+    baseUrl = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolveClose) => httpServer.close(() => resolveClose()));
+    await service.close();
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  test('a client that destroys the connection mid-upload does not leak the transport/server', async () => {
+    const beforeCount = closedServers;
+
+    await new Promise<void>((resolveReq) => {
+      const req = http.request(`${baseUrl}/mcp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          Authorization: `Bearer ${VALID_TOKEN}`,
+          // Declares far more than gets written, so the server is still mid-read when destroyed.
+          'Content-Length': '1000000',
+        },
+      });
+      req.on('error', () => resolveReq());
+      // Bun's node:http client buffers a plain write() and never actually sends it without
+      // flushHeaders() (or .end()) - without this the server never even sees the request.
+      req.flushHeaders();
+      req.write('{"jsonrpc":"2.0"');
+      setTimeout(() => {
+        req.destroy();
+        resolveReq();
+      }, 50);
+    });
+
+    const deadline = Date.now() + 1000;
+    while (closedServers === beforeCount && Date.now() < deadline) {
+      await new Promise((resolvePoll) => setTimeout(resolvePoll, 20));
+    }
+
+    expect(closedServers).toBe(beforeCount + 1);
   });
 });
 
