@@ -33,6 +33,9 @@ import {
   writeBytesSafely,
 } from './attachment-sync-utils';
 import { getMobileCloudRequestOptions, getMobileWebDavRequestOptions } from './webdav-request-options';
+import { openAttachmentBytesFromDownload } from './attachment-sync-backends/common';
+import { readSyncArtifactBytes } from './storage-file-encryption';
+import { getSyncEncryptionMaterial } from './sync-encryption-state';
 
 const downloadLocks = new Map<string, Promise<Attachment | null>>();
 
@@ -53,17 +56,30 @@ const ensureFileAttachmentAvailable = async (
   }
 
   try {
+    // #1056: the local attachments directory always holds plaintext, so an encrypted
+    // sync folder's bytes are opened on the way in. `null` material keeps the
+    // byte-for-byte pre-feature behavior, including the plain `copyFileSafely` fast
+    // path. Inside the try: S3 — an `enabled`-but-no-key device throws instead of
+    // returning `null`, and that must fail this fetch closed (logged, `null` result),
+    // never fall through to the plaintext `copyFileSafely` path as if encryption were off.
+    const material = await getSyncEncryptionMaterial();
     if (syncDir.type === 'file') {
       const sourceUri = `${syncDir.attachmentsDirUri}${filename}`;
       const exists = await fileExists(sourceUri);
       if (!exists) return null;
-      await copyFileSafely(sourceUri, targetUri);
+      if (!material) {
+        await copyFileSafely(sourceUri, targetUri);
+        return { ...attachment, uri: targetUri, localStatus: 'available' };
+      }
+      const sourceBytes = await readSyncArtifactBytes(sourceUri);
+      if (!sourceBytes) return null;
+      await writeBytesSafely(targetUri, await openAttachmentBytesFromDownload(sourceBytes, material));
       return { ...attachment, uri: targetUri, localStatus: 'available' };
     }
     const entry = await findSafEntry(syncDir.attachmentsDirUri, filename);
     if (!entry || !StorageAccessFramework?.readAsStringAsync) return null;
     const base64 = await StorageAccessFramework.readAsStringAsync(entry, { encoding: FileSystem.EncodingType.Base64 });
-    await writeBytesSafely(targetUri, base64ToBytes(base64));
+    await writeBytesSafely(targetUri, await openAttachmentBytesFromDownload(base64ToBytes(base64), material));
     return { ...attachment, uri: targetUri, localStatus: 'available' };
   } catch (error) {
     logAttachmentWarn(`Failed to copy attachment ${attachment.title} from sync folder`, error);
@@ -118,7 +134,10 @@ const ensureAttachmentAvailableInternal = async (attachment: Attachment): Promis
           dropboxClientId,
           (accessToken) => downloadDropboxFile(accessToken, localAttachment.cloudKey as string),
         );
-        const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data as ArrayBuffer);
+        const bytes = await openAttachmentBytesFromDownload(
+          data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data as ArrayBuffer),
+          await getSyncEncryptionMaterial(),
+        );
         await validateAttachmentHash(localAttachment, bytes);
         await writeBytesSafely(targetUri, bytes);
         reportProgress(localAttachment.id, 'download', bytes.length, bytes.length, 'completed');
@@ -187,7 +206,10 @@ const ensureAttachmentAvailableInternal = async (attachment: Attachment): Promis
           onProgress: (loaded, total) => reportProgress(localAttachment.id, 'download', loaded, total, 'active'),
         })
       );
-      const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data as ArrayBuffer);
+      const bytes = await openAttachmentBytesFromDownload(
+        data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data as ArrayBuffer),
+        await getSyncEncryptionMaterial(),
+      );
       await validateAttachmentHash(localAttachment, bytes);
       await writeBytesSafely(targetUri, bytes);
       reportProgress(localAttachment.id, 'download', bytes.length, bytes.length, 'completed');

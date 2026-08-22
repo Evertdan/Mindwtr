@@ -54,6 +54,7 @@ mod platform;
 mod storage;
 mod sync;
 mod sync_crypto;
+mod sync_encryption;
 mod ui;
 mod window_state;
 
@@ -120,6 +121,15 @@ use sync::{
     sync_fs_remove_file, sync_fs_rename, sync_fs_stat, webdav_get_json, webdav_put_json,
     write_sync_file,
     DropboxStagedCredentialState, DropboxStartupRecoveryOutcome,
+};
+use sync::{
+    change_sync_encryption_passphrase, disable_sync_encryption, enable_sync_encryption,
+    provide_sync_encryption_passphrase,
+};
+use sync_encryption::{
+    clear_sync_encryption_key_material, derive_sync_encryption_key,
+    get_sync_encryption_key_material, get_sync_encryption_status,
+    mark_sync_encryption_remote_discovered, set_sync_encryption_key_material,
 };
 use ui::{
     acknowledge_close_request, apply_global_quick_add_shortcut, consume_quick_add_pending,
@@ -1601,6 +1611,16 @@ pub fn run() {
             finalize_staged_dropbox_credentials,
             discard_staged_dropbox_credentials,
             disconnect_dropbox,
+            get_sync_encryption_status,
+            get_sync_encryption_key_material,
+            set_sync_encryption_key_material,
+            clear_sync_encryption_key_material,
+            derive_sync_encryption_key,
+            mark_sync_encryption_remote_discovered,
+            enable_sync_encryption,
+            disable_sync_encryption,
+            change_sync_encryption_passphrase,
+            provide_sync_encryption_passphrase,
             get_external_calendars,
             set_external_calendars,
             read_external_calendar_file,

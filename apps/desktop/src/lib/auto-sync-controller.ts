@@ -7,6 +7,11 @@ type SyncResult = {
 
 type DesktopAutoSyncControllerOptions = {
     canSync: () => Promise<boolean>;
+    /** #1056 decision #5: once this device has discovered ciphertext it has no key for,
+     *  automatic and background sync stay off for that backend until the user supplies the
+     *  passphrase. A MANUAL run is deliberately still allowed through — it is how the user
+     *  finds out, and it surfaces the typed failure instead of doing nothing at all. */
+    isSyncEncryptionLocked?: () => Promise<boolean>;
     performSync: () => Promise<SyncResult>;
     flushPendingSave: () => Promise<void>;
     reportError: (label: string, error: unknown) => void;
@@ -184,6 +189,13 @@ export const createDesktopAutoSyncController = (
                         void requestAutoSync(0, 'throttle');
                     }, waitMs);
                 }
+                return;
+            }
+
+            if (request.source !== 'manual' && (await options.isSyncEncryptionLocked?.())) {
+                trace('Auto sync suppressed while the remote is encrypted and unreadable', {
+                    source: request.source,
+                });
                 return;
             }
 

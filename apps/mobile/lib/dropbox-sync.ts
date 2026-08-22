@@ -11,4 +11,5 @@ export {
   uploadDropboxAppData,
   uploadDropboxFile,
   type DropboxDownloadResult,
+  type DropboxSyncCrypto,
 } from '@mindwtr/core';

@@ -49,6 +49,7 @@ import {
     handleAttachmentValidationFailure,
     markAttachmentUnrecoverable,
 } from './sync-attachment-validation';
+import { openAttachmentBytes, sealAttachmentBytes } from './sync-encryption-service';
 import {
     downloadDropboxFile,
     DropboxFileNotFoundError,
@@ -440,16 +441,20 @@ export async function syncWebdavAttachments(
                 bytes: String(fileData.length),
                 cloudKey,
             });
+            // Encrypted bytes keep the attachment's exact remote name (cloudKey is identity-
+            // keyed and immutable once uploaded), but they are longer than the plaintext — the
+            // Content-Length header has to describe what actually goes on the wire.
+            const wireData = await sealAttachmentBytes(fileData);
             await withRetry(
                 async () => {
                     await waitForSlot();
                     return await webdavPutFile(
                         `${baseSyncUrl}/${cloudKey}`,
-                        fileData,
+                        wireData,
                         attachment.mimeType || 'application/octet-stream',
                         {
                             allowInsecureHttp: webDavConfig.allowInsecureHttp,
-                            headers: { 'Content-Length': String(fileData.length) },
+                            headers: { 'Content-Length': String(wireData.length) },
                             username: webDavConfig.username,
                             password,
                             fetcher,
@@ -522,8 +527,11 @@ export async function syncWebdavAttachments(
                 }
                 throw error;
             }
-            const bytes =
-                fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : new Uint8Array(fileData as ArrayBuffer);
+            // Decrypt before the hash check: fileHash is a plaintext-domain value inside the
+            // synced document, and it must stay stable across re-encryptions.
+            const bytes = await openAttachmentBytes(
+                fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : new Uint8Array(fileData as ArrayBuffer),
+            );
             await validateAttachmentHash(attachment, bytes);
             const filename = cloudKey.split('/').pop() || `${attachment.id}${extractExtension(attachment.uri)}`;
             const targetPath = await join(managedAttachmentsDir, filename);
@@ -799,13 +807,14 @@ export async function syncDropboxAttachments(
             }
             clearAttachmentValidationFailure(attachment.id);
             reportProgress(attachment.id, 'upload', 0, fileData.length, 'active');
+            const wireData = await sealAttachmentBytes(fileData);
             await withRetry(
                 () =>
                     withDropboxAccess((token) =>
                         uploadDropboxFile(
                             token,
                             cloudKey,
-                            fileData,
+                            wireData,
                             attachment.mimeType || 'application/octet-stream',
                             dropboxFetcher,
                         ),
@@ -852,8 +861,9 @@ export async function syncDropboxAttachments(
                 }
                 throw error;
             }
-            const bytes =
-                fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : new Uint8Array(fileData as ArrayBuffer);
+            const bytes = await openAttachmentBytes(
+                fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : new Uint8Array(fileData as ArrayBuffer),
+            );
             await validateAttachmentHash(attachment, bytes);
             const filename =
                 attachment.cloudKey.split('/').pop() || `${attachment.id}${extractExtension(attachment.uri)}`;
@@ -1106,7 +1116,11 @@ export async function syncFileAttachments(
                 return failure.mutated;
             }
             clearAttachmentValidationFailure(attachment.id);
-            await writeFileSafelyAbsolute(await resolveFileBackendPath(join, baseSyncDir, cloudKey), fileData, {
+            // The sync folder is the remote for this backend, so its attachment bytes are
+            // encrypted here for the same reason WebDAV's and Dropbox's are. The LOCAL managed
+            // copy (below, in onDownload) stays plaintext — encryption never touches local data.
+            const wireData = await sealAttachmentBytes(fileData);
+            await writeFileSafelyAbsolute(await resolveFileBackendPath(join, baseSyncDir, cloudKey), wireData, {
                 writeFile,
                 rename: syncFsRename,
                 remove: syncFsRemove,
@@ -1122,7 +1136,7 @@ export async function syncFileAttachments(
             if (!attachment.cloudKey) return false;
             const sourcePath = await resolveFileBackendPath(join, baseSyncDir, attachment.cloudKey);
             if (!(await syncFsExists(sourcePath))) return false;
-            const fileData = await readFile(sourcePath);
+            const fileData = await openAttachmentBytes(await readFile(sourcePath));
             await validateAttachmentHash(attachment, fileData);
             const filename =
                 attachment.cloudKey.split('/').pop() || `${attachment.id}${extractExtension(attachment.uri)}`;

@@ -1,0 +1,191 @@
+// Mobile's implementations of core's sync-encryption ports (#1056 phase 2).
+//
+//   SyncEncryptionKeyCachePort   -> expo-secure-store, via the existing secure-config
+//                                   seam (platform keystore, AFTER_FIRST_UNLOCK).
+//   SyncEncryptionLocalStatePort -> AsyncStorage, the same device-local, never-synced
+//                                   mechanism every other `@mindwtr_*` sync setting uses.
+//
+// Judgment call (deviates from the handoff's "one JSON blob with key + salt + params"):
+// the secure blob holds ONLY the derived key. Salt and KDF params live solely in the
+// AsyncStorage local state, because that is what core's transition orchestration writes
+// (`localState.write({ discoveredSalt, discoveredParams })`) and it calls
+// `keyCache.setKey()` BEFORE that write — so a key blob that also carried salt/params
+// would have to guess them from the not-yet-updated local state and could silently
+// persist a salt that does not match its key. One source of truth instead. Neither the
+// salt nor the params are secret; both are in the clear in every artifact header.
+//
+// The local-state port is synchronous (core's shape) but AsyncStorage is not, so the
+// port reads an in-memory cache that `loadSyncEncryptionLocalState()` hydrates and every
+// write refreshes synchronously before the async persist. Callers must await the
+// hydrate once per process before constructing ports.
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+    type SyncCryptoKdfParams,
+    type SyncEncryptionKeyCachePort,
+    type SyncEncryptionLocalState,
+    type SyncEncryptionLocalStatePort,
+    type SyncEncryptionStatus,
+    type SyncKeyMaterial,
+} from '@mindwtr/core';
+
+import { base64ToBytes, bytesToBase64 } from './attachment-sync-utils';
+import { logWarn } from './app-log';
+import { deleteSecureConfigValue, getSecureConfigValue, setSecureConfigValue } from './secure-config';
+import { SYNC_ENCRYPTION_KEY_KEY, SYNC_ENCRYPTION_STATE_KEY } from './sync-constants';
+
+const SYNC_KEY_LEN = 32;
+
+/**
+ * Thrown by a read seam that finds MWENC1 ciphertext this device has no key for. Distinct
+ * from core's `SyncEncryptionTerminalError` (which means "we had a key and the bytes
+ * failed"): this one means "supply a passphrase", and both must stay distinct from the
+ * generic permission/auth toasts in `classifySyncFailure`. Either way the seam leaves the
+ * bytes exactly where they are — nothing is repaired, rotated, or deleted.
+ */
+export class SyncEncryptionNoKeyError extends Error {
+    constructor(message = 'This sync folder is encrypted. Enter the sync passphrase to continue.') {
+        super(message);
+        this.name = 'SyncEncryptionNoKeyError';
+    }
+}
+
+/**
+ * Thrown by `getSyncEncryptionMaterial()` when the local state says `enabled` but the key
+ * cache comes back empty or malformed — Android Keystore invalidation (a lock-screen or
+ * biometric change) is the realistic trigger. Distinct from `SyncEncryptionNoKeyError`
+ * (which means "this device has never had a key for this remote, ask once"): this means
+ * "this device is supposed to have a key and doesn't anymore, something is wrong". Both
+ * must be treated as terminal by every seam — S3: returning `null` here (as if encryption
+ * were simply off) would make a seam silently write a PLAINTEXT artifact into a folder it
+ * believes is enabled.
+ */
+export class SyncEncryptionKeyMissingError extends Error {
+    constructor(message = 'The sync passphrase is no longer available on this device. Enter it again to continue.') {
+        super(message);
+        this.name = 'SyncEncryptionKeyMissingError';
+    }
+}
+
+let cachedLocalState: SyncEncryptionLocalState | null = null;
+let hydrated = false;
+
+const isKdfParams = (value: unknown): value is SyncCryptoKdfParams => {
+    if (!value || typeof value !== 'object') return false;
+    const { mKib, t, p } = value as Record<string, unknown>;
+    return typeof mKib === 'number' && typeof t === 'number' && typeof p === 'number';
+};
+
+/** Anything unrecognized degrades to `null` (= implicit 'off'), never to a half-built
+ *  state: a corrupt blob must not leave the device believing it holds a key. */
+const parseLocalState = (raw: string | null): SyncEncryptionLocalState | null => {
+    if (!raw) return null;
+    try {
+        const parsed = JSON.parse(raw) as Partial<SyncEncryptionLocalState>;
+        if (parsed?.state !== 'enabled' && parsed?.state !== 'remote-encrypted-no-key') return null;
+        return {
+            state: parsed.state,
+            discoveredSalt: typeof parsed.discoveredSalt === 'string' ? parsed.discoveredSalt : undefined,
+            discoveredParams: isKdfParams(parsed.discoveredParams) ? parsed.discoveredParams : undefined,
+        };
+    } catch {
+        return null;
+    }
+};
+
+export const loadSyncEncryptionLocalState = async (): Promise<SyncEncryptionLocalState | null> => {
+    if (hydrated) return cachedLocalState;
+    try {
+        cachedLocalState = parseLocalState(await AsyncStorage.getItem(SYNC_ENCRYPTION_STATE_KEY));
+    } catch (error) {
+        // Treat an unreadable store as 'off' rather than throwing into the sync cycle;
+        // an encrypted remote will simply be re-discovered on the next read.
+        void logWarn('Failed to read sync encryption state; treating as off', {
+            scope: 'sync',
+            extra: { error: error instanceof Error ? error.message : String(error) },
+        });
+        cachedLocalState = null;
+    }
+    hydrated = true;
+    return cachedLocalState;
+};
+
+export const syncEncryptionLocalState: SyncEncryptionLocalStatePort = {
+    read: () => cachedLocalState,
+    write: (state) => {
+        cachedLocalState = state;
+        hydrated = true;
+        const persist = state === null
+            ? AsyncStorage.removeItem(SYNC_ENCRYPTION_STATE_KEY)
+            : AsyncStorage.setItem(SYNC_ENCRYPTION_STATE_KEY, JSON.stringify(state));
+        void persist.catch((error: unknown) => {
+            void logWarn('Failed to persist sync encryption state', {
+                scope: 'sync',
+                extra: { error: error instanceof Error ? error.message : String(error) },
+            });
+        });
+    },
+};
+
+export const syncEncryptionKeyCache: SyncEncryptionKeyCachePort = {
+    getKey: async () => {
+        const stored = await getSecureConfigValue(SYNC_ENCRYPTION_KEY_KEY);
+        if (!stored) return null;
+        const key = base64ToBytes(stored);
+        // A truncated/garbled keystore entry must fail closed as "no key" — handing a
+        // short key to encryptSyncArtifact would throw deep inside a write instead.
+        return key.length === SYNC_KEY_LEN ? key : null;
+    },
+    setKey: async (key) => {
+        await setSecureConfigValue(SYNC_ENCRYPTION_KEY_KEY, bytesToBase64(key));
+    },
+    clearKey: async () => {
+        await deleteSecureConfigValue(SYNC_ENCRYPTION_KEY_KEY);
+    },
+};
+
+const hexToBytes = (hex: string): Uint8Array => {
+    const out = new Uint8Array(Math.floor(hex.length / 2));
+    for (let i = 0; i < out.length; i += 1) {
+        out[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+    }
+    return out;
+};
+
+/**
+ * The key material this device should encrypt/decrypt sync artifacts with, or `null` when
+ * encryption is genuinely off. `null` is the encryption-off path everywhere downstream —
+ * every seam that takes optional `material` behaves byte-for-byte as it did before this
+ * feature when it gets `null` (backward-compat invariant #1).
+ *
+ * Throws `SyncEncryptionKeyMissingError` instead of returning `null` when local state says
+ * `enabled` but the key (or its salt/params) is missing (S3) — `enabled`-without-a-key must
+ * fail CLOSED, the same way Rust's `resolve_sync_encryption_material` already does on
+ * desktop. Returning `null` here would be indistinguishable downstream from "off", and
+ * every seam would fall back to writing plaintext into a folder it believes is encrypted.
+ */
+export const getSyncEncryptionMaterial = async (): Promise<SyncKeyMaterial | null> => {
+    const state = await loadSyncEncryptionLocalState();
+    if (state?.state !== 'enabled') return null;
+    if (!state.discoveredSalt || !state.discoveredParams) throw new SyncEncryptionKeyMissingError();
+    const key = await syncEncryptionKeyCache.getKey();
+    if (!key) throw new SyncEncryptionKeyMissingError();
+    return { key, salt: hexToBytes(state.discoveredSalt), params: state.discoveredParams };
+};
+
+export const getMobileSyncEncryptionStatus = async (): Promise<SyncEncryptionStatus> => {
+    const state = await loadSyncEncryptionLocalState();
+    if (!state || state.state === 'off') return { state: 'off' };
+    return { state: state.state, kdfParams: state.discoveredParams };
+};
+
+/** True when this device must NOT auto-sync: the remote is encrypted and we have no key
+ *  (pinned decision #5 — automatic and background sync stay off until the user supplies
+ *  the passphrase through an explicit manual action). */
+export const isSyncEncryptionBlocked = async (): Promise<boolean> =>
+    (await loadSyncEncryptionLocalState())?.state === 'remote-encrypted-no-key';
+
+export const __resetSyncEncryptionStateForTests = (): void => {
+    cachedLocalState = null;
+    hydrated = false;
+};

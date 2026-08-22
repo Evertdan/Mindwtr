@@ -8846,6 +8846,28 @@ pub(crate) fn read_json_with_retries_validated<Validate>(
 where
     Validate: Fn(&Value) -> Result<(), String>,
 {
+    read_json_with_retries_decoded(
+        path,
+        attempts,
+        |path| fs::read_to_string(path).map_err(|error| error.to_string()),
+        validate,
+    )
+}
+
+/// Same retry/eviction/backoff behavior as `read_json_with_retries_validated`, with the
+/// bytes-to-JSON-text step supplied by the caller. The sync-encryption seam passes a decoder
+/// that reads raw bytes and decrypts them (#1056); every other caller passes the plain
+/// `read_to_string` above, whose behavior is unchanged.
+pub(crate) fn read_json_with_retries_decoded<Decode, Validate>(
+    path: &Path,
+    attempts: usize,
+    decode: Decode,
+    validate: Validate,
+) -> Result<Value, String>
+where
+    Decode: Fn(&Path) -> Result<String, String>,
+    Validate: Fn(&Value) -> Result<(), String>,
+{
     let mut last_err: Option<String> = None;
     for attempt in 0..attempts {
         // Re-check for iCloud eviction on each retry — the file may have been
@@ -8858,7 +8880,7 @@ where
             continue;
         }
 
-        match fs::read_to_string(path) {
+        match decode(path) {
             Ok(content) => match parse_json_relaxed(&content) {
                 Ok(value) => match validate(&value) {
                     Ok(()) => return Ok(normalize_sync_value(value)),

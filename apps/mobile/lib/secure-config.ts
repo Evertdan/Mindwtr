@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 
-import { CLOUD_TOKEN_KEY, WEBDAV_PASSWORD_KEY } from './sync-constants';
+import { CLOUD_TOKEN_KEY, SYNC_ENCRYPTION_KEY_KEY, WEBDAV_PASSWORD_KEY } from './sync-constants';
 import {
     deleteSessionSecret,
     evacuateLegacySecretToSession,
@@ -14,7 +14,11 @@ import {
 // Android Keystore) rather than plaintext AsyncStorage, which lands in device
 // backups. Non-secret sync config (URLs, usernames, flags) stays in
 // AsyncStorage on purpose: SecureStore reads are slower and size-limited.
-const SECRET_CONFIG_KEYS: ReadonlySet<string> = new Set([WEBDAV_PASSWORD_KEY, CLOUD_TOKEN_KEY]);
+const SECRET_CONFIG_KEYS: ReadonlySet<string> = new Set([
+    WEBDAV_PASSWORD_KEY,
+    CLOUD_TOKEN_KEY,
+    SYNC_ENCRYPTION_KEY_KEY,
+]);
 
 export const isSecretConfigKey = (key: string): boolean => SECRET_CONFIG_KEYS.has(key);
 

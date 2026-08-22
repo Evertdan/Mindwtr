@@ -25,7 +25,21 @@ use crate::config::{
     read_dropbox_credential_state, set_keyring_secret, update_dropbox_credential_state,
     write_config_files, CredentialService,
 };
-use crate::storage::{get_config_path, get_secrets_path, read_json_with_retries_validated};
+use crate::storage::{
+    get_config_path, get_secrets_path, read_json_with_retries_decoded,
+    read_json_with_retries_validated,
+};
+use crate::sync_crypto::{
+    decrypt_sync_artifact, derive_sync_key_material, encrypt_sync_artifact, inspect_sync_artifact,
+    random_salt, SyncArtifactInspection, SyncCryptoError, SyncCryptoKdfParams, SyncKeyMaterial,
+    KEY_LEN, SALT_LEN, SYNC_CRYPTO_DEFAULT_KDF_PARAMS,
+};
+use crate::sync_encryption::{
+    bytes_to_hex, clear_encryption_state, encrypted_artifact_name, hex_to_bytes,
+    is_encryption_enabled, is_terminal_error, mark_remote_encrypted_no_key,
+    persist_enabled_material, plaintext_artifact_name, resolve_key_material, terminal_error,
+    SYNC_ENCRYPTION_REMOTE_ENCRYPTED,
+};
 #[cfg(target_os = "macos")]
 use crate::{
     mindwtr_macos_create_security_bookmark, mindwtr_macos_free_bookmark_string,
@@ -3029,21 +3043,65 @@ fn webdav_error_body_snippet(body: &str) -> String {
     format!(": {snippet}")
 }
 
-fn webdav_get_json_blocking(app: &tauri::AppHandle) -> Result<Value, String> {
+/// `https://host/dav/data.json?x=1` -> `https://host/dav/data.json.enc?x=1`. The `.enc` marker
+/// belongs on the path, never after the query — `normalize_webdav_url` preserves a `?`/`#`
+/// suffix, so a naive append would corrupt it.
+fn encrypted_webdav_url(url: &str) -> String {
+    let split = url.find(['?', '#']).unwrap_or(url.len());
+    let (path, suffix) = url.split_at(split);
+    format!("{}{suffix}", encrypted_artifact_name(path))
+}
+
+/// Classifies MWENC1 bytes found where JSON was expected. Ciphertext is never "invalid JSON"
+/// to repair (decision #4); an off-state device instead learns the remote is encrypted.
+fn webdav_encrypted_discovery(bytes: &[u8]) -> Option<String> {
+    match inspect_sync_artifact(bytes) {
+        SyncArtifactInspection::Encrypted(header) => Some(format!(
+            "{SYNC_ENCRYPTION_REMOTE_ENCRYPTED}:{}:{}:{}:{}",
+            bytes_to_hex(&header.salt),
+            header.params.m_kib,
+            header.params.t,
+            header.params.p
+        )),
+        SyncArtifactInspection::Unsupported(reason) => Some(terminal_error(reason)),
+        SyncArtifactInspection::Plaintext => None,
+    }
+}
+
+fn webdav_get_json_blocking(
+    app: &tauri::AppHandle,
+    material: Option<&SyncKeyMaterial>,
+) -> Result<Value, String> {
     let (config, password) = read_bound_credential(app, CredentialService::Webdav)?;
     let allow_insecure_http = webdav_allows_insecure_http(&config);
-    let url = resolve_webdav_request_url(&config)?;
+    let plain_url = resolve_webdav_request_url(&config)?;
+    let url = match material {
+        Some(_) => encrypted_webdav_url(&plain_url),
+        None => plain_url.clone(),
+    };
     let username = config.webdav_username.unwrap_or_default();
     let password = password.ok_or_else(|| "WebDAV password not configured".to_string())?;
 
     let client = webdav_blocking_http_client(config.proxy_url.as_deref(), allow_insecure_http)?;
-    let response = client
-        .get(url.as_str())
-        .basic_auth(username, Some(password))
-        .send()
-        .map_err(|e| format_reqwest_send_error("WebDAV request failed", &e))?;
+    let get = |target: &str| {
+        client
+            .get(target)
+            .basic_auth(&username, Some(&password))
+            .send()
+            .map_err(|e| format_reqwest_send_error("WebDAV request failed", &e))
+    };
+    let response = get(&url)?;
 
     if response.status() == reqwest::StatusCode::NOT_FOUND {
+        // Detection (decision #2): only an off-state device, and only once the plain read has
+        // already come back missing — a populated plaintext remote's steady reads succeed and
+        // never issue this probe, so an existing install sees zero extra requests (invariant
+        // #1, and no `.enc` probing that a strict server could reject).
+        if material.is_none() {
+            if let Some(discovery) = webdav_probe_encrypted_document(&get, &plain_url)? {
+                return Err(discovery);
+            }
+        }
         return Ok(Value::Null);
     }
 
@@ -3056,42 +3114,90 @@ fn webdav_get_json_blocking(app: &tauri::AppHandle) -> Result<Value, String> {
         ));
     }
 
-    let body = response
-        .text()
+    let body_bytes = response
+        .bytes()
         .map_err(|e| format!("Invalid WebDAV response: error reading response body: {e}"))?;
+
+    if let Some(material) = material {
+        let plaintext = decrypt_sync_artifact(&body_bytes, &material.key)
+            .map_err(|error| terminal_error(error))?;
+        return serde_json::from_slice::<Value>(&plaintext)
+            .map_err(|e| format!("Invalid WebDAV response: error decoding response body: {e}"));
+    }
+
+    let body = String::from_utf8_lossy(&body_bytes);
     let normalized_body = body.trim_start_matches('\u{feff}').trim();
     if normalized_body.is_empty() {
+        if let Some(discovery) = webdav_probe_encrypted_document(&get, &plain_url)? {
+            return Err(discovery);
+        }
         return Ok(Value::Null);
     }
-    serde_json::from_str::<Value>(normalized_body)
-        .map_err(|e| format!("Invalid WebDAV response: error decoding response body: {e}"))
+    serde_json::from_str::<Value>(normalized_body).map_err(|e| {
+        // Inspect the ORIGINAL bytes, not the lossy UTF-8 text, before conceding "invalid JSON".
+        webdav_encrypted_discovery(&body_bytes)
+            .unwrap_or_else(|| format!("Invalid WebDAV response: error decoding response body: {e}"))
+    })
+}
+
+fn webdav_probe_encrypted_document<Get>(get: &Get, plain_url: &str) -> Result<Option<String>, String>
+where
+    Get: Fn(&str) -> Result<reqwest::blocking::Response, String>,
+{
+    let response = get(&encrypted_webdav_url(plain_url))?;
+    if !response.status().is_success() {
+        return Ok(None);
+    }
+    let bytes = response.bytes().map_err(|e| {
+        format!("Invalid WebDAV response: error reading response body: {e}")
+    })?;
+    Ok(webdav_encrypted_discovery(&bytes))
 }
 
 #[tauri::command]
 pub(crate) async fn webdav_get_json(app: tauri::AppHandle) -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(move || webdav_get_json_blocking(&app))
-        .await
-        .map_err(|e| e.to_string())?
+    let material = resolve_sync_encryption_material(&app)?;
+    let result = tauri::async_runtime::spawn_blocking({
+        let app = app.clone();
+        move || webdav_get_json_blocking(&app, material.as_ref())
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    persist_discovery_and_reduce(&app, result)
 }
 
 fn webdav_put_json_blocking(
     app: &tauri::AppHandle,
     data: &Value,
+    material: Option<&SyncKeyMaterial>,
 ) -> Result<RemoteJsonWriteResult, String> {
     let (config, password) = read_bound_credential(app, CredentialService::Webdav)?;
     let allow_insecure_http = webdav_allows_insecure_http(&config);
     let url = resolve_webdav_request_url(&config)?;
+    let url = match material {
+        Some(_) => encrypted_webdav_url(&url),
+        None => url,
+    };
     let username = config.webdav_username.unwrap_or_default();
     let password = password.ok_or_else(|| "WebDAV password not configured".to_string())?;
 
     let payload = serde_json::to_string_pretty(&data)
         .map_err(|e| format!("Failed to encode WebDAV payload: {e}"))?;
+    // Encryption wraps the already-serialized document; nothing above this line differs.
+    let (payload, content_type): (Vec<u8>, &str) = match material {
+        None => (payload.into_bytes(), "application/json"),
+        Some(material) => (
+            encrypt_sync_artifact(payload.as_bytes(), material)
+                .map_err(|error| terminal_error(error))?,
+            "application/octet-stream",
+        ),
+    };
     let client = webdav_blocking_http_client(config.proxy_url.as_deref(), allow_insecure_http)?;
     let send_put = || {
         client
             .put(url.clone())
             .basic_auth(&username, Some(&password))
-            .header("Content-Type", "application/json")
+            .header("Content-Type", content_type)
             .body(payload.clone())
             .send()
             .map_err(|e| format_reqwest_send_error("WebDAV request failed", &e))
@@ -3127,9 +3233,12 @@ pub(crate) async fn webdav_put_json(
     app: tauri::AppHandle,
     data: Value,
 ) -> Result<RemoteJsonWriteResult, String> {
-    tauri::async_runtime::spawn_blocking(move || webdav_put_json_blocking(&app, &data))
-        .await
-        .map_err(|e| e.to_string())?
+    let material = resolve_sync_encryption_material(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        webdav_put_json_blocking(&app, &data, material.as_ref())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 fn cloud_request_builder(
@@ -3607,7 +3716,8 @@ mod tests {
         assert!(!backup.exists());
         assert!(backup_previous.exists());
         assert_eq!(
-            read_sync_backup(&backup, &backup_previous)
+            read_sync_backup(&backup, &backup_previous, SyncFileCrypto::Off)
+                .expect("backup read must not be a terminal failure")
                 .and_then(|value| value.data["tasks"][0]["id"].as_str().map(str::to_owned))
                 .as_deref(),
             Some("preserved")
@@ -4138,6 +4248,14 @@ mod tests {
             .split_once("\n#[tauri::command")
             .expect("end of write_sync_file_to_dir")
             .0;
+        // The slice runs to the next command attribute, so it spans both the thin
+        // `write_sync_file_to_dir` delegate and the `_with` function holding the real write.
+        // Pin that: a refactor that moves the actual write out of this span would otherwise
+        // leave the guard scanning a one-line wrapper and silently guarding nothing.
+        assert!(
+            body.contains("File::create(&tmp_file)"),
+            "the scanned span must still contain the real sync write"
+        );
         for (forbidden, reason) in [
             (
                 "fs::copy(",
@@ -4153,6 +4271,415 @@ mod tests {
                 "the sync write path {reason} (found {forbidden:?})"
             );
         }
+    }
+
+    // ---------------------------------------------------------------
+    // Sync encryption at the file-sync seam (#1056 phase 2)
+    // ---------------------------------------------------------------
+
+    fn test_material(seed: u8) -> SyncKeyMaterial {
+        // The seam never derives; it is handed material. Skipping Argon2 here keeps these
+        // tests fast without weakening what they check.
+        SyncKeyMaterial {
+            key: [seed; KEY_LEN],
+            salt: [seed; SALT_LEN],
+            params: SYNC_CRYPTO_DEFAULT_KDF_PARAMS,
+        }
+    }
+
+    fn seal(bytes: &[u8], material: &SyncKeyMaterial) -> Vec<u8> {
+        encrypt_sync_artifact(bytes, material).expect("seal")
+    }
+
+    #[test]
+    fn encryption_off_writes_exactly_what_it_wrote_before_the_feature() {
+        // Backward-compat invariant #1: an install that never opts in must be byte-for-byte
+        // and path-for-path unchanged.
+        let dir = tempfile::tempdir().expect("temp dir");
+        let data = serde_json::json!({ "tasks": [{ "id": "a" }] });
+        write_sync_file_to_dir(dir.path(), data.clone(), None).expect("write");
+
+        let written = fs::read_to_string(dir.path().join(DATA_FILE_NAME)).expect("read");
+        assert_eq!(written, serde_json::to_string_pretty(&data).expect("pretty"));
+        assert!(!dir.path().join("data.json.enc").exists());
+        assert!(!dir.path().join("data.json.tmp").exists());
+    }
+
+    #[test]
+    fn encrypted_documents_round_trip_through_the_enc_names() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let material = test_material(1);
+        let crypto = SyncFileCrypto::Enabled(&material);
+        let data = serde_json::json!({ "tasks": [{ "id": "encrypted" }] });
+
+        write_sync_file_to_dir_with(dir.path(), data.clone(), None, crypto).expect("write");
+
+        assert!(dir.path().join("data.json.enc").exists());
+        assert!(!dir.path().join(DATA_FILE_NAME).exists());
+        let raw = fs::read(dir.path().join("data.json.enc")).expect("read raw");
+        assert!(matches!(inspect_sync_artifact(&raw), SyncArtifactInspection::Encrypted(_)));
+        assert!(!raw.starts_with(b"{"), "the document on disk must not be readable JSON");
+
+        let read = read_sync_file_versioned_from_dir_with(dir.path(), crypto).expect("read");
+        assert_eq!(read.data["tasks"][0]["id"], "encrypted");
+        assert_eq!(read.source, "primary");
+        // Fingerprints stay plaintext-domain, so they match a plaintext write of the same doc.
+        assert_eq!(read.fingerprint, sync_document_fingerprint(&read.data).expect("fingerprint"));
+    }
+
+    #[test]
+    fn a_second_encrypted_write_rotates_the_backup_under_the_enc_names() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let material = test_material(1);
+        let crypto = SyncFileCrypto::Enabled(&material);
+
+        write_sync_file_to_dir_with(dir.path(), serde_json::json!({ "tasks": [{ "id": "one" }] }), None, crypto)
+            .expect("first write");
+        write_sync_file_to_dir_with(dir.path(), serde_json::json!({ "tasks": [{ "id": "two" }] }), None, crypto)
+            .expect("second write");
+
+        assert!(dir.path().join("data.json.enc.bak").exists());
+        let backup = read_sync_candidate_with(&dir.path().join("data.json.enc.bak"), 1, crypto)
+            .expect("backup decrypts");
+        assert_eq!(backup["tasks"][0]["id"], "one");
+    }
+
+    #[test]
+    fn a_wrong_key_read_is_terminal_and_never_degrades_into_recovery() {
+        // The data-loss guardrail (decision #4): ciphertext this device cannot open may be a
+        // peer's perfectly good newer generation. It must stop the run, not walk the recovery
+        // chain and certainly not "repair" anything.
+        let dir = tempfile::tempdir().expect("temp dir");
+        let real = test_material(1);
+        let primary = seal(br#"{"tasks":[{"id":"remote"}]}"#, &real);
+        let backup = seal(br#"{"tasks":[{"id":"older-remote"}]}"#, &real);
+        fs::write(dir.path().join("data.json.enc"), &primary).expect("write primary");
+        fs::write(dir.path().join("data.json.enc.bak"), &backup).expect("write backup");
+
+        let wrong = test_material(2);
+        let error = read_sync_file_versioned_from_dir_with(
+            dir.path(),
+            SyncFileCrypto::Enabled(&wrong),
+        )
+        .expect_err("a wrong key must fail the read");
+
+        assert!(is_terminal_error(&error), "expected a terminal error, got: {error}");
+        // Nothing moved, nothing was rewritten, nothing fell back to the backup's contents.
+        assert_eq!(fs::read(dir.path().join("data.json.enc")).expect("primary"), primary);
+        assert_eq!(fs::read(dir.path().join("data.json.enc.bak")).expect("backup"), backup);
+        assert!(!dir.path().join("data.json.enc.previous").exists());
+    }
+
+    #[test]
+    fn tampered_ciphertext_is_terminal_rather_than_invalid_json_to_repair() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let material = test_material(1);
+        let mut sealed = seal(br#"{"tasks":[{"id":"remote"}]}"#, &material);
+        let last = sealed.len() - 1;
+        sealed[last] ^= 0xff;
+        fs::write(dir.path().join("data.json.enc"), &sealed).expect("write");
+
+        let error = read_sync_file_versioned_from_dir_with(
+            dir.path(),
+            SyncFileCrypto::Enabled(&material),
+        )
+        .expect_err("tampered bytes must fail the read");
+
+        assert!(is_terminal_error(&error), "expected a terminal error, got: {error}");
+        assert_eq!(fs::read(dir.path().join("data.json.enc")).expect("primary"), sealed);
+    }
+
+    #[test]
+    fn a_wrong_key_write_refuses_and_leaves_the_backup_unrotated() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let real = test_material(1);
+        let primary = seal(br#"{"tasks":[{"id":"remote"}]}"#, &real);
+        let backup = seal(br#"{"tasks":[{"id":"older-remote"}]}"#, &real);
+        fs::write(dir.path().join("data.json.enc"), &primary).expect("write primary");
+        fs::write(dir.path().join("data.json.enc.bak"), &backup).expect("write backup");
+
+        let wrong = test_material(2);
+        let error = write_sync_file_to_dir_with(
+            dir.path(),
+            serde_json::json!({ "tasks": [{ "id": "local" }] }),
+            None,
+            SyncFileCrypto::Enabled(&wrong),
+        )
+        .expect_err("a wrong key must refuse the write");
+
+        assert!(is_terminal_error(&error), "expected a terminal error, got: {error}");
+        assert_eq!(fs::read(dir.path().join("data.json.enc")).expect("primary"), primary);
+        assert_eq!(fs::read(dir.path().join("data.json.enc.bak")).expect("backup"), backup);
+        assert!(!dir.path().join("data.json.enc.bak.previous").exists());
+        assert!(!dir.path().join("data.json.enc.tmp").exists());
+    }
+
+    #[test]
+    fn an_off_state_device_detects_an_encrypted_remote_only_after_the_plaintext_chain_is_empty() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let material = test_material(1);
+        fs::write(
+            dir.path().join("data.json.enc"),
+            seal(br#"{"tasks":[{"id":"remote"}]}"#, &material),
+        )
+        .expect("write");
+
+        let error = read_sync_file_versioned_from_dir(dir.path())
+            .expect_err("ciphertext with no key must not read as an empty remote");
+        let (salt, params) = parse_encrypted_discovery(&error).expect("discovery payload");
+        assert_eq!(salt, material.salt);
+        assert_eq!(params, material.params);
+    }
+
+    #[test]
+    fn an_off_state_device_with_a_populated_plaintext_remote_ignores_the_enc_name_entirely() {
+        // Invariant #1: an existing install must not change behavior, and must not start
+        // reading (or erroring on) a name it never looked at before.
+        let dir = tempfile::tempdir().expect("temp dir");
+        fs::write(dir.path().join(DATA_FILE_NAME), br#"{"tasks":[{"id":"plain"}]}"#).expect("plain");
+        fs::write(dir.path().join("data.json.enc"), b"not even a valid container").expect("enc");
+
+        let read = read_sync_file_versioned_from_dir(dir.path()).expect("plaintext read");
+        assert_eq!(read.data["tasks"][0]["id"], "plain");
+        assert_eq!(read.source, "primary");
+    }
+
+    #[test]
+    fn plain_named_ciphertext_is_classified_before_the_recovery_chain_can_rotate_it() {
+        // A peer that wrote MWENC1 under the plain name (or a partially-migrated folder) must
+        // not look like "corrupt JSON, fall through to the backup and repair".
+        let dir = tempfile::tempdir().expect("temp dir");
+        let material = test_material(1);
+        fs::write(
+            dir.path().join(DATA_FILE_NAME),
+            seal(br#"{"tasks":[{"id":"remote"}]}"#, &material),
+        )
+        .expect("write");
+        fs::write(dir.path().join("data.json.bak"), br#"{"tasks":[{"id":"stale"}]}"#).expect("bak");
+
+        let error = read_sync_file_versioned_from_dir(dir.path())
+            .expect_err("plain-named ciphertext must not resolve to the stale backup");
+        assert!(parse_encrypted_discovery(&error).is_some(), "unexpected error: {error}");
+    }
+
+    fn seed_transition_folder(dir: &Path) {
+        fs::write(dir.join(DATA_FILE_NAME), br#"{"tasks":[{"id":"current"}]}"#).expect("data");
+        fs::write(dir.join("data.json.bak"), br#"{"tasks":[{"id":"backup"}]}"#).expect("bak");
+        fs::write(dir.join("mindwtr-backup-2026-01-01.json"), br#"{"tasks":[{"id":"seed"}]}"#)
+            .expect("seed");
+        fs::create_dir_all(dir.join("attachments")).expect("attachments dir");
+        fs::write(dir.join("attachments").join("a1.png"), b"\x89PNG attachment bytes").expect("att");
+    }
+
+    #[test]
+    fn enable_converts_every_artifact_and_removes_plaintext_only_after_verification() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        seed_transition_folder(dir.path());
+
+        let material = enable_sync_encryption_in_dir(dir.path(), "correct horse battery").expect("enable");
+
+        for name in ["data.json.enc", "data.json.enc.bak", "mindwtr-backup-2026-01-01.json.enc"] {
+            let bytes = fs::read(dir.path().join(name)).unwrap_or_else(|_| panic!("missing {name}"));
+            assert!(
+                matches!(inspect_sync_artifact(&bytes), SyncArtifactInspection::Encrypted(_)),
+                "{name} must be an MWENC1 container"
+            );
+            decrypt_sync_artifact(&bytes, &material.key).unwrap_or_else(|_| panic!("{name} must decrypt"));
+        }
+        for name in [DATA_FILE_NAME, "data.json.bak", "mindwtr-backup-2026-01-01.json"] {
+            assert!(!dir.path().join(name).exists(), "{name} must be gone once its .enc verified");
+        }
+        // Attachments keep their exact name — cloudKey is identity-keyed and immutable.
+        let attachment = fs::read(dir.path().join("attachments").join("a1.png")).expect("attachment");
+        assert_eq!(
+            decrypt_sync_artifact(&attachment, &material.key).expect("attachment decrypts"),
+            b"\x89PNG attachment bytes"
+        );
+
+        // The folder now reads back through the encrypted seam.
+        let read = read_sync_file_versioned_from_dir_with(
+            dir.path(),
+            SyncFileCrypto::Enabled(&material),
+        )
+        .expect("read after enable");
+        assert_eq!(read.data["tasks"][0]["id"], "current");
+    }
+
+    #[test]
+    fn an_interrupted_enable_leaves_both_generations_and_a_re_run_completes() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        seed_transition_folder(dir.path());
+        let first = enable_sync_encryption_in_dir(dir.path(), "correct horse battery").expect("enable");
+
+        // Simulate a crash between "wrote the .enc" and "removed the plaintext": both
+        // generations present. A re-run must reuse the salt already committed to the folder
+        // (deriving a second key under a fresh salt would orphan everything the first run
+        // wrote) and converge.
+        fs::write(dir.path().join("data.json.bak"), br#"{"tasks":[{"id":"backup"}]}"#).expect("bak");
+        let second = enable_sync_encryption_in_dir(dir.path(), "correct horse battery").expect("re-run");
+
+        assert_eq!(second.salt, first.salt);
+        assert_eq!(second.key, first.key);
+        assert!(!dir.path().join("data.json.bak").exists());
+        assert!(dir.path().join("data.json.enc.bak").exists());
+    }
+
+    #[test]
+    fn an_enable_interrupted_during_the_attachment_phase_resumes_under_the_same_key() {
+        // Enable seals attachments before it writes any `.enc` document, so this crash window
+        // leaves sealed attachments and no encrypted document to recover the salt from. If the
+        // re-run drew a fresh salt, those attachments — skipped next pass as "already
+        // encrypted" — would never open again.
+        let dir = tempfile::tempdir().expect("temp dir");
+        seed_transition_folder(dir.path());
+        let material = enable_sync_encryption_in_dir(dir.path(), "correct horse battery").expect("enable");
+
+        // Rewind to exactly that window: documents back to plaintext, attachment still sealed.
+        for (enc, plain) in [
+            ("data.json.enc", DATA_FILE_NAME),
+            ("data.json.enc.bak", "data.json.bak"),
+            ("mindwtr-backup-2026-01-01.json.enc", "mindwtr-backup-2026-01-01.json"),
+        ] {
+            fs::remove_file(dir.path().join(enc)).expect("remove enc");
+            fs::write(dir.path().join(plain), br#"{"tasks":[{"id":"current"}]}"#).expect("restore plaintext");
+        }
+        assert!(matches!(
+            inspect_sync_artifact(&fs::read(dir.path().join("attachments").join("a1.png")).expect("att")),
+            SyncArtifactInspection::Encrypted(_)
+        ));
+
+        let resumed = enable_sync_encryption_in_dir(dir.path(), "correct horse battery").expect("resume");
+
+        assert_eq!(resumed.salt, material.salt, "the resumed run must reuse the committed salt");
+        let attachment = fs::read(dir.path().join("attachments").join("a1.png")).expect("attachment");
+        assert_eq!(
+            decrypt_sync_artifact(&attachment, &resumed.key).expect("attachment still opens"),
+            b"\x89PNG attachment bytes"
+        );
+    }
+
+    #[test]
+    fn disable_restores_plaintext_and_change_passphrase_rewraps_everything() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        seed_transition_folder(dir.path());
+        let first = enable_sync_encryption_in_dir(dir.path(), "first pass").expect("enable");
+
+        let next = change_sync_encryption_passphrase_in_dir(dir.path(), &first.key, "second pass")
+            .expect("rotate");
+        assert_ne!(next.salt, first.salt, "rotation must draw a fresh salt");
+        let rotated = fs::read(dir.path().join("data.json.enc")).expect("rotated document");
+        assert!(decrypt_sync_artifact(&rotated, &first.key).is_err(), "the old key must be dead");
+        decrypt_sync_artifact(&rotated, &next.key).expect("the new key must open it");
+
+        disable_sync_encryption_in_dir(dir.path(), &next.key).expect("disable");
+        assert!(!dir.path().join("data.json.enc").exists());
+        assert_eq!(
+            read_sync_file_versioned_from_dir(dir.path()).expect("plaintext read").data["tasks"][0]["id"],
+            "current"
+        );
+        assert_eq!(
+            fs::read(dir.path().join("attachments").join("a1.png")).expect("attachment"),
+            b"\x89PNG attachment bytes"
+        );
+    }
+
+    #[test]
+    fn a_disable_with_the_wrong_key_changes_nothing() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        seed_transition_folder(dir.path());
+        enable_sync_encryption_in_dir(dir.path(), "first pass").expect("enable");
+        let before = fs::read(dir.path().join("data.json.enc")).expect("before");
+
+        let error = disable_sync_encryption_in_dir(dir.path(), &test_material(9).key)
+            .expect_err("a wrong key must not disable");
+
+        assert!(is_terminal_error(&error), "expected a terminal error, got: {error}");
+        assert_eq!(fs::read(dir.path().join("data.json.enc")).expect("after"), before);
+        assert!(!dir.path().join(DATA_FILE_NAME).exists());
+    }
+
+    #[test]
+    fn a_stale_plaintext_fork_from_an_old_client_never_shadows_or_loses_the_encrypted_document() {
+        // Backward-compat #3: an un-updated peer cannot read `data.json.enc`, sees the data
+        // file missing, and may write a stale plaintext `data.json` alongside it. `.enc` stays
+        // authoritative and readers never delete or "repair" the fork — a later transition may
+        // clean it up, a read never does.
+        let dir = tempfile::tempdir().expect("temp dir");
+        let material = test_material(1);
+        let sealed = seal(br#"{"tasks":[{"id":"encrypted-truth"}]}"#, &material);
+        fs::write(dir.path().join("data.json.enc"), &sealed).expect("enc");
+        let stale = br#"{"tasks":[{"id":"stale-fork-from-old-client"}]}"#;
+        fs::write(dir.path().join(DATA_FILE_NAME), stale).expect("stale fork");
+
+        let crypto = SyncFileCrypto::Enabled(&material);
+        let read = read_sync_file_versioned_from_dir_with(dir.path(), crypto).expect("read");
+        assert_eq!(read.data["tasks"][0]["id"], "encrypted-truth");
+        assert_eq!(read.source, "primary");
+
+        // S4 (mandate #3, the write half): B eventually updates and provides the
+        // passphrase. What lands back on the remote must be the result of merging B's
+        // OWN diverged local changes (which is what its stale plaintext fork actually
+        // represents — B kept syncing against it while it couldn't read `.enc`) into the
+        // authoritative encrypted document, losslessly. Rust doesn't run the field-level
+        // merge algorithm itself (that's core's `mergeAppDataWithStats`, exercised under
+        // encryption separately in packages/core/src/sync-encryption-cycle.test.ts) — its
+        // job is the write seam, so this constructs the union a real merge would produce
+        // (both task ids present) and proves the write seam carries it through intact,
+        // encrypted, and without touching the stale fork.
+        let merged = serde_json::json!({ "tasks": [
+            { "id": "encrypted-truth" },
+            { "id": "stale-fork-from-old-client" },
+        ] });
+        write_sync_file_to_dir_with(dir.path(), merged, Some(&read.fingerprint), crypto).expect("write");
+
+        // The stale fork is left in place — a transition may clean it up later, a read
+        // or write never does.
+        assert_eq!(fs::read(dir.path().join(DATA_FILE_NAME)).expect("fork"), stale);
+
+        let reread = read_sync_file_versioned_from_dir_with(dir.path(), crypto).expect("re-read");
+        let ids: Vec<&str> = reread.data["tasks"]
+            .as_array()
+            .expect("tasks array")
+            .iter()
+            .map(|task| task["id"].as_str().expect("id"))
+            .collect();
+        assert!(ids.contains(&"encrypted-truth"), "lost device A's change: {ids:?}");
+        assert!(ids.contains(&"stale-fork-from-old-client"), "lost device B's diverged change: {ids:?}");
+    }
+
+    #[test]
+    fn the_encrypted_webdav_url_keeps_the_marker_on_the_path() {
+        assert_eq!(
+            encrypted_webdav_url("https://host/dav/data.json"),
+            "https://host/dav/data.json.enc"
+        );
+        assert_eq!(
+            encrypted_webdav_url("https://host/dav/data.json?token=1"),
+            "https://host/dav/data.json.enc?token=1"
+        );
+        assert_eq!(
+            encrypted_webdav_url("https://host/dav/data.json#frag"),
+            "https://host/dav/data.json.enc#frag"
+        );
+    }
+
+    #[test]
+    fn webdav_bodies_are_classified_before_being_called_invalid_json() {
+        let material = test_material(4);
+        let sealed = seal(br#"{"tasks":[]}"#, &material);
+        let (salt, params) =
+            parse_encrypted_discovery(&webdav_encrypted_discovery(&sealed).expect("discovery"))
+                .expect("payload");
+        assert_eq!(salt, material.salt);
+        assert_eq!(params, material.params);
+
+        // A present-but-unreadable header is still never "repair me".
+        let mut unsupported = sealed.clone();
+        unsupported[6] = 0x7f; // format_version
+        let error = webdav_encrypted_discovery(&unsupported).expect("unsupported is classified");
+        assert!(is_terminal_error(&error), "unexpected error: {error}");
+
+        assert!(webdav_encrypted_discovery(br#"{"tasks":[]}"#).is_none());
     }
 
     #[test]
@@ -4581,6 +5108,7 @@ mod tests {
             ("platform.rs", include_str!("platform.rs")),
             ("storage.rs", include_str!("storage.rs")),
             ("sync.rs", include_str!("sync.rs")),
+            ("sync_encryption.rs", include_str!("sync_encryption.rs")),
             ("ui.rs", include_str!("ui.rs")),
         ];
 
@@ -8348,8 +8876,41 @@ where
     replace_file_preserving_previous(replacement, target, previous, "sync file", remove, rename)
 }
 
-fn read_sync_candidate(path: &Path, attempts: usize) -> Result<Value, String> {
-    read_json_with_retries_validated(path, attempts, |value| {
+/// How the file backend should treat the bytes on disk for this operation. `Off` is the
+/// pre-feature path and must stay byte-for-byte identical to it (backward-compat invariant #1):
+/// same filenames, same recovery chain, same errors, no extra IO.
+#[derive(Clone, Copy)]
+pub(crate) enum SyncFileCrypto<'a> {
+    Off,
+    Enabled(&'a SyncKeyMaterial),
+}
+
+impl<'a> SyncFileCrypto<'a> {
+    fn material(self) -> Option<&'a SyncKeyMaterial> {
+        match self {
+            Self::Off => None,
+            Self::Enabled(material) => Some(material),
+        }
+    }
+
+    fn is_on(self) -> bool {
+        matches!(self, Self::Enabled(_))
+    }
+
+    /// The base document name every sibling path is derived from: `data.json` when off,
+    /// `data.json.enc` when on. `.bak`/`.tmp`/`.previous` still append to it, which is exactly
+    /// core's `syncEncryptedArtifactName` mapping (`data.json.bak` -> `data.json.enc.bak`).
+    fn data_base(self) -> String {
+        if self.is_on() {
+            encrypted_artifact_name(DATA_FILE_NAME)
+        } else {
+            DATA_FILE_NAME.to_string()
+        }
+    }
+}
+
+fn sync_payload_is_valid(value: &Value) -> Result<(), String> {
+    let validate = |value: &Value| -> Result<(), String> {
         let Some(object) = value.as_object() else {
             return Err("Invalid sync payload shape: expected an object".to_string());
         };
@@ -8388,7 +8949,46 @@ fn read_sync_candidate(path: &Path, attempts: usize) -> Result<Value, String> {
             );
         }
         Ok(())
-    })
+    };
+    validate(value)
+}
+
+fn read_sync_candidate(path: &Path, attempts: usize) -> Result<Value, String> {
+    read_json_with_retries_validated(path, attempts, sync_payload_is_valid)
+}
+
+/// Decrypt-then-validate. A decrypt failure is a TERMINAL error, never "invalid JSON, try the
+/// next recovery candidate": ciphertext this device cannot open may be a peer's perfectly good
+/// newer generation, or simply the wrong passphrase. Fail closed — the caller stops the run,
+/// nothing is rotated, nothing is repaired, nothing is deleted (pinned decision #4).
+fn read_encrypted_sync_candidate(
+    path: &Path,
+    attempts: usize,
+    key: &[u8; KEY_LEN],
+) -> Result<Value, String> {
+    read_json_with_retries_decoded(
+        path,
+        attempts,
+        |path| {
+            let bytes = fs::read(path).map_err(|error| error.to_string())?;
+            let plaintext =
+                decrypt_sync_artifact(&bytes, key).map_err(|error| terminal_error(error))?;
+            String::from_utf8(plaintext)
+                .map_err(|error| terminal_error(format!("decrypted sync payload is not UTF-8: {error}")))
+        },
+        sync_payload_is_valid,
+    )
+}
+
+fn read_sync_candidate_with(
+    path: &Path,
+    attempts: usize,
+    crypto: SyncFileCrypto<'_>,
+) -> Result<Value, String> {
+    match crypto.material() {
+        None => read_sync_candidate(path, attempts),
+        Some(material) => read_encrypted_sync_candidate(path, attempts, &material.key),
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -8426,42 +9026,76 @@ struct SyncFileRead {
     source: SyncFileReadSource,
 }
 
-fn read_sync_backup(backup_file: &Path, previous_file: &Path) -> Option<SyncFileRead> {
-    [
+/// `Ok(None)` means "no usable candidate here, keep walking the chain". `Err` is reserved for
+/// the terminal encryption class, which must stop the walk instead of degrading into a
+/// recovery/repair (decision #4).
+fn read_sync_backup(
+    backup_file: &Path,
+    previous_file: &Path,
+    crypto: SyncFileCrypto<'_>,
+) -> Result<Option<SyncFileRead>, String> {
+    for (path, source) in [
         (backup_file, SyncFileReadSource::Backup),
         (previous_file, SyncFileReadSource::BackupPrevious),
-    ]
-    .into_iter()
-    .filter(|(path, _)| path.exists())
-    .find_map(|(path, source)| {
-        read_sync_candidate(path, 2)
-            .ok()
-            .map(|data| SyncFileRead { data, source })
-    })
+    ] {
+        if !path.exists() {
+            continue;
+        }
+        match read_sync_candidate_with(path, 2, crypto) {
+            Ok(data) => return Ok(Some(SyncFileRead { data, source })),
+            Err(error) if is_terminal_error(&error) => return Err(error),
+            Err(_) => continue,
+        }
+    }
+    Ok(None)
 }
 
 fn read_sync_recovery(
     primary_previous_file: &Path,
     backup_file: &Path,
     backup_previous_file: &Path,
-) -> Option<SyncFileRead> {
+    crypto: SyncFileCrypto<'_>,
+) -> Result<Option<SyncFileRead>, String> {
     if primary_previous_file.exists() {
-        if let Ok(data) = read_sync_candidate(primary_previous_file, 2) {
-            return Some(SyncFileRead {
-                data,
-                source: SyncFileReadSource::PrimaryPrevious,
-            });
+        match read_sync_candidate_with(primary_previous_file, 2, crypto) {
+            Ok(data) => {
+                return Ok(Some(SyncFileRead {
+                    data,
+                    source: SyncFileReadSource::PrimaryPrevious,
+                }))
+            }
+            Err(error) if is_terminal_error(&error) => return Err(error),
+            Err(_) => {}
         }
     }
-    read_sync_backup(backup_file, backup_previous_file)
+    read_sync_backup(backup_file, backup_previous_file, crypto)
 }
 
+/// Encryption-off shorthand. Only the tests still call it directly; every command resolves
+/// this device's posture first and goes through the `_with` form.
+#[cfg(test)]
 fn read_sync_file_with_source_from_dir(sync_dir: &Path) -> Result<SyncFileRead, String> {
-    let sync_file = sync_dir.join(DATA_FILE_NAME);
-    let primary_previous_file = sync_dir.join(format!("{}.previous", DATA_FILE_NAME));
-    let backup_file = sync_dir.join(format!("{}.bak", DATA_FILE_NAME));
-    let backup_previous_file = sync_dir.join(format!("{}.bak.previous", DATA_FILE_NAME));
-    let legacy_sync_file = sync_dir.join(format!("{}-sync.json", APP_NAME));
+    read_sync_file_with_source_from_dir_with(sync_dir, SyncFileCrypto::Off)
+}
+
+fn read_sync_file_with_source_from_dir_with(
+    sync_dir: &Path,
+    crypto: SyncFileCrypto<'_>,
+) -> Result<SyncFileRead, String> {
+    let data_base = crypto.data_base();
+    let sync_file = sync_dir.join(&data_base);
+    let primary_previous_file = sync_dir.join(format!("{data_base}.previous"));
+    let backup_file = sync_dir.join(format!("{data_base}.bak"));
+    let backup_previous_file = sync_dir.join(format!("{data_base}.bak.previous"));
+    let legacy_name = format!("{}-sync.json", APP_NAME);
+    let legacy_sync_file = sync_dir.join(if crypto.is_on() {
+        encrypted_artifact_name(&legacy_name)
+    } else {
+        legacy_name
+    });
+    // Seed backups the transition converted keep their base name plus `.enc`; an off-state
+    // device keeps looking at exactly the `.json` names it always did.
+    let seed_suffix = if crypto.is_on() { ".json.enc" } else { ".json" };
 
     let find_seed_backup_files = |dir: &Path| -> Vec<PathBuf> {
         let Ok(entries) = fs::read_dir(dir) else {
@@ -8480,7 +9114,7 @@ fn read_sync_file_with_source_from_dir(sync_dir: &Path) -> Result<SyncFileRead, 
             if !(lower.starts_with("mindwtr-backup-") || lower.starts_with("data-backup-")) {
                 continue;
             }
-            if !lower.ends_with(".json") {
+            if !lower.ends_with(seed_suffix) {
                 continue;
             }
             let modified = fs::metadata(&path)
@@ -8495,24 +9129,26 @@ fn read_sync_file_with_source_from_dir(sync_dir: &Path) -> Result<SyncFileRead, 
     let read_seed_or_legacy_file = || -> Option<Result<SyncFileRead, String>> {
         let mut first_error: Option<String> = None;
         if legacy_sync_file.exists() {
-            match read_sync_candidate(&legacy_sync_file, 1) {
+            match read_sync_candidate_with(&legacy_sync_file, 1, crypto) {
                 Ok(data) => {
                     return Some(Ok(SyncFileRead {
                         data,
                         source: SyncFileReadSource::Legacy,
                     }));
                 }
+                Err(error) if is_terminal_error(&error) => return Some(Err(error)),
                 Err(error) => first_error = Some(error),
             }
         }
         for seed_file in find_seed_backup_files(sync_dir) {
-            match read_sync_candidate(&seed_file, 1) {
+            match read_sync_candidate_with(&seed_file, 1, crypto) {
                 Ok(data) => {
                     return Some(Ok(SyncFileRead {
                         data,
                         source: SyncFileReadSource::Seed,
                     }));
                 }
+                Err(error) if is_terminal_error(&error) => return Some(Err(error)),
                 Err(error) => {
                     if first_error.is_none() {
                         first_error = Some(error);
@@ -8530,9 +9166,12 @@ fn read_sync_file_with_source_from_dir(sync_dir: &Path) -> Result<SyncFileRead, 
             sync_dir
         );
         log::warn!("{}", msg);
-        if let Some(value) =
-            read_sync_recovery(&primary_previous_file, &backup_file, &backup_previous_file)
-        {
+        if let Some(value) = read_sync_recovery(
+            &primary_previous_file,
+            &backup_file,
+            &backup_previous_file,
+            crypto,
+        )? {
             return Ok(value);
         }
         if let Some(result) = read_seed_or_legacy_file() {
@@ -8542,13 +9181,25 @@ fn read_sync_file_with_source_from_dir(sync_dir: &Path) -> Result<SyncFileRead, 
     }
 
     if !sync_file.exists() {
-        if let Some(value) =
-            read_sync_recovery(&primary_previous_file, &backup_file, &backup_previous_file)
-        {
+        if let Some(value) = read_sync_recovery(
+            &primary_previous_file,
+            &backup_file,
+            &backup_previous_file,
+            crypto,
+        )? {
             return Ok(value);
         }
         if let Some(result) = read_seed_or_legacy_file() {
             return result;
+        }
+        // Detection (decision #2): only an off-state device, and only once the whole plaintext
+        // chain has come up empty — which is exactly the "first sync" / "a peer enabled
+        // encryption and removed the plaintext" shape. A populated plaintext folder never gets
+        // here, so an existing install pays no extra IO for this (invariant #1).
+        if !crypto.is_on() {
+            if let Some(discovery) = detect_encrypted_sync_document(sync_dir) {
+                return Err(discovery);
+            }
         }
         return Ok(SyncFileRead {
             data: empty_remote_app_data(),
@@ -8556,15 +9207,28 @@ fn read_sync_file_with_source_from_dir(sync_dir: &Path) -> Result<SyncFileRead, 
         });
     }
 
-    match read_sync_candidate(&sync_file, 5) {
+    match read_sync_candidate_with(&sync_file, 5, crypto) {
         Ok(data) => Ok(SyncFileRead {
             data,
             source: SyncFileReadSource::Primary,
         }),
         Err(primary_err) => {
-            if let Some(value) =
-                read_sync_recovery(&primary_previous_file, &backup_file, &backup_previous_file)
-            {
+            if is_terminal_error(&primary_err) {
+                return Err(primary_err);
+            }
+            // A plain-named file whose bytes are MWENC1 is not "invalid JSON to repair"
+            // (decision #4) — classify it before the recovery chain can rotate anything.
+            if !crypto.is_on() {
+                if let Some(discovery) = classify_encrypted_bytes(&sync_file) {
+                    return Err(discovery);
+                }
+            }
+            if let Some(value) = read_sync_recovery(
+                &primary_previous_file,
+                &backup_file,
+                &backup_previous_file,
+                crypto,
+            )? {
                 return Ok(value);
             }
             Err(primary_err)
@@ -8572,8 +9236,53 @@ fn read_sync_file_with_source_from_dir(sync_dir: &Path) -> Result<SyncFileRead, 
     }
 }
 
+/// Encodes an MWENC1 discovery as `SYNC_ENCRYPTION_REMOTE_ENCRYPTED:<saltHex>:<mKib>:<t>:<p>`.
+/// The command layer parses it, persists `remote-encrypted-no-key`, and hands TS the bare
+/// sentinel — keeping the AppHandle-free `*_from_dir` functions directly unit-testable.
+fn classify_encrypted_bytes(path: &Path) -> Option<String> {
+    let bytes = fs::read(path).ok()?;
+    match inspect_sync_artifact(&bytes) {
+        SyncArtifactInspection::Encrypted(header) => Some(format!(
+            "{SYNC_ENCRYPTION_REMOTE_ENCRYPTED}:{}:{}:{}:{}",
+            bytes_to_hex(&header.salt),
+            header.params.m_kib,
+            header.params.t,
+            header.params.p
+        )),
+        // A header that is present but unreadable is still never "repair me".
+        SyncArtifactInspection::Unsupported(reason) => Some(terminal_error(reason)),
+        SyncArtifactInspection::Plaintext => None,
+    }
+}
+
+fn detect_encrypted_sync_document(sync_dir: &Path) -> Option<String> {
+    let encrypted = sync_dir.join(encrypted_artifact_name(DATA_FILE_NAME));
+    if !encrypted.exists() {
+        return None;
+    }
+    classify_encrypted_bytes(&encrypted)
+}
+
+pub(crate) fn parse_encrypted_discovery(error: &str) -> Option<([u8; SALT_LEN], SyncCryptoKdfParams)> {
+    let rest = error.strip_prefix(SYNC_ENCRYPTION_REMOTE_ENCRYPTED)?.strip_prefix(':')?;
+    let mut parts = rest.split(':');
+    let salt = <[u8; SALT_LEN]>::try_from(hex_to_bytes(parts.next()?)?.as_slice()).ok()?;
+    let m_kib = parts.next()?.parse().ok()?;
+    let t = parts.next()?.parse().ok()?;
+    let p = parts.next()?.parse().ok()?;
+    Some((salt, SyncCryptoKdfParams { m_kib, t, p }))
+}
+
+#[cfg(test)]
 fn read_sync_file_from_dir(sync_dir: &Path) -> Result<serde_json::Value, String> {
     read_sync_file_with_source_from_dir(sync_dir).map(|result| result.data)
+}
+
+fn read_sync_file_from_dir_with(
+    sync_dir: &Path,
+    crypto: SyncFileCrypto<'_>,
+) -> Result<serde_json::Value, String> {
+    read_sync_file_with_source_from_dir_with(sync_dir, crypto).map(|result| result.data)
 }
 
 #[derive(Debug, Serialize)]
@@ -8594,8 +9303,16 @@ fn sync_document_fingerprint(data: &Value) -> Result<String, String> {
     ))
 }
 
+#[cfg(test)]
 fn read_sync_file_versioned_from_dir(sync_dir: &Path) -> Result<SyncFileReadResult, String> {
-    let result = read_sync_file_with_source_from_dir(sync_dir)?;
+    read_sync_file_versioned_from_dir_with(sync_dir, SyncFileCrypto::Off)
+}
+
+fn read_sync_file_versioned_from_dir_with(
+    sync_dir: &Path,
+    crypto: SyncFileCrypto<'_>,
+) -> Result<SyncFileReadResult, String> {
+    let result = read_sync_file_with_source_from_dir_with(sync_dir, crypto)?;
     let fingerprint = sync_document_fingerprint(&result.data)?;
     Ok(SyncFileReadResult {
         data: result.data,
@@ -8603,6 +9320,43 @@ fn read_sync_file_versioned_from_dir(sync_dir: &Path) -> Result<SyncFileReadResu
         source: result.source.as_str(),
         needs_repair: result.source.needs_repair(),
     })
+}
+
+/// Resolves this device's encryption posture for a file-backend operation. Enabled-but-no-key
+/// fails closed rather than silently reading/writing the plaintext names, which would fork the
+/// folder into two generations.
+fn resolve_sync_encryption_material(app: &tauri::AppHandle) -> Result<Option<SyncKeyMaterial>, String> {
+    if !is_encryption_enabled(app) {
+        return Ok(None);
+    }
+    resolve_key_material(app)
+        .map(Some)
+        .ok_or_else(|| terminal_error("sync encryption is enabled but no key is available on this device"))
+}
+
+fn crypto_for<'a>(material: &'a Option<SyncKeyMaterial>) -> SyncFileCrypto<'a> {
+    match material {
+        Some(material) => SyncFileCrypto::Enabled(material),
+        None => SyncFileCrypto::Off,
+    }
+}
+
+/// Turns an in-band discovery marker into persisted `remote-encrypted-no-key` state plus the
+/// bare sentinel TS classifies on. Anything else passes through untouched.
+fn persist_discovery_and_reduce<T>(
+    app: &tauri::AppHandle,
+    result: Result<T, String>,
+) -> Result<T, String> {
+    match result {
+        Err(error) => {
+            if let Some((salt, params)) = parse_encrypted_discovery(&error) {
+                mark_remote_encrypted_no_key(app, &salt, params)?;
+                return Err(SYNC_ENCRYPTION_REMOTE_ENCRYPTED.to_string());
+            }
+            Err(error)
+        }
+        ok => ok,
+    }
 }
 
 #[tauri::command(async)]
@@ -8616,7 +9370,11 @@ pub(crate) fn read_sync_file(
             configured_sync_dir(&app)?.ok_or_else(|| "Sync path is not configured".to_string())?
         }
     };
-    read_sync_file_from_dir(&sync_dir)
+    let material = resolve_sync_encryption_material(&app)?;
+    persist_discovery_and_reduce(
+        &app,
+        read_sync_file_from_dir_with(&sync_dir, crypto_for(&material)),
+    )
 }
 
 #[tauri::command(async)]
@@ -8630,19 +9388,34 @@ pub(crate) fn read_sync_file_versioned(
             configured_sync_dir(&app)?.ok_or_else(|| "Sync path is not configured".to_string())?
         }
     };
-    read_sync_file_versioned_from_dir(&sync_dir)
+    let material = resolve_sync_encryption_material(&app)?;
+    persist_discovery_and_reduce(
+        &app,
+        read_sync_file_versioned_from_dir_with(&sync_dir, crypto_for(&material)),
+    )
 }
 
+#[cfg(test)]
 fn write_sync_file_to_dir(
     sync_dir: &Path,
     data: Value,
     expected_fingerprint: Option<&str>,
 ) -> Result<bool, String> {
-    let sync_file = sync_dir.join(DATA_FILE_NAME);
-    let backup_file = sync_dir.join(format!("{}.bak", DATA_FILE_NAME));
-    let backup_previous_file = sync_dir.join(format!("{}.bak.previous", DATA_FILE_NAME));
-    let primary_previous_file = sync_dir.join(format!("{}.previous", DATA_FILE_NAME));
-    let tmp_file = sync_dir.join(format!("{}.tmp", DATA_FILE_NAME));
+    write_sync_file_to_dir_with(sync_dir, data, expected_fingerprint, SyncFileCrypto::Off)
+}
+
+fn write_sync_file_to_dir_with(
+    sync_dir: &Path,
+    data: Value,
+    expected_fingerprint: Option<&str>,
+    crypto: SyncFileCrypto<'_>,
+) -> Result<bool, String> {
+    let data_base = crypto.data_base();
+    let sync_file = sync_dir.join(&data_base);
+    let backup_file = sync_dir.join(format!("{data_base}.bak"));
+    let backup_previous_file = sync_dir.join(format!("{data_base}.bak.previous"));
+    let primary_previous_file = sync_dir.join(format!("{data_base}.previous"));
+    let tmp_file = sync_dir.join(format!("{data_base}.tmp"));
 
     if is_icloud_evicted(&sync_file) {
         log::warn!(
@@ -8658,19 +9431,35 @@ fn write_sync_file_to_dir(
 
     let result = (|| -> Result<bool, String> {
         if let Some(expected_fingerprint) = expected_fingerprint {
-            let current = read_sync_file_from_dir(sync_dir)?;
+            // Fingerprints stay plaintext-domain: the read below decrypts first, so the same
+            // document fingerprints identically before and after a re-encryption (decision #9).
+            let current = read_sync_file_from_dir_with(sync_dir, crypto)?;
             if sync_document_fingerprint(&current)? != expected_fingerprint {
                 return Err(SYNC_FILE_WRITE_CONFLICT.to_string());
             }
         }
 
-        if sync_file.exists() && read_sync_candidate(&sync_file, 1).is_ok() {
+        let existing_primary = if sync_file.exists() {
+            match read_sync_candidate_with(&sync_file, 1, crypto) {
+                Ok(_) => Some(true),
+                // Fail closed: ciphertext we cannot open may be a peer's newer generation.
+                // Refuse to write over it at all — do not rotate, do not overwrite, do not
+                // "repair" (decision #4). Unlike a plain unparseable file, this is never a
+                // corrupt-remote-we-should-replace signal.
+                Err(error) if is_terminal_error(&error) => return Err(error),
+                Err(_) => Some(false),
+            }
+        } else {
+            None
+        };
+
+        if existing_primary == Some(true) {
             // Overwriting the backup in place needs O_TRUNC, which rclone/WinFSP
             // mounts refuse without a VFS write cache — so the .bak silently
             // stopped updating there (#1001). Write a fresh temp name (a new
             // file, always allowed) and rename over the old backup, the same
             // shape the data file itself uses.
-            let backup_tmp = sync_dir.join(format!("{}.bak.tmp", DATA_FILE_NAME));
+            let backup_tmp = sync_dir.join(format!("{data_base}.bak.tmp"));
             let _ = fs::remove_file(&backup_tmp);
             if let Err(error) = copy_file_sequentially(&sync_file, &backup_tmp) {
                 log::warn!("Sync backup copy failed: {error}");
@@ -8698,11 +9487,17 @@ fn write_sync_file_to_dir(
         }
 
         let content = serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?;
+        // Encryption wraps the already-serialized bytes and changes nothing above this line:
+        // the document, its pretty-printing, and its fingerprint are all plaintext-domain.
+        let content: Vec<u8> = match crypto.material() {
+            None => content.into_bytes(),
+            Some(material) => encrypt_sync_artifact(content.as_bytes(), material)
+                .map_err(|error| terminal_error(error))?,
+        };
 
         {
             let mut file = File::create(&tmp_file).map_err(|e| e.to_string())?;
-            file.write_all(content.as_bytes())
-                .map_err(|e| e.to_string())?;
+            file.write_all(&content).map_err(|e| e.to_string())?;
             file.sync_all().map_err(|e| e.to_string())?;
         }
 
@@ -8778,7 +9573,461 @@ pub(crate) fn write_sync_file(
             configured_sync_dir(&app)?.ok_or_else(|| "Sync path is not configured".to_string())?
         }
     };
-    write_sync_file_to_dir(&sync_dir, data, expected_fingerprint.as_deref())
+    let material = resolve_sync_encryption_material(&app)?;
+    write_sync_file_to_dir_with(
+        &sync_dir,
+        data,
+        expected_fingerprint.as_deref(),
+        crypto_for(&material),
+    )
+}
+
+// ---------------------------------------------------------------------------
+// File-sync encryption transitions (#1056 decision #3).
+//
+// Explicit maintenance operations, never a sync-cycle side effect. They hold the same sync
+// lock every write holds, they touch the REMOTE (sync-folder) artifact set only — local
+// SQLite and the local attachments directory are never rewritten, so an interrupted or
+// wrong-passphrase run always leaves the user's full local dataset intact — and every
+// artifact is written, read back and decrypt-verified before its predecessor is removed, so
+// a crash mid-run leaves both generations present and re-running resumes.
+//
+// WebDAV and Dropbox transitions do NOT come through here: they run core's shared
+// `runEnableSyncEncryptionOverRemote` family from TS, because enumerating a remote's
+// attachments is a TS-side concern (the sync document is the attachment index) and one
+// shared implementation for those two backends beats a second Rust one. Rust still owns the
+// per-cycle WebDAV crypto seam (`webdav_get_json`/`webdav_put_json`) below.
+// ---------------------------------------------------------------------------
+
+const SYNC_ENCRYPTION_TRANSITION_TMP_SUFFIX: &str = ".enctransition";
+/// Mirrors ATTACHMENTS_DIR_NAME in packages/core/src/attachment-paths.ts.
+const SYNC_ATTACHMENTS_DIR_NAME: &str = "attachments";
+
+/// Every artifact in the folder the transition must convert, in the order it must convert
+/// them: attachments first, then non-base documents, then the base document last. A reader
+/// that finds `data.json.enc` must never find it referencing a `.bak` or attachment that is
+/// not itself already migrated.
+struct SyncFolderArtifacts {
+    attachments: Vec<PathBuf>,
+    documents: Vec<PathBuf>,
+}
+
+fn is_transition_scratch(name: &str) -> bool {
+    name.ends_with(SYNC_ENCRYPTION_TRANSITION_TMP_SUFFIX)
+        || name.ends_with(".tmp")
+        || name.ends_with(".previous")
+        || name.ends_with(".lock")
+        || name.starts_with('.')
+}
+
+fn collect_sync_folder_attachments(sync_dir: &Path) -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    let mut stack = vec![sync_dir.join(SYNC_ATTACHMENTS_DIR_NAME)];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+                continue;
+            };
+            if is_transition_scratch(name) {
+                continue;
+            }
+            found.push(path);
+        }
+    }
+    found.sort();
+    found
+}
+
+/// `encrypting` selects which generation to look for: the plaintext names when enabling, the
+/// `.enc` names when disabling. Passphrase rotation reuses the `.enc` side.
+fn collect_sync_folder_artifacts(sync_dir: &Path, encrypting: bool) -> SyncFolderArtifacts {
+    let base = if encrypting {
+        DATA_FILE_NAME.to_string()
+    } else {
+        encrypted_artifact_name(DATA_FILE_NAME)
+    };
+    let legacy_plain = format!("{}-sync.json", APP_NAME);
+    let legacy = if encrypting { legacy_plain.clone() } else { encrypted_artifact_name(&legacy_plain) };
+
+    let mut documents: Vec<PathBuf> = Vec::new();
+    // Non-base first; the base document is pushed last, below.
+    for name in [
+        format!("{base}.bak"),
+        format!("{base}.bak.previous"),
+        format!("{base}.previous"),
+        legacy,
+    ] {
+        let path = sync_dir.join(&name);
+        if path.is_file() {
+            documents.push(path);
+        }
+    }
+
+    // Seed backups (`mindwtr-backup-*.json` / `data-backup-*.json`), the same set the recovery
+    // chain reads. Encrypted ones carry the `.json.enc` tail.
+    let seed_suffix = if encrypting { ".json" } else { ".json.enc" };
+    if let Ok(entries) = fs::read_dir(sync_dir) {
+        let mut seeds: Vec<PathBuf> = Vec::new();
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+                continue;
+            };
+            let lower = name.to_ascii_lowercase();
+            if !(lower.starts_with("mindwtr-backup-") || lower.starts_with("data-backup-")) {
+                continue;
+            }
+            if !lower.ends_with(seed_suffix) {
+                continue;
+            }
+            seeds.push(path);
+        }
+        seeds.sort();
+        documents.append(&mut seeds);
+    }
+
+    let base_path = sync_dir.join(&base);
+    if base_path.is_file() {
+        documents.push(base_path);
+    }
+
+    SyncFolderArtifacts { attachments: collect_sync_folder_attachments(sync_dir), documents }
+}
+
+fn write_new_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    // Create-new + rename everywhere on the sync path: a cache-off rclone/WinFSP mount refuses
+    // to reopen an existing file for truncating overwrite (#1001).
+    let _ = fs::remove_file(path);
+    let mut file = File::create(path).map_err(|error| error.to_string())?;
+    file.write_all(bytes).map_err(|error| error.to_string())?;
+    file.sync_all().map_err(|error| error.to_string())
+}
+
+fn install_replacing(tmp: &Path, target: &Path) -> Result<(), String> {
+    if cfg!(windows) && target.exists() {
+        let previous = target.with_extension("enctransition.previous");
+        replace_sync_file_preserving_previous(
+            tmp,
+            target,
+            &previous,
+            |path| fs::remove_file(path),
+            |from, to| fs::rename(from, to),
+        )?;
+    } else {
+        fs::rename(tmp, target).map_err(|error| error.to_string())?;
+    }
+    sync_parent_directory_for_durability(target)
+        .map_err(|error| format!("Failed to flush sync directory metadata: {error}"))
+}
+
+fn transition_tmp_path(target: &Path) -> PathBuf {
+    let mut name = target.as_os_str().to_os_string();
+    name.push(SYNC_ENCRYPTION_TRANSITION_TMP_SUFFIX);
+    PathBuf::from(name)
+}
+
+/// Writes `bytes` at `target` through a scratch file, then reads it back and runs `verify`
+/// before returning. Nothing downstream may delete a predecessor until this has succeeded.
+fn write_and_verify<Verify>(target: &Path, bytes: &[u8], verify: Verify) -> Result<(), String>
+where
+    Verify: Fn(&[u8]) -> Result<(), String>,
+{
+    let tmp = transition_tmp_path(target);
+    write_new_file(&tmp, bytes)?;
+    install_replacing(&tmp, target)?;
+    let written = fs::read(target)
+        .map_err(|error| format!("Failed to read back {}: {error}", target.display()))?;
+    verify(&written)
+}
+
+fn verify_decrypts(material: &SyncKeyMaterial) -> impl Fn(&[u8]) -> Result<(), String> + '_ {
+    move |bytes: &[u8]| {
+        decrypt_sync_artifact(bytes, &material.key)
+            .map(|_| ())
+            .map_err(|error| terminal_error(error))
+    }
+}
+
+fn seal_artifact_in_place(path: &Path, material: &SyncKeyMaterial) -> Result<(), String> {
+    let bytes = fs::read(path).map_err(|error| format!("Failed to read {}: {error}", path.display()))?;
+    if matches!(inspect_sync_artifact(&bytes), SyncArtifactInspection::Encrypted(_)) {
+        return Ok(()); // already migrated (resume)
+    }
+    let sealed = encrypt_sync_artifact(&bytes, material).map_err(|error| terminal_error(error))?;
+    write_and_verify(path, &sealed, verify_decrypts(material))
+}
+
+fn open_artifact_in_place(path: &Path, key: &[u8; KEY_LEN]) -> Result<(), String> {
+    let bytes = fs::read(path).map_err(|error| format!("Failed to read {}: {error}", path.display()))?;
+    if !matches!(inspect_sync_artifact(&bytes), SyncArtifactInspection::Encrypted(_)) {
+        return Ok(()); // already plaintext (resume)
+    }
+    let plain = decrypt_sync_artifact(&bytes, key).map_err(|error| terminal_error(error))?;
+    write_and_verify(path, &plain, |written| {
+        if written == plain {
+            Ok(())
+        } else {
+            Err(format!("Failed to verify {} after write", path.display()))
+        }
+    })
+}
+
+/// Resume self-heal, mirroring core TS's `recoverMaterialForSalt`: an artifact left over from
+/// an earlier, interrupted passphrase-change attempt (same `next_passphrase`, an abandoned
+/// intermediate salt because every attempt draws a fresh random one) decrypts under neither
+/// `old_key` nor `next.key`. Recover it by deriving from its OWN header salt/params with
+/// `next_passphrase` — a rotation attempt only ever re-derives from the new passphrase, never
+/// the old one, so that is the only candidate worth trying. `recovered_by_salt` caches the
+/// Argon2id derivation per salt so a batch of artifacts from the same abandoned attempt only
+/// pays the KDF cost once.
+fn rewrap_artifact_in_place(
+    path: &Path,
+    old_key: &[u8; KEY_LEN],
+    next: &SyncKeyMaterial,
+    next_passphrase: &str,
+    recovered_by_salt: &mut HashMap<[u8; SALT_LEN], SyncKeyMaterial>,
+) -> Result<(), String> {
+    let bytes = fs::read(path).map_err(|error| format!("Failed to read {}: {error}", path.display()))?;
+    if decrypt_sync_artifact(&bytes, &next.key).is_ok() {
+        return Ok(()); // already migrated under the new key (resume)
+    }
+    let plain = if let Ok(plain) = decrypt_sync_artifact(&bytes, old_key) {
+        plain
+    } else {
+        let header = match inspect_sync_artifact(&bytes) {
+            SyncArtifactInspection::Encrypted(header) => header,
+            _ => return Err(terminal_error(format!("{} is not a valid MWENC1 container", path.display()))),
+        };
+        let recovered = if let Some(material) = recovered_by_salt.get(&header.salt) {
+            material.clone()
+        } else {
+            let material = derive_sync_key_material(next_passphrase, header.salt, header.params)
+                .map_err(|error| terminal_error(error))?;
+            recovered_by_salt.insert(header.salt, material.clone());
+            material
+        };
+        decrypt_sync_artifact(&bytes, &recovered.key).map_err(|error| terminal_error(error))?
+    };
+    let sealed = encrypt_sync_artifact(&plain, next).map_err(|error| terminal_error(error))?;
+    write_and_verify(path, &sealed, verify_decrypts(next))
+}
+
+/// The salt/params already committed to this folder, if any — resuming an interrupted enable
+/// must reuse them rather than deriving a second key under a fresh salt and orphaning whatever
+/// the first run already wrote.
+///
+/// Attachments are scanned too, and that is load-bearing rather than thorough-for-its-own-sake:
+/// enable seals every attachment BEFORE it writes the first `.enc` document, so a crash during
+/// the attachment phase leaves sealed attachments and no encrypted document at all. Looking
+/// only at documents there would derive a fresh salt, and the already-sealed attachments —
+/// which the next pass skips as "already encrypted" — would be unopenable under the new key.
+fn existing_folder_header(sync_dir: &Path) -> Option<([u8; SALT_LEN], SyncCryptoKdfParams)> {
+    let artifacts = collect_sync_folder_artifacts(sync_dir, false);
+    let header_of = |path: &PathBuf| -> Option<([u8; SALT_LEN], SyncCryptoKdfParams)> {
+        match inspect_sync_artifact(&fs::read(path).ok()?) {
+            SyncArtifactInspection::Encrypted(header) => Some((header.salt, header.params)),
+            _ => None,
+        }
+    };
+    // Base document first (documents are ordered with it last), then the rest, then
+    // attachments — the most authoritative header wins.
+    artifacts
+        .documents
+        .iter()
+        .rev()
+        .chain(artifacts.attachments.iter())
+        .find_map(header_of)
+}
+
+fn enable_sync_encryption_in_dir(
+    sync_dir: &Path,
+    passphrase: &str,
+) -> Result<SyncKeyMaterial, String> {
+    let (salt, params) =
+        existing_folder_header(sync_dir).unwrap_or((random_salt(), SYNC_CRYPTO_DEFAULT_KDF_PARAMS));
+    let material =
+        derive_sync_key_material(passphrase, salt, params).map_err(|error| terminal_error(error))?;
+
+    let lock = acquire_sync_lock(sync_dir)?;
+    let result = (|| -> Result<(), String> {
+        let artifacts = collect_sync_folder_artifacts(sync_dir, true);
+        for path in &artifacts.attachments {
+            seal_artifact_in_place(path, &material)?;
+        }
+        for path in &artifacts.documents {
+            let bytes = fs::read(path)
+                .map_err(|error| format!("Failed to read {}: {error}", path.display()))?;
+            if matches!(inspect_sync_artifact(&bytes), SyncArtifactInspection::Encrypted(_)) {
+                continue;
+            }
+            let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+                continue;
+            };
+            let target = sync_dir.join(encrypted_artifact_name(name));
+            let sealed =
+                encrypt_sync_artifact(&bytes, &material).map_err(|error| terminal_error(error))?;
+            write_and_verify(&target, &sealed, verify_decrypts(&material))?;
+            // Only now, with the ciphertext on disk and proven readable, does the plaintext go.
+            fs::remove_file(path)
+                .map_err(|error| format!("Failed to remove {}: {error}", path.display()))?;
+        }
+        Ok(())
+    })();
+    release_sync_lock(&lock);
+    result.map(|()| material)
+}
+
+fn disable_sync_encryption_in_dir(sync_dir: &Path, key: &[u8; KEY_LEN]) -> Result<(), String> {
+    let lock = acquire_sync_lock(sync_dir)?;
+    let result = (|| -> Result<(), String> {
+        let artifacts = collect_sync_folder_artifacts(sync_dir, false);
+        for path in &artifacts.attachments {
+            open_artifact_in_place(path, key)?;
+        }
+        for path in &artifacts.documents {
+            let bytes = fs::read(path)
+                .map_err(|error| format!("Failed to read {}: {error}", path.display()))?;
+            if !matches!(inspect_sync_artifact(&bytes), SyncArtifactInspection::Encrypted(_)) {
+                continue;
+            }
+            let plain = decrypt_sync_artifact(&bytes, key).map_err(|error| terminal_error(error))?;
+            let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+                continue;
+            };
+            let target = sync_dir.join(plaintext_artifact_name(name));
+            write_and_verify(&target, &plain, |written| {
+                if written == plain {
+                    Ok(())
+                } else {
+                    Err(format!("Failed to verify {} after write", target.display()))
+                }
+            })?;
+            fs::remove_file(path)
+                .map_err(|error| format!("Failed to remove {}: {error}", path.display()))?;
+        }
+        Ok(())
+    })();
+    release_sync_lock(&lock);
+    result
+}
+
+fn change_sync_encryption_passphrase_in_dir(
+    sync_dir: &Path,
+    old_key: &[u8; KEY_LEN],
+    next_passphrase: &str,
+) -> Result<SyncKeyMaterial, String> {
+    let next = derive_sync_key_material(next_passphrase, random_salt(), SYNC_CRYPTO_DEFAULT_KDF_PARAMS)
+        .map_err(|error| terminal_error(error))?;
+    let lock = acquire_sync_lock(sync_dir)?;
+    let result = (|| -> Result<(), String> {
+        let artifacts = collect_sync_folder_artifacts(sync_dir, false);
+        let mut recovered_by_salt: HashMap<[u8; SALT_LEN], SyncKeyMaterial> = HashMap::new();
+        for path in artifacts.attachments.iter().chain(artifacts.documents.iter()) {
+            rewrap_artifact_in_place(path, old_key, &next, next_passphrase, &mut recovered_by_salt)?;
+        }
+        Ok(())
+    })();
+    release_sync_lock(&lock);
+    result.map(|()| next)
+}
+
+fn require_file_backend_dir(
+    app: &tauri::AppHandle,
+    path: Option<String>,
+) -> Result<PathBuf, String> {
+    match path {
+        Some(path) => resolve_sync_dir_granting_scope(app, path),
+        None => configured_sync_dir(app)?.ok_or_else(|| "Sync path is not configured".to_string()),
+    }
+}
+
+fn cached_key_or_err(app: &tauri::AppHandle) -> Result<[u8; KEY_LEN], String> {
+    resolve_key_material(app)
+        .map(|material| material.key)
+        .ok_or_else(|| terminal_error("sync encryption is not unlocked on this device"))
+}
+
+/// Turns the whole folder's remote artifact set into `.enc` counterparts and caches the key.
+/// The enabled state is persisted only after the conversion has fully succeeded — the same
+/// "never persist a backend flag before its first successful round-trip" rule the staged
+/// credential family follows (#1034).
+#[tauri::command(async)]
+pub(crate) fn enable_sync_encryption(
+    app: tauri::AppHandle,
+    passphrase: String,
+    path: Option<String>,
+) -> Result<(), String> {
+    let sync_dir = require_file_backend_dir(&app, path)?;
+    let material = enable_sync_encryption_in_dir(&sync_dir, &passphrase)?;
+    persist_enabled_material(&app, &material)
+}
+
+#[tauri::command(async)]
+pub(crate) fn disable_sync_encryption(
+    app: tauri::AppHandle,
+    path: Option<String>,
+) -> Result<(), String> {
+    let sync_dir = require_file_backend_dir(&app, path)?;
+    let key = cached_key_or_err(&app)?;
+    disable_sync_encryption_in_dir(&sync_dir, &key)?;
+    clear_encryption_state(&app)
+}
+
+#[tauri::command(async)]
+pub(crate) fn change_sync_encryption_passphrase(
+    app: tauri::AppHandle,
+    next_passphrase: String,
+    path: Option<String>,
+) -> Result<(), String> {
+    let sync_dir = require_file_backend_dir(&app, path)?;
+    let old_key = cached_key_or_err(&app)?;
+    let next = change_sync_encryption_passphrase_in_dir(&sync_dir, &old_key, &next_passphrase)?;
+    persist_enabled_material(&app, &next)
+}
+
+/// Validates a passphrase against the folder's current `.enc` base document. Never mutates the
+/// remote either way: a wrong passphrase is a plain answer, not an error and not a write.
+#[tauri::command(async)]
+pub(crate) fn provide_sync_encryption_passphrase(
+    app: tauri::AppHandle,
+    passphrase: String,
+    path: Option<String>,
+) -> Result<String, String> {
+    let sync_dir = require_file_backend_dir(&app, path)?;
+    let encrypted = sync_dir.join(encrypted_artifact_name(DATA_FILE_NAME));
+    let bytes = fs::read(&encrypted)
+        .map_err(|error| format!("Failed to read {}: {error}", encrypted.display()))?;
+    let header = match inspect_sync_artifact(&bytes) {
+        SyncArtifactInspection::Encrypted(header) => header,
+        SyncArtifactInspection::Unsupported(reason) => return Err(terminal_error(reason)),
+        SyncArtifactInspection::Plaintext => {
+            return Err(terminal_error(format!(
+                "{} is not an encrypted sync document",
+                encrypted.display()
+            )))
+        }
+    };
+    let material = derive_sync_key_material(&passphrase, header.salt, header.params)
+        .map_err(|error| terminal_error(error))?;
+    match decrypt_sync_artifact(&bytes, &material.key) {
+        Ok(_) => {
+            persist_enabled_material(&app, &material)?;
+            Ok("ok".to_string())
+        }
+        Err(SyncCryptoError::Auth) => Ok("wrong-passphrase".to_string()),
+        Err(error) => Err(terminal_error(error)),
+    }
 }
 
 // tauri-plugin-fs declares `exists`, `mkdir`, `remove` and `rename` as plain

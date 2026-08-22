@@ -2,9 +2,29 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from './file-system';
 import { Directory as ExpoDirectory, File as ExpoFile } from 'expo-file-system';
-import { AppData, decodeUriSafe, LEGACY_SYNC_FILE_NAME, sleep, SYNC_FILE_NAME } from '@mindwtr/core';
+import {
+    AppData,
+    decodeUriSafe,
+    decryptRemoteArtifactOrThrow,
+    encryptSyncArtifact,
+    inspectSyncArtifact,
+    LEGACY_SYNC_FILE_NAME,
+    markRemoteEncryptionDiscovered,
+    sleep,
+    SYNC_FILE_NAME,
+    syncEncryptedArtifactName,
+    SyncEncryptionTerminalError,
+    type SyncKeyMaterial,
+} from '@mindwtr/core';
 import { Platform } from 'react-native';
 import { logError, logInfo, logWarn } from './app-log';
+import { mobileSyncCryptoPrimitives } from './sync-crypto-native';
+import { SyncEncryptionNoKeyError, syncEncryptionLocalState } from './sync-encryption-state';
+import {
+    readSyncArtifactBytes,
+    resolveSyncArtifactSiblingUri,
+    writeSyncArtifactBytes,
+} from './storage-file-encryption';
 import {
     createSyncPathBookmark,
     readBookmarkedSyncFileText,
@@ -534,11 +554,87 @@ export const pickAndParseSyncFolder = async (): Promise<PickResult | null> => {
 export interface SyncFileAccessOptions {
     /** iOS security-scoped bookmark for the sync file or its folder. */
     bookmark?: string | null;
+    /**
+     * Sync-encryption key material (#1056). `null`/absent is the encryption-off path and
+     * behaves byte-for-byte as it did before this feature: same file name, same text APIs,
+     * same recovery chain. When present, `data.json` becomes `data.json.enc` and all IO
+     * switches to raw bytes.
+     */
+    material?: SyncKeyMaterial | null;
 }
+
+const getUriLeafName = (uri: string): string => {
+    const stripped = decodeUriSafe(uri).replace(/[?#].*$/, '').replace(/\/+$/, '');
+    const lastSeparator = Math.max(stripped.lastIndexOf('/'), stripped.lastIndexOf(':'));
+    return lastSeparator >= 0 ? stripped.slice(lastSeparator + 1) : stripped;
+};
+
+const encryptedLeafNameFor = (resolvedUri: string): string =>
+    syncEncryptedArtifactName(getUriLeafName(resolvedUri) || SYNC_FILE_NAME);
+
+/**
+ * Decision #2 detection, mirroring `webdavGetSyncDocument`'s reasoning exactly: only ever
+ * called when this device has NO key AND the plaintext read produced nothing usable, so a
+ * steadily-syncing plaintext install never pays for it. Persists the discovery (decision
+ * #5 — it must survive a restart) and returns true when the caller must fail closed.
+ *
+ * `plainBytes` is the plain-named file's raw content when it existed but failed to parse:
+ * a peer could have written ciphertext under the plain name, and ciphertext is never
+ * "invalid JSON to be repaired" (decision #4).
+ */
+const discoverEncryptedSyncFolder = async (
+    resolvedUri: string,
+    plainBytes: Uint8Array | null,
+): Promise<boolean> => {
+    const candidates: (Uint8Array | null)[] = [plainBytes];
+    try {
+        const encUri = await resolveSyncArtifactSiblingUri(resolvedUri, encryptedLeafNameFor(resolvedUri), {
+            createIfMissing: false,
+        });
+        if (encUri) candidates.push(await readSyncArtifactBytes(encUri));
+    } catch {
+        // A folder we cannot list is simply a folder with no discoverable `.enc` sibling.
+    }
+    for (const bytes of candidates) {
+        if (!bytes || bytes.length === 0) continue;
+        const inspected = inspectSyncArtifact(bytes);
+        if (inspected.kind !== 'encrypted') continue;
+        markRemoteEncryptionDiscovered(syncEncryptionLocalState, {
+            salt: inspected.salt,
+            params: inspected.params,
+        });
+        return true;
+    }
+    return false;
+};
+
+const readEncryptedSyncFile = async (
+    resolvedUri: string,
+    material: SyncKeyMaterial,
+): Promise<AppData | null> => {
+    const encUri = await resolveSyncArtifactSiblingUri(resolvedUri, encryptedLeafNameFor(resolvedUri), {
+        createIfMissing: false,
+    });
+    if (!encUri) return null;
+    const bytes = await readSyncArtifactBytes(encUri);
+    if (!bytes || bytes.length === 0) return null;
+    const plaintext = await decryptRemoteArtifactOrThrow(bytes, material.key, mobileSyncCryptoPrimitives);
+    return parseAppData(new TextDecoder().decode(plaintext));
+};
 
 // Read sync file from a stored path
 export const readSyncFile = async (fileUri: string, options?: SyncFileAccessOptions): Promise<AppData | null> => {
     try {
+        const material = options?.material ?? null;
+        if (material) {
+            // The bookmarked-IO shortcut below is text-only (the native module exposes
+            // readTextFile/writeTextFile), and ciphertext is not text. Encrypted folders
+            // use the byte path against the already-bookmark-resolved URI, which is the
+            // same access route the plaintext path falls back to when bookmarked IO fails.
+            const resolvedEncryptedUri = await resolveSyncFileUri(fileUri, { createIfMissing: false });
+            return await readEncryptedSyncFile(resolvedEncryptedUri, material);
+        }
+
         const bookmark = options?.bookmark?.trim() || null;
         if (bookmark && Platform.OS === 'ios' && supportsBookmarkedSyncFileIO()) {
             let fileContent: string | null | undefined;
@@ -588,16 +684,38 @@ export const readSyncFile = async (fileUri: string, options?: SyncFileAccessOpti
         for (let attempt = 0; attempt < 4; attempt += 1) {
             try {
                 const fileContent = await readFileText(resolvedUri);
-                if (!fileContent) return null;
+                if (!fileContent) {
+                    // "Nothing here" is also the exact shape of a folder a peer encrypted
+                    // and whose plaintext original it then removed — take one look before
+                    // reporting no data (and, with no data, letting the cycle write a
+                    // fresh plaintext file alongside the encrypted one).
+                    if (await discoverEncryptedSyncFolder(resolvedUri, null)) throw new SyncEncryptionNoKeyError();
+                    return null;
+                }
                 return parseAppData(fileContent);
             } catch (error) {
+                if (error instanceof SyncEncryptionNoKeyError) throw error;
                 lastError = error;
                 // Small backoff to allow file writes to finish.
                 await sleep(120 + attempt * 80);
             }
         }
+        // Before the "invalid JSON" repair path can fire: ciphertext under the plain name
+        // is not corrupt JSON (decision #4). Read the raw bytes and check for MWENC1.
+        const rawBytes = await readSyncArtifactBytes(resolvedUri).catch(() => null);
+        if (await discoverEncryptedSyncFolder(resolvedUri, rawBytes)) throw new SyncEncryptionNoKeyError();
         throw lastError;
     } catch (error) {
+        // Fail closed: neither a no-key discovery nor a failed decrypt may reach the
+        // "invalid JSON -> return null and repair" branch below. Defense in depth — no
+        // current MWENC1 error message matches that branch's regex, so removing these
+        // three lines does not fail a test today. They exist so that a future wording
+        // change ("...is not valid JSON container...") cannot silently turn a wrong
+        // passphrase into "no remote data, overwrite it".
+        if (error instanceof SyncEncryptionNoKeyError || error instanceof SyncEncryptionTerminalError) {
+            void logWarn('Sync file is encrypted and could not be read with the current key', { scope: 'sync' });
+            throw error;
+        }
         const message = String(error);
         // Provide a clearer UX-oriented error.
         if (fileUri.startsWith('content://') && /Invalid URI|IllegalArgumentException/i.test(message)) {
@@ -613,12 +731,70 @@ export const readSyncFile = async (fileUri: string, options?: SyncFileAccessOpti
     }
 };
 
+/**
+ * Encrypted write. Mirrors the Rust backup-rotation gate (decision #4): the `.bak`
+ * rotation is gated on the CURRENT artifact decrypting successfully, so bytes we cannot
+ * read are never rotated away and never overwritten — the write aborts with a terminal
+ * error instead. Verification after the write is decrypt+parse, not parse.
+ */
+const writeEncryptedSyncFile = async (
+    resolvedUri: string,
+    content: string,
+    material: SyncKeyMaterial,
+): Promise<void> => {
+    const encLeaf = encryptedLeafNameFor(resolvedUri);
+    const encUri = await resolveSyncArtifactSiblingUri(resolvedUri, encLeaf, { createIfMissing: true });
+    if (!encUri) throw new Error('Unable to create the encrypted sync file in the selected folder');
+
+    const current = await readSyncArtifactBytes(encUri).catch(() => null);
+    if (current && current.length > 0) {
+        // Throws SyncEncryptionTerminalError on a wrong key or a corrupt container. Note
+        // what does NOT happen on that path: no rotation, no overwrite, no repair.
+        const previousPlaintext = await decryptRemoteArtifactOrThrow(current, material.key, mobileSyncCryptoPrimitives);
+        void previousPlaintext;
+        try {
+            const backupUri = await resolveSyncArtifactSiblingUri(
+                resolvedUri,
+                syncEncryptedArtifactName(BACKUP_FILE_NAME),
+                { createIfMissing: true },
+            );
+            if (backupUri) await writeSyncArtifactBytes(backupUri, current);
+        } catch (error) {
+            void logWarn('Encrypted sync backup rotation failed; continuing with the write', {
+                scope: 'sync',
+                extra: { error: error instanceof Error ? error.message : String(error) },
+            });
+        }
+    }
+
+    const sealed = await encryptSyncArtifact(
+        new TextEncoder().encode(content),
+        material,
+        mobileSyncCryptoPrimitives,
+    );
+    await writeSyncArtifactBytes(encUri, sealed);
+
+    const written = await readSyncArtifactBytes(encUri);
+    if (!written || written.length === 0) {
+        throw new Error('Sync file write verification failed: file is empty after write.');
+    }
+    const verified = await decryptRemoteArtifactOrThrow(written, material.key, mobileSyncCryptoPrimitives);
+    parseAppData(new TextDecoder().decode(verified));
+    void logInfo('Written encrypted sync file', { scope: 'sync', extra: { fileUri: encUri } });
+};
+
 // Write merged data back to sync file
 export const writeSyncFile = async (fileUri: string, data: AppData, options?: SyncFileAccessOptions): Promise<void> => {
     try {
         const content = JSON.stringify(data, null, 2);
         const bookmark = options?.bookmark?.trim() || null;
         const resolvedUri = await resolveSyncFileUri(fileUri, { createIfMissing: true });
+
+        const material = options?.material ?? null;
+        if (material) {
+            await writeEncryptedSyncFile(resolvedUri, content, material);
+            return;
+        }
 
         // Warn if writing to an iCloud-evicted target — the placeholder may get corrupted.
         if (isICloudEvicted(resolvedUri)) {

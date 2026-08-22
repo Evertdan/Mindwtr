@@ -69,6 +69,12 @@ const buildResponse = (
         get: (name: string) => headers[name.toLowerCase()] ?? null,
     } as Headers,
     text: async () => body,
+    // A real Response always has this; the Dropbox document reader needs the raw bytes so it
+    // can tell MWENC1 ciphertext from genuinely invalid JSON before erroring (#1056).
+    arrayBuffer: async () => {
+        const bytes = new TextEncoder().encode(body);
+        return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    },
     json: async () => {
         try {
             return JSON.parse(body);

@@ -60,6 +60,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "react-native-quick-crypto",
       "./plugins/ios-cloudkit-sync",
       "./plugins/ios-fabric-unmount-guard",
       "./plugins/expo-router",

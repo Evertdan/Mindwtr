@@ -6,8 +6,15 @@ import {
     useTaskStore,
     MergeStats,
     webdavGetJson,
+    webdavGetSyncDocument,
+    type SyncEncryptionRemotePort,
+    type SyncEncryptionStatus,
+    type SyncEncryptionTransitionProgress,
     webdavHeadFile,
-    webdavPutJson,
+    webdavPutSyncDocument,
+    syncEncryptedArtifactName,
+    SyncCryptoUnsupportedError,
+    SyncEncryptionTerminalError,
     buildCloudCalendarFeedUrl,
     cloudGetJson,
     cloudHeadJson,
@@ -98,6 +105,20 @@ import {
     getCloudBaseUrl,
 } from './sync-attachments';
 import {
+    classifySyncEncryptionFailure,
+    createDropboxRemotePort,
+    createWebdavRemotePort,
+    desktopSyncCryptoPrimitives,
+    getSyncEncryptionMaterial,
+    getSyncEncryptionStatus as readSyncEncryptionStatus,
+    isSyncEncryptionFailure,
+    markRemoteSyncEncryptionDiscovered,
+    runChangePassphraseOverRemote,
+    runDisableOverRemote,
+    runEnableOverRemote,
+    runProvidePassphraseOverRemote,
+} from './sync-encryption-service';
+import {
     getFileSyncDir,
     hashString,
     isSyncFilePath,
@@ -111,6 +132,7 @@ import {
     handleAttachmentValidationFailure,
 } from './sync-attachment-validation';
 import type { SyncBackend } from './sync-service-utils';
+import type { DropboxDownloadResult } from '@mindwtr/core';
 import {
     downloadDropboxAppData,
     DropboxUnauthorizedError,
@@ -278,6 +300,29 @@ const resolveSyncText = (key: string, fallback: string): string => resolveI18nTe
     key,
     { fallback },
 );
+
+/** A failed decrypt is never a permission problem and never "corrupt data we repaired" — it
+ *  always means this device needs the sync passphrase again (#1056 decision #4). Mapping it
+ *  here keeps it out of the generic failure toast. The message is built into a variable
+ *  because desktop's toast-i18n test scans showToast's FIRST argument for prose literals.
+ *  Phase 3 owns the settings surface that turns this into a re-entry prompt; the fallbacks
+ *  carry the wording until its locale keys land. */
+const resolveSyncFailureMessage = (rawError: string | undefined): string => {
+    switch (classifySyncEncryptionFailure(rawError)) {
+        case 'remote-encrypted-no-key':
+            return resolveSyncText(
+                'settings.syncEncryptionRemoteEncrypted',
+                'This sync location is encrypted. Enter its sync passphrase to continue syncing.',
+            );
+        case 'needs-passphrase':
+            return resolveSyncText(
+                'settings.syncEncryptionPassphraseNeeded',
+                'Sync stopped: the sync passphrase for this location did not work. Enter it again to continue.',
+            );
+        default:
+            return rawError || resolveSyncText('settings.queuedSyncFailed', 'Queued sync failed.');
+    }
+};
 
 const logSyncWarning = (message: string, error?: unknown) => {
     const extra = error
@@ -836,11 +881,8 @@ export class SyncService {
             if (!queuedResult.success) {
                 logSyncWarning('Queued sync failed', queuedResult.error);
                 try {
-                    useUiStore.getState().showToast(
-                        queuedResult.error || resolveSyncText('settings.queuedSyncFailed', 'Queued sync failed.'),
-                        'error',
-                        6000,
-                    );
+                    const message = resolveSyncFailureMessage(queuedResult.error);
+                    useUiStore.getState().showToast(message, 'error', 6000);
                 } catch {
                     // UI store may be unavailable during shutdown/tests.
                 }
@@ -1400,6 +1442,144 @@ export class SyncService {
         return readWebDavConfig(getSyncConfigDeps(), options);
     }
 
+    // -----------------------------------------------------------------
+    // Sync encryption (#1056). The surface phase 3's settings UI calls.
+    //
+    // A transition is an explicit maintenance pass over the whole remote artifact set, so it
+    // runs wherever that set can be enumerated:
+    //   * File Sync -> Rust, which owns the folder's IO and can walk it directly.
+    //   * WebDAV and Dropbox -> core's shared `run*OverRemote` orchestration from TS, because
+    //     the attachment set is enumerated from the sync document (a TS-side concern) and one
+    //     shared implementation beats a second Rust one. Rust still owns the per-CYCLE WebDAV
+    //     crypto seam; it picks up the key this transition cached.
+    // Either way the key lives only in Rust's keyring — TS keeps no cache of its own.
+    // -----------------------------------------------------------------
+
+    private static async resolveEncryptionTarget(): Promise<
+        { kind: 'native' } | { kind: 'remote'; remote: SyncEncryptionRemotePort }
+    > {
+        const backend = await SyncService.getSyncBackend();
+        if (backend === 'file') return { kind: 'native' };
+
+        // `cloud` covers two very different providers; only Dropbox is a blob store this
+        // feature applies to. Never branch on a bare `backend === 'cloud'` here.
+        if (backend === 'cloud' && (await SyncService.getCloudProvider()) === 'dropbox') {
+            const clientId = await SyncService.getDropboxAppKey();
+            const fetcher = (await getTauriFetch()) ?? fetch;
+            return {
+                kind: 'remote',
+                remote: createDropboxRemotePort(
+                    async (operation) => operation(await getDropboxAccessTokenDirect(clientId)),
+                    fetcher,
+                ),
+            };
+        }
+
+        if (backend === 'webdav') {
+            const config = await SyncService.getWebDavConfig();
+            const password = await resolveWebdavPassword(config);
+            return {
+                kind: 'remote',
+                remote: createWebdavRemotePort({
+                    baseUrl: getBaseSyncUrl(config.url),
+                    options: {
+                        allowInsecureHttp: config.allowInsecureHttp,
+                        username: config.username,
+                        password,
+                        fetcher: (await getTauriFetch()) ?? fetch,
+                    },
+                }),
+            };
+        }
+
+        // CloudKit and the self-hosted cloud backend are out of scope for #1056 — they are not
+        // blob stores this app writes whole documents to.
+        throw new Error(`Sync encryption is not available for the ${backend} backend.`);
+    }
+
+    static async getSyncEncryptionStatus(): Promise<SyncEncryptionStatus> {
+        return readSyncEncryptionStatus();
+    }
+
+    static async enableSyncEncryption(
+        passphrase: string,
+        onProgress?: (progress: SyncEncryptionTransitionProgress) => void,
+    ): Promise<void> {
+        // Serialized against sync runs and restores by the same exclusive gate every other
+        // configuration mutation uses; the Rust side additionally holds the sync-folder lock.
+        return runSyncRestoreExclusive(async () => {
+            const target = await SyncService.resolveEncryptionTarget();
+            if (target.kind === 'native') {
+                await invokeSyncNative('enable_sync_encryption', { passphrase });
+                return;
+            }
+            await runEnableOverRemote(passphrase, target.remote, onProgress);
+        });
+    }
+
+    static async disableSyncEncryption(
+        onProgress?: (progress: SyncEncryptionTransitionProgress) => void,
+    ): Promise<void> {
+        return runSyncRestoreExclusive(async () => {
+            const target = await SyncService.resolveEncryptionTarget();
+            if (target.kind === 'native') {
+                await invokeSyncNative('disable_sync_encryption');
+                return;
+            }
+            await runDisableOverRemote(target.remote, onProgress);
+        });
+    }
+
+    static async changeSyncEncryptionPassphrase(
+        currentPassphrase: string,
+        nextPassphrase: string,
+        onProgress?: (progress: SyncEncryptionTransitionProgress) => void,
+    ): Promise<void> {
+        return runSyncRestoreExclusive(async () => {
+            // Confirm the current passphrase before rewrapping anything: the cached key is
+            // what actually decrypts, so an unverified "current" would let a typo rotate the
+            // folder to a passphrase the user did not intend.
+            if ((await SyncService.provideSyncEncryptionPassphraseUnlocked(currentPassphrase)) !== 'ok') {
+                throw new Error('SYNC_ENCRYPTION_WRONG_PASSPHRASE');
+            }
+            const target = await SyncService.resolveEncryptionTarget();
+            if (target.kind === 'native') {
+                await invokeSyncNative('change_sync_encryption_passphrase', { nextPassphrase });
+                return;
+            }
+            await runChangePassphraseOverRemote(currentPassphrase, nextPassphrase, target.remote, onProgress);
+        });
+    }
+
+    private static async provideSyncEncryptionPassphraseUnlocked(
+        passphrase: string,
+    ): Promise<'ok' | 'wrong-passphrase'> {
+        const target = await SyncService.resolveEncryptionTarget();
+        if (target.kind === 'native') {
+            return invokeSyncNative<'ok' | 'wrong-passphrase'>('provide_sync_encryption_passphrase', {
+                passphrase,
+            });
+        }
+        return runProvidePassphraseOverRemote(passphrase, target.remote);
+    }
+
+    /** Validates against the remote's own header and caches the key on success. Never mutates
+     *  the remote, whichever way it answers. */
+    static async provideSyncEncryptionPassphrase(passphrase: string): Promise<'ok' | 'wrong-passphrase'> {
+        return runSyncRestoreExclusive(() =>
+            SyncService.provideSyncEncryptionPassphraseUnlocked(passphrase),
+        );
+    }
+
+    /** "Not now". The no-key state was already persisted at discovery, so this only re-affirms
+     *  it — a dismissal must never re-arm automatic sync against ciphertext this device cannot
+     *  read. Kept as a stable call for phase 3 rather than letting the UI infer a no-op. */
+    static async declineSyncEncryptionPassphrase(): Promise<void> {
+        const status = await readSyncEncryptionStatus();
+        if (status.state !== 'remote-encrypted-no-key') return;
+        logSyncInfo('Sync encryption passphrase declined; automatic sync stays paused for this backend');
+    }
+
     static async setWebDavConfig(config: { url: string; username?: string; password?: string; allowInsecureHttp?: boolean; allowWeakFingerprint?: boolean; replacePassword?: boolean }): Promise<void> {
         return writeWebDavConfig(config, getSyncConfigDeps());
     }
@@ -1940,15 +2120,25 @@ export class SyncService {
                 const webdavConfig = context.webdavConfig!;
                 const password = await resolveWebdavPassword(webdavConfig);
                 const fetcher = await createFetchWithAbortForContext(context);
-                return logMissingRemote(await withRetry(
-                    () => webdavGetJson<AppData>(normalizedUrl, {
+                const material = (await getSyncEncryptionMaterial()) ?? undefined;
+                const result = await withRetry(
+                    () => webdavGetSyncDocument<AppData>(normalizedUrl, {
                         allowInsecureHttp: webdavConfig.allowInsecureHttp,
                         username: webdavConfig.username,
                         password,
                         fetcher,
+                        material,
+                        cryptoPrims: desktopSyncCryptoPrimitives,
                     }),
                     WEBDAV_READ_RETRY_OPTIONS,
-                ));
+                );
+                if (result.state === 'encrypted-no-key') {
+                    await markRemoteSyncEncryptionDiscovered({ salt: result.salt, params: result.params });
+                    throw new SyncEncryptionTerminalError(
+                        new SyncCryptoUnsupportedError('the WebDAV remote is encrypted and this device has no key'),
+                    );
+                }
+                return logMissingRemote(result.data);
             },
             webdavPut: async (sanitized) => {
                 if (isTauriRuntimeEnv() && !context.usesConfigOverride) {
@@ -1959,18 +2149,26 @@ export class SyncService {
                 ctx.syncUrl = normalizedUrl;
                 const password = await resolveWebdavPassword(config);
                 const fetcher = await createFetchWithAbortForContext(context);
-                return webdavPutJson(normalizedUrl, sanitized, {
+                const material = (await getSyncEncryptionMaterial()) ?? undefined;
+                return webdavPutSyncDocument(normalizedUrl, sanitized, {
                     allowInsecureHttp: config.allowInsecureHttp,
                     username: config.username,
                     password,
                     fetcher,
+                    material,
+                    cryptoPrims: desktopSyncCryptoPrimitives,
                 });
             },
             webdavHead: async () => {
                 const webdavConfig = context.webdavConfig!;
                 const password = await resolveWebdavPassword(webdavConfig);
                 const fetcher = await createFetchWithAbortForContext(context);
-                return webdavHeadFile(ctx.syncUrl!, {
+                // The HEAD has to target the artifact that actually exists, or the change
+                // probe 404s every cycle on an encrypted remote. The fingerprint it builds
+                // stays a change-detection heuristic either way.
+                const material = await getSyncEncryptionMaterial();
+                const headUrl = material ? syncEncryptedArtifactName(ctx.syncUrl!) : ctx.syncUrl!;
+                return webdavHeadFile(headUrl, {
                     allowInsecureHttp: webdavConfig.allowInsecureHttp,
                     allowWeakFingerprint: webdavConfig.allowWeakFingerprint,
                     username: webdavConfig.username,
@@ -2045,13 +2243,20 @@ export class SyncService {
             dropboxDownload: (token) => SyncService.downloadDropboxWithFallback(context, token),
             dropboxUpload: async (token, sanitized, expectedRev) => {
                 const fetcher = await createFetchWithAbortForContext(context);
+                const material = (await getSyncEncryptionMaterial()) ?? undefined;
                 return SyncService.runDropboxTransientRetry(
-                    () => uploadDropboxAppData(token, sanitized, expectedRev, fetcher)
+                    () => uploadDropboxAppData(token, sanitized, expectedRev, fetcher, {
+                        material,
+                        cryptoPrims: desktopSyncCryptoPrimitives,
+                    })
                 );
             },
             dropboxMetadata: async (token) => {
                 const fetcher = await createFetchWithAbortForContext(context);
-                return SyncService.runDropboxTransientRetry(() => getDropboxAppDataMetadata(token, fetcher));
+                const material = (await getSyncEncryptionMaterial()) ?? undefined;
+                return SyncService.runDropboxTransientRetry(
+                    () => getDropboxAppDataMetadata(token, fetcher, { material })
+                );
             },
             syncWebdavAttachments: async (data, helpers) => {
                 const baseUrl = getBaseSyncUrl(context.webdavConfig!.url);
@@ -2094,26 +2299,54 @@ export class SyncService {
     ): Promise<{ data: AppData | null; rev: string | null }> {
         const nativeFetch = await getTauriFetch();
         const browserFetcher = createAbortableFetch(fetch, { baseSignal: context.requestAbortController.signal });
+        // `undefined` material is the encryption-off path and produces byte-for-byte the same
+        // request Dropbox saw before this feature existed.
+        const material = (await getSyncEncryptionMaterial()) ?? undefined;
+        const crypto = { material, cryptoPrims: desktopSyncCryptoPrimitives };
+
+        // A discovery means the remote is encrypted and this device has no key: persist the
+        // state and stop the run. Never "no data" — that would let the merge treat an encrypted
+        // remote as empty and push a full plaintext document over it.
+        const settle = async (result: DropboxDownloadResult): Promise<DropboxDownloadResult> => {
+            if (result.encryptedNoKey) {
+                await markRemoteSyncEncryptionDiscovered(result.encryptedNoKey);
+                throw new SyncEncryptionTerminalError(
+                    new SyncCryptoUnsupportedError('the Dropbox remote is encrypted and this device has no key'),
+                );
+            }
+            return result;
+        };
 
         if (!nativeFetch) {
-            return SyncService.runDropboxTransientRetry(() => downloadDropboxAppData(token, browserFetcher));
+            return settle(
+                await SyncService.runDropboxTransientRetry(() =>
+                    downloadDropboxAppData(token, browserFetcher, crypto)
+                )
+            );
         }
 
         const nativeFetcher = createAbortableFetch(nativeFetch, { baseSignal: context.requestAbortController.signal });
-        const nativeRemote = await SyncService.runDropboxTransientRetry(() => downloadDropboxAppData(token, nativeFetcher));
+        const nativeRemote = await settle(
+            await SyncService.runDropboxTransientRetry(() => downloadDropboxAppData(token, nativeFetcher, crypto))
+        );
         if (nativeRemote.data !== null) {
             return nativeRemote;
         }
 
         logSyncInfo('Retrying Dropbox remote read with browser fetch fallback');
         try {
-            const browserRemote = await SyncService.runDropboxTransientRetry(() => downloadDropboxAppData(token, browserFetcher));
+            const browserRemote = await settle(
+                await SyncService.runDropboxTransientRetry(() =>
+                    downloadDropboxAppData(token, browserFetcher, crypto)
+                )
+            );
             if (browserRemote.data !== null) {
                 logSyncInfo('Recovered Dropbox remote read via browser fetch fallback');
                 return browserRemote;
             }
             return nativeRemote;
         } catch (error) {
+            if (isSyncEncryptionFailure(error)) throw error;
             logSyncWarning('Dropbox browser fetch fallback failed', error);
             return nativeRemote;
         }

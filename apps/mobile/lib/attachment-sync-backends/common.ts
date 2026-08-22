@@ -1,11 +1,55 @@
-import type { Attachment } from '@mindwtr/core';
-import { runAttachmentTransferLifecycle, type AttachmentTransferLifecycleOptions } from '@mindwtr/core';
+import type { Attachment, SyncKeyMaterial } from '@mindwtr/core';
+import {
+  decryptRemoteArtifactOrThrow,
+  encryptSyncArtifact,
+  inspectSyncArtifact,
+  runAttachmentTransferLifecycle,
+  SyncCryptoUnsupportedError,
+  SyncEncryptionTerminalError,
+  type AttachmentTransferLifecycleOptions,
+} from '@mindwtr/core';
 import * as FileSystem from '../file-system';
 import {
   bytesToBase64,
   createAttachmentLocalMigrationLimiter,
   DEFAULT_CONTENT_TYPE,
 } from '../attachment-sync-utils';
+import { mobileSyncCryptoPrimitives } from '../sync-crypto-native';
+
+/**
+ * Attachment bytes at the storage seam (#1056). Local attachment files always stay
+ * plaintext — only what leaves the device is sealed — and attachments keep their exact
+ * remote names (`cloudKey` is identity-keyed and immutable-once-uploaded), so the only
+ * change is the byte content.
+ *
+ * `null` material is the encryption-off path and returns the input untouched.
+ */
+export const sealAttachmentBytesForUpload = async (
+  bytes: Uint8Array,
+  material: SyncKeyMaterial | null | undefined,
+): Promise<Uint8Array> => (
+  material ? encryptSyncArtifact(bytes, material, mobileSyncCryptoPrimitives) : bytes
+);
+
+/**
+ * Inverse of the above. A remote attachment that is still plaintext is passed through:
+ * an interrupted enable-transition legitimately leaves some attachments unmigrated, and
+ * `validateAttachmentHash` downstream is the backstop for content that is neither. Bytes
+ * that DO carry the MWENC1 magic must decrypt or fail closed — a broken container is
+ * never quietly treated as file content.
+ */
+export const openAttachmentBytesFromDownload = async (
+  bytes: Uint8Array,
+  material: SyncKeyMaterial | null | undefined,
+): Promise<Uint8Array> => {
+  if (!material) return bytes;
+  const inspected = inspectSyncArtifact(bytes);
+  if (inspected.kind === 'plaintext') return bytes;
+  if (inspected.kind === 'unsupported') {
+    throw new SyncEncryptionTerminalError(new SyncCryptoUnsupportedError(inspected.reason));
+  }
+  return decryptRemoteArtifactOrThrow(bytes, material.key, mobileSyncCryptoPrimitives);
+};
 
 const encodeBase64Utf8 = (value: string): string => {
   const Encoder = typeof TextEncoder === 'function' ? TextEncoder : undefined;

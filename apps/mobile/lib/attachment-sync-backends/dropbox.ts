@@ -1,4 +1,4 @@
-import type { AppData, Attachment } from '@mindwtr/core';
+import type { AppData, Attachment, SyncKeyMaterial } from '@mindwtr/core';
 import { isAbortError, validateAttachmentForUpload } from '@mindwtr/core';
 import {
   DropboxFileNotFoundError,
@@ -29,12 +29,18 @@ import {
   validateAttachmentHash,
   writeBytesSafely,
 } from '../attachment-sync-utils';
-import { migrateAttachmentsLocallyBeforeSync } from './common';
+import {
+  migrateAttachmentsLocallyBeforeSync,
+  openAttachmentBytesFromDownload,
+  sealAttachmentBytesForUpload,
+} from './common';
 
 export type DropboxAttachmentSyncOptions = {
   activationProbe?: boolean;
   resolveAccessToken?: DropboxAccessTokenResolver;
   signal?: AbortSignal;
+  /** #1056: seal bytes before upload / open them after download. Null = encryption off. */
+  material?: SyncKeyMaterial | null;
 };
 
 type PendingDropboxUploadMutation = {
@@ -139,13 +145,14 @@ export const syncDropboxAttachments = async (
           }
           uploadBytes = readResult.data;
         }
+        const wireBytes = await sealAttachmentBytesForUpload(uploadBytes, options.material);
         await runDropboxAuthorized(
           dropboxClientId,
           (accessToken) =>
             uploadDropboxFile(
               accessToken,
               cloudKey,
-              toArrayBuffer(uploadBytes),
+              toArrayBuffer(wireBytes),
               attachment.mimeType || DEFAULT_CONTENT_TYPE,
               fetcher
             ),
@@ -222,7 +229,12 @@ export const syncDropboxAttachments = async (
         fetcher,
         options.resolveAccessToken,
       );
-      const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data as ArrayBuffer);
+      // Decrypt before hashing/writing: `fileHash` is plaintext-domain and the local
+      // attachments directory always holds plaintext.
+      const bytes = await openAttachmentBytesFromDownload(
+        data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data as ArrayBuffer),
+        options.material,
+      );
       await validateAttachmentHash(attachment, bytes);
       const filename = cloudKey.split('/').pop() || `${attachment.id}${extractExtension(attachment.title)}`;
       const targetUri = `${attachmentsDir}${filename}`;

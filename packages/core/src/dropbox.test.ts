@@ -1,0 +1,87 @@
+import { describe, expect, it } from 'vitest';
+import { downloadDropboxAppData, uploadDropboxAppData } from './dropbox';
+import { deriveSyncKeyMaterial } from './sync-crypto';
+import type { AppData } from './types';
+
+const FAST_KDF = { mKib: 8, t: 1, p: 1 };
+
+/** Minimal in-memory fake of the two Dropbox endpoints these functions call, keyed by
+ * `path` from the `Dropbox-API-Arg` header — enough to round-trip upload/download. */
+function createFakeDropbox() {
+    const files = new Map<string, Uint8Array>();
+    const fetcher = async (url: string | URL, init?: RequestInit): Promise<Response> => {
+        const arg = JSON.parse((init?.headers as Record<string, string>)['Dropbox-API-Arg']) as { path: string };
+        const target = String(url);
+        if (target.includes('/download')) {
+            const bytes = files.get(arg.path);
+            if (!bytes) {
+                return { ok: false, status: 409, headers: { get: () => null } as unknown as Headers, text: async () => '' } as Response;
+            }
+            return {
+                ok: true,
+                status: 200,
+                headers: { get: (name: string) => (name === 'dropbox-api-result' ? JSON.stringify({ rev: 'rev1' }) : null) } as unknown as Headers,
+                arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+                text: async () => new TextDecoder().decode(bytes),
+            } as Response;
+        }
+        // upload
+        const bodyBytes = init!.body instanceof ArrayBuffer
+            ? new Uint8Array(init!.body)
+            : new TextEncoder().encode(init!.body as string);
+        files.set(arg.path, bodyBytes);
+        return {
+            ok: true,
+            status: 200,
+            headers: { get: () => null } as unknown as Headers,
+            json: async () => ({ rev: 'rev1' }),
+            text: async () => '',
+        } as Response;
+    };
+    return { files, fetcher };
+}
+
+describe('dropbox sync-document encryption', () => {
+    it('encrypts on upload to the .enc path and decrypts on download, leaving the plain path untouched', async () => {
+        const { files, fetcher } = createFakeDropbox();
+        const material = await deriveSyncKeyMaterial('pw', new Uint8Array(16).fill(1), FAST_KDF);
+        const data: AppData = { tasks: [] } as unknown as AppData;
+
+        await uploadDropboxAppData('token', data, null, fetcher, { material });
+        expect(files.has('/data.json.enc')).toBe(true);
+        expect(files.has('/data.json')).toBe(false);
+
+        const result = await downloadDropboxAppData('token', fetcher, { material });
+        expect(result.data).toEqual(data);
+    });
+
+    it('off-state path is unchanged: plain JSON at /data.json, no encryption params needed', async () => {
+        const { files, fetcher } = createFakeDropbox();
+        const data: AppData = { tasks: [] } as unknown as AppData;
+        await uploadDropboxAppData('token', data, null, fetcher);
+        expect(files.has('/data.json')).toBe(true);
+        expect(new TextDecoder().decode(files.get('/data.json')!)).toBe(JSON.stringify(data));
+        const result = await downloadDropboxAppData('token', fetcher);
+        expect(result.data).toEqual(data);
+    });
+
+    it('an off-state device discovers an encrypted-but-plaintext-deleted remote instead of treating it as empty', async () => {
+        const { files, fetcher } = createFakeDropbox();
+        const material = await deriveSyncKeyMaterial('pw', new Uint8Array(16).fill(2), FAST_KDF);
+        await uploadDropboxAppData('token', { tasks: [] } as unknown as AppData, null, fetcher, { material });
+        expect(files.has('/data.json')).toBe(false); // plain path genuinely gone
+
+        const result = await downloadDropboxAppData('token', fetcher); // no material — this device is 'off'
+        expect(result.data).toBeNull();
+        expect(result.encryptedNoKey).toBeDefined();
+        expect(result.encryptedNoKey!.salt.length).toBe(16);
+    });
+
+    it('a wrong key fails closed on download instead of returning garbage', async () => {
+        const { fetcher } = createFakeDropbox();
+        const material = await deriveSyncKeyMaterial('pw', new Uint8Array(16).fill(3), FAST_KDF);
+        await uploadDropboxAppData('token', { tasks: [] } as unknown as AppData, null, fetcher, { material });
+        const wrongMaterial = await deriveSyncKeyMaterial('other-pw', material.salt, FAST_KDF);
+        await expect(downloadDropboxAppData('token', fetcher, { material: wrongMaterial })).rejects.toThrow();
+    });
+});

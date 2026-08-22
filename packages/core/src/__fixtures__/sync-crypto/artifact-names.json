@@ -1,0 +1,9 @@
+[
+    { "plain": "data.json", "encrypted": "data.json.enc" },
+    { "plain": "data.json.bak", "encrypted": "data.json.enc.bak" },
+    { "plain": "data.json.tmp", "encrypted": "data.json.enc.tmp" },
+    { "plain": "data.json.previous", "encrypted": "data.json.enc.previous" },
+    { "plain": "data.json.bak.previous", "encrypted": "data.json.enc.bak.previous" },
+    { "plain": "snapshot-2026-08-21.json", "encrypted": "snapshot-2026-08-21.json.enc" },
+    { "plain": "mindwtr-backup-2026-01-01.json", "encrypted": "mindwtr-backup-2026-01-01.json.enc" }
+]

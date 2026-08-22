@@ -11,6 +11,13 @@ export const CLOUD_TOKEN_KEY = '@mindwtr_cloud_token';
 export const CLOUD_PROVIDER_KEY = '@mindwtr_cloud_provider';
 export const CLOUD_ALLOW_INSECURE_HTTP_KEY = '@mindwtr_cloud_allow_insecure_http';
 export const DROPBOX_LAST_REV_KEY = '@mindwtr_dropbox_last_rev';
+/** Device-local sync-encryption state (state + discovered salt/params). NEVER synced,
+ *  never a content-signature field — see sync-encryption-state.ts. Non-secret on purpose:
+ *  the salt and KDF params are in every artifact header anyway. */
+export const SYNC_ENCRYPTION_STATE_KEY = '@mindwtr_sync_encryption_state_v1';
+/** The derived 32-byte sync-encryption key, base64. Secret — routed to the platform
+ *  keystore by secure-config.ts. The passphrase itself is never persisted. */
+export const SYNC_ENCRYPTION_KEY_KEY = '@mindwtr_sync_encryption_key_v1';
 export const CLOUDKIT_CHANGE_TOKEN_KEY = '@mindwtr_cloudkit_change_token';
 export const CLOUDKIT_SEEDED_KEY = '@mindwtr_cloudkit_seeded';
 export const CLOUDKIT_ZONE_CREATED_KEY = '@mindwtr_cloudkit_zone_created';

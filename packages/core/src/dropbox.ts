@@ -5,6 +5,8 @@ import {
     parseDropboxMetadataRev,
     resolveDropboxPath,
 } from './dropbox-sync-utils';
+import { decryptRemoteArtifactOrThrow, syncEncryptedArtifactName } from './sync-encryption';
+import { encryptSyncArtifact, inspectSyncArtifact, type SyncCryptoKdfParams, type SyncCryptoPrimitives, type SyncKeyMaterial } from './sync-crypto';
 
 const DROPBOX_SYNC_PATH = '/data.json';
 const DOWNLOAD_ENDPOINT = 'https://content.dropboxapi.com/2/files/download';
@@ -45,11 +47,27 @@ export const isDropboxUnauthorizedError = (error: unknown): boolean => {
 export type DropboxDownloadResult = {
     data: AppData | null;
     rev: string | null;
+    /** Set instead of `data` when this call has no key for a remote that is (or looks
+     *  like it is) MWENC1-encrypted. Callers persist this via sync-encryption.ts's
+     *  markRemoteEncryptionDiscovered; never treated as "no data". */
+    encryptedNoKey?: { salt: Uint8Array; params: SyncCryptoKdfParams };
+};
+
+export type DropboxSyncCrypto = {
+    /** Full key material. Omitting this is the encryption-off path and is byte-for-byte
+     *  identical to calling these functions without it (backward-compat invariant #1):
+     *  same `/data.json` path, same request/body shape, same errors. */
+    material?: SyncKeyMaterial;
+    cryptoPrims?: SyncCryptoPrimitives;
 };
 
 export async function getDropboxAppDataMetadata(
     accessToken: string,
-    fetcher: typeof fetch = fetch
+    fetcher: typeof fetch = fetch,
+    /** Same shape as the download/upload helpers: supplying `material` moves this probe to the
+     *  `.enc` path so an encrypted remote reports a real rev instead of 409-ing to `null` and
+     *  making every cycle look like a fresh remote. Omitting it is the pre-feature behavior. */
+    crypto: DropboxSyncCrypto = {},
 ): Promise<{ rev: string | null }> {
     const response = await fetcher(FILE_METADATA_ENDPOINT, {
         method: 'POST',
@@ -58,7 +76,7 @@ export async function getDropboxAppDataMetadata(
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            path: DROPBOX_SYNC_PATH,
+            path: crypto.material ? syncEncryptedArtifactName(DROPBOX_SYNC_PATH) : DROPBOX_SYNC_PATH,
             include_media_info: false,
             include_deleted: false,
         }),
@@ -78,17 +96,42 @@ export async function getDropboxAppDataMetadata(
 
 export async function downloadDropboxAppData(
     accessToken: string,
-    fetcher: typeof fetch = fetch
+    fetcher: typeof fetch = fetch,
+    crypto: DropboxSyncCrypto = {},
 ): Promise<DropboxDownloadResult> {
+    const path = crypto.material ? syncEncryptedArtifactName(DROPBOX_SYNC_PATH) : DROPBOX_SYNC_PATH;
     const response = await fetcher(DOWNLOAD_ENDPOINT, {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${accessToken}`,
-            'Dropbox-API-Arg': JSON.stringify({ path: DROPBOX_SYNC_PATH }),
+            'Dropbox-API-Arg': JSON.stringify({ path }),
         },
     });
 
     if (response.status === 409) {
+        if (!crypto.material) {
+            // Nothing at the plain path — the common "first sync" shape. Only when this
+            // device doesn't already have a key do we take one extra look at the `.enc`
+            // path, to catch a peer that already enabled encryption and deleted the
+            // plaintext original (decision #2). A device syncing an existing plaintext
+            // folder never reaches this branch — its plain download succeeds every
+            // cycle — so invariant #1 (no extra requests for an existing install) holds.
+            const probe = await fetcher(DOWNLOAD_ENDPOINT, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Dropbox-API-Arg': JSON.stringify({ path: syncEncryptedArtifactName(DROPBOX_SYNC_PATH) }),
+                },
+            });
+            if (probe.status === 401) throw new DropboxUnauthorizedError('Dropbox download failed: HTTP 401');
+            if (probe.ok) {
+                const encBytes = new Uint8Array(await probe.arrayBuffer());
+                const inspected = inspectSyncArtifact(encBytes);
+                if (inspected.kind === 'encrypted') {
+                    return { data: null, rev: null, encryptedNoKey: { salt: inspected.salt, params: inspected.params } };
+                }
+            }
+        }
         return { data: null, rev: null };
     }
     if (response.status === 401) {
@@ -99,6 +142,16 @@ export async function downloadDropboxAppData(
     }
 
     const metadata = parseDropboxMetadataRev(response.headers.get('dropbox-api-result'));
+
+    if (crypto.material) {
+        const bodyBytes = new Uint8Array(await response.arrayBuffer());
+        const plaintext = await decryptRemoteArtifactOrThrow(bodyBytes, crypto.material.key, crypto.cryptoPrims);
+        return { data: JSON.parse(new TextDecoder().decode(plaintext)) as AppData, rev: metadata.rev };
+    }
+
+    // Off-state: reads via .text(), exactly as before this feature existed — a fetch
+    // mock (real or test double) that only implements .text() keeps working unchanged
+    // (backward-compat invariant #1).
     const text = await response.text();
     if (!text.trim()) {
         return { data: null, rev: metadata.rev };
@@ -108,6 +161,29 @@ export async function downloadDropboxAppData(
     try {
         data = JSON.parse(text) as AppData;
     } catch {
+        // Distinguish "someone already encrypted this remote" from genuine corruption
+        // before falling back to the existing error — ciphertext is never "invalid
+        // JSON" to repair (decision #4). `text` may already be a lossy UTF-8
+        // reconstruction of binary ciphertext, so re-issue the same download request
+        // for raw bytes to inspect (mirrors the 409 branch's re-fetch above) rather than
+        // re-encoding `text`. Best-effort: any problem here (including a bare-bones
+        // fetch double with no arrayBuffer()) just falls through to the original error.
+        let inspected: ReturnType<typeof inspectSyncArtifact> | null = null;
+        try {
+            const raw = await fetcher(DOWNLOAD_ENDPOINT, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Dropbox-API-Arg': JSON.stringify({ path }),
+                },
+            });
+            if (raw.ok) inspected = inspectSyncArtifact(new Uint8Array(await raw.arrayBuffer()));
+        } catch {
+            // fall through to the original error below
+        }
+        if (inspected?.kind === 'encrypted') {
+            return { data: null, rev: metadata.rev, encryptedNoKey: { salt: inspected.salt, params: inspected.params } };
+        }
         throw new Error('Dropbox data.json is not valid JSON');
     }
     return { data, rev: metadata.rev };
@@ -117,24 +193,32 @@ export async function uploadDropboxAppData(
     accessToken: string,
     data: AppData,
     expectedRev: string | null,
-    fetcher: typeof fetch = fetch
+    fetcher: typeof fetch = fetch,
+    crypto: DropboxSyncCrypto = {},
 ): Promise<{ rev: string | null }> {
     const mode = expectedRev
         ? { '.tag': 'update', update: expectedRev }
         : { '.tag': 'overwrite' };
+    const path = crypto.material ? syncEncryptedArtifactName(DROPBOX_SYNC_PATH) : DROPBOX_SYNC_PATH;
+    // `.slice()` copies into a fresh, exactly-sized ArrayBuffer — sidesteps the
+    // Uint8Array<ArrayBufferLike> vs BodyInit's Uint8Array<ArrayBuffer> typing mismatch
+    // (same TS 5.9 DOM-lib issue sync-crypto.ts's toArrayBufferView works around).
+    const body: BodyInit = crypto.material
+        ? (await encryptSyncArtifact(new TextEncoder().encode(JSON.stringify(data)), crypto.material, crypto.cryptoPrims)).slice().buffer
+        : JSON.stringify(data);
     const response = await fetcher(UPLOAD_ENDPOINT, {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${accessToken}`,
             'Dropbox-API-Arg': JSON.stringify({
-                path: DROPBOX_SYNC_PATH,
+                path,
                 mode,
                 mute: true,
                 strict_conflict: false,
             }),
             'Content-Type': 'application/octet-stream',
         },
-        body: JSON.stringify(data),
+        body,
     });
 
     if (response.status === 409) {

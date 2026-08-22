@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { AppData, MergeStats, createSyncOrchestrator, runSerializedSyncDocumentOperation, runSharedSyncCycle, useTaskStore, webdavGetJson, webdavHeadFile, webdavPutJson, cloudGetJson, cloudHeadJson, cloudPutJson, flushPendingSave, performSyncCycle, withRetry, isRetryableError, isRetryableWebdavReadError, isWebdavInvalidJsonError, normalizeWebdavUrl, normalizeCloudUrl, createSyncBackendIO, buildFastSyncScope, hasPendingSyncSideEffects, injectExternalCalendars as injectExternalCalendarsForSync, persistExternalCalendars as persistExternalCalendarsForSync, getInMemoryAppDataSnapshot, createAbortableFetch, normalizeCloudProvider as normalizeCoreCloudProvider, isDropboxUnauthorizedError, parseFastSyncState, serializeFastSyncState, summarizeTaskLifecycleCounts, decodeUriSafe, SYNC_FILE_NAME, CLOUD_PROVIDER_DROPBOX, CLOUD_PROVIDER_SELF_HOSTED, type Attachment, type CloudProvider, type FastSyncState, type SyncBackendContext, type SyncBackendIO, type SyncRunDiagnosticEvent, type SyncRunNotifier, type SyncRunPlatformHooks, type SyncRunStorage, type SyncTransport } from '@mindwtr/core';
+import { AppData, MergeStats, createSyncOrchestrator, runSerializedSyncDocumentOperation, runSharedSyncCycle, useTaskStore, webdavGetJson, webdavGetSyncDocument, webdavHeadFile, webdavPutJson, webdavPutSyncDocument, markRemoteEncryptionDiscovered, SyncEncryptionTerminalError, type SyncKeyMaterial, cloudGetJson, cloudHeadJson, cloudPutJson, flushPendingSave, performSyncCycle, withRetry, isRetryableError, isRetryableWebdavReadError, isWebdavInvalidJsonError, normalizeWebdavUrl, normalizeCloudUrl, createSyncBackendIO, buildFastSyncScope, hasPendingSyncSideEffects, injectExternalCalendars as injectExternalCalendarsForSync, persistExternalCalendars as persistExternalCalendarsForSync, getInMemoryAppDataSnapshot, createAbortableFetch, normalizeCloudProvider as normalizeCoreCloudProvider, isDropboxUnauthorizedError, parseFastSyncState, serializeFastSyncState, summarizeTaskLifecycleCounts, decodeUriSafe, SYNC_FILE_NAME, CLOUD_PROVIDER_DROPBOX, CLOUD_PROVIDER_SELF_HOSTED, type Attachment, type CloudProvider, type FastSyncState, type SyncBackendContext, type SyncBackendIO, type SyncRunDiagnosticEvent, type SyncRunNotifier, type SyncRunPlatformHooks, type SyncRunStorage, type SyncTransport } from '@mindwtr/core';
 import { mobileStorage } from './storage-adapter';
 import { logInfo, logSyncError, logWarn, sanitizeLogMessage } from './app-log';
 import { readSyncFile, resolveSyncFileUri, writeSyncFile } from './storage-file';
@@ -44,6 +44,31 @@ import {
   DROPBOX_LAST_REV_KEY,
 } from './sync-constants';
 import { getSecureConfigValue, isSecretConfigKey } from './secure-config';
+import { mobileSyncCryptoPrimitives } from './sync-crypto-native';
+import {
+  getSyncEncryptionMaterial,
+  isSyncEncryptionBlocked,
+  SyncEncryptionNoKeyError,
+  syncEncryptionLocalState,
+} from './sync-encryption-state';
+
+// Phase 3 imports the sync-encryption surface from the sync-service layer (pinned API
+// location); the implementation lives next door in sync-encryption-service.ts.
+export {
+  changeSyncEncryptionPassphrase,
+  declineSyncEncryptionPassphrase,
+  disableSyncEncryption,
+  enableSyncEncryption,
+  getSyncEncryptionStatus,
+  provideSyncEncryptionPassphrase,
+  type SyncEncryptionTransitionOptions,
+} from './sync-encryption-service';
+
+/** Encryption-class failures must never be mistaken for transport failures (they must
+ *  not feed the WebDAV rate limiter) nor for generic permission errors in the toast
+ *  mapping — see classifySyncFailure in sync-service-utils.ts. */
+const isSyncEncryptionError = (error: unknown): boolean =>
+  error instanceof SyncEncryptionNoKeyError || error instanceof SyncEncryptionTerminalError;
 import { getMobileCloudRequestOptions, getMobileWebDavRequestOptions } from './webdav-request-options';
 
 const DEFAULT_SYNC_TIMEOUT_MS = 30_000;
@@ -515,6 +540,9 @@ class MobileSyncRun {
   private dropboxLastRev: string | null = null;
   private fileSyncPath: string | null = null;
   private fileSyncBookmark: string | null = null;
+  /** #1056: resolved once per cycle in setupCycle. `null` is the encryption-off path and
+   *  every seam below then behaves byte-for-byte as it did before the feature. */
+  private encryptionMaterial: SyncKeyMaterial | null = null;
 
   constructor(backend: SyncBackend, request: MobileSyncRequest | undefined, requestFollowUp: MobileRequestFollowUp) {
     this.backend = backend;
@@ -942,6 +970,13 @@ class MobileSyncRun {
     }
   }
 
+  /** The three blob backends #1056 covers. CloudKit and mindwtr-cloud (self-hosted) are
+   *  out of scope; Dropbox reaches us as the `cloud` backend with a dropbox provider. */
+  private supportsSyncEncryption(): boolean {
+    if (this.backend === 'file' || this.backend === 'webdav') return true;
+    return this.backend === 'cloud' && this.cloudProvider === CLOUD_PROVIDER_DROPBOX;
+  }
+
   private createHooks(): SyncRunPlatformHooks {
     return {
       setupCycle: async ({ setStep }) => {
@@ -954,6 +989,17 @@ class MobileSyncRun {
         }
         if (backend === 'cloud') {
           await this.resolveCloudBackendConfig();
+        }
+        // #1056: encryption applies to the three blob backends only. A device that knows
+        // the remote is encrypted but holds no key must not sync at all — writing a fresh
+        // plaintext document beside the ciphertext is exactly the outcome decision #5
+        // exists to prevent. Automatic and background runs go quiet; a manual run says why.
+        if (this.supportsSyncEncryption()) {
+          if (await isSyncEncryptionBlocked()) {
+            if (!this.manual) return { kind: 'disabled' };
+            throw new SyncEncryptionNoKeyError();
+          }
+          this.encryptionMaterial = await getSyncEncryptionMaterial();
         }
         // CloudKit setup — ensure zone and subscription exist before sync cycle.
         if (backend === 'cloudkit') {
@@ -1170,24 +1216,54 @@ class MobileSyncRun {
     return {
       webdavGet: async () => {
         const webdavConfig = this.webdavConfig!;
+        const requestOptions = {
+          ...getMobileWebDavRequestOptions(webdavConfig.allowInsecureHttp),
+          username: webdavConfig.username,
+          password: webdavConfig.password,
+          timeoutMs: DEFAULT_SYNC_TIMEOUT_MS,
+          fetcher: this.fetchWithAbort,
+          allowWeakFingerprint: webdavConfig.allowWeakFingerprint,
+        };
         this.ensureWebdavSyncNotRateLimited();
         try {
-          return await withRetry(
-            () =>
-              webdavGetJson<AppData>(webdavConfig.url, {
-                ...getMobileWebDavRequestOptions(webdavConfig.allowInsecureHttp),
-                username: webdavConfig.username,
-                password: webdavConfig.password,
-                timeoutMs: DEFAULT_SYNC_TIMEOUT_MS,
-                fetcher: this.fetchWithAbort,
-                allowWeakFingerprint: webdavConfig.allowWeakFingerprint,
-              }),
+          if (this.encryptionMaterial) {
+            const result = await withRetry(
+              () =>
+                webdavGetSyncDocument<AppData>(webdavConfig.url, {
+                  ...requestOptions,
+                  material: this.encryptionMaterial ?? undefined,
+                  cryptoPrims: mobileSyncCryptoPrimitives,
+                }),
+              WEBDAV_READ_RETRY_OPTIONS
+            );
+            return result.state === 'data' ? result.data : null;
+          }
+
+          // Encryption off: the read is the pre-feature call, unchanged — same core
+          // function, same URL, same request shape (backward-compat invariant #1).
+          const data = await withRetry(
+            () => webdavGetJson<AppData>(webdavConfig.url, requestOptions),
             WEBDAV_READ_RETRY_OPTIONS
           );
+          if (data !== null) return data;
+
+          // Only "the remote has nothing" — the shape a first sync and a peer that
+          // enabled encryption both produce — costs one extra probe (decision #2). A
+          // steadily-syncing plaintext install never reaches it, and a probe that
+          // itself fails must never break an otherwise working sync.
+          const probe = await webdavGetSyncDocument<AppData>(webdavConfig.url, requestOptions)
+            .catch(() => null);
+          if (probe?.state === 'encrypted-no-key') {
+            // Persist first (decision #5: the state must survive a restart), then fail
+            // the cycle. Nothing on the remote is touched on this path.
+            markRemoteEncryptionDiscovered(syncEncryptionLocalState, probe);
+            throw new SyncEncryptionNoKeyError();
+          }
+          return null;
         } catch (error) {
           // The core machine maps invalid-JSON reads to the repair-write path;
           // only genuine transport failures count toward the rate limiter.
-          if (!isWebdavInvalidJsonError(error)) {
+          if (!isWebdavInvalidJsonError(error) && !isSyncEncryptionError(error)) {
             this.handleWebdavRateLimit(error);
           }
           throw error;
@@ -1196,21 +1272,30 @@ class MobileSyncRun {
       webdavPut: async (sanitized) => {
         const webdavConfig = this.webdavConfig;
         if (!webdavConfig?.url) throw new Error('WebDAV URL not configured');
+        const requestOptions = {
+          ...getMobileWebDavRequestOptions(webdavConfig.allowInsecureHttp),
+          username: webdavConfig.username,
+          password: webdavConfig.password,
+          timeoutMs: DEFAULT_SYNC_TIMEOUT_MS,
+          fetcher: this.fetchWithAbort,
+        };
         this.ensureWebdavSyncNotRateLimited();
         try {
+          // Encryption off keeps the pre-feature call verbatim (invariant #1).
+          const material = this.encryptionMaterial;
           return await withRetry(
             () =>
-              webdavPutJson(webdavConfig.url, sanitized, {
-                ...getMobileWebDavRequestOptions(webdavConfig.allowInsecureHttp),
-                username: webdavConfig.username,
-                password: webdavConfig.password,
-                timeoutMs: DEFAULT_SYNC_TIMEOUT_MS,
-                fetcher: this.fetchWithAbort,
-              }),
+              material
+                ? webdavPutSyncDocument(webdavConfig.url, sanitized, {
+                    ...requestOptions,
+                    material,
+                    cryptoPrims: mobileSyncCryptoPrimitives,
+                  })
+                : webdavPutJson(webdavConfig.url, sanitized, requestOptions),
             WEBDAV_RETRY_OPTIONS
           );
         } catch (error) {
-          this.handleWebdavRateLimit(error);
+          if (!isSyncEncryptionError(error)) this.handleWebdavRateLimit(error);
           throw error;
         }
       },
@@ -1266,12 +1351,20 @@ class MobileSyncRun {
       fileRead: async () => {
         const fileSyncPath = this.fileSyncPath;
         if (!fileSyncPath) throw new Error('No sync folder configured');
-        return readSyncFile(fileSyncPath, { bookmark: this.fileSyncBookmark });
+        // The `material` key is added only when encryption is on, so the off-state call
+        // is argument-for-argument what it was before this feature (invariant #1).
+        return readSyncFile(fileSyncPath, {
+          bookmark: this.fileSyncBookmark,
+          ...(this.encryptionMaterial ? { material: this.encryptionMaterial } : {}),
+        });
       },
       fileWrite: async (sanitized) => {
         const fileSyncPath = this.fileSyncPath;
         if (!fileSyncPath) throw new Error('No sync folder configured');
-        await writeSyncFile(fileSyncPath, sanitized, { bookmark: this.fileSyncBookmark });
+        await writeSyncFile(fileSyncPath, sanitized, {
+          bookmark: this.fileSyncBookmark,
+          ...(this.encryptionMaterial ? { material: this.encryptionMaterial } : {}),
+        });
       },
       cloudKitRead: async () => readRemoteCloudKit({ signal: this.requestAbortController.signal }),
       cloudKitWrite: async (sanitized) => {
@@ -1281,13 +1374,26 @@ class MobileSyncRun {
         () => this.resolveDropboxAccessToken(forceRefresh),
       ),
       dropboxDownload: async (token) => {
-        const result = await this.runDropboxTransientRetry(() => downloadDropboxAppData(token, this.fetchWithAbort));
+        // Off state calls the pre-feature 2-argument form verbatim (invariant #1).
+        const material = this.encryptionMaterial;
+        const result = await this.runDropboxTransientRetry(
+          () => (material
+            ? downloadDropboxAppData(token, this.fetchWithAbort, { material, cryptoPrims: mobileSyncCryptoPrimitives })
+            : downloadDropboxAppData(token, this.fetchWithAbort))
+        );
+        if (result.encryptedNoKey) {
+          markRemoteEncryptionDiscovered(syncEncryptionLocalState, result.encryptedNoKey);
+          throw new SyncEncryptionNoKeyError();
+        }
         await this.persistDropboxRev(result.rev);
         return result;
       },
       dropboxUpload: async (token, sanitized, expectedRev) => {
+        const material = this.encryptionMaterial;
         const result = await this.runDropboxTransientRetry(
-          () => uploadDropboxAppData(token, sanitized, expectedRev, this.fetchWithAbort)
+          () => (material
+            ? uploadDropboxAppData(token, sanitized, expectedRev, this.fetchWithAbort, { material, cryptoPrims: mobileSyncCryptoPrimitives })
+            : uploadDropboxAppData(token, sanitized, expectedRev, this.fetchWithAbort))
         );
         await this.persistDropboxRev(result.rev);
         return result;
@@ -1299,6 +1405,7 @@ class MobileSyncRun {
         return syncWebdavAttachments(data, webdavConfig, baseSyncUrl, this.requestAbortController.signal, {
           activationProbe: helpers.activationProbe,
           phase: helpers.phase,
+          ...(this.encryptionMaterial ? { material: this.encryptionMaterial } : {}),
         });
       },
       syncCloudKitAttachments: async (data, helpers) => syncCloudKitAttachments(
@@ -1319,12 +1426,17 @@ class MobileSyncRun {
         activationProbe: helpers.activationProbe,
         resolveAccessToken: (forceRefresh) => this.resolveDropboxAccessToken(forceRefresh),
         signal: this.requestAbortController.signal,
+        ...(this.encryptionMaterial ? { material: this.encryptionMaterial } : {}),
       }),
       syncFileAttachments: async (data, helpers) => syncFileAttachments(
         data,
         this.fileSyncPath!,
         this.requestAbortController.signal,
-        { activationProbe: helpers.activationProbe, phase: helpers.phase }
+        {
+          activationProbe: helpers.activationProbe,
+          phase: helpers.phase,
+          ...(this.encryptionMaterial ? { material: this.encryptionMaterial } : {}),
+        }
       ),
     };
   }

@@ -9,6 +9,8 @@ import {
     toUint8Array,
 } from './http-utils';
 import { logWarn } from './logger';
+import { decryptRemoteArtifactOrThrow, syncEncryptedArtifactName } from './sync-encryption';
+import { encryptSyncArtifact, inspectSyncArtifact, type SyncCryptoPrimitives, type SyncKeyMaterial } from './sync-crypto';
 
 export interface WebDavOptions {
     username?: string;
@@ -408,6 +410,133 @@ export async function webdavPutJson(
         allowWeakFingerprint: options.allowWeakFingerprint,
         warnOnceKey: getWebdavWeakFingerprintWarningKey(url),
     });
+}
+
+/** Like webdavGetFile, but a 404 resolves to `null` instead of throwing — the common
+ *  "nothing there yet" shape the sync-document helpers below need to branch on. */
+async function webdavGetFileOrNull(url: string, options: WebDavOptions): Promise<Uint8Array | null> {
+    try {
+        return new Uint8Array(await webdavGetFile(url, options));
+    } catch (err) {
+        if ((err as { status?: number } | null)?.status === 404) return null;
+        throw err;
+    }
+}
+
+async function putWebdavBytes(
+    url: string,
+    bytes: Uint8Array,
+    options: WebDavOptions,
+): Promise<RemoteJsonWriteResult> {
+    assertWebdavUrl(url, options);
+    const fetcher = options.fetcher ?? fetch;
+    const headers = buildHeaders(options);
+    headers['Content-Type'] = 'application/octet-stream';
+    headers[WEBDAV_AUTOMKCOL_HEADER] = headers[WEBDAV_AUTOMKCOL_HEADER] || '1';
+    const body = new Uint8Array(bytes);
+    const sendPut = async (): Promise<Response> => fetchWithTimeout(
+        url,
+        { method: 'PUT', headers, body, signal: options.signal },
+        options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        fetcher,
+        WEBDAV_TIMEOUT_ERROR,
+    );
+    let res = await sendPut();
+    if (!res.ok && (res.status === 404 || res.status === 409)) {
+        await ensureWebdavParentCollectionsBeforePut(url, options);
+        res = await sendPut();
+    }
+    if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        const error = new Error(`WebDAV PUT failed (${res.status}): ${text || res.statusText}`);
+        (error as { status?: number }).status = res.status;
+        throw error;
+    }
+    return metadataFromHeaders('webdav', res.headers, {
+        allowWeakFingerprint: options.allowWeakFingerprint,
+        warnOnceKey: getWebdavWeakFingerprintWarningKey(url),
+    });
+}
+
+export type WebDavSyncDataOptions = WebDavOptions & {
+    /** Full key material (key + salt + params, e.g. from the local key cache combined
+     *  with the locally-recorded salt/params). Omitting this is the encryption-off path
+     *  and is byte-for-byte identical to calling webdavGetJson/webdavPutJson directly —
+     *  same URL, same request shape, same errors (backward-compat invariant #1). */
+    material?: SyncKeyMaterial;
+    cryptoPrims?: SyncCryptoPrimitives;
+};
+
+export type WebDavSyncDataResult<T> =
+    | { state: 'data'; data: T | null }
+    /** The remote has a valid `.enc` (or, defensively, plain-named ciphertext) artifact
+     *  this call has no key for. Callers persist this via
+     *  sync-encryption.ts's markRemoteEncryptionDiscovered and must not treat it as
+     *  "no data" or attempt any repair/rotation. */
+    | { state: 'encrypted-no-key'; salt: Uint8Array; params: import('./sync-crypto').SyncCryptoKdfParams };
+
+/**
+ * Encryption-aware sync-document read. `url` is always the PLAIN document URL — this
+ * function derives the `.enc` URL itself when `material` is supplied.
+ *
+ * Detection of a peer that already enabled encryption (decision #2): only probed when
+ * `material` is absent AND the plain read comes back empty/missing, which is exactly
+ * the "nothing here" shape a first-sync or a post-enable plaintext-deleted remote both
+ * produce — an existing, steadily-syncing plaintext installation's plain read succeeds
+ * every cycle and never reaches the probe, so it costs that install nothing (invariant
+ * #1). A plain-named body that fails JSON.parse is also inspected for MWENC1 magic
+ * before falling back to the existing "invalid JSON" error, per decision #4: ciphertext
+ * is never treated as corrupt JSON to repair.
+ */
+export async function webdavGetSyncDocument<T>(
+    url: string,
+    options: WebDavSyncDataOptions = {},
+): Promise<WebDavSyncDataResult<T>> {
+    const { material, cryptoPrims, ...webdavOptions } = options;
+    if (material) {
+        const bytes = await webdavGetFileOrNull(syncEncryptedArtifactName(url), webdavOptions);
+        if (!bytes) return { state: 'data', data: null };
+        const plaintext = await decryptRemoteArtifactOrThrow(bytes, material.key, cryptoPrims);
+        return { state: 'data', data: JSON.parse(new TextDecoder().decode(plaintext)) as T };
+    }
+
+    let data: T | null;
+    try {
+        data = await webdavGetJson<T>(url, webdavOptions);
+    } catch (err) {
+        const bytes = await webdavGetFileOrNull(url, webdavOptions).catch(() => null);
+        if (bytes) {
+            const inspected = inspectSyncArtifact(bytes);
+            if (inspected.kind === 'encrypted') {
+                return { state: 'encrypted-no-key', salt: inspected.salt, params: inspected.params };
+            }
+        }
+        throw err;
+    }
+    if (data !== null) return { state: 'data', data };
+
+    const encBytes = await webdavGetFileOrNull(syncEncryptedArtifactName(url), webdavOptions).catch(() => null);
+    if (encBytes) {
+        const inspected = inspectSyncArtifact(encBytes);
+        if (inspected.kind === 'encrypted') {
+            return { state: 'encrypted-no-key', salt: inspected.salt, params: inspected.params };
+        }
+    }
+    return { state: 'data', data: null };
+}
+
+export async function webdavPutSyncDocument(
+    url: string,
+    data: unknown,
+    options: WebDavSyncDataOptions = {},
+): Promise<RemoteJsonWriteResult> {
+    const { material, cryptoPrims, ...webdavOptions } = options;
+    if (!material) {
+        return webdavPutJson(url, data, webdavOptions);
+    }
+    const plaintext = new TextEncoder().encode(JSON.stringify(data, null, 2));
+    const sealed = await encryptSyncArtifact(plaintext, material, cryptoPrims);
+    return putWebdavBytes(syncEncryptedArtifactName(url), sealed, webdavOptions);
 }
 
 export async function webdavMakeDirectory(

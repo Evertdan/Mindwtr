@@ -85,6 +85,14 @@ impl std::fmt::Display for SyncCryptoError {
 
 impl std::error::Error for SyncCryptoError {}
 
+/// Fresh folder-level KDF salt, drawn from the OS CSPRNG. One per enable / passphrase change;
+/// it is not secret (it travels in every artifact header) but it must never repeat.
+pub fn random_salt() -> [u8; SALT_LEN] {
+    let mut salt = [0u8; SALT_LEN];
+    OsRng.fill_bytes(&mut salt);
+    salt
+}
+
 pub fn derive_sync_key_material(
     passphrase: &str,
     salt: [u8; SALT_LEN],

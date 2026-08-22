@@ -1,4 +1,4 @@
-import type { AppData } from '@mindwtr/core';
+import type { AppData, SyncKeyMaterial } from '@mindwtr/core';
 import { validateAttachmentForUpload } from '@mindwtr/core';
 import * as FileSystem from '../file-system';
 import {
@@ -28,13 +28,19 @@ import {
   assertAttachmentSyncNotAborted,
   isAttachmentSyncAbortError,
   runMobileAttachmentLifecycle,
+  sealAttachmentBytesForUpload,
 } from './common';
 
 export const syncFileAttachments = async (
   appData: AppData,
   syncPath: string,
   signal?: AbortSignal,
-  options: { activationProbe?: boolean; phase?: 'prepare' | 'post-merge' } = {}
+  options: {
+    activationProbe?: boolean;
+    phase?: 'prepare' | 'post-merge';
+    /** #1056: seal bytes before they land in the sync folder. Null = encryption off. */
+    material?: SyncKeyMaterial | null;
+  } = {}
 ): Promise<boolean> => {
   assertAttachmentSyncNotAborted(signal);
   const syncDir = await resolveFileSyncDir(syncPath);
@@ -132,10 +138,13 @@ export const syncFileAttachments = async (
           return false;
         }
       }
+      const material = options.material ?? null;
       if (syncDir.type === 'file') {
         const targetUri = `${syncDir.attachmentsDirUri}${filename}`;
-        if (isContentAttachmentUri(localPath)) {
-          const bytes = await readFileAsBytes(localPath);
+        if (isContentAttachmentUri(localPath) || material) {
+          // `copyFileSafely` would copy the local plaintext straight into the sync
+          // folder, so encryption always takes the read-seal-write route.
+          const bytes = await sealAttachmentBytesForUpload(await readFileAsBytes(localPath), material);
           assertAttachmentSyncNotAborted(signal);
           await writeBytesSafely(targetUri, bytes);
         } else {
@@ -143,7 +152,9 @@ export const syncFileAttachments = async (
           await copyFileSafely(localPath, targetUri);
         }
       } else {
-        const base64 = await readFileAsBytes(localPath).then(bytesToBase64);
+        const base64 = await readFileAsBytes(localPath)
+          .then((bytes) => sealAttachmentBytesForUpload(bytes, material))
+          .then(bytesToBase64);
         assertAttachmentSyncNotAborted(signal);
         const safEntries = await getSafEntriesByName();
         let targetUri = safEntries.get(filename) ?? null;

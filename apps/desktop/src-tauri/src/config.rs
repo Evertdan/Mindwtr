@@ -153,12 +153,12 @@ fn write_secrets_toml(path: &Path, config: &AppConfigToml) -> Result<(), String>
 /// Windows, where file ACLs are not expressible through
 /// `std::fs::Permissions`.
 #[cfg(unix)]
-fn restrict_to_owner(path: &Path, mode: u32) -> Result<(), String> {
+pub(crate) fn restrict_to_owner(path: &Path, mode: u32) -> Result<(), String> {
     fs::set_permissions(path, fs::Permissions::from_mode(mode)).map_err(|e| e.to_string())
 }
 
 #[cfg(not(unix))]
-fn restrict_to_owner(_path: &Path, _mode: u32) -> Result<(), String> {
+pub(crate) fn restrict_to_owner(_path: &Path, _mode: u32) -> Result<(), String> {
     Ok(())
 }
 

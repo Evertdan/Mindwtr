@@ -1,4 +1,4 @@
-import type { AppData, Attachment } from '@mindwtr/core';
+import type { AppData, Attachment, SyncKeyMaterial } from '@mindwtr/core';
 import {
   getErrorStatus,
   isWebdavRateLimitedError,
@@ -46,7 +46,9 @@ import {
   assertAttachmentSyncNotAborted,
   isAttachmentSyncAbortError,
   migrateAttachmentsLocallyBeforeSync,
+  openAttachmentBytesFromDownload,
   runMobileAttachmentLifecycle,
+  sealAttachmentBytesForUpload,
   uploadWebdavFileWithFileSystem,
   waitForAttachmentSyncDelay,
 } from './common';
@@ -66,9 +68,15 @@ export const syncWebdavAttachments = async (
   webDavConfig: WebDavConfig,
   baseSyncUrl: string,
   signal?: AbortSignal,
-  options: { activationProbe?: boolean; phase?: 'prepare' | 'post-merge' } = {}
+  options: {
+    activationProbe?: boolean;
+    phase?: 'prepare' | 'post-merge';
+    /** #1056: seal bytes before upload / open them after download. Null = encryption off. */
+    material?: SyncKeyMaterial | null;
+  } = {}
 ): Promise<boolean> => {
   assertAttachmentSyncNotAborted(signal);
+  const material = options.material ?? null;
   let lastRequestAt = 0;
   let blockedUntil = 0;
   const waitForSlot = async (): Promise<void> => {
@@ -250,7 +258,10 @@ export const syncWebdavAttachments = async (
           bytes: String(uploadBytes),
           cloudKey,
         });
-        const uploadedWithFileSystem = await withRetry(
+        // The FileSystem uploader streams the LOCAL file straight to the server, so it
+        // can only ever send plaintext. With encryption on we must go through the
+        // read-seal-PUT path below instead.
+        const uploadedWithFileSystem = material ? false : await withRetry(
           async () => {
             await waitForSlot();
             return await uploadWebdavFileWithFileSystem(
@@ -283,7 +294,7 @@ export const syncWebdavAttachments = async (
             if (readResult.readFailed) throw new LocalReadFailure(readResult.error);
             uploadData = readResult.data;
           }
-          const buffer = toArrayBuffer(uploadData);
+          const buffer = toArrayBuffer(await sealAttachmentBytesForUpload(uploadData, material));
           await withRetry(
             async () => {
               await waitForSlot();
@@ -382,8 +393,13 @@ export const syncWebdavAttachments = async (
         }
         throw error;
       }
-      const bytes =
-        fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : new Uint8Array(fileData as ArrayBuffer);
+      // Decrypt BEFORE hashing and before writing: `fileHash` is plaintext-domain (it
+      // lives in the synced document and must stay stable across re-encryptions), and
+      // local attachment files are always stored plaintext.
+      const bytes = await openAttachmentBytesFromDownload(
+        fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : new Uint8Array(fileData as ArrayBuffer),
+        material,
+      );
       await validateAttachmentHash(attachment, bytes);
       const filename = cloudKey.split('/').pop() || `${attachment.id}${extractExtension(attachment.title)}`;
       const targetUri = `${attachmentsDir}${filename}`;
