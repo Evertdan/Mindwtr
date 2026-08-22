@@ -1,13 +1,20 @@
-# 25. No first-party sync-payload encryption; pluggable encrypted backends welcome
+# 25. No encryption of the server-merged sync payload; passphrase-encrypted blob backends are first-party
 
 Date: 2026-08-06
 
 ## Status
 
-Accepted
+Accepted; amended 2026-08-22.
 
 Settled in discussion #1001. Dated to when the stance was decided, not to when
-this record was written.
+this record was written. Amended after #1056 shipped optional user-held-key
+(passphrase) encryption for the blob sync backends — File Sync, WebDAV, and
+Dropbox — as a first-party feature. The original decision's reasoning stands
+unchanged for the surfaces the server must read: the self-hosted cloud backend
+and CloudKit remain unencrypted because their merge runs where the document is
+stored. The blanket "no first-party encryption" wording below was superseded by
+that release; the app-managed-key rejection and the server-merge analysis were
+not.
 
 ## Context
 
@@ -37,9 +44,13 @@ claim is only worth making if it names who holds the key.
 
 ## Decision
 
-Mindwtr does not offer first-party encryption of the sync payload, in either the
-app-managed-key or the user-held-key form. A pluggable encrypted storage backend
-contributed by a user remains welcome.
+Mindwtr does not encrypt the sync payload on any backend whose server must read
+it to merge — the self-hosted cloud server and CloudKit — and offers no
+app-managed-key encryption anywhere. For the blob backends the file-sync path
+writes through (File Sync, WebDAV, Dropbox), Mindwtr ships optional first-party
+encryption with a user-held passphrase (#1056, MWENC1 format): the device
+encrypts before writing, the passphrase never leaves the user, and losing it
+makes the synced copies unreadable by design.
 
 ### Why app-managed keys are not worth shipping
 
@@ -75,15 +86,21 @@ Preserving E2E and multi-device merge together means moving the merge to the
 clients: a different sync architecture, in CRDT territory, which ADR 0017
 deliberately defers.
 
-### What is welcome instead
+### What ships instead: encrypted blob backends (amended 2026-08-22)
 
-A **pluggable encrypted blob backend** — an alternative sync target (rclone
-crypt, an encrypted WebDAV/S3 remote, or similar) that the file-sync path writes
-through. This moves the tradeoff to the user who chooses it: they accept
-whole-document last-writer-wins semantics in exchange for the server never
-seeing plaintext, and they hold their own key. A contribution along those lines
-is welcome. We will not promise it as a first-party feature, because doing so
-would put us back to managing keys we should not hold.
+The original record closed with "a pluggable encrypted blob backend contributed
+by a user remains welcome; we will not promise it as a first-party feature."
+#1056 shipped that shape first-party after the spec converged in #1001: the
+blob backends (File Sync, WebDAV, Dropbox) can encrypt everything written to
+the sync location with a key derived from a user-held passphrase (Argon2id →
+AES-256-GCM, MWENC1 container). This does not contradict the key-management
+concern that motivated the original wording — Mindwtr still manages no keys.
+The passphrase is user-held, device-local, never synced and never recoverable;
+merge still happens on devices that hold the plaintext, so the revision-aware
+merge is untouched. The tradeoff moved exactly where this section said it
+belongs: the user who enables it accepts that a lost passphrase loses the
+remote copies. Backends the server must read (self-hosted cloud, CloudKit)
+remain excluded for the merge reasons above.
 
 ## Consequences
 
