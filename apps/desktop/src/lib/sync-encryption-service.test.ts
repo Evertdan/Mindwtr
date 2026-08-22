@@ -348,6 +348,23 @@ describe('attachment bytes', () => {
     });
 });
 
+describe('unsupported base document', () => {
+    it('classifies a truncated container as terminal instead of throwing a raw JSON parse error', async () => {
+        const store = seedRemote();
+        // Magic present, header short: neither plaintext to parse nor ciphertext to open.
+        const truncated = new Uint8Array(20);
+        truncated.set(new TextEncoder().encode('MWENC1'), 0);
+        store.files.set('data.json.enc', truncated);
+
+        const error = await runEnableOverRemote('correct horse battery', createDropboxRemotePort((o) => o('token'), createDropboxFetch(store)))
+            .then(() => null, (thrown: unknown) => thrown);
+
+        expect(error).toBeInstanceOf(SyncEncryptionTerminalError);
+        expect(classifySyncEncryptionFailure(error)).toBe('needs-passphrase');
+        expect(store.files.get('data.json.enc')).toEqual(truncated);
+    });
+});
+
 describe('passphrase-change resume', () => {
     it('finishes after an earlier attempt already rewrapped the base document under an abandoned salt', async () => {
         const store = seedRemote();

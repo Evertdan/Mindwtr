@@ -280,7 +280,12 @@ const decodeDocument = async (
 ): Promise<AppData | null> => {
     if (!bytes) return null;
     const inspected = inspectSyncArtifact(bytes);
-    if (inspected.kind !== 'encrypted') {
+    if (inspected.kind === 'unsupported') {
+        // Same classification core's `unsupportedArtifact` gives this input class. Parsing it
+        // as JSON would throw a raw SyntaxError out of remote.list() instead.
+        throw new SyncEncryptionTerminalError(new SyncCryptoUnsupportedError(inspected.reason));
+    }
+    if (inspected.kind === 'plaintext') {
         return JSON.parse(new TextDecoder().decode(bytes)) as AppData;
     }
     const candidates: Uint8Array[] = key ? [key] : [];
