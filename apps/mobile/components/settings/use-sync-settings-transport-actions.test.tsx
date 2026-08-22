@@ -9,6 +9,7 @@ import {
     SYNC_BACKEND_KEY,
     SYNC_PATH_KEY,
     WEBDAV_ALLOW_INSECURE_HTTP_KEY,
+    WEBDAV_ALLOW_WEAK_FINGERPRINT_KEY,
     WEBDAV_PASSWORD_KEY,
     WEBDAV_URL_KEY,
     WEBDAV_USERNAME_KEY,
@@ -77,7 +78,20 @@ vi.mock('@/lib/secure-config', () => ({
     setSecureConfigValue: mocked.setSecureConfigValue,
 }));
 
-vi.mock('@mindwtr/core', () => ({
+// The sync-configuration commit protocol is the behaviour these storage
+// assertions are about, so it is pulled in for real rather than stubbed. The
+// barrel itself stays mocked: loading it here would drag in LOCALES and the
+// settings-search tables at module-load time.
+vi.mock('@mindwtr/core', async () => ({
+    ...(await vi.importActual<typeof import('../../../../packages/core/src/sync-configuration-transaction')>(
+        '../../../../packages/core/src/sync-configuration-transaction',
+    )),
+    ...(await vi.importActual<typeof import('../../../../packages/core/src/sync-service-utils')>(
+        '../../../../packages/core/src/sync-service-utils',
+    )),
+    ...(await vi.importActual<typeof import('../../../../packages/core/src/sync-client-helpers')>(
+        '../../../../packages/core/src/sync-client-helpers',
+    )),
     addBreadcrumb: mocked.addBreadcrumb,
     CLOCK_SKEW_THRESHOLD_MS: 60_000,
     cloudGetJson: mocked.cloudGetJson,
@@ -484,6 +498,7 @@ describe('useSyncSettingsTransportActions', () => {
             [WEBDAV_URL_KEY, 'https://dav.example.com/mindwtr/'],
             [WEBDAV_USERNAME_KEY, 'alice'],
             [WEBDAV_ALLOW_INSECURE_HTTP_KEY, 'false'],
+            [WEBDAV_ALLOW_WEAK_FINGERPRINT_KEY, 'false'],
         ]);
         expect(mocked.asyncStorage.setItem).toHaveBeenNthCalledWith(1, SYNC_BACKEND_KEY, 'off');
         expect(mocked.asyncStorage.setItem).toHaveBeenLastCalledWith(SYNC_BACKEND_KEY, 'webdav');
@@ -704,9 +719,7 @@ describe('useSyncSettingsTransportActions', () => {
         expect(mocked.saveDropboxTokens.mock.invocationCallOrder[0]).toBeLessThan(
             mocked.performMobileSync.mock.invocationCallOrder[1],
         );
-        expect(mocked.asyncStorage.multiSet).toHaveBeenCalledWith([
-            [CLOUD_PROVIDER_KEY, 'dropbox'],
-        ]);
+        expect(mocked.asyncStorage.setItem).toHaveBeenCalledWith(CLOUD_PROVIDER_KEY, 'dropbox');
         expect(mocked.asyncStorage.setItem).toHaveBeenNthCalledWith(1, SYNC_BACKEND_KEY, 'off');
         expect(mocked.asyncStorage.setItem).toHaveBeenLastCalledWith(SYNC_BACKEND_KEY, 'cloud');
     });

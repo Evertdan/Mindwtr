@@ -1,3 +1,13 @@
+import {
+    commitProvenSyncConfiguration,
+    normalizeCloudProvider,
+    normalizeSyncBackend,
+    type PersistedSyncConfiguration,
+    type SecretAuthority,
+    type SyncConfigurationCandidate,
+    type SyncConfigurationPort,
+} from '@mindwtr/core';
+
 import type { DropboxAuthTokens } from './dropbox-auth';
 import {
     CLOUD_ALLOW_INSECURE_HTTP_KEY,
@@ -8,6 +18,7 @@ import {
     SYNC_PATH_BOOKMARK_KEY,
     SYNC_PATH_KEY,
     WEBDAV_ALLOW_INSECURE_HTTP_KEY,
+    WEBDAV_ALLOW_WEAK_FINGERPRINT_KEY,
     WEBDAV_PASSWORD_KEY,
     WEBDAV_URL_KEY,
     WEBDAV_USERNAME_KEY,
@@ -41,21 +52,27 @@ export class MobileSyncConfigurationTransactionError extends Error {
     }
 }
 
-type CandidateWrites = {
-    dropboxTokens: DropboxAuthTokens | null;
-    secret: StorageEntry | null;
-    storageEntries: StorageEntry[];
-    storageKeysToRemove: string[];
-};
+/** Dropbox tokens arrive inside the candidate rather than behind a native staging
+ *  handle, so the adapter synthesizes one. Unlike desktop there is no durable
+ *  promotion journal: a process kill between promote and activation loses the
+ *  previous refresh token, which is why `recover` and `finalize` are no-ops. */
+const STAGED_DROPBOX_HANDLE = 'mobile-staged-dropbox-credentials';
 
-type ConfigurationSnapshot = {
-    backend: string | null;
-    dropboxTokens: DropboxAuthTokens | null | undefined;
-    secret: StorageSnapshotEntry | null;
-    storage: readonly StorageSnapshotEntry[];
-};
+const CONFIGURATION_KEYS = [
+    SYNC_BACKEND_KEY,
+    SYNC_PATH_KEY,
+    SYNC_PATH_BOOKMARK_KEY,
+    WEBDAV_URL_KEY,
+    WEBDAV_USERNAME_KEY,
+    WEBDAV_ALLOW_INSECURE_HTTP_KEY,
+    WEBDAV_ALLOW_WEAK_FINGERPRINT_KEY,
+    CLOUD_PROVIDER_KEY,
+    CLOUD_URL_KEY,
+    CLOUD_ALLOW_INSECURE_HTTP_KEY,
+];
 
 const serializeBool = (value: boolean): string => (value ? 'true' : 'false');
+const parseBool = (value: string | null): boolean => value === 'true';
 
 const errorMessage = (error: unknown): string => {
     if (error instanceof Error && error.message.trim()) return error.message.trim();
@@ -63,268 +80,181 @@ const errorMessage = (error: unknown): string => {
     return text || 'Unknown sync configuration error';
 };
 
-const tokensMatch = (actual: DropboxAuthTokens | null, expected: DropboxAuthTokens | null): boolean => (
-    actual?.accessToken === expected?.accessToken
-    && actual?.refreshToken === expected?.refreshToken
-    && actual?.expiresAt === expected?.expiresAt
-);
-
-const buildCandidateWrites = (candidate: MobileSyncConfigOverride): CandidateWrites => {
-    const storageEntries: StorageEntry[] = [];
-    const storageKeysToRemove: string[] = [];
-    let secret: StorageEntry | null = null;
-
-    if (candidate.backend === 'file') {
-        storageEntries.push([SYNC_PATH_KEY, candidate.syncPath ?? '']);
-        if (candidate.syncPathBookmark) {
-            storageEntries.push([SYNC_PATH_BOOKMARK_KEY, candidate.syncPathBookmark]);
-        } else {
-            storageKeysToRemove.push(SYNC_PATH_BOOKMARK_KEY);
-        }
-    } else if (candidate.backend === 'webdav') {
-        if (!candidate.webdav) throw new Error('WebDAV configuration is required');
-        storageEntries.push(
-            [WEBDAV_URL_KEY, candidate.webdav.url],
-            [WEBDAV_USERNAME_KEY, candidate.webdav.username],
-            [WEBDAV_ALLOW_INSECURE_HTTP_KEY, serializeBool(candidate.webdav.allowInsecureHttp === true)],
-        );
-        secret = [WEBDAV_PASSWORD_KEY, candidate.webdav.password];
-    } else if (candidate.backend === 'cloudkit') {
-        storageEntries.push([CLOUD_PROVIDER_KEY, 'cloudkit']);
-    } else if (candidate.backend === 'cloud') {
-        const provider = candidate.cloudProvider ?? 'selfhosted';
-        storageEntries.push([CLOUD_PROVIDER_KEY, provider]);
-        if (provider === 'selfhosted') {
-            if (!candidate.cloud) throw new Error('Self-hosted configuration is required');
-            storageEntries.push(
-                [CLOUD_URL_KEY, candidate.cloud.url],
-                [CLOUD_ALLOW_INSECURE_HTTP_KEY, serializeBool(candidate.cloud.allowInsecureHttp === true)],
-            );
-            secret = [CLOUD_TOKEN_KEY, candidate.cloud.token];
-        }
-    }
-
-    return {
-        dropboxTokens: candidate.backend === 'cloud'
-            && candidate.cloudProvider === 'dropbox'
-            && candidate.dropbox
-            ? candidate.dropbox.tokens
-            : null,
-        secret,
-        storageEntries,
-        storageKeysToRemove,
-    };
-};
-
-const readStorageMap = async (
-    keys: string[],
+const createPort = (
+    candidate: MobileSyncConfigOverride,
     dependencies: MobileSyncConfigurationTransactionDependencies,
-): Promise<Map<string, string | null>> => new Map(await dependencies.multiGet(keys));
+): SyncConfigurationPort => {
+    const stagedTokens = candidate.dropbox?.tokens ?? null;
+    let previousTokens: DropboxAuthTokens | null = null;
+    let capturedPreviousTokens = false;
 
-const assertStorageValues = async (
-    expected: readonly StorageSnapshotEntry[],
-    dependencies: MobileSyncConfigurationTransactionDependencies,
-): Promise<void> => {
-    const actual = await readStorageMap(expected.map(([key]) => key), dependencies);
-    for (const [key, expectedValue] of expected) {
-        if ((actual.get(key) ?? null) !== expectedValue) {
-            throw new Error(`Persisted sync setting ${key} did not match the expected value`);
-        }
-    }
-};
-
-const snapshotConfiguration = async (
-    writes: CandidateWrites,
-    dependencies: MobileSyncConfigurationTransactionDependencies,
-): Promise<ConfigurationSnapshot> => {
-    const storageKeys = [...new Set([
-        SYNC_BACKEND_KEY,
-        ...writes.storageEntries.map(([key]) => key),
-        ...writes.storageKeysToRemove,
-    ])];
-    const storage = await dependencies.multiGet(storageKeys);
-    const backend = storage.find(([key]) => key === SYNC_BACKEND_KEY)?.[1] ?? null;
-    return {
-        backend,
-        dropboxTokens: writes.dropboxTokens ? await dependencies.getDropboxTokens() : undefined,
-        secret: writes.secret
-            ? [writes.secret[0], await dependencies.getSecret(writes.secret[0])]
-            : null,
-        storage: storage.filter(([key]) => key !== SYNC_BACKEND_KEY),
-    };
-};
-
-const writeBackend = async (
-    backend: string,
-    dependencies: MobileSyncConfigurationTransactionDependencies,
-): Promise<void> => {
-    await dependencies.setItem(SYNC_BACKEND_KEY, backend);
-    dependencies.clearConfigCache();
-};
-
-const assertBackend = async (
-    expected: string,
-    dependencies: MobileSyncConfigurationTransactionDependencies,
-): Promise<void> => {
-    await assertStorageValues([[SYNC_BACKEND_KEY, expected]], dependencies);
-};
-
-const writeCandidate = async (
-    writes: CandidateWrites,
-    dependencies: MobileSyncConfigurationTransactionDependencies,
-): Promise<void> => {
-    if (writes.storageEntries.length > 0) {
-        await dependencies.multiSet(writes.storageEntries);
-    }
-    for (const key of writes.storageKeysToRemove) {
-        await dependencies.removeItem(key);
-    }
-    if (writes.secret) {
-        await dependencies.setSecret(writes.secret[0], writes.secret[1]);
-    }
-    if (writes.dropboxTokens) {
-        await dependencies.saveDropboxTokens(writes.dropboxTokens);
-    }
-    dependencies.clearConfigCache();
-};
-
-const assertCandidate = async (
-    writes: CandidateWrites,
-    dependencies: MobileSyncConfigurationTransactionDependencies,
-): Promise<void> => {
-    await assertBackend('off', dependencies);
-    await assertStorageValues([
-        ...writes.storageEntries,
-        ...writes.storageKeysToRemove.map((key): StorageSnapshotEntry => [key, null]),
-    ], dependencies);
-    if (writes.secret) {
-        const actualSecret = await dependencies.getSecret(writes.secret[0]);
-        if (actualSecret !== writes.secret[1]) {
-            throw new Error('Persisted sync secret did not match the proven candidate');
-        }
-    }
-    if (writes.dropboxTokens) {
-        const actualTokens = await dependencies.getDropboxTokens();
-        if (!tokensMatch(actualTokens, writes.dropboxTokens)) {
-            throw new Error('Persisted Dropbox credentials did not match the proven candidate');
-        }
-    }
-};
-
-const restoreSnapshot = async (
-    snapshot: ConfigurationSnapshot,
-    dependencies: MobileSyncConfigurationTransactionDependencies,
-): Promise<void> => {
-    const failures: string[] = [];
-    const attempt = async (label: string, operation: () => Promise<unknown>): Promise<boolean> => {
+    // An unreadable secret is authoritative-but-opaque, exactly as on a desktop
+    // without a keyring: the value is never treated as absent, so rollback can
+    // refuse to overwrite it. A readable null genuinely means "not set".
+    const readSecret = async (
+        key: string,
+    ): Promise<{ value: string | null; authority: SecretAuthority }> => {
         try {
-            await operation();
-            return true;
-        } catch (error) {
-            failures.push(`${label}: ${errorMessage(error)}`);
-            return false;
+            return { value: await dependencies.getSecret(key), authority: 'known' };
+        } catch {
+            return { value: null, authority: 'opaque' };
         }
     };
 
-    const disabled = await attempt('disable sync', async () => {
-        await writeBackend('off', dependencies);
-        await assertBackend('off', dependencies);
-    });
+    const writeSecret = async (key: string, value: string): Promise<void> => {
+        if (value) {
+            await dependencies.setSecret(key, value);
+            return;
+        }
+        await dependencies.deleteSecret(key);
+    };
 
-    if (disabled) {
-        const values = snapshot.storage.filter(
-            (entry): entry is readonly [string, string] => entry[1] !== null,
-        );
-        const missingKeys = snapshot.storage
-            .filter(([, value]) => value === null)
-            .map(([key]) => key);
-        if (values.length > 0) {
-            await attempt('restore transport settings', () => dependencies.multiSet(values));
-        }
-        for (const key of missingKeys) {
-            await attempt(`clear ${key}`, () => dependencies.removeItem(key));
-        }
-        if (snapshot.secret) {
-            const secretSnapshot = snapshot.secret;
-            await attempt('restore sync secret', () => secretSnapshot[1] === null
-                ? dependencies.deleteSecret(secretSnapshot[0])
-                : dependencies.setSecret(secretSnapshot[0], secretSnapshot[1]));
-        }
-        if (snapshot.dropboxTokens) {
-            await attempt('restore Dropbox credentials', () => dependencies.saveDropboxTokens(snapshot.dropboxTokens!));
-        } else if (snapshot.dropboxTokens === null) {
-            await attempt('clear Dropbox credentials', () => dependencies.clearDropboxTokens());
-        }
-        dependencies.clearConfigCache();
+    return {
+        recoverDropboxCredentialsBeforeConfiguration: async () => undefined,
 
-        if (failures.length === 0) {
-            await attempt('verify restored transport settings', async () => {
-                await assertBackend('off', dependencies);
-                await assertStorageValues(snapshot.storage, dependencies);
-                if (snapshot.secret) {
-                    const actualSecret = await dependencies.getSecret(snapshot.secret[0]);
-                    if (actualSecret !== snapshot.secret[1]) {
-                        throw new Error('restored secret does not match the previous value');
-                    }
-                }
-                if (snapshot.dropboxTokens !== undefined) {
-                    const actualTokens = await dependencies.getDropboxTokens();
-                    if (!tokensMatch(actualTokens, snapshot.dropboxTokens)) {
-                        throw new Error('restored Dropbox credentials do not match the previous value');
-                    }
-                }
-            });
-        }
-    }
+        readConfiguration: async (requirements = {}): Promise<PersistedSyncConfiguration> => {
+            const stored = new Map(await dependencies.multiGet(CONFIGURATION_KEYS));
+            const value = (key: string): string | null => stored.get(key) ?? null;
+            const webdavSecret = await readSecret(WEBDAV_PASSWORD_KEY);
+            const cloudSecret = await readSecret(CLOUD_TOKEN_KEY);
+            if (requirements.requireWebdavPassword && webdavSecret.authority === 'opaque') {
+                throw new Error('WebDAV password is unavailable');
+            }
+            if (requirements.requireCloudToken && cloudSecret.authority === 'opaque') {
+                throw new Error('Self-hosted token is unavailable');
+            }
+            return {
+                backend: normalizeSyncBackend(value(SYNC_BACKEND_KEY)),
+                syncPath: value(SYNC_PATH_KEY) ?? '',
+                syncPathBookmark: value(SYNC_PATH_BOOKMARK_KEY),
+                webdav: {
+                    url: value(WEBDAV_URL_KEY) ?? '',
+                    username: value(WEBDAV_USERNAME_KEY) ?? '',
+                    password: webdavSecret.value,
+                    passwordAuthority: webdavSecret.authority,
+                    hasPassword: webdavSecret.authority === 'known'
+                        ? Boolean(webdavSecret.value)
+                        : null,
+                    allowInsecureHttp: parseBool(value(WEBDAV_ALLOW_INSECURE_HTTP_KEY)),
+                    allowWeakFingerprint: parseBool(value(WEBDAV_ALLOW_WEAK_FINGERPRINT_KEY)),
+                },
+                cloudProvider: normalizeCloudProvider(value(CLOUD_PROVIDER_KEY)),
+                cloud: {
+                    url: value(CLOUD_URL_KEY) ?? '',
+                    token: cloudSecret.value,
+                    tokenAuthority: cloudSecret.authority,
+                    allowInsecureHttp: parseBool(value(CLOUD_ALLOW_INSECURE_HTTP_KEY)),
+                    // Mobile always persists the token it was given; there is no
+                    // session-only mode to distinguish.
+                    rememberToken: true,
+                },
+            };
+        },
 
-    const previousBackend = snapshot.backend ?? 'off';
-    if (failures.length === 0 && previousBackend !== 'off') {
-        await attempt('reactivate previous backend', async () => {
-            await writeBackend(previousBackend, dependencies);
-            await assertBackend(previousBackend, dependencies);
-        });
-    }
+        writeBackend: async (backend) => {
+            await dependencies.setItem(SYNC_BACKEND_KEY, backend);
+            dependencies.clearConfigCache();
+        },
 
-    if (failures.length > 0) {
-        await attempt('keep sync disabled', async () => {
-            await writeBackend('off', dependencies);
-            await assertBackend('off', dependencies);
-        });
-        throw new MobileSyncConfigurationTransactionError(
-            `Previous sync settings could not be fully restored; sync remains disabled. ${failures.join('; ')}`,
-            true,
-        );
-    }
+        writeSyncPath: async (path, bookmark) => {
+            await dependencies.multiSet([[SYNC_PATH_KEY, path]]);
+            if (bookmark) {
+                await dependencies.multiSet([[SYNC_PATH_BOOKMARK_KEY, bookmark]]);
+            } else {
+                await dependencies.removeItem(SYNC_PATH_BOOKMARK_KEY);
+            }
+            dependencies.clearConfigCache();
+            return { success: true, path };
+        },
+
+        clearSyncPath: async () => {
+            await dependencies.removeItem(SYNC_PATH_KEY);
+            await dependencies.removeItem(SYNC_PATH_BOOKMARK_KEY);
+            dependencies.clearConfigCache();
+        },
+
+        writeWebDav: async (webdav) => {
+            await dependencies.multiSet([
+                [WEBDAV_URL_KEY, webdav.url],
+                [WEBDAV_USERNAME_KEY, webdav.username],
+                [WEBDAV_ALLOW_INSECURE_HTTP_KEY, serializeBool(webdav.allowInsecureHttp)],
+                [WEBDAV_ALLOW_WEAK_FINGERPRINT_KEY, serializeBool(webdav.allowWeakFingerprint)],
+            ]);
+            await writeSecret(WEBDAV_PASSWORD_KEY, webdav.password);
+            dependencies.clearConfigCache();
+        },
+
+        writeCloud: async (cloud) => {
+            await dependencies.multiSet([
+                [CLOUD_URL_KEY, cloud.url],
+                [CLOUD_ALLOW_INSECURE_HTTP_KEY, serializeBool(cloud.allowInsecureHttp)],
+            ]);
+            await writeSecret(CLOUD_TOKEN_KEY, cloud.token);
+            dependencies.clearConfigCache();
+        },
+
+        writeCloudProvider: async (provider) => {
+            await dependencies.setItem(CLOUD_PROVIDER_KEY, provider);
+            dependencies.clearConfigCache();
+        },
+
+        promoteDropboxCredentials: async () => {
+            if (!capturedPreviousTokens) {
+                previousTokens = await dependencies.getDropboxTokens();
+                capturedPreviousTokens = true;
+            }
+            if (stagedTokens) await dependencies.saveDropboxTokens(stagedTokens);
+            dependencies.clearConfigCache();
+        },
+
+        // Nothing durable is staged before promotion, so there is nothing to drop.
+        discardDropboxCredentials: async () => undefined,
+
+        rollbackDropboxCredentials: async () => {
+            if (!capturedPreviousTokens) return;
+            if (previousTokens) {
+                await dependencies.saveDropboxTokens(previousTokens);
+            } else {
+                await dependencies.clearDropboxTokens();
+            }
+            dependencies.clearConfigCache();
+        },
+
+        // Rollback material is this closure, discarded when the commit returns.
+        finalizeDropboxCredentials: async () => undefined,
+    };
 };
+
+const toCandidate = (candidate: MobileSyncConfigOverride): SyncConfigurationCandidate => ({
+    backend: candidate.backend,
+    syncPath: candidate.syncPath,
+    syncPathBookmark: candidate.syncPathBookmark ?? null,
+    webdav: candidate.webdav,
+    // CloudKit needs a stale `dropbox` provider cleared, or attachment resolution
+    // keeps reaching for Dropbox after the backend has moved on.
+    cloudProvider: candidate.backend === 'cloudkit'
+        ? 'selfhosted'
+        : candidate.cloudProvider,
+    cloud: candidate.cloud,
+    dropboxCredentialHandle: candidate.dropbox?.tokens ? STAGED_DROPBOX_HANDLE : undefined,
+});
 
 /**
- * Persist a configuration already proven by an activation probe. The backend
- * key is the activation flag: transport settings and credentials are changed
- * only while that flag is durably off, then verified before one final write.
+ * Persist a configuration already proven by an activation probe. The backend key
+ * is the activation flag: transport settings and credentials change only while
+ * that flag is durably off, then are verified before one final write.
  */
 export async function commitProvenMobileSyncConfiguration(
     candidate: MobileSyncConfigOverride,
     dependencies: MobileSyncConfigurationTransactionDependencies,
 ): Promise<void> {
-    const writes = buildCandidateWrites(candidate);
-    const snapshot = await snapshotConfiguration(writes, dependencies);
-
     try {
-        await writeBackend('off', dependencies);
-        await assertBackend('off', dependencies);
-        await writeCandidate(writes, dependencies);
-        await assertCandidate(writes, dependencies);
-        await writeBackend(candidate.backend, dependencies);
-        await assertBackend(candidate.backend, dependencies);
-    } catch (commitError) {
-        try {
-            await restoreSnapshot(snapshot, dependencies);
-        } catch (rollbackError) {
-            throw new MobileSyncConfigurationTransactionError(
-                `${errorMessage(commitError)}. ${errorMessage(rollbackError)}`,
-                true,
-            );
-        }
-        throw commitError;
+        await commitProvenSyncConfiguration(toCandidate(candidate), createPort(candidate, dependencies));
+    } catch (error) {
+        const syncRemainsDisabled = Boolean(
+            (error as { syncRemainsDisabled?: boolean } | null)?.syncRemainsDisabled,
+        );
+        if (!syncRemainsDisabled) throw error;
+        throw new MobileSyncConfigurationTransactionError(errorMessage(error), true);
     }
 }

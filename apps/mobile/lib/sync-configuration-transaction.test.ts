@@ -15,10 +15,38 @@ import {
     SYNC_PATH_BOOKMARK_KEY,
     SYNC_PATH_KEY,
     WEBDAV_ALLOW_INSECURE_HTTP_KEY,
+    WEBDAV_ALLOW_WEAK_FINGERPRINT_KEY,
     WEBDAV_PASSWORD_KEY,
     WEBDAV_URL_KEY,
     WEBDAV_USERNAME_KEY,
 } from './sync-constants';
+
+const CONFIG_KEYS = [
+    SYNC_BACKEND_KEY,
+    SYNC_PATH_KEY,
+    SYNC_PATH_BOOKMARK_KEY,
+    WEBDAV_URL_KEY,
+    WEBDAV_USERNAME_KEY,
+    WEBDAV_ALLOW_INSECURE_HTTP_KEY,
+    WEBDAV_ALLOW_WEAK_FINGERPRINT_KEY,
+    CLOUD_PROVIDER_KEY,
+    CLOUD_URL_KEY,
+    CLOUD_ALLOW_INSECURE_HTTP_KEY,
+];
+/** One protocol read: the whole persisted configuration plus both secrets. */
+const READ_CONFIG = [
+    `read:${CONFIG_KEYS.join(',')}`,
+    `read-secret:${WEBDAV_PASSWORD_KEY}`,
+    `read-secret:${CLOUD_TOKEN_KEY}`,
+];
+const WEBDAV_WRITE = `multi-set:${[
+    WEBDAV_URL_KEY,
+    WEBDAV_USERNAME_KEY,
+    WEBDAV_ALLOW_INSECURE_HTTP_KEY,
+    WEBDAV_ALLOW_WEAK_FINGERPRINT_KEY,
+].join(',')}`;
+const CLOUD_WRITE = `multi-set:${[CLOUD_URL_KEY, CLOUD_ALLOW_INSECURE_HTTP_KEY].join(',')}`;
+const backendWrite = (backend: string): string => `set:${SYNC_BACKEND_KEY}:${backend}`;
 
 type HarnessOptions = {
     failCandidateActivation?: boolean;
@@ -160,6 +188,44 @@ describe('commitProvenMobileSyncConfiguration', () => {
         );
     });
 
+    // Desktop verifies its whole persisted configuration after disabling the
+    // backend, so a disable that perturbs a transport aborts before any
+    // credential is written. Mobile proves the same over the snapshot's own key
+    // footprint.
+    it('aborts before writing the candidate when disabling sync perturbs a transport', async () => {
+        const harness = createHarness({
+            [SYNC_BACKEND_KEY]: 'webdav',
+            [WEBDAV_URL_KEY]: 'https://old.example.test/dav',
+            [WEBDAV_USERNAME_KEY]: 'old-user',
+            [WEBDAV_ALLOW_INSECURE_HTTP_KEY]: 'false',
+        }, {
+            [WEBDAV_PASSWORD_KEY]: 'old-password',
+        });
+        const { setItem } = harness.dependencies;
+        let tampered = false;
+        harness.dependencies.setItem = async (key, value) => {
+            await setItem(key, value);
+            if (!tampered && key === SYNC_BACKEND_KEY && value === 'off') {
+                tampered = true;
+                harness.storage.set(WEBDAV_URL_KEY, 'https://tampered.example.test/dav');
+            }
+        };
+
+        await expect(commitProvenMobileSyncConfiguration({
+            backend: 'webdav',
+            webdav: {
+                url: 'https://new.example.test/dav',
+                username: 'new-user',
+                password: 'new-password',
+                allowInsecureHttp: false,
+            },
+        }, harness.dependencies)).rejects.toThrow(/Disabling sync changed the persisted transport configuration/);
+
+        expect(harness.secrets.get(WEBDAV_PASSWORD_KEY)).toBe('old-password');
+        expect(harness.storage.get(WEBDAV_URL_KEY)).toBe('https://old.example.test/dav');
+        expect(harness.storage.get(SYNC_BACKEND_KEY)).toBe('webdav');
+    });
+
     it('leaves sync off and does not reactivate a partially restored configuration', async () => {
         const harness = createHarness({
             [SYNC_BACKEND_KEY]: 'cloud',
@@ -180,7 +246,8 @@ describe('commitProvenMobileSyncConfiguration', () => {
         expect(String(error)).toContain('sync remains disabled');
         expect(harness.storage.get(SYNC_BACKEND_KEY)).toBe('off');
         expect(harness.getDropboxTokens()).toEqual(NEW_DROPBOX_TOKENS);
-        expect(harness.events.at(-2)).toBe(`set:${SYNC_BACKEND_KEY}:off`);
+        expect(harness.events.filter((event) => event.startsWith(`set:${SYNC_BACKEND_KEY}:`)).at(-1))
+            .toBe(backendWrite('off'));
     });
 });
 
@@ -274,18 +341,17 @@ describe('mobile commit protocol goldens', () => {
         );
 
         expect(harness.events).toEqual([
-            `read:${SYNC_BACKEND_KEY},${SYNC_PATH_KEY},${SYNC_PATH_BOOKMARK_KEY}`,
-            `set:${SYNC_BACKEND_KEY}:off`,
+            ...READ_CONFIG,
+            backendWrite('off'),
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
+            ...READ_CONFIG,
             `multi-set:${SYNC_PATH_KEY}`,
             `remove:${SYNC_PATH_BOOKMARK_KEY}`,
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
-            `read:${SYNC_PATH_KEY},${SYNC_PATH_BOOKMARK_KEY}`,
-            `set:${SYNC_BACKEND_KEY}:file`,
+            ...READ_CONFIG,
+            backendWrite('file'),
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
+            ...READ_CONFIG,
         ]);
     });
 
@@ -300,20 +366,17 @@ describe('mobile commit protocol goldens', () => {
         );
 
         expect(harness.events).toEqual([
-            `read:${SYNC_BACKEND_KEY},${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
-            `read-secret:${WEBDAV_PASSWORD_KEY}`,
-            `set:${SYNC_BACKEND_KEY}:off`,
+            ...READ_CONFIG,
+            backendWrite('off'),
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
-            `multi-set:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            ...READ_CONFIG,
+            WEBDAV_WRITE,
             `set-secret:${WEBDAV_PASSWORD_KEY}:golden-password`,
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
-            `read:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
-            `read-secret:${WEBDAV_PASSWORD_KEY}`,
-            `set:${SYNC_BACKEND_KEY}:webdav`,
+            ...READ_CONFIG,
+            backendWrite('webdav'),
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
+            ...READ_CONFIG,
         ]);
     });
 
@@ -331,20 +394,19 @@ describe('mobile commit protocol goldens', () => {
         }, harness.dependencies);
 
         expect(harness.events).toEqual([
-            `read:${SYNC_BACKEND_KEY},${CLOUD_PROVIDER_KEY},${CLOUD_URL_KEY},${CLOUD_ALLOW_INSECURE_HTTP_KEY}`,
-            `read-secret:${CLOUD_TOKEN_KEY}`,
-            `set:${SYNC_BACKEND_KEY}:off`,
+            ...READ_CONFIG,
+            backendWrite('off'),
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
-            `multi-set:${CLOUD_PROVIDER_KEY},${CLOUD_URL_KEY},${CLOUD_ALLOW_INSECURE_HTTP_KEY}`,
+            ...READ_CONFIG,
+            CLOUD_WRITE,
             `set-secret:${CLOUD_TOKEN_KEY}:golden-token`,
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
-            `read:${CLOUD_PROVIDER_KEY},${CLOUD_URL_KEY},${CLOUD_ALLOW_INSECURE_HTTP_KEY}`,
-            `read-secret:${CLOUD_TOKEN_KEY}`,
-            `set:${SYNC_BACKEND_KEY}:cloud`,
+            `set:${CLOUD_PROVIDER_KEY}:selfhosted`,
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
+            ...READ_CONFIG,
+            backendWrite('cloud'),
+            'clear-cache',
+            ...READ_CONFIG,
         ]);
     });
 
@@ -361,20 +423,20 @@ describe('mobile commit protocol goldens', () => {
         }, harness.dependencies);
 
         expect(harness.events).toEqual([
-            `read:${SYNC_BACKEND_KEY},${CLOUD_PROVIDER_KEY}`,
-            'read-dropbox',
-            `set:${SYNC_BACKEND_KEY}:off`,
+            ...READ_CONFIG,
+            backendWrite('off'),
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
-            `multi-set:${CLOUD_PROVIDER_KEY}`,
+            ...READ_CONFIG,
+            `set:${CLOUD_PROVIDER_KEY}:dropbox`,
+            'clear-cache',
+            ...READ_CONFIG,
+            'read-dropbox',
             `save-dropbox:${NEW_DROPBOX_TOKENS.accessToken}`,
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
-            `read:${CLOUD_PROVIDER_KEY}`,
-            'read-dropbox',
-            `set:${SYNC_BACKEND_KEY}:cloud`,
+            ...READ_CONFIG,
+            backendWrite('cloud'),
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
+            ...READ_CONFIG,
         ]);
     });
 
@@ -389,24 +451,24 @@ describe('mobile commit protocol goldens', () => {
         )).rejects.toThrow('injected transport failure');
 
         expect(harness.events).toEqual([
-            `read:${SYNC_BACKEND_KEY},${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
-            `read-secret:${WEBDAV_PASSWORD_KEY}`,
-            `set:${SYNC_BACKEND_KEY}:off`,
+            ...READ_CONFIG,
+            backendWrite('off'),
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
-            `multi-set:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
-            `set:${SYNC_BACKEND_KEY}:off`,
+            ...READ_CONFIG,
+            WEBDAV_WRITE,
+            backendWrite('off'),
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
-            `multi-set:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            ...READ_CONFIG,
+            backendWrite('off'),
+            'clear-cache',
+            ...READ_CONFIG,
+            WEBDAV_WRITE,
             `set-secret:${WEBDAV_PASSWORD_KEY}:old-password`,
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
-            `read:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
-            `read-secret:${WEBDAV_PASSWORD_KEY}`,
-            `set:${SYNC_BACKEND_KEY}:webdav`,
+            ...READ_CONFIG,
+            backendWrite('webdav'),
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
+            ...READ_CONFIG,
         ]);
     });
 
@@ -421,30 +483,28 @@ describe('mobile commit protocol goldens', () => {
         )).rejects.toThrow('injected activation failure');
 
         expect(harness.events).toEqual([
-            `read:${SYNC_BACKEND_KEY},${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
-            `read-secret:${WEBDAV_PASSWORD_KEY}`,
-            `set:${SYNC_BACKEND_KEY}:off`,
+            ...READ_CONFIG,
+            backendWrite('off'),
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
-            `multi-set:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            ...READ_CONFIG,
+            WEBDAV_WRITE,
             `set-secret:${WEBDAV_PASSWORD_KEY}:golden-password`,
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
-            `read:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
-            `read-secret:${WEBDAV_PASSWORD_KEY}`,
-            `set:${SYNC_BACKEND_KEY}:webdav`,
-            `set:${SYNC_BACKEND_KEY}:off`,
+            ...READ_CONFIG,
+            backendWrite('webdav'),
+            backendWrite('off'),
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
-            `multi-set:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            ...READ_CONFIG,
+            backendWrite('off'),
+            'clear-cache',
+            ...READ_CONFIG,
+            WEBDAV_WRITE,
             `set-secret:${WEBDAV_PASSWORD_KEY}:old-password`,
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
-            `read:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
-            `read-secret:${WEBDAV_PASSWORD_KEY}`,
-            `set:${SYNC_BACKEND_KEY}:webdav`,
+            ...READ_CONFIG,
+            backendWrite('webdav'),
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
+            ...READ_CONFIG,
         ]);
     });
 
@@ -459,27 +519,24 @@ describe('mobile commit protocol goldens', () => {
         )).rejects.toThrow(/sync remains disabled/i);
 
         expect(harness.events).toEqual([
-            `read:${SYNC_BACKEND_KEY},${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
-            `read-secret:${WEBDAV_PASSWORD_KEY}`,
-            `set:${SYNC_BACKEND_KEY}:off`,
+            ...READ_CONFIG,
+            backendWrite('off'),
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
-            `multi-set:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
+            ...READ_CONFIG,
+            WEBDAV_WRITE,
             `set-secret:${WEBDAV_PASSWORD_KEY}:golden-password`,
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
-            `read:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
-            `read-secret:${WEBDAV_PASSWORD_KEY}`,
-            `set:${SYNC_BACKEND_KEY}:webdav`,
-            `set:${SYNC_BACKEND_KEY}:off`,
+            ...READ_CONFIG,
+            backendWrite('webdav'),
+            backendWrite('off'),
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
-            `multi-set:${WEBDAV_URL_KEY},${WEBDAV_USERNAME_KEY},${WEBDAV_ALLOW_INSECURE_HTTP_KEY}`,
-            `set-secret:${WEBDAV_PASSWORD_KEY}:old-password`,
+            ...READ_CONFIG,
+            backendWrite('off'),
             'clear-cache',
-            `set:${SYNC_BACKEND_KEY}:off`,
+            ...READ_CONFIG,
+            WEBDAV_WRITE,
+            backendWrite('off'),
             'clear-cache',
-            `read:${SYNC_BACKEND_KEY}`,
         ]);
     });
 });
