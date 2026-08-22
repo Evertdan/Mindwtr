@@ -567,8 +567,9 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
         }
         const prepareMs = Date.now() - updateStartedAt;
         let snapshot: AppData | null = null;
-        const incrementalPersistence: { task?: Task; hasRecurringFollowUp: boolean } = {
+        const incrementalPersistence: { task?: Task; hasRecurringFollowUp: boolean; mintedDeviceId: boolean } = {
             hasRecurringFollowUp: false,
+            mintedDeviceId: false,
         };
         let setProducerMs = 0;
         let notifyProfile: NotifyProfile | null = null;
@@ -606,6 +607,7 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
                     : stampedNextRecurringTask;
                 incrementalPersistence.task = updatedTask;
                 incrementalPersistence.hasRecurringFollowUp = recurringFollowUpTask !== null;
+                incrementalPersistence.mintedDeviceId = deviceState.updated;
 
                 const updatedAllTasksBase = replaceEntityInArray(state._allTasks, id, updatedTask);
                 const updatedAllTasks = recurringFollowUpTask
@@ -645,9 +647,14 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
         // fail its FOREIGN KEY check (#1024), so fold the task into the queued
         // snapshot instead. Saves already in flight are safe: both platform
         // adapters run writes through one FIFO queue.
+        //
+        // A deviceId minted in this update lives only in the snapshot's settings,
+        // which the single-row write cannot carry: dropping it would let the next
+        // launch mint another id and churn revBy.
         if (
             incrementalPersistence.task
             && !incrementalPersistence.hasRecurringFollowUp
+            && !incrementalPersistence.mintedDeviceId
             && storage.saveTask
             && !hasQueuedSnapshotSave()
         ) {

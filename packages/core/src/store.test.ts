@@ -206,6 +206,9 @@ describe('TaskStore', () => {
             tasks: [task],
             _allTasks: [task],
             _tasksById: buildEntityMap([task]),
+            // A loaded store always carries a deviceId; without one the update
+            // mints it and takes the snapshot path instead (see below).
+            settings: { deviceId: 'device-a' },
         });
 
         const result = await useTaskStore.getState().updateTask('task-1', { title: 'Updated Task' });
@@ -221,6 +224,31 @@ describe('TaskStore', () => {
         expect(mockStorage.saveData).not.toHaveBeenCalled();
         await flushPendingSave();
         expect(mockStorage.saveData).not.toHaveBeenCalled();
+    });
+
+    // A deviceId minted inside the update only exists in the snapshot, and the
+    // incremental path writes one task row: taking it would drop the id and let
+    // the next launch mint another one, churning revBy across sessions.
+    it('takes the snapshot path when the update mints a device id', async () => {
+        const saveTask = vi.fn().mockResolvedValue(undefined);
+        mockStorage.saveTask = saveTask;
+        const task = createStoreTask('task-1', { status: 'next' });
+        useTaskStore.setState({
+            tasks: [task],
+            _allTasks: [task],
+            _tasksById: buildEntityMap([task]),
+            settings: {},
+        });
+
+        const result = await useTaskStore.getState().updateTask('task-1', { title: 'Renamed' });
+
+        expect(result).toEqual({ success: true });
+        expect(saveTask).not.toHaveBeenCalled();
+        await flushPendingSave();
+        expect(mockStorage.saveData).toHaveBeenCalledTimes(1);
+        const savedData = vi.mocked(mockStorage.saveData).mock.calls[0]?.[0] as AppData;
+        expect(savedData.settings.deviceId).toBe(useTaskStore.getState().settings.deviceId);
+        expect(savedData.settings.deviceId).toBeTruthy();
     });
 
     it('skips incremental task storage while a queued snapshot save holds a new referenced project (#1024)', async () => {
@@ -259,6 +287,7 @@ describe('TaskStore', () => {
             tasks: [task],
             _allTasks: [task],
             _tasksById: buildEntityMap([task]),
+            settings: { deviceId: 'device-a' },
         });
 
         const result = await useTaskStore.getState().updateTask('task-1', { title: 'Updated Task' });
@@ -367,6 +396,7 @@ describe('TaskStore', () => {
             tasks: [task],
             _allTasks: [task],
             _tasksById: buildEntityMap([task]),
+            settings: { deviceId: 'device-a' },
         });
 
         const tracked = await runWithImmediateSaveTracking(() =>
@@ -3706,6 +3736,7 @@ describe('TaskStore', () => {
             tasks: [task],
             _allTasks: [task],
             _tasksById: buildEntityMap([task]),
+            settings: { deviceId: 'device-a' },
         });
         mockStorage.saveTask = vi.fn().mockRejectedValue(new Error('secret adapter detail'));
         setStorageAdapter(mockStorage);
@@ -3762,6 +3793,7 @@ describe('TaskStore', () => {
             tasks: [task],
             _allTasks: [task],
             _tasksById: buildEntityMap([task]),
+            settings: { deviceId: 'device-a' },
         });
 
         let rejectSaveTask: ((reason?: unknown) => void) | null = null;
@@ -3802,6 +3834,7 @@ describe('TaskStore', () => {
             tasks: [task1, task2],
             _allTasks: [task1, task2],
             _tasksById: buildEntityMap([task1, task2]),
+            settings: { deviceId: 'device-a' },
         });
 
         const rejectors: Array<(reason?: unknown) => void> = [];
@@ -3848,6 +3881,7 @@ describe('TaskStore', () => {
             tasks: [task],
             _allTasks: [task],
             _tasksById: buildEntityMap([task]),
+            settings: { deviceId: 'device-a' },
         });
         mockStorage.saveTask = vi.fn().mockRejectedValue(new Error('incremental write failed'));
         mockStorage.getData = vi.fn().mockResolvedValue({
