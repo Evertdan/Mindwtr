@@ -1038,9 +1038,9 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
             return actionFail(message);
         }
         const existingTaskIds = new Set(state._tasksById.keys());
-        const missingIds = updatesList
-            .map((update) => update.id)
-            .filter((id, index, ids) => !existingTaskIds.has(id) && ids.indexOf(id) === index);
+        const missingIds = Array.from(new Set(
+            updatesList.map((update) => update.id).filter((id) => !existingTaskIds.has(id))
+        ));
         if (missingIds.length > 0) {
             const message = `Tasks not found: ${missingIds.join(', ')}`;
             set({ error: message });
@@ -1070,7 +1070,7 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
 
         set((state) => {
             const deviceState = ensureDeviceId(state.settings);
-            let nextRecurringTasks: Task[] = [];
+            const nextRecurringTasks: Task[] = [];
             const changedTasks: Task[] = [];
             const newAllTasksBase = [...state._allTasks];
             const projectOrderReserver = createProjectOrderReserver(newAllTasksBase);
@@ -1097,13 +1097,18 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
                     deviceState.deviceId,
                     projectOrderReserver,
                 );
-                const duplicateFollowUp = findExistingRecurringFollowUp(
-                    [...newAllTasksBase, ...nextRecurringTasks],
-                    stampedNextRecurringTask,
-                    task.id
-                );
-                if (stampedNextRecurringTask && !duplicateFollowUp) {
-                    nextRecurringTasks = [...nextRecurringTasks, stampedNextRecurringTask];
+                // Guard before the call: its arguments copy the whole collection,
+                // and evaluating them once per updated task made "select all ->
+                // move" quadratic even though almost nothing recurs.
+                if (stampedNextRecurringTask) {
+                    const duplicateFollowUp = findExistingRecurringFollowUp(
+                        [...newAllTasksBase, ...nextRecurringTasks],
+                        stampedNextRecurringTask,
+                        task.id
+                    );
+                    if (!duplicateFollowUp) {
+                        nextRecurringTasks.push(stampedNextRecurringTask);
+                    }
                 }
                 newAllTasksBase[index] = updatedTask;
                 changedTasks.push(updatedTask);
@@ -1140,7 +1145,7 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
                 .filter((task) => !task.deletedAt)
                 .map((task) => task.id)
         );
-        const missingIds = ids.filter((id, index) => !existingTaskIds.has(id) && ids.indexOf(id) === index);
+        const missingIds = Array.from(new Set(ids.filter((id) => !existingTaskIds.has(id))));
         if (missingIds.length > 0) {
             const message = `Tasks not found: ${missingIds.join(', ')}`;
             set({ error: message });
