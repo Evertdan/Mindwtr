@@ -55,3 +55,53 @@ Dependencies: 015 before 016 (both touch lint wiring; 015 is upstream in CI). 00
 - Localize desktop Settings feedback — **LARGELY DONE** (4b8c53a4c, 43fc66552, 06eb36bc9, 24ac122f2); the ratchet-test remainder is superseded by plan 009.
 - Mobile onboarding busy-guard — **LIKELY DONE** (8aad219ff); verify before re-planning.
 - SQLite warm-open cost, TS/Rust golden merge fixtures, exact transfer-operation IDs, mobile Data-row a11y — **STILL OPEN**, carried as future candidates (not selected this run; the first two are M-L with high care requirements, the latter two are UX polish batches).
+
+---
+
+# 2026-08-22 improve audit (Phase 2 of the review-improve loop), stamped against `b0a96ccc9`
+
+Selection non-interactive: every HIGH-confidence actionable finding became a plan; numbering continues from the 08-13 run. All 08-13 plans remain DONE. Executors: one commit per finding, red test first, honor STOP conditions, update this table.
+
+## Execution order & status
+
+| Plan | Title | Priority | Effort | Depends on | Status |
+|------|-------|----------|--------|------------|--------|
+| 019 | cloud-server-integrity | P1 | S | — | TODO |
+| 020 | core-store-write-integrity | P1 | M | — | TODO |
+| 021 | delete-vs-live-revision | P1 | M | — | TODO |
+| 022 | sync-orchestrator-rejections | P1 | S | — | TODO |
+| 023 | fts-search-quoting | P1 | S | — | TODO |
+| 024 | attachment-integrity | P1 | L | — | TODO |
+| 025 | android-component-security | P1 | M | — | TODO |
+| 026 | network-policy | P2 | M | — | TODO |
+| 027 | mcp-hardening-2 | P1 | M | — | TODO |
+| 028 | desktop-native-hardening-2 | P1 | M | — | TODO |
+| 029 | core-input-hardening | P2 | M | — | TODO |
+| 030 | batch-update-perf | P1 | S | — | TODO |
+| 031 | mobile-test-integrity | P2 | M | 024 (soft) | TODO |
+| 032 | dx-batch-2 | P2 | M | DX-01 lands first & alone | TODO |
+| 033 | docs-batch-2 | P2 | M | — | TODO |
+| 034 | csv-recurrence | P2 | M | — | TODO |
+
+Dependency notes: 031 after 024 (shared vi.mock idiom for un-stubbing); 032's DX-01 (lockfile) lands as an isolated commit before other work touches node_modules; 024 items 1→5→8→9 are ordered internally.
+
+## Deferred (recorded, deliberately not planned this run)
+
+- **DEPS-03** ~50 RN transitives pinned as direct root dependencies (from 7703fdee2, none imported by root code): removal is mechanical but requires a lockfile review + real Android build round — own maintenance window, alongside DEPS-02 (Expo 54→57).
+- **SEC-15b** any-token-mode IP rate limiting + true-LRU eviction on the cloud limiter: real but opt-in mode; an IP bucket changes behavior for proxied deployments — needs a deployment-model decision.
+- **SEC-12b** moving WebDAV URL userinfo into the keyring at config-save: real, M effort, follow-up to 026's redaction.
+- **SEC-10b** Android network-security-config domain scoping: REJECTED as planned — conflicts with settled #663 (base-config cleartext is load-bearing for arbitrary private-IP WebDAV); the JS-level `assertConnectionAllowed` guard (026) is the enforcement point.
+- **DIR-02** spreadsheet round-trip apply mode: DECIDED "no" this run — docs stance (skip on id match) stands; 033/DOCS-05 aligns the code comments. Revisit only with a rev-aware design.
+- **DIR-03** backup ZIP with attachment bytes: needs a mobile memory/threading measurement spike; DOCS-01 (033) captures the safety value now.
+- **BUG-26 caveat** — if investigation shows SyncRun re-checks freshness, 024 item 7 downgrades to early-abort only.
+- **DEBT-01** (AppTheme descriptor registry) and **DEBT-02** (sync-configuration transaction consolidation): routed to the architecture-deepening phase, not this plan set.
+- **DX-02** worktree pool: `git worktree prune` done operationally; deleting the 21 checkout dirs (53 GB) left to the maintainer (destructive).
+
+## Findings considered and rejected (this run)
+
+- MCP task-content-as-instructions sanitizer: inherent to a task-reading tool; client-side concern.
+- MCP auth-throttle FIFO eviction: bounded impact (401→429 only); comment-worthy at most.
+- window_state.rs non-atomic layout write: loss is monitor geometry; not scheduled.
+- `insertColumns` dead cache in queries.ts: one-line deletion, fold into any 027 commit touching the file.
+- Wholesale task-utils.ts split; big React-surface splits; SETTINGS_X_VALUES helper; wiki/Home.md link parity; CI caching: all re-confirmed not worth doing (see 08-13 rationale).
+- allTokens memoization (ListView.tsx:292): consumers re-render regardless; buys nothing.
