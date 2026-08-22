@@ -376,7 +376,11 @@ jobs:
           for attempt in 1 2 3; do
             log_file="${RUNNER_TEMP}/tauri-macos-build-${{ matrix.rust_target }}-${attempt}.log"
             echo "Running macOS bundle build (attempt ${attempt}/3)..."
-            if bunx tauri build --target ${{ matrix.rust_target }} 2>&1 | tee "${log_file}"; then
+            # `--bundles app` only: the DMG is built later, by "Bundle macOS DMG",
+            # from the app this same directory holds AFTER the widget step embeds
+            # and re-signs it. Building the DMG here would package the app before
+            # the widget ever exists in it (#1054).
+            if bunx tauri build --target ${{ matrix.rust_target }} --bundles app 2>&1 | tee "${log_file}"; then
               exit 0
             fi
 
@@ -405,6 +409,27 @@ jobs:
           # Keep bundled whisper bindings on macOS release builds.
           WHISPER_DONT_GENERATE_BINDINGS: "1"
           DEVELOPER_DIR: ${{ env.DEVELOPER_DIR }}
+          # build.rs bakes this into the binary as the widget's App Group ID
+          # (team-ID-prefixed). Without it here the shipped binary bakes the
+          # DEVTEAM dev placeholder while the widget step's own entitlements
+          # injection uses the real team ID, and the widget silently never
+          # sees data (#1054).
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Build and embed macOS widget
+        if: env.APPLE_SIGNING_IDENTITY != ''
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          APP_DIR="apps/desktop/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos"
+          APP_PATH="$(find "$APP_DIR" -maxdepth 1 -name '*.app' | head -n 1)"
+          if [ -z "${APP_PATH:-}" ]; then
+            echo "::error::Built .app bundle not found in $APP_DIR"
+            exit 1
+          fi
+          bash scripts/build-macos-widget.sh "$APP_PATH" "$APPLE_TEAM_ID" "$APPLE_SIGNING_IDENTITY" "${{ matrix.rust_target }}"
+        shell: bash
 
       - name: Verify macOS app signature
         run: |
@@ -457,6 +482,19 @@ jobs:
               fi
             done
           fi
+        shell: bash
+
+      - name: Bundle macOS DMG
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          cd apps/desktop
+          # Packages the app already built (and widget-embedded, re-signed) above
+          # into a DMG, without rebuilding or re-signing the app itself -- `tauri
+          # bundle` only assembles installers from an existing `tauri build`
+          # output. Building the DMG as part of the original `tauri build` call
+          # would package the app *before* the widget step ever touched it (#1054).
+          bunx tauri bundle --target ${{ matrix.rust_target }} --bundles dmg
         shell: bash
 
       - name: Notarize DMG

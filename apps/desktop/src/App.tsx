@@ -56,6 +56,7 @@ import {
     startDesktopCalendarPushSync,
     stopDesktopCalendarPushSync,
 } from './lib/desktop-calendar-push-sync';
+import { startMacWidgetSync, stopMacWidgetSync } from './lib/macos-widget-sync';
 import { SyncService } from './lib/sync-service';
 import type { ExternalSyncChange, ExternalSyncChangeResolution } from './lib/sync-service';
 import { migratePortableAttachments } from './lib/portable-migration';
@@ -749,6 +750,7 @@ function App() {
                     stopCalendarPush = startDesktopCalendarPushSync();
                     runFullDesktopCalendarPushSync()
                         .catch((error) => reportError('Calendar push failed', error));
+                    startMacWidgetSync();
                 }
             })
             .catch((error) => reportError('Data load failed', error));
@@ -949,6 +951,7 @@ function App() {
             emailCaptureController?.dispose();
             stopCalendarPush?.();
             stopDesktopCalendarPushSync();
+            stopMacWidgetSync();
             stopDesktopNotifications();
             LocalDataWatcher.stop();
             SyncService.stopFileWatcher().catch((error) => reportError('File watcher failed', error));

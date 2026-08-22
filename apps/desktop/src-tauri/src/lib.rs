@@ -46,6 +46,7 @@ mod install;
 mod linux_calendar;
 mod local_api;
 mod logging;
+mod macos_widget;
 mod obsidian_paths;
 mod obsidian_watcher;
 mod obsidian_writer;
@@ -86,6 +87,7 @@ use local_api::{
     LocalApiServerState,
 };
 use logging::{append_log_line, append_native_log_line, clear_log_file};
+use macos_widget::write_macos_widget_payload;
 use obsidian_paths::default_obsidian_inbox_file;
 use obsidian_watcher::{start_obsidian_watcher, stop_obsidian_watcher, ObsidianWatcherState};
 use obsidian_writer::{
@@ -1671,6 +1673,7 @@ pub fn run() {
             email_capture_commit,
             get_desktop_rendering_config,
             set_desktop_rendering_config,
+            write_macos_widget_payload,
             quit_app
         ])
         .build(tauri::generate_context!())

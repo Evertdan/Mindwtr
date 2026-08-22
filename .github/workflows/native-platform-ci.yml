@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/native-platform-ci.yml"
       - "apps/desktop/src-tauri/**"
+      - "apps/desktop/widgets-macos/**"
       - "apps/mobile/modules/**/android/**"
       - "apps/mobile/ios-app-intents/**"
       - "apps/mobile/widgets-ios/**"
@@ -25,6 +26,7 @@ on:
     paths:
       - ".github/workflows/native-platform-ci.yml"
       - "apps/desktop/src-tauri/**"
+      - "apps/desktop/widgets-macos/**"
       - "apps/mobile/modules/**/android/**"
       - "apps/mobile/ios-app-intents/**"
       - "apps/mobile/widgets-ios/**"
@@ -93,7 +95,7 @@ jobs:
           windows=false
           while IFS= read -r path; do
             case "$path" in
-              apps/desktop/src-tauri/*|packages/core/src/*|scripts/check-synced-field-parity.ts|package.json|bun.lock|.github/workflows/native-platform-ci.yml)
+              apps/desktop/src-tauri/*|apps/desktop/widgets-macos/*|packages/core/src/*|scripts/check-synced-field-parity.ts|package.json|bun.lock|.github/workflows/native-platform-ci.yml)
                 macos=true
                 ;;
             esac
@@ -142,6 +144,17 @@ jobs:
 
       - name: Run macOS native library tests
         run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib
+
+      - name: Swift compile check for macOS widget sources
+        run: |
+          set -euo pipefail
+          xcrun swiftc \
+            -typecheck \
+            -sdk "$(xcrun --sdk macosx --show-sdk-path)" \
+            -target "$(uname -m)-apple-macos14.0" \
+            -parse-as-library \
+            -application-extension \
+            apps/desktop/widgets-macos/*.swift
 
   windows-rust:
     if: needs.changes.outputs.windows == 'true'
