@@ -700,6 +700,9 @@ export function safeParseDate(dateStr: string | undefined | null): Date | null {
                 const year = Number(match[1]);
                 const month = Number(match[2]) - 1;
                 const day = Number(match[3]);
+                // `new Date(y, m, d)` rolls 2024-02-31 into March 2 rather than
+                // rejecting it, same trap as the instant fast path above.
+                if (!isValidCalendarDate(year, month + 1, day)) return null;
                 const hour = match[4] ? Number(match[4]) : 0;
                 const minute = match[5] ? Number(match[5]) : 0;
                 const second = match[6] ? Number(match[6]) : 0;

@@ -71,6 +71,26 @@ describe('date utils', () => {
         expect(parsed?.getTime()).toBe(reference.getTime());
     });
 
+    // The instant fast path already rejects these; the date-only/local branch used
+    // to let `new Date(y, m, d)` roll them into the next month instead.
+    it.each([
+        '2024-02-31',
+        '2025-02-29',
+        '2025-04-31',
+        '2025-13-02',
+        '2025-00-10',
+        '2025-06-00',
+        '2024-02-31T10:00',
+    ])('rejects the calendar-invalid local value %s', (value) => {
+        expect(safeParseDate(value)).toBeNull();
+    });
+
+    it('still accepts a real leap day as a date-only value', () => {
+        const parsed = safeParseDate('2024-02-29');
+        expect(parsed?.getMonth()).toBe(1);
+        expect(parsed?.getDate()).toBe(29);
+    });
+
     it('preserves years below 100 instead of coercing to 19xx', () => {
         const parsed = safeParseDate('0002-01-03');
         expect(parsed).not.toBeNull();
