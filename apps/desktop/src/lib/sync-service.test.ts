@@ -3331,6 +3331,16 @@ describe('SyncService orchestration', () => {
                 status: 'next',
                 tags: [],
                 contexts: [],
+                // The attachment phases are gated on there being attachment work at
+                // all, so the payload-mutating pass below needs something to act on.
+                attachments: [{
+                    id: 'attachment-1',
+                    kind: 'file',
+                    title: 'notes.pdf',
+                    uri: '/tmp/notes.pdf',
+                    createdAt: '2026-04-01T00:00:00.000Z',
+                    updatedAt: '2026-04-01T00:00:00.000Z',
+                }],
                 createdAt: '2026-04-01T00:00:00.000Z',
                 updatedAt: '2026-04-01T00:00:00.000Z',
             }],
