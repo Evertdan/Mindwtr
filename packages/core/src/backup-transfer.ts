@@ -1,4 +1,4 @@
-import type { AppData } from './types';
+import type { AppData, Attachment } from './types';
 import { createImportDiagnostics, type ImportDiagnostic } from './import-diagnostics';
 import { nextRevision, normalizeRevision, SYNC_BACKUP_RESTORE_REV_BY } from './sync-revision';
 import {
@@ -10,6 +10,7 @@ import {
 } from './tombstone-compaction';
 import {
     isObjectRecord,
+    normalizeAttachmentsForSyncMerge,
     validateMergedSyncData,
 } from './sync-normalization';
 import { parseSyncDocument } from './sync-document';
@@ -293,6 +294,16 @@ const stripDeviceLocalRestoreSettings = (settings: AppData['settings']): AppData
     return nextSettings;
 };
 
+/**
+ * A backup file is user-supplied bytes, and restore stamps fresh revisions so its records
+ * win the next merge — without this, an attachment path the sync-merge sanitizer would have
+ * rejected gets published to every device from here. Bad values are cleared, never dropped:
+ * the attachment degrades to "missing locally" instead of vanishing from the user's task.
+ */
+const sanitizeRestoredAttachments = <T extends { attachments?: Attachment[] }>(item: T): T => (
+    item.attachments ? { ...item, attachments: normalizeAttachmentsForSyncMerge(item.attachments) } : item
+);
+
 export const prepareRestoredBackupDataForSync = (
     data: AppData,
     options: BackupRestoreSyncPreparationOptions = {}
@@ -313,7 +324,7 @@ export const prepareRestoredBackupDataForSync = (
                 ...task,
                 attachments: previousTasksById.get(task.id)?.attachments,
             })
-            : task
+            : sanitizeRestoredAttachments(task)
     ));
     const projects = prepare(data.projects, previous?.projects).map((project) => (
         project.purgedAt
@@ -321,7 +332,7 @@ export const prepareRestoredBackupDataForSync = (
                 ...project,
                 attachments: previousProjectsById.get(project.id)?.attachments,
             })
-            : project
+            : sanitizeRestoredAttachments(project)
     ));
     const sections = compactSectionsForPurgedProjects(
         prepare(data.sections, previous?.sections),

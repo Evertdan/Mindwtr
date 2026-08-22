@@ -267,6 +267,39 @@ describe('runImport', () => {
         });
     });
 
+    it('sanitizes hostile attachment paths out of an additively merged backup (SEC-08)', async () => {
+        const now = '2026-01-01T00:00:00.000Z';
+        const hostile = {
+            id: 'attachment',
+            kind: 'file' as const,
+            title: 'Report',
+            uri: 'file:///safe/%252e%252e/secret.txt',
+            cloudKey: '../attachments/secret.txt',
+            fileHash: 'not-a-digest',
+            createdAt: now,
+            updatedAt: now,
+        };
+        const local = mockAppData(
+            [{ ...createMockTask('task', now), rev: 1 }],
+            [{ ...createMockProject('project', now), rev: 1 }],
+        );
+        const backup = mockAppData(
+            [{ ...createMockTask('task', now), attachments: [hostile], rev: 2 }],
+            [{ ...createMockProject('project', now), attachments: [hostile], rev: 2 }],
+        );
+        const { boundaries, persisted } = buildBoundaries(local);
+        const { log } = buildLog();
+
+        await runImport('backup-merge', backup, boundaries, log);
+
+        for (const attachments of [persisted[0].tasks[0]?.attachments, persisted[0].projects[0]?.attachments]) {
+            expect(attachments).toHaveLength(1);
+            expect(attachments?.[0].uri).toBe('');
+            expect(attachments?.[0].cloudKey).toBeUndefined();
+            expect(attachments?.[0].fileHash).toBeUndefined();
+        }
+    });
+
     it('keeps restore replacing local data and outranking local tombstones', async () => {
         const { local, backup } = buildDivergedData();
         const { boundaries, persisted } = buildBoundaries(local);

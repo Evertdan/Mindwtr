@@ -3224,6 +3224,44 @@ fn valid_checklist(value: &Value) -> bool {
     })
 }
 
+/// Mirrors `ATTACHMENT_CLOUD_KEY_PATTERN` in packages/core/src/sync-normalization.ts. The local
+/// HTTP API is a second write path into the same attachments, so a cloudKey accepted here must be
+/// one the sync merge would accept too — the pattern is what rules out separators, traversal
+/// segments and NUL bytes reaching a filesystem or remote path.
+fn valid_attachment_cloud_key(value: &str) -> bool {
+    fn valid_name(name: &str) -> bool {
+        let mut chars = name.chars();
+        chars
+            .next()
+            .is_some_and(|first| first.is_ascii_alphanumeric())
+            && chars.all(|item| item.is_ascii_alphanumeric() || item == '_' || item == '-')
+    }
+
+    if let Some(record_id) = value.strip_prefix("cloudkit:") {
+        return valid_name(record_id);
+    }
+    let Some(name) = value.strip_prefix("attachments/") else {
+        return false;
+    };
+    let (stem, extension) = match name.split_once('.') {
+        Some((stem, extension)) => (stem, Some(extension)),
+        None => (name, None),
+    };
+    if !valid_name(stem) {
+        return false;
+    }
+    let Some(extension) = extension else {
+        return true;
+    };
+    let mut chars = extension.chars();
+    chars
+        .next()
+        .is_some_and(|first| first.is_ascii_alphanumeric())
+        && extension.chars().count() <= 128
+        && chars
+            .all(|item| item.is_ascii_alphanumeric() || item == '.' || item == '_' || item == '-')
+}
+
 fn valid_attachments(value: &Value) -> bool {
     value.as_array().is_some_and(|attachments| {
         attachments.iter().all(|attachment| {
@@ -3237,7 +3275,8 @@ fn valid_attachments(value: &Value) -> bool {
                 "kind" => value
                     .as_str()
                     .is_some_and(|kind| matches!(kind, "file" | "link")),
-                "mimeType" | "deletedAt" | "cloudKey" | "fileHash" => value.is_string(),
+                "mimeType" | "deletedAt" | "fileHash" => value.is_string(),
+                "cloudKey" => value.as_str().is_some_and(valid_attachment_cloud_key),
                 "size" | "contentRev" | "contentMtimeMs" | "contentSize" => {
                     value.as_u64().is_some()
                 }
@@ -4110,6 +4149,53 @@ mod tests {
                     "{field} should reject {bad_value:?}"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn local_api_valid_attachments_enforces_cloud_key_shape() {
+        // SEC-08: the local HTTP API is a second write path into the same attachments, so a
+        // cloudKey it accepts must be one the sync merge would accept too
+        // (ATTACHMENT_CLOUD_KEY_PATTERN in packages/core/src/sync-normalization.ts).
+        let with_cloud_key = |cloud_key: &str| {
+            json!([{
+                "id": "attachment-1",
+                "kind": "file",
+                "title": "Report",
+                "uri": "file:///report.pdf",
+                "createdAt": "2026-01-01T00:00:00.000Z",
+                "updatedAt": "2026-01-01T00:00:00.000Z",
+                "cloudKey": cloud_key,
+            }])
+        };
+
+        for accepted in [
+            "attachments/att-1.txt",
+            "attachments/att-1",
+            "attachments/a1.tar.gz",
+            "cloudkit:ABC123",
+        ] {
+            assert!(
+                valid_attachments(&with_cloud_key(accepted)),
+                "{accepted} should be accepted"
+            );
+        }
+
+        for rejected in [
+            "../secret",
+            "attachments/../../secret",
+            "/etc/passwd",
+            "attachments/secret\0.txt",
+            "attachments/",
+            "attachments/.hidden",
+            "attachments/a/b.txt",
+            "",
+            "https://example.com/x",
+        ] {
+            assert!(
+                !valid_attachments(&with_cloud_key(rejected)),
+                "{rejected:?} should be rejected"
+            );
         }
     }
 

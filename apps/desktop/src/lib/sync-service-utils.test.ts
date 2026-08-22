@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createLocalAttachmentFs, writeFileSafelyAbsolute } from './sync-service-utils';
+import { createLocalAttachmentFs, resolveFileBackendPath, writeFileSafelyAbsolute } from './sync-service-utils';
 
 const BASE_DATA_DIR = '/os-data';
 const MANAGED_DIR = '/new-profile/attachments';
@@ -95,6 +95,24 @@ describe('createLocalAttachmentFs managed-dir fallback', () => {
         expect(await fs.localFileExists(STALE_URI, { id: 'different-id' })).toBe(false);
         await expect(fs.readLocalFile(STALE_URI, { id: 'different-id' })).rejects.toThrow();
         expect(exists).not.toHaveBeenCalledWith(MANAGED_FILE);
+    });
+});
+
+describe('resolveFileBackendPath', () => {
+    const join = vi.fn(async (...paths: string[]) => paths.join('/'));
+
+    it('resolves an ordinary cloudKey under the sync folder', async () => {
+        await expect(resolveFileBackendPath(join, '/sync', 'attachments/a1.pdf'))
+            .resolves.toBe('/sync/attachments/a1.pdf');
+    });
+
+    // SEC-08: a cloudKey arrives over sync, so it is attacker-controlled input to a
+    // filesystem write/delete. Escaping the sync folder must fail loudly — both callers
+    // treat a rejection as a failed transfer, never as a completed one.
+    it('refuses a cloudKey that escapes the sync folder', async () => {
+        for (const hostile of ['attachments/../../escape.txt', 'attachments\\..\\..\\escape.txt', '../escape.txt', 'attachments/a\0.pdf']) {
+            await expect(resolveFileBackendPath(join, '/sync', hostile)).rejects.toThrow(/outside the sync folder|invalid/i);
+        }
     });
 });
 

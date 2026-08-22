@@ -716,6 +716,37 @@ describe('backup transfer', () => {
         expect(merged.tasks.find((task) => task.id === 'other-device-task')?.deletedAt).toBeUndefined();
     });
 
+    it('sanitizes hostile attachment paths out of a restored backup (SEC-08)', () => {
+        // A backup file is user-supplied bytes, and restore stamps fresh revisions so its
+        // records win the next merge — a traversal uri/cloudKey smuggled in here would be
+        // published to every device without ever passing the sync-merge sanitizer.
+        const restoredAt = '2026-04-01T00:00:10.000Z';
+        const backup = buildAppData();
+        const hostile = {
+            id: 'attachment-1',
+            kind: 'file' as const,
+            title: 'Report',
+            uri: 'file:///safe/%252e%252e/secret.txt',
+            cloudKey: '../attachments/secret.txt',
+            fileHash: 'not-a-digest',
+            createdAt: '2026-03-30T12:00:00.000Z',
+            updatedAt: '2026-03-30T12:00:00.000Z',
+        };
+        backup.tasks[0].attachments = [hostile];
+        backup.projects[0].attachments = [hostile];
+
+        const restored = prepareRestoredBackupDataForSync(backup, { restoredAt });
+
+        for (const attachments of [restored.tasks[0].attachments, restored.projects[0].attachments]) {
+            // Degraded to "missing locally", never dropped: the user's record survives.
+            expect(attachments).toHaveLength(1);
+            expect(attachments?.[0].id).toBe('attachment-1');
+            expect(attachments?.[0].uri).toBe('');
+            expect(attachments?.[0].cloudKey).toBeUndefined();
+            expect(attachments?.[0].fileHash).toBeUndefined();
+        }
+    });
+
     describe('countActiveRecords', () => {
         // Pinned verbatim from desktop's and mobile's data-transfer.ts before this refactor —
         // both had this exact 4-field object and both silently omitted `people`. Per the "a test

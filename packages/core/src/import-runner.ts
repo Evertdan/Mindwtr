@@ -29,6 +29,7 @@ import {
     type ParsedOmniFocusImportData,
 } from './omnifocus-import';
 import { mergeAppDataWithStats } from './sync';
+import { normalizeAttachmentsForSyncMerge } from './sync-normalization';
 import type { EntityMergeStats, MergeResult } from './sync-types';
 import {
     applyTickTickImport,
@@ -122,12 +123,18 @@ const toBackupCountExtra = (data: AppData): Record<string, string> => ({
     areas: String(data.areas.filter((area) => !area.deletedAt).length),
 });
 
+// The backup is user-supplied bytes, so its attachment paths get the same sanitizing the sync
+// merge applies (bad uri -> '', bad cloudKey/fileHash -> undefined; the record itself survives).
+// mergeAppDataWithStats normalizes incoming entities again downstream — this pins the shape at
+// the entry point so the guarantee does not depend on which importer consumes it.
 const filterAdditiveBackupAttachments = (
     incoming: Attachment[] | undefined,
     current: Attachment[] | undefined,
 ): Attachment[] | undefined => {
     const locallyDeletedIds = new Set(current?.filter((item) => item.deletedAt).map((item) => item.id));
-    return incoming?.filter((item) => !item.deletedAt && !locallyDeletedIds.has(item.id));
+    return normalizeAttachmentsForSyncMerge(
+        incoming?.filter((item) => !item.deletedAt && !locallyDeletedIds.has(item.id)),
+    );
 };
 
 // `resolvedUsingIncoming` counts every record the backup supplied, records this device had

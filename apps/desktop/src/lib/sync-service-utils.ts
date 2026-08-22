@@ -290,6 +290,9 @@ export const writeFileSafelyAbsolute = async (
     }
 };
 
+// A cloudKey arrives over sync, so it is attacker-controlled input to a filesystem
+// write/delete. Both callers treat a rejection as a failed transfer, never a completed
+// one, so throwing is safe here and silently clamping the path would not be.
 export const resolveFileBackendPath = async (
     join: (...paths: string[]) => Promise<string>,
     baseDir: string,
@@ -298,6 +301,9 @@ export const resolveFileBackendPath = async (
     const segments = relativePath
         .split(/[\\/]+/)
         .filter(Boolean);
+    if (relativePath.includes('\0') || segments.some((segment) => segment === '..')) {
+        throw new Error(`Refusing attachment path outside the sync folder: ${JSON.stringify(relativePath)}`);
+    }
     return segments.length > 0 ? await join(baseDir, ...segments) : baseDir;
 };
 
