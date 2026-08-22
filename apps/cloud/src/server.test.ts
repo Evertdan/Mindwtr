@@ -3273,6 +3273,35 @@ describe('cloud server api', () => {
         expect(followUp?.pushCount).toBe(0);
     });
 
+    test('reserves a project order for a REST-created task', async () => {
+        const projectResponse = await fetch(`${baseUrl}/v1/projects`, {
+            method: 'POST',
+            headers: { ...authHeaders, 'content-type': 'application/json' },
+            body: JSON.stringify({ title: 'Ordered Project' }),
+        });
+        expect(projectResponse.status).toBe(201);
+        const projectId = (await projectResponse.json()).project.id as string;
+
+        const siblingResponse = await fetch(`${baseUrl}/v1/tasks`, {
+            method: 'POST',
+            headers: { ...authHeaders, 'content-type': 'application/json' },
+            body: JSON.stringify({ title: 'Sibling', props: { projectId } }),
+        });
+        expect(siblingResponse.status).toBe(201);
+        const sibling = (await siblingResponse.json()).task as Task;
+        expect(sibling.order).toBe(0);
+
+        const taskResponse = await fetch(`${baseUrl}/v1/tasks`, {
+            method: 'POST',
+            headers: { ...authHeaders, 'content-type': 'application/json' },
+            body: JSON.stringify({ title: 'New Task', props: { projectId } }),
+        });
+        expect(taskResponse.status).toBe(201);
+        const task = (await taskResponse.json()).task as Task;
+        expect(task.order).toBe(1);
+        expect(task.orderNum).toBe(1);
+    });
+
     // Documents synced from the apps do carry an order, and there the next
     // occurrence must hold the completed task's place rather than sort below
     // every sibling -- matching core's stampNewRecurringFollowUp.

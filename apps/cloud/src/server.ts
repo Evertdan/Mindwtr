@@ -619,6 +619,11 @@ const ENTITY_ROUTES: Array<EntityRouteDefinition<any>> = [
                 contexts: _contexts,
                 ...restProps
             } = props;
+            // Mirrors core's addTasks: an explicit order/orderNum in props wins, otherwise a
+            // task landing in a project reserves the next slot instead of sorting below every
+            // sibling (missing order is +Infinity in compareTasksByProjectOrder).
+            const hasExplicitOrder = Object.prototype.hasOwnProperty.call(props, 'order')
+                || Object.prototype.hasOwnProperty.call(props, 'orderNum');
             const task: Task = {
                 id: generateUUID(),
                 title,
@@ -631,6 +636,11 @@ const ENTITY_ROUTES: Array<EntityRouteDefinition<any>> = [
                 createdAt: nowIso,
                 updatedAt: nowIso,
             } as Task;
+            if (!hasExplicitOrder && task.projectId) {
+                const order = getNextProjectOrder(task.projectId, data.tasks);
+                task.order = order;
+                task.orderNum = order;
+            }
             if (isTaskFinished(status) && !task.completedAt) {
                 task.completedAt = nowIso;
             }
