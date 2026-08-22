@@ -243,6 +243,26 @@ describe('omnifocus import', () => {
         });
     });
 
+    it('rejects an OmniFocus JSON export with more tasks than the archive-wide entity budget allows (SEC-14)', () => {
+        // 100_001 minimal task entities exceeds DEFAULT_IMPORT_ARCHIVE_BUDGET_LIMITS.maxEntities
+        // (100_000); the JSON path used to build the full hierarchy/checklist maps over this
+        // uncapped array instead of rejecting it up front.
+        const tasks = Array.from({ length: 100_001 }, (_, index) => ({
+            id: `task-${index}`,
+            name: `Task ${index}`,
+        }));
+
+        const result = parseOmniFocusImportSource({
+            fileName: 'omnifocus.json',
+            text: JSON.stringify({ tasks }),
+        });
+
+        expect(result.valid).toBe(false);
+        expect(result.parsedData).toBeNull();
+        expect(result.errors).toHaveLength(1);
+        expect(result.errors[0]).toContain('too many');
+    });
+
     it('imports parsed OmniFocus data into projects and standalone inbox tasks', () => {
         const parseResult = parseOmniFocusImportSource({
             fileName: 'OmniFocus Export.csv',

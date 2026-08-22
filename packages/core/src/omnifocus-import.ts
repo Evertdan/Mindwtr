@@ -4,6 +4,7 @@ import {
     appendWarning,
     basename,
     buildHeaderIndex,
+    createImportArchiveBudget,
     dedupeStrings,
     decodeTextBytes,
     detectDelimiter,
@@ -16,6 +17,7 @@ import {
     readImportSource,
     sanitizeCsvText,
     sanitizeJsonText,
+    type ImportArchiveBudget,
 } from './import-source-reader';
 import { buildRRuleString, parseRRuleString } from './recurrence';
 import { normalizeTagId } from './store-helpers';
@@ -898,7 +900,8 @@ const isChecklistConvertibleTask = (task: OmniFocusJsonTask): boolean => {
 
 const parseJsonImport = (
     documents: OmniFocusJsonDocument[],
-    counters: OmniFocusWarningCounters
+    counters: OmniFocusWarningCounters,
+    archiveBudget: ImportArchiveBudget
 ): ParsedOmniFocusImportData => {
     const preferredTasksDocument = documents.find((document) => isPreferredTaskDocumentName(document.name) && readTasksArray(document).length > 0)
         || documents.find((document) => readTasksArray(document).length > 0)
@@ -911,7 +914,14 @@ const parseJsonImport = (
         || documents.find((document) => document !== preferredTasksDocument && (readProjectsArray(document).length > 0 || readTagsArray(document).length > 0))
         || (readProjectsArray(preferredTasksDocument).length > 0 || readTagsArray(preferredTasksDocument).length > 0 ? preferredTasksDocument : null);
 
-    const rawTasks = readTasksArray(preferredTasksDocument)
+    // Charged as soon as the raw counts are known, before the hierarchy/checklist
+    // maps below do O(n) work over them — an oversized export is rejected instead
+    // of first paying for the maps it's guaranteed to make us discard (SEC-14).
+    const rawTaskEntries = readTasksArray(preferredTasksDocument);
+    const rawProjectEntries = readProjectsArray(preferredMetadataDocument);
+    archiveBudget.consumeEntities(rawTaskEntries.length + rawProjectEntries.length);
+
+    const rawTasks = rawTaskEntries
         .map((task, index) => readOmniFocusTask(task, index))
         .filter((task): task is OmniFocusJsonTask => Boolean(task));
     if (rawTasks.length === 0) {
@@ -919,7 +929,7 @@ const parseJsonImport = (
         return { areas: [], projects: [], tasks: [], warnings: buildWarnings(counters) };
     }
 
-    const rawProjects = readProjectsArray(preferredMetadataDocument)
+    const rawProjects = rawProjectEntries
         .map((project, index) => readOmniFocusProjectMeta(project, index))
         .filter((project): project is OmniFocusJsonProjectMeta => Boolean(project));
     const tagNameById = readOmniFocusTags(readTagsArray(preferredMetadataDocument));
@@ -1065,7 +1075,9 @@ const parseJsonImport = (
             completionDate: task.completionDate,
         }, counters);
         const recurrenceResolution = resolveOmniFocusRecurrence(task.repetition, counters);
-        const checklistItems = (checklistChildrenByParentId.get(task.id) ?? [])
+        const checklistChildren = checklistChildrenByParentId.get(task.id) ?? [];
+        archiveBudget.consumeChecklistItems(checklistChildren.length);
+        const checklistItems = checklistChildren
             .map((child) => ({
                 id: uuidv4(),
                 title: child.name || OMNIFOCUS_TASK_FALLBACK,
@@ -1117,7 +1129,8 @@ const parseJsonImport = (
 
 const parseOmniFocusImportData = (
     input: OmniFocusFileInput,
-    counters: OmniFocusWarningCounters
+    counters: OmniFocusWarningCounters,
+    archiveBudget: ImportArchiveBudget
 ): ParsedOmniFocusImportData => {
     const source = readImportSource(input, decodeOmniFocusBytes);
     if (source.kind === 'archive') {
@@ -1125,11 +1138,11 @@ const parseOmniFocusImportData = (
         if (documents.length === 0) {
             throw new Error('The selected OmniFocus ZIP archive did not contain any supported JSON export files.');
         }
-        return parseJsonImport(documents, counters);
+        return parseJsonImport(documents, counters, archiveBudget);
     }
 
     if (isLikelyJsonText(source.text)) {
-        return parseJsonImport([parseJsonDocument(source.text, input.fileName)], counters);
+        return parseJsonImport([parseJsonDocument(source.text, input.fileName)], counters, archiveBudget);
     }
     return parseCsvImport(source.text, counters);
 };
@@ -1165,7 +1178,8 @@ export const parseOmniFocusImportSource = (input: OmniFocusFileInput): OmniFocus
     const fileName = basename(input.fileName);
     try {
         const counters = createWarningCounters();
-        const parsedData = parseOmniFocusImportData(input, counters);
+        const archiveBudget = createImportArchiveBudget();
+        const parsedData = parseOmniFocusImportData(input, counters, archiveBudget);
         if (parsedData.projects.length === 0 && parsedData.tasks.length === 0) {
             return {
                 valid: false,
