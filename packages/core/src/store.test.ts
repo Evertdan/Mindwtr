@@ -2610,6 +2610,54 @@ describe('TaskStore', () => {
         expect((mockStorage.saveData as unknown as { mock: { calls: any[][] } }).mock.calls.length).toBeGreaterThan(0);
     });
 
+    // Restore Backup replaces the whole document, so the freshly loaded rows share
+    // no ids with what the store still holds. The migration write-back's guard asks
+    // "did the migrations drop rows", not "does the new document contain the old
+    // one" -- comparing against the pre-load store threw inside the set() producer,
+    // fetchData swallowed it, and the UI kept serving the pre-restore data.
+    it('accepts a full-replace load whose document shares no ids with the in-memory store', async () => {
+        const stale = createStoreTask('stale-1', { status: 'next' });
+        useTaskStore.setState({
+            tasks: [stale],
+            _allTasks: [stale],
+            _tasksById: buildEntityMap([stale]),
+            settings: { deviceId: 'device-a' },
+        });
+        const restored = createStoreTask('restored-1', { status: 'next' });
+        // No deviceId in the restored document, so ensure-device-id applies and the
+        // migration write-back runs -- the same thing a real restore does.
+        const restoredDocument: AppData = {
+            tasks: [restored],
+            projects: [],
+            sections: [],
+            areas: [],
+            people: [],
+            settings: {},
+        };
+        let persisted: AppData | null = null;
+        mockStorage.getData = vi.fn().mockImplementation(async () => structuredClone(persisted ?? restoredDocument));
+
+        await runDataTransferTransaction({
+            operation: 'restoreBackup',
+            flushPendingSave,
+            getCurrentChangeAt: () => useTaskStore.getState().lastDataChangeAt,
+            readCurrentData: () => mockStorage.getData(),
+            createRecoverySnapshot: async () => 'data.snapshot.json',
+            apply: () => ({ data: restoredDocument, result: undefined }),
+            persistData: async (data) => {
+                persisted = data;
+                await mockStorage.saveData(data);
+            },
+            refreshData: () => useTaskStore.getState().fetchData({ silent: true }),
+        });
+        await flushPendingSave();
+
+        expect(useTaskStore.getState().error).toBeNull();
+        expect(useTaskStore.getState()._allTasks.map((task) => task.id)).toEqual(['restored-1']);
+        const saved = vi.mocked(mockStorage.saveData).mock.calls.at(-1)?.[0] as AppData;
+        expect(saved.tasks.map((task) => task.id)).toEqual(['restored-1']);
+    });
+
     it('clears project archive metadata from deleted task tombstones during fetch', async () => {
         // Dates are relative on purpose. This test needs the tombstone to SURVIVE
         // fetchData's purge so it can assert the archive metadata was stripped, and

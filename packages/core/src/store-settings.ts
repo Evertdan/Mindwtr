@@ -47,6 +47,25 @@ export const clearDerivedCache = () => {
     derivedCache = null;
 };
 
+let documentReplacementPending = false;
+
+/**
+ * Declares that the next load reads a document the caller just persisted in
+ * full (Restore Backup, import apply). Such a document is authoritative and may
+ * legitimately share no ids with what the store still holds, so its load guard
+ * checks only that the migrations kept every row — unlike an ordinary load,
+ * where missing live rows mean a bad or truncated storage read.
+ */
+export const markNextLoadAsDocumentReplacement = (): void => {
+    documentReplacementPending = true;
+};
+
+const consumeDocumentReplacementMark = (): boolean => {
+    const pending = documentReplacementPending;
+    documentReplacementPending = false;
+    return pending;
+};
+
 const settingsValueChanged = (left: unknown, right: unknown): boolean => JSON.stringify(left ?? null) !== JSON.stringify(right ?? null);
 
 const mergeSettingsUpdates = (
@@ -109,6 +128,8 @@ export const createSettingsActions = ({
      */
     fetchData: async (options) => {
         markCoreStartupPhase('core.fetch_data.start');
+        // Consumed at entry so a fetch already in flight keeps its own answer.
+        const isDocumentReplacement = consumeDocumentReplacementMark();
         const fetchInvokedAt = Date.now();
         const isResultStillRelevant = options?.isResultStillRelevant ?? (() => true);
         const finishIrrelevantFetch = () => {
@@ -283,14 +304,19 @@ export const createSettingsActions = ({
                             return state;
                         }
                         if (applied.length > 0) {
+                            // Baseline for the partial-snapshot guard. Normally it is the
+                            // pre-load store, so a bad or truncated storage read cannot be
+                            // saved over live rows. After a caller-declared full replace
+                            // (Restore Backup) the new document is authoritative and shares
+                            // no ids with the store, so there the guard only has to prove
+                            // the migrations kept every row the document arrived with.
+                            //
                             // Tombstone GC ('purge-expired-tombstones', applied above via
                             // runLoadMigrations) legitimately shrinks these collections
-                            // relative to `state` — the in-memory data this fetch started
-                            // from — once a day. Run the identical age-based cleanup on
-                            // `state`'s own collections so the partial-snapshot guard
-                            // compares like for like instead of tripping on that expected
-                            // GC shrink (it would otherwise fail every load on the day the
-                            // cleanup runs for any long-lived process).
+                            // once a day. Run the identical age-based cleanup on the
+                            // baseline so the partial-snapshot guard compares like for
+                            // like instead of tripping on that expected GC shrink (it
+                            // would otherwise fail every load on the day it runs).
                             //
                             // DEFAULT_TOMBSTONE_RETENTION_DAYS is passed explicitly (matching
                             // purgeExpiredTombstonesMigration's own implicit default) rather
@@ -304,13 +330,22 @@ export const createSettingsActions = ({
                             // only .tasks/.projects/.sections/.areas/.people below are read --
                             // the pruned settings purgeExpiredTombstones would otherwise compute
                             // (savedFilters/pendingRemoteDeletes) are unused here.
-                            const gcReference = purgeExpiredTombstones(
-                                {
+                            const guardBaseline = isDocumentReplacement
+                                ? initialData
+                                : {
                                     tasks: state._allTasks,
                                     projects: state._allProjects,
                                     sections: state._allSections,
                                     areas: state._allAreas,
                                     people: state._allPeople,
+                                };
+                            const gcReference = purgeExpiredTombstones(
+                                {
+                                    tasks: guardBaseline.tasks,
+                                    projects: guardBaseline.projects,
+                                    sections: guardBaseline.sections,
+                                    areas: guardBaseline.areas,
+                                    people: guardBaseline.people ?? [],
                                     settings: {},
                                 },
                                 nowIso,

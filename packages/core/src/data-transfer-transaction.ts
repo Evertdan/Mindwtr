@@ -1,6 +1,7 @@
 import { ensureFreshLocalSyncSnapshot } from './sync-client-helpers';
 import { cloneAppData } from './sync-runtime-utils';
 import { createSerializedAsyncQueue } from './async-queue';
+import { markNextLoadAsDocumentReplacement } from './store-settings';
 import type { AppData } from './types';
 
 const syncDocumentOperationQueue = createSerializedAsyncQueue();
@@ -123,6 +124,9 @@ export async function runDataTransferTransaction<TResult, TSnapshot>(
 
         await options.persistData(application.data);
         try {
+            // The document on disk is now the one we just wrote, not the one the
+            // store still holds; tell the load which guard applies.
+            markNextLoadAsDocumentReplacement();
             await options.refreshData();
         } catch (error) {
             throw new DataTransferRefreshError(options.operation, error);
