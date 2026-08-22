@@ -69,6 +69,12 @@ export type LoadMigration = {
     name: string;
     /** Static gate evaluated once against the context, before `data` is touched. */
     shouldRun?(ctx: LoadContext): boolean;
+    /**
+     * Part of the one-time legacy schema backfill gated by
+     * `shouldRunSchemaMigration`. If one of these is skipped, the version bump
+     * that closes that gate must be skipped too, or the step never retries.
+     */
+    schemaGated?: true;
     /** Returns updated data, or null when this pass made no change. */
     run(data: AppData, ctx: LoadContext): AppData | null;
     /**
@@ -111,9 +117,10 @@ const normalizeAreaTimestampsMigration: LoadMigration = {
     },
 };
 
+// Not in LOAD_MIGRATIONS: this is the backfill group's receipt, applied by
+// runLoadMigrations after the pass and only when every gated step landed.
 const bumpMigrationsVersionMigration: LoadMigration = {
     name: 'bump-migrations-version',
-    shouldRun: (ctx) => ctx.shouldRunSchemaMigration,
     run: (data) => ({
         ...data,
         settings: {
@@ -358,6 +365,7 @@ const normalizePeopleForLoadMigration: LoadMigration = {
 const normalizeProjectStatusAndTagsMigration: LoadMigration = {
     name: 'normalize-project-status-and-tags',
     shouldRun: (ctx) => ctx.shouldRunSchemaMigration,
+    schemaGated: true,
     run: (data) => {
         const projects = data.projects.map((project) => {
             const status = project.status;
@@ -379,6 +387,7 @@ const normalizeProjectStatusAndTagsMigration: LoadMigration = {
 const migrateProjectOrderMigration: LoadMigration = {
     name: 'migrate-project-order',
     shouldRun: (ctx) => ctx.shouldRunSchemaMigration,
+    schemaGated: true,
     // Consumes normalize-project-status-and-tags' output.
     run: (data) => {
         const projectOrderCounters = new Map<string, number>();
@@ -397,6 +406,7 @@ const migrateProjectOrderMigration: LoadMigration = {
 const migrateLegacyAreasMigration: LoadMigration = {
     name: 'migrate-legacy-areas',
     shouldRun: (ctx) => ctx.shouldRunSchemaMigration,
+    schemaGated: true,
     // Consumes migrate-project-order's output; must run after
     // normalize-area-timestamps so area order/timestamps are already filled in.
     run: (data) => {
@@ -660,7 +670,6 @@ const purgeExpiredTombstonesMigration: LoadMigration = {
 // on each step above for why it must come after the ones before it.
 const LOAD_MIGRATIONS: LoadMigration[] = [
     normalizeAreaTimestampsMigration,
-    bumpMigrationsVersionMigration,
     bumpTombstoneCleanupTimestampMigration,
     // Everything below reads settings.deviceId for revBy stamping.
     ensureDeviceIdMigration,
@@ -685,8 +694,9 @@ const LOAD_MIGRATIONS: LoadMigration[] = [
 export const runLoadMigrations = (data: AppData, ctx: LoadContext): { data: AppData; applied: string[] } => {
     let current = data;
     const applied: string[] = [];
-    for (const migration of LOAD_MIGRATIONS) {
-        if (migration.shouldRun && !migration.shouldRun(ctx)) continue;
+    let schemaBackfillFailed = false;
+
+    const apply = (migration: LoadMigration): void => {
         let result: AppData | null;
         try {
             result = migration.run(current, ctx);
@@ -695,19 +705,31 @@ export const runLoadMigrations = (data: AppData, ctx: LoadContext): { data: AppD
             // caller's outer catch would leave the store empty on every launch.
             // Skipping keeps the pre-migration state, which the later steps and
             // the next load both still see.
+            if (migration.schemaGated) schemaBackfillFailed = true;
             logWarn('Load migration failed; continuing without it', {
                 scope: 'store',
                 category: 'storage',
                 context: { migration: migration.name },
                 error,
             });
-            continue;
+            return;
         }
-        if (result) {
-            current = result;
-            applied.push(migration.name);
-            markCoreStartupPhase(`core.fetch_data.migration:${migration.name}`);
-        }
+        if (!result) return;
+        current = result;
+        applied.push(migration.name);
+        markCoreStartupPhase(`core.fetch_data.migration:${migration.name}`);
+    };
+
+    for (const migration of LOAD_MIGRATIONS) {
+        if (migration.shouldRun && !migration.shouldRun(ctx)) continue;
+        apply(migration);
+    }
+
+    // Last, and only when every gated step landed: this write closes
+    // shouldRunSchemaMigration for good, so recording it after a skipped
+    // backfill step would mean that step never runs again.
+    if (ctx.shouldRunSchemaMigration && !schemaBackfillFailed) {
+        apply(bumpMigrationsVersionMigration);
     }
     return { data: current, applied };
 };

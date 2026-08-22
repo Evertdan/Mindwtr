@@ -296,6 +296,47 @@ describe('runLoadMigrations', () => {
         }
     });
 
+    // The version bump is the receipt for the one-time schema backfill. Writing it
+    // while one of those migrations was skipped closes shouldRunSchemaMigration
+    // forever, so the skipped step never gets a second chance.
+    it('keeps the schema gate open when a schema-gated migration fails', () => {
+        const logs: LogPayload[] = [];
+        setLogger((payload) => logs.push(payload));
+        try {
+            const data = settledData({ projects: [null as unknown as Project] });
+            data.settings = { ...data.settings, migrations: { ...data.settings.migrations, version: 0 } };
+
+            const { data: result, applied } = runLoadMigrations(data, ctxFor(data));
+
+            expect(applied).not.toContain('normalize-project-status-and-tags');
+            expect(applied).not.toContain('bump-migrations-version');
+            expect(result.settings.migrations?.version ?? 0).toBe(0);
+            // The next launch must still see the backfill as owed.
+            expect(buildLoadContext(result.settings, false, NOW_ISO, NOW_MS).shouldRunSchemaMigration).toBe(true);
+        } finally {
+            setLogger(consoleLogger);
+        }
+    });
+
+    it('still bumps the version when the failure is outside the schema group', () => {
+        const logs: LogPayload[] = [];
+        setLogger((payload) => logs.push(payload));
+        try {
+            // No schema-gated migration reads sections, so only the ungated
+            // repair pass trips here.
+            const data = settledData({ sections: [null as unknown as Section] });
+            data.settings = { ...data.settings, migrations: { ...data.settings.migrations, version: 0 } };
+
+            const { data: result, applied } = runLoadMigrations(data, ctxFor(data));
+
+            expect(applied).not.toContain('repair-dangling-entity-references');
+            expect(applied).toContain('bump-migrations-version');
+            expect(result.settings.migrations?.version).toBe(MIGRATION_VERSION);
+        } finally {
+            setLogger(consoleLogger);
+        }
+    });
+
     it('idempotence: running the pipeline twice over the same data applies nothing the second time', () => {
         const messyData: AppData = {
             tasks: [{ id: 't1', title: 'Due', status: 'inbox', tags: [], contexts: [], dueDate: '2026-04-01', createdAt: NOW_ISO, updatedAt: NOW_ISO } as unknown as Task],
