@@ -136,11 +136,13 @@ bun run verify
 ```
 
 `bun run verify` chains typecheck (core, cloud, desktop, mobile, and mcp), lint
-for every workspace app, the five workspace unit-test suites, governance and
+for every workspace app, the five workspace unit-test suites, the Rust suite
+(`native:test`, a few seconds once the cargo cache is warm), governance and
 schema checks, locale parity, and README parity. CI also runs performance
 budgets, coverage thresholds, Expo Doctor, and store/workflow metadata checks.
 
-Run `bun run native:test` when you touch `apps/desktop/src-tauri/`, and run
+Run `bun run native:test` on its own while iterating on
+`apps/desktop/src-tauri/`, and run
 `bun run test:perf` for list, store, recurrence, or other hot-path changes.
 `bun run test:e2e` needs a browser and remains a separate optional gate.
 
