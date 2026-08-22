@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, waitFor } from '@testing-library/react';
-import { useTaskStore, type Project, type Task } from '@mindwtr/core';
+import { safeFormatDate, useTaskStore, type Project, type Task } from '@mindwtr/core';
 import { LanguageProvider } from '../../contexts/language-context';
 import { AgendaView } from './AgendaView';
 import { useUiStore } from '../../store/ui-store';
@@ -299,7 +299,7 @@ describe('AgendaView', () => {
         expect(queryByText('Far away task')).not.toBeInTheDocument();
     });
 
-    it('disables the Upcoming star for rows that are deferred', () => {
+    it('disables the Upcoming star and shows when each row appears', () => {
         const now = new Date();
         const inThreeDays = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 3, 9, 0, 0, 0);
         const deferredTask: Task = {
@@ -324,7 +324,7 @@ describe('AgendaView', () => {
             highlightTaskId: null,
         });
 
-        const { getByLabelText } = renderAgenda();
+        const { getByText, getByLabelText } = renderAgenda();
 
         const upcomingSection = document.getElementById('agenda-section-upcoming');
         expect(upcomingSection).not.toBeNull();
@@ -333,6 +333,8 @@ describe('AgendaView', () => {
         const star = getByLabelText('This task is deferred; change its start date before focusing it.');
         expect(upcomingSection).toContainElement(star);
         expect(star).toBeDisabled();
+        // The reveal date is the section's purpose, so it renders on the row.
+        expect(upcomingSection).toContainElement(getByText(safeFormatDate(inThreeDays, 'P')));
     });
 
     it('shows an empty state when active tasks do not produce agenda sections', () => {

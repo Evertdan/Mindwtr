@@ -14,7 +14,7 @@ import {
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { shallow, useTaskStore, TaskPriority, TimeEstimate, applyFilter, buildAdvancedFilterCriteriaChips, compareProjectsByOrder, removeAdvancedFilterCriteriaChip, formatFocusTaskLimitText,
-    getFocusStarBlockedText, formatTimeEstimateLabel, generateUUID, getUsedTaskTokens, getFocusSequentialFirstTaskIds, getProjectDeadlineBoosts, getProjectDeadlineBoostLabel, getTaskMetadataFilterVisibility, markSavedFilterDeleted, normalizeFocusTaskLimit, resolveFeatureFlags, safeParseDate, safeParseDueDate, isDueForReview, SAVED_FILTER_NO_PROJECT_ID, getUpcomingDeferredTasks, shouldShowTaskForStart, sortFocusNextActions, sortTasksByFocusOrder, sortTasksBySavedPreference, translateWithFallback, tFallback } from '@mindwtr/core';
+    getFocusStarBlockedText, formatTimeEstimateLabel, generateUUID, getUsedTaskTokens, getFocusSequentialFirstTaskIds, getProjectDeadlineBoosts, getProjectDeadlineBoostLabel, getTaskMetadataFilterVisibility, markSavedFilterDeleted, normalizeFocusTaskLimit, resolveFeatureFlags, safeFormatDate, safeParseDate, safeParseDueDate, isDueForReview, SAVED_FILTER_NO_PROJECT_ID, getUpcomingDeferredTasks, shouldShowTaskForStart, sortFocusNextActions, sortTasksByFocusOrder, sortTasksBySavedPreference, translateWithFallback, tFallback } from '@mindwtr/core';
 import type { MultiValueFilterMatchMode, ProjectDeadlineBoost, SavedFilter, SortField, Task, TaskEnergyLevel } from '@mindwtr/core';
 import { useTaskFilterSelections } from '@mindwtr/core/task-filter-selections';
 import { useLanguage } from '../../contexts/language-context';
@@ -122,6 +122,7 @@ function getSavedFilterDefaultName(chips: AgendaActiveFilterChip[], fallback: st
 function AgendaTaskList({
     tasks,
     buildFocusToggle,
+    getAppearsAtLabel,
     getProjectDeadlineLabel,
     showListDetails,
     highlightTaskId,
@@ -135,6 +136,7 @@ function AgendaTaskList({
         ariaLabel: string;
         alwaysVisible?: boolean;
     };
+    getAppearsAtLabel?: (taskId: string) => string | undefined;
     getProjectDeadlineLabel?: (taskId: string) => string | undefined;
     showListDetails: boolean;
     highlightTaskId: string | null;
@@ -188,6 +190,7 @@ function AgendaTaskList({
                         showProjectBadgeInActions={false}
                         compactMetaEnabled={showListDetails}
                         enableDoubleClickEdit
+                        appearsAtLabel={getAppearsAtLabel?.(task.id)}
                         projectDeadlineLabel={getProjectDeadlineLabel?.(task.id)}
                     />
                 ))}
@@ -226,6 +229,7 @@ function AgendaTaskList({
                             showProjectBadgeInActions={false}
                             compactMetaEnabled={showListDetails}
                             enableDoubleClickEdit
+                            appearsAtLabel={getAppearsAtLabel?.(task.id)}
                             projectDeadlineLabel={getProjectDeadlineLabel?.(task.id)}
                         />
                     </div>
@@ -511,7 +515,7 @@ export function AgendaView() {
         + (activeSavedFilterId && filterSelections.activeCount === 0 && effectiveFocusSortBy === DEFAULT_FOCUS_SORT_BY ? 1 : 0);
     const saveFilterDefaultName = getSavedFilterDefaultName(activeFilterChips, resolveText('savedFilters.defaultName', 'Focus filter'));
 
-    const { filteredActiveTasks, reviewDueCandidates, upcomingCandidates } = useMemo(() => {
+    const { filteredActiveTasks, reviewDueCandidates, upcomingCandidates, upcomingAppearsAtById } = useMemo(() => {
         void localDayKey;
         const now = new Date();
         const filtered = applyFilter(activeTasks, effectiveFilterCriteria, { projects, now, tokenMatchMode: 'all' })
@@ -531,9 +535,22 @@ export function AgendaView() {
             effectiveFilterCriteria,
             { projects, now, tokenMatchMode: 'all' },
         );
-        const upcoming = getUpcomingDeferredTasks(upcomingBase, { now }).map((entry) => entry.task);
-        return { filteredActiveTasks: filtered, reviewDueCandidates: reviewDue, upcomingCandidates: upcoming };
+        const upcomingEntries = getUpcomingDeferredTasks(upcomingBase, { now });
+        return {
+            filteredActiveTasks: filtered,
+            reviewDueCandidates: reviewDue,
+            upcomingCandidates: upcomingEntries.map((entry) => entry.task),
+            // Showing the date is the whole point of the section, so it rides the
+            // row rather than the metadata that "show list details" hides.
+            upcomingAppearsAtById: new Map(upcomingEntries.map((entry) => (
+                [entry.task.id, safeFormatDate(entry.appearsAt, 'P')]
+            ))),
+        };
     }, [activeTasks, baseActiveTasks, effectiveFilterCriteria, localDayKey, matchesSearchQuery, projects]);
+    const getUpcomingAppearsAtLabel = useCallback(
+        (taskId: string) => upcomingAppearsAtById.get(taskId),
+        [upcomingAppearsAtById],
+    );
 
     const reviewDueProjects = useMemo(() => {
         void localDayKey;
@@ -1279,6 +1296,7 @@ export function AgendaView() {
                                 <AgendaTaskList
                                     tasks={sections.upcoming}
                                     buildFocusToggle={buildUpcomingFocusToggle}
+                                    getAppearsAtLabel={getUpcomingAppearsAtLabel}
                                     showListDetails={showListDetails}
                                     highlightTaskId={highlightTaskId}
                                 />

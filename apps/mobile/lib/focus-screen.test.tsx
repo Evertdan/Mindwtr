@@ -829,7 +829,7 @@ describe('FocusScreen', () => {
     vi.useRealTimers();
   });
 
-  it('disables the Upcoming star for rows that are deferred', () => {
+  it('disables the Upcoming star and gives each row its reveal date', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 3, 5, 12, 0, 0, 0));
     storeState.tasks = [
@@ -851,6 +851,9 @@ describe('FocusScreen', () => {
     expect(upcomingRow?.props.focusToggleDisabledLabel)
       .toBe('This task is deferred; change its start date before focusing it.');
     expect(nextRow?.props.focusToggleDisabledLabel).toBeUndefined();
+    // The reveal date is the section's purpose, so it rides the row.
+    expect(upcomingRow?.props.footerContent).toBeTruthy();
+    expect(nextRow?.props.footerContent).toBeUndefined();
     vi.useRealTimers();
   });
 

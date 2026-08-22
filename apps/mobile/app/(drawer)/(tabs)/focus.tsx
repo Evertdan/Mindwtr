@@ -368,14 +368,32 @@ export default function FocusScreen() {
   ]);
   // The Upcoming preview draws from baseActiveTasks: the deferral filter that
   // produced activeTasks is exactly what hides these rows today (#1061).
-  const upcomingCandidates = useMemo(() => {
+  const upcomingEntries = useMemo(() => {
     void localDayKey;
     const now = new Date();
     return getUpcomingDeferredTasks(
       applyFilter(baseActiveTasks, selections.criteria, { projects, tokenMatchMode: 'all' }),
       { now },
-    ).map((entry) => entry.task);
+    );
   }, [baseActiveTasks, localDayKey, projects, selections.criteria]);
+  const upcomingCandidates = useMemo(
+    () => upcomingEntries.map((entry) => entry.task),
+    [upcomingEntries],
+  );
+  // The date a deferred row surfaces on is the section's whole point, so it rides
+  // the row itself rather than the meta line. Built once per list so the footer
+  // node stays identity-stable and the row keeps its memo boundary (#766).
+  const upcomingAppearsAtFooters = useMemo(() => {
+    const byTaskId = new Map<string, React.ReactNode>();
+    for (const entry of upcomingEntries) {
+      byTaskId.set(entry.task.id, (
+        <Text style={[styles.upcomingAppearsAt, { color: tc.secondaryText }]}>
+          {safeFormatDate(entry.appearsAt, 'P')}
+        </Text>
+      ));
+    }
+    return byTaskId;
+  }, [tc.secondaryText, upcomingEntries]);
   const getFocusGroupByLabel = useCallback((groupBy: FocusGroupBy) => {
     switch (groupBy) {
       case 'context':
@@ -1344,6 +1362,7 @@ export default function FocusScreen() {
           showFocusHighlight={section.type !== 'focus'}
           hideStatusBadge={section.type !== 'reviewDue'}
           projectDeadlineLabel={projectDeadlineLabel}
+          footerContent={section.type === 'upcoming' ? upcomingAppearsAtFooters.get(item.task.id) : undefined}
           onLongPressAction={longPressAction}
           onLongPressActionLabel={longPressActionLabel}
           onProjectPress={openProjectScreen}
@@ -2231,6 +2250,11 @@ const styles = StyleSheet.create({
   },
   itemWrapper: {
     marginBottom: 8,
+  },
+  upcomingAppearsAt: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: '600',
   },
   projectReviewCard: {
     minHeight: 72,

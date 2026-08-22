@@ -95,6 +95,7 @@ interface TaskItemProps {
     enableDoubleClickEdit?: boolean;
     showHoverHint?: boolean;
     editorPresentation?: TaskEditorPresentation;
+    appearsAtLabel?: string;
     projectDeadlineLabel?: string;
 }
 
@@ -127,6 +128,7 @@ export const TaskItem = memo(function TaskItem({
     enableDoubleClickEdit = false,
     showHoverHint = true,
     editorPresentation,
+    appearsAtLabel,
     projectDeadlineLabel,
 }: TaskItemProps) {
     const [isEditing, setIsEditing] = useState(false);
@@ -1379,6 +1381,7 @@ export const TaskItem = memo(function TaskItem({
                                 dragHandle={dragHandle}
                                 showTaskAge={showTaskAge}
                                 showHoverHint={showHoverHint}
+                                appearsAtLabel={appearsAtLabel}
                                 projectDeadlineLabel={projectDeadlineLabel}
                                 renameRequestToken={renameRequestToken}
                                 theme={settings?.theme}

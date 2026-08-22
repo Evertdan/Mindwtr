@@ -71,6 +71,8 @@ interface TaskItemDisplayProps {
     dragHandle?: ReactNode;
     showTaskAge?: boolean;
     showHoverHint?: boolean;
+    /** Focus "Upcoming": the date the deferred task surfaces on. */
+    appearsAtLabel?: string;
     projectDeadlineLabel?: string;
     renameRequestToken?: number;
     /** Active theme, for the context swatch palette only (#974). */
@@ -120,6 +122,7 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
     dragHandle,
     showTaskAge = false,
     showHoverHint = true,
+    appearsAtLabel,
     projectDeadlineLabel,
     renameRequestToken = 0,
     theme,
@@ -184,6 +187,7 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
         (showProjectBadgeInMetadata && project)
         || area
         || projectDeadlineLabel
+        || appearsAtLabel
         || completionLabel
         || task.startTime
         || task.dueDate
@@ -412,6 +416,17 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
             </button>
         );
     };
+    const renderAppearsAtMetadataBadge = () => {
+        if (!appearsAtLabel) return null;
+        return (
+            <MetadataBadge
+                variant="info"
+                icon={CalendarIcon}
+                label={appearsAtLabel}
+                ariaLabel={`${tFallback(t, 'agenda.upcoming', 'Upcoming')}: ${appearsAtLabel}`}
+            />
+        );
+    };
     const renderProjectDeadlineMetadataBadge = () => {
         if (!projectDeadlineLabel) return null;
         return (
@@ -426,6 +441,7 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
     const renderMetadataRow = (className?: string) => (
         <div className={cn("flex flex-wrap items-center text-xs", className)}>
             {showProjectBadgeInMetadata && renderProjectBadge()}
+            {renderAppearsAtMetadataBadge()}
             {renderProjectDeadlineMetadataBadge()}
             {!project && area && (
                 <MetadataBadge
@@ -743,13 +759,16 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
                         dense ? "mt-0.5" : "mt-1",
                         (overlayDragHandle || overlayQuickDone) && "pl-12"
                     ))}
-                    {!showCompactMeta && !isViewOpen && (completionLabel || projectDeadlineLabel) && (
+                    {!showCompactMeta && !isViewOpen && (completionLabel || projectDeadlineLabel || appearsAtLabel) && (
                         <div className={cn(
                             "flex flex-wrap items-center gap-2 text-xs text-muted-foreground",
                             dense ? "mt-0.5" : "mt-1",
                             (overlayDragHandle || overlayQuickDone) && "pl-12"
                         )}>
                             {renderCompletionMetadataBadge()}
+                            {/* Upcoming's whole purpose is the reveal date, so it survives
+                                "show list details" off along with the completion timestamp. */}
+                            {renderAppearsAtMetadataBadge()}
                             {renderProjectDeadlineMetadataBadge()}
                         </div>
                     )}
