@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import * as nodeCrypto from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Attachment } from '@mindwtr/core';
 
@@ -7,7 +7,7 @@ import type { Attachment } from '@mindwtr/core';
 // one branch per sync backend, and it is the last place integrity validation runs before
 // bytes land on disk.
 
-const sha256Hex = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
+const sha256Hex = (bytes: Uint8Array): string => nodeCrypto.createHash('sha256').update(bytes).digest('hex');
 const toArrayBuffer = (bytes: Uint8Array): ArrayBuffer => bytes.slice().buffer as ArrayBuffer;
 
 const fileSystemMock = vi.hoisted(() => ({
@@ -189,6 +189,58 @@ describe('ensureAttachmentAvailable', () => {
       uri: 'file://document/attachments/a-cloud.txt',
       localStatus: 'available',
     });
+  });
+
+  it('decrypts a self-hosted cloud download before validating and writing it', async () => {
+    // The cloud branch was the only one building bytes straight from the response: with
+    // sync encryption on it either failed integrity validation or wrote the MWENC1
+    // container to disk as the user's file.
+    const core = await import('@mindwtr/core');
+    const { setSyncCryptoNativeModuleForTests } = await import('./sync-crypto-native');
+    setSyncCryptoNativeModuleForTests({
+      argon2: () => { throw new Error('not needed: the key is constructed directly'); },
+      createCipheriv: (a, k, i) => nodeCrypto.createCipheriv(a, k, i) as never,
+      createDecipheriv: (a, k, i) => nodeCrypto.createDecipheriv(a, k, i) as never,
+      createHash: (a) => nodeCrypto.createHash(a) as never,
+      randomBytes: (size) => new Uint8Array(nodeCrypto.randomBytes(size)),
+    });
+    const material = {
+      key: new Uint8Array(32).fill(7),
+      salt: new Uint8Array(16).fill(3),
+      params: core.SYNC_CRYPTO_DEFAULT_KDF_PARAMS,
+    };
+    const { getSyncEncryptionMaterial } = await import('./sync-encryption-state');
+    vi.mocked(getSyncEncryptionMaterial).mockResolvedValue(material as never);
+    const sealed = await core.encryptSyncArtifact(
+      REMOTE_BYTES,
+      material,
+      (await import('./sync-crypto-native')).mobileSyncCryptoPrimitives,
+    );
+    expect(core.inspectSyncArtifact(sealed).kind).toBe('encrypted');
+
+    asyncStorageMock.store.set('@mindwtr_sync_backend', 'cloud');
+    asyncStorageMock.store.set('@mindwtr_cloud_url', 'https://cloud.example/v1/data');
+    asyncStorageMock.store.set('@mindwtr_cloud_token', 'cloud-token');
+    vi.mocked(core.cloudGetFile).mockResolvedValue(toArrayBuffer(sealed) as never);
+
+    const { ensureAttachmentAvailable } = await import('./attachment-sync-availability');
+    const result = await ensureAttachmentAvailable(
+      // fileHash describes the PLAINTEXT — it is a plaintext-domain value inside the
+      // synced document and must stay stable across re-encryptions.
+      makeAttachment('a-sealed', { fileHash: sha256Hex(REMOTE_BYTES) })
+    );
+
+    expect(result).toMatchObject({
+      uri: 'file://document/attachments/a-sealed.txt',
+      localStatus: 'available',
+    });
+    expect(fileSystemMock.writeAsStringAsync).toHaveBeenCalledWith(
+      expect.stringMatching(/^file:\/\/document\/attachments\/a-sealed\.txt\.tmp-/),
+      Buffer.from(REMOTE_BYTES).toString('base64'),
+      { encoding: 'base64' }
+    );
+    setSyncCryptoNativeModuleForTests(null);
+    vi.mocked(getSyncEncryptionMaterial).mockResolvedValue(null);
   });
 
   it('falls back to WebDAV for any other backend that has a cloud key', async () => {

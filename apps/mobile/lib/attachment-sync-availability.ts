@@ -166,7 +166,10 @@ const ensureAttachmentAvailableInternal = async (attachment: Attachment): Promis
           onProgress: (loaded, total) => reportProgress(localAttachment.id, 'download', loaded, total, 'active'),
         })
       );
-      const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data as ArrayBuffer);
+      const bytes = await openAttachmentBytesFromDownload(
+        data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data as ArrayBuffer),
+        await getSyncEncryptionMaterial(),
+      );
       await validateAttachmentHash(localAttachment, bytes);
       await writeBytesSafely(targetUri, bytes);
       reportProgress(localAttachment.id, 'download', bytes.length, bytes.length, 'completed');
