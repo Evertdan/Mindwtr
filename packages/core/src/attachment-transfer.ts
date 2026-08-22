@@ -318,31 +318,32 @@ export async function runAttachmentTransferLifecycle(
                 } else {
                     // Post-merge: the merge just adopted another device's newer content
                     // and this device's on-disk copy is stale — re-download it.
-                    if (!options.policy?.shouldDownload || options.policy.shouldDownload(attachment)) {
-                        // Review S3: the local file may have been edited again in the window
-                        // between this cycle's prepare pass and this post-merge pass (or the
-                        // prepare pass may have missed a transient stat failure) — re-stat
-                        // immediately before overwriting. A fresh mismatch here means this is
-                        // actually an in-flight local edit, not remote's content; skip the
-                        // download (never stomp it) and leave it for the next cycle's prepare
-                        // pass to detect and re-upload properly.
-                        const restat = await options.getLocalFileStat(localPath, attachment).catch(() => null);
-                        const stillMatchesDetectedState = restat
-                            && restat.mtimeMs === check.stat.mtimeMs
-                            && restat.size === check.stat.size;
-                        if (!stillMatchesDetectedState) {
-                            options.onLocalEditRace?.(attachment);
-                        } else {
-                            try {
-                                if (await options.onDownload(attachment)) {
-                                    didMutate = true;
-                                    const freshPath = attachment.uri ? resolveLocalPath(attachment.uri) : localPath;
-                                    if (freshPath) await refreshContentStat(attachment, freshPath);
-                                }
-                            } catch (error) {
-                                if (options.isFatalError?.(error)) throw error;
-                                options.onDownloadError(attachment, error);
+                    //
+                    // Review S3: the local file may have been edited again in the window
+                    // between this cycle's prepare pass and this post-merge pass (or the
+                    // prepare pass may have missed a transient stat failure) — re-stat
+                    // immediately before overwriting. A fresh mismatch here means this is
+                    // actually an in-flight local edit, not remote's content; skip the
+                    // download (never stomp it) and leave it for the next cycle's prepare
+                    // pass to detect and re-upload properly. This re-stat runs before the
+                    // download-budget gate below, so a skip from a local-edit race never
+                    // consumes a download slot.
+                    const restat = await options.getLocalFileStat(localPath, attachment).catch(() => null);
+                    const stillMatchesDetectedState = restat
+                        && restat.mtimeMs === check.stat.mtimeMs
+                        && restat.size === check.stat.size;
+                    if (!stillMatchesDetectedState) {
+                        options.onLocalEditRace?.(attachment);
+                    } else if (!options.policy?.shouldDownload || options.policy.shouldDownload(attachment)) {
+                        try {
+                            if (await options.onDownload(attachment)) {
+                                didMutate = true;
+                                const freshPath = attachment.uri ? resolveLocalPath(attachment.uri) : localPath;
+                                if (freshPath) await refreshContentStat(attachment, freshPath);
                             }
+                        } catch (error) {
+                            if (options.isFatalError?.(error)) throw error;
+                            options.onDownloadError(attachment, error);
                         }
                     }
                 }

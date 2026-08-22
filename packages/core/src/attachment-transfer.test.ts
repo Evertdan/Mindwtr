@@ -485,6 +485,41 @@ describe('runAttachmentTransferLifecycle', () => {
             expect(attachment.contentMtimeMs).toBe(9000);
         });
 
+        it('post-merge phase: a download skipped by the local-edit race never consults the download budget', async () => {
+            const attachment = makeAttachment({
+                cloudKey: 'attachments/attachment-1.txt',
+                fileHash: 'winner-hash',
+                contentRev: 5,
+                contentMtimeMs: 9000,
+                contentSize: 90,
+                localStatus: 'available',
+            });
+            const onDownload = vi.fn(async () => true);
+            const shouldDownload = vi.fn(() => true);
+            // Same race setup as the S3 test above: the re-stat immediately before
+            // overwrite reports a fresh mismatch, so the download is skipped.
+            const getLocalFileStat = vi.fn()
+                .mockResolvedValueOnce({ mtimeMs: 1234, size: 12 })
+                .mockResolvedValueOnce({ mtimeMs: 5678, size: 34 });
+            const didMutate = await runAttachmentTransferLifecycle({
+                attachmentsById: new Map([[attachment.id, attachment]]),
+                localFileExists: vi.fn(async () => true),
+                getLocalFileStat,
+                computeLocalFileHash: vi.fn(async () => 'loser-hash'),
+                contentChangePhase: 'post-merge',
+                onUpload: vi.fn(),
+                onUploadError: vi.fn(),
+                onDownload,
+                onDownloadError: vi.fn(),
+                onLocalEditRace: vi.fn(),
+                policy: { shouldDownload },
+            });
+
+            expect(onDownload).not.toHaveBeenCalled();
+            expect(shouldDownload).not.toHaveBeenCalled();
+            expect(didMutate).toBe(false);
+        });
+
         it('prepare phase: a cosmetic mtime touch with the same hash refreshes stat but does not bump or re-upload', async () => {
             const attachment = makeAttachment({
                 cloudKey: 'attachments/attachment-1.txt',
