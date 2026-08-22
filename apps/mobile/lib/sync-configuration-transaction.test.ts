@@ -221,9 +221,85 @@ describe('commitProvenMobileSyncConfiguration', () => {
             },
         }, harness.dependencies)).rejects.toThrow(/Disabling sync changed the persisted transport configuration/);
 
+        // Asserting the stored values alone would also pass if rollback had
+        // rewritten every slot, so pin the scoping directly: the candidate's
+        // secret never reaches the store, and the untouched cloud bundle is never
+        // written. The webdav secret IS rewritten — the perturbed url marks that
+        // whole bundle touched — but only ever with the prior value.
+        expect(harness.events.some((event) => event.includes(':new-password'))).toBe(false);
+        expect(harness.events).toContain(`set-secret:${WEBDAV_PASSWORD_KEY}:old-password`);
+        expect(harness.events).not.toContain(CLOUD_WRITE);
+        expect(harness.events.some((event) => event.startsWith(`set:${CLOUD_PROVIDER_KEY}:`))).toBe(false);
         expect(harness.secrets.get(WEBDAV_PASSWORD_KEY)).toBe('old-password');
         expect(harness.storage.get(WEBDAV_URL_KEY)).toBe('https://old.example.test/dav');
         expect(harness.storage.get(SYNC_BACKEND_KEY)).toBe('webdav');
+    });
+
+    // #1043: a prior secret can become unreadable while its endpoint stays
+    // configured. Re-entering it must work, which it only does because the
+    // tolerant read makes the unreadable prior opaque rather than absent.
+    it('commits a re-entered password over an unreadable prior secret', async () => {
+        const harness = createHarness({
+            [SYNC_BACKEND_KEY]: 'webdav',
+            [WEBDAV_URL_KEY]: 'https://old.example.test/dav',
+            [WEBDAV_USERNAME_KEY]: 'old-user',
+            [WEBDAV_ALLOW_INSECURE_HTTP_KEY]: 'false',
+        }, {
+            [WEBDAV_PASSWORD_KEY]: 'unreadable-password',
+        });
+        const { getSecret, setSecret } = harness.dependencies;
+        let readable = false;
+        harness.dependencies.getSecret = async (key) => {
+            if (key === WEBDAV_PASSWORD_KEY && !readable) {
+                throw new Error('keystore is unavailable');
+            }
+            return getSecret(key);
+        };
+        harness.dependencies.setSecret = async (key, value) => {
+            await setSecret(key, value);
+            if (key === WEBDAV_PASSWORD_KEY) readable = true;
+        };
+
+        await commitProvenMobileSyncConfiguration({
+            backend: 'webdav',
+            webdav: {
+                url: 'https://new.example.test/dav',
+                username: 'new-user',
+                password: 're-entered-password',
+                allowInsecureHttp: false,
+            },
+        }, harness.dependencies);
+
+        expect(harness.secrets.get(WEBDAV_PASSWORD_KEY)).toBe('re-entered-password');
+        expect(harness.storage.get(SYNC_BACKEND_KEY)).toBe('webdav');
+    });
+
+    // Settings restore keys off the literal 'cloudkit' in the provider slot
+    // (use-sync-settings-transport-actions.ts), which the canonical
+    // 'dropbox' | 'selfhosted' union cannot express.
+    it.each<{ label: string; stored: Record<string, string> }>([
+        { label: 'over a Dropbox provider', stored: { [CLOUD_PROVIDER_KEY]: 'dropbox' } },
+        { label: 'on a fresh install', stored: {} },
+    ])('stores the cloudkit provider literal $label', async ({ stored }) => {
+        const harness = createHarness({ [SYNC_BACKEND_KEY]: 'off', ...stored });
+
+        await commitProvenMobileSyncConfiguration({ backend: 'cloudkit' }, harness.dependencies);
+
+        expect(harness.storage.get(CLOUD_PROVIDER_KEY)).toBe('cloudkit');
+        expect(harness.storage.get(SYNC_BACKEND_KEY)).toBe('cloudkit');
+    });
+
+    it('writes the sync path and its bookmark in one batch', async () => {
+        const harness = createHarness({ [SYNC_BACKEND_KEY]: 'off' });
+
+        await commitProvenMobileSyncConfiguration({
+            backend: 'file',
+            syncPath: '/sync/folder',
+            syncPathBookmark: 'bookmark-blob',
+        }, harness.dependencies);
+
+        expect(harness.events).toContain(`multi-set:${SYNC_PATH_KEY},${SYNC_PATH_BOOKMARK_KEY}`);
+        expect(harness.storage.get(SYNC_PATH_BOOKMARK_KEY)).toBe('bookmark-blob');
     });
 
     it('leaves sync off and does not reactivate a partially restored configuration', async () => {

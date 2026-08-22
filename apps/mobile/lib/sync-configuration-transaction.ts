@@ -112,6 +112,11 @@ const createPort = (
     return {
         recoverDropboxCredentialsBeforeConfiguration: async () => undefined,
 
+        // Deliberately reads the whole configuration and BOTH secrets every time,
+        // even for a candidate that touches neither. Whole-configuration equality
+        // is what proves nothing else moved, and narrowing these reads to the
+        // candidate's own fields would reintroduce the #1043 dead end where an
+        // unreadable unrelated secret reads back as absent.
         readConfiguration: async (requirements = {}): Promise<PersistedSyncConfiguration> => {
             const stored = new Map(await dependencies.multiGet(CONFIGURATION_KEYS));
             const value = (key: string): string | null => stored.get(key) ?? null;
@@ -157,12 +162,12 @@ const createPort = (
         },
 
         writeSyncPath: async (path, bookmark) => {
-            await dependencies.multiSet([[SYNC_PATH_KEY, path]]);
-            if (bookmark) {
-                await dependencies.multiSet([[SYNC_PATH_BOOKMARK_KEY, bookmark]]);
-            } else {
-                await dependencies.removeItem(SYNC_PATH_BOOKMARK_KEY);
-            }
+            // The path and its bookmark land in one batch: a half-written pair
+            // leaves a folder reference the app cannot reopen.
+            const entries: StorageEntry[] = [[SYNC_PATH_KEY, path]];
+            if (bookmark) entries.push([SYNC_PATH_BOOKMARK_KEY, bookmark]);
+            await dependencies.multiSet(entries);
+            if (!bookmark) await dependencies.removeItem(SYNC_PATH_BOOKMARK_KEY);
             dependencies.clearConfigCache();
             return { success: true, path };
         },
@@ -194,7 +199,12 @@ const createPort = (
         },
 
         writeCloudProvider: async (provider) => {
-            await dependencies.setItem(CLOUD_PROVIDER_KEY, provider);
+            // Mobile stores 'cloudkit' in this slot even though it is not a
+            // CloudProvider — settings restore keys off that literal on load.
+            await dependencies.setItem(
+                CLOUD_PROVIDER_KEY,
+                candidate.backend === 'cloudkit' ? 'cloudkit' : provider,
+            );
             dependencies.clearConfigCache();
         },
 

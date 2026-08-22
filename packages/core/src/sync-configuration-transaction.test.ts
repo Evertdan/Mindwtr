@@ -916,6 +916,51 @@ describe('commitProvenSyncConfiguration', () => {
         expect(harness.events).toContain('webdav:https://old-dav.example.com');
     });
 
+    // A backend with no provider of its own must still clear a stale one, or
+    // provider-keyed lookups keep resolving to the old service after the backend
+    // has moved on.
+    it('clears a stale cloud provider for a provider-less backend and restores it on failure', async () => {
+        const initial = baselineConfiguration();
+        initial.backend = 'cloud';
+        initial.cloudProvider = 'dropbox';
+        const harness = createTransactionHarness(initial, 'backend');
+
+        await expect(commitProvenSyncConfiguration(
+            { backend: 'cloudkit', cloudProvider: 'selfhosted' },
+            harness.dependencies,
+        )).rejects.toThrow('injected backend failure');
+
+        // Restored at all only because the cleared provider was marked touched.
+        expect(harness.getState()).toEqual(initial);
+        expect(harness.events.lastIndexOf('provider:dropbox')).toBeGreaterThan(
+            harness.events.indexOf('provider:selfhosted'),
+        );
+    });
+
+    // Written even when the canonical value already matches: an adapter may keep
+    // its own representation in that slot which the canonical value cannot see.
+    it('writes the cloud provider for a provider-less backend even when it already matches', async () => {
+        const initial = baselineConfiguration();
+        initial.backend = 'file';
+        const harness = createTransactionHarness(initial);
+
+        await commitProvenSyncConfiguration(
+            { backend: 'cloudkit', cloudProvider: 'selfhosted' },
+            harness.dependencies,
+        );
+
+        expect(harness.events).toContain('provider:selfhosted');
+        expect(harness.getState().backend).toBe('cloudkit');
+    });
+
+    it('does not touch the cloud provider when the candidate supplies none', async () => {
+        const harness = createTransactionHarness(baselineConfiguration());
+
+        await commitProvenSyncConfiguration({ backend: 'off' }, harness.dependencies);
+
+        expect(harness.events.some((event) => event.startsWith('provider:'))).toBe(false);
+    });
+
     it('keeps sync off when rollback cannot be completely restored and verified', async () => {
         const initial = baselineConfiguration();
         const harness = createTransactionHarness(initial, 'provider', 'provider');

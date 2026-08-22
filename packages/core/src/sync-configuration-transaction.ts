@@ -454,7 +454,10 @@ const writeCandidateTransport = async (
         return { ...previous, backend: 'off', cloudProvider: provider };
     }
 
-    if (candidate.cloudProvider && candidate.cloudProvider !== previous.cloudProvider) {
+    // Backends that own no provider of their own still need the provider slot
+    // written: a stale one must be cleared, and an adapter may persist its own
+    // representation there that the canonical value cannot express.
+    if (candidate.cloudProvider) {
         touched.cloudProvider = true;
         await dependencies.writeCloudProvider(candidate.cloudProvider);
         return { ...previous, backend: 'off', cloudProvider: candidate.cloudProvider };
