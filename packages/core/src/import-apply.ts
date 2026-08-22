@@ -11,7 +11,7 @@
 // behaviour, which the "pure refactor" requirement rules out.
 import { DEFAULT_AREA_COLOR, DEFAULT_PROJECT_COLOR } from './color-constants';
 import { safeParseDate } from './date';
-import { ensureDeviceId } from './store-helpers';
+import { ensureDeviceId, getReferenceTaskFieldClears } from './store-helpers';
 import { nextRevision } from './sync-revision';
 import { isTaskFinished } from './task-status';
 import type { AppData, Area, ChecklistItem, Project, Section, Task, TaskEnergyLevel, TaskPriority, TaskStatus } from './types';
@@ -473,6 +473,11 @@ export function applyImport(
             revBy: deviceState.deviceId,
             order,
             orderNum: order,
+            // Importers can hand us a reference task that still carries dates,
+            // recurrence or a priority. Clear them here rather than leaving the
+            // task looking scheduled until its first edit wipes them silently
+            // (applyTaskUpdates applies the same clears).
+            ...(status === 'reference' ? getReferenceTaskFieldClears() : {}),
             ...(projectId ? { projectId } : {}),
             ...(sectionId ? { sectionId } : {}),
             ...(areaId ? { areaId } : {}),

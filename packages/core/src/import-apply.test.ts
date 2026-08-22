@@ -228,4 +228,38 @@ describe('applyImport', () => {
         expect(second.importedSectionCount).toBe(0);
         expect(second.data.sections).toHaveLength(1);
     });
+
+    // Importers do emit reference tasks carrying dates/recurrence/priority (OmniFocus
+    // "dropped", the CSV reader). Storing them unchanged left the task looking scheduled
+    // until the first edit silently wiped those fields, so clear them on the way in —
+    // same as addTasks does for a reference capture.
+    it('clears scheduling fields on an imported reference task', () => {
+        const parsed: ImportSource = {
+            areas: [],
+            projects: [],
+            tasks: [{
+                title: 'Reference material',
+                order: 0,
+                status: 'reference',
+                sourceKey: 'src-ref',
+                dueDate: '2026-07-01',
+                startTime: '2026-06-20T09:00:00.000Z',
+                reviewAt: '2026-07-05',
+                priority: 'high',
+                recurrence: { rule: 'weekly' },
+                isFocusedToday: true,
+            }],
+            warnings: [],
+        } as unknown as ImportSource;
+
+        const result = applyImport(mockAppData([], [], []), parsed, { ...OPTS, now: '2026-06-17T12:00:00.000Z' });
+        const task = result.data.tasks[0];
+        expect(task.status).toBe('reference');
+        expect(task.dueDate).toBeUndefined();
+        expect(task.startTime).toBeUndefined();
+        expect(task.reviewAt).toBeUndefined();
+        expect(task.priority).toBeUndefined();
+        expect(task.recurrence).toBeUndefined();
+        expect(task.isFocusedToday).toBe(false);
+    });
 });
