@@ -3,7 +3,10 @@ import {
     assertConnectionAllowed,
     createProgressStream,
     fetchWithTimeout,
+    MAX_DOWNLOAD_BYTES,
+    MAX_SYNC_DOCUMENT_BYTES,
     readResponseBody,
+    readResponseText,
     SYNC_LOCAL_INSECURE_URL_OPTIONS,
     toUint8Array,
 } from './http-utils';
@@ -40,6 +43,9 @@ export function isValidCloudSyncToken(token: string): boolean {
 }
 
 export interface CloudOptions {
+    /** Download ceiling for this call. Defaults to the per-attachment cap; the sync
+     *  document is not an attachment and passes MAX_SYNC_DOCUMENT_BYTES instead. */
+    maxBytes?: number;
     token?: string;
     headers?: Record<string, string>;
     signal?: AbortSignal;
@@ -159,7 +165,7 @@ export async function cloudGetJson<T>(
         throw cloudHttpError('Cloud GET', res);
     }
 
-    const text = await res.text();
+    const text = await readResponseText(res, options.maxBytes ?? MAX_SYNC_DOCUMENT_BYTES);
     try {
         return JSON.parse(text) as T;
     } catch (error) {
@@ -359,7 +365,7 @@ export async function cloudGetFile(
         throw cloudHttpError('Cloud File GET', res);
     }
 
-    return await readResponseBody(res, options.onProgress);
+    return await readResponseBody(res, options.onProgress, options.maxBytes ?? MAX_DOWNLOAD_BYTES);
 }
 
 export async function cloudDeleteFile(

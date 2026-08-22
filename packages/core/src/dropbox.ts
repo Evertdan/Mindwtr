@@ -5,6 +5,7 @@ import {
     parseDropboxMetadataRev,
     resolveDropboxPath,
 } from './dropbox-sync-utils';
+import { MAX_DOWNLOAD_BYTES, MAX_SYNC_DOCUMENT_BYTES, readResponseBody } from './http-utils';
 import { decryptRemoteArtifactOrThrow, isPlaintextSyncArtifact, syncEncryptedArtifactName } from './sync-encryption';
 import { encryptSyncArtifact, inspectSyncArtifact, type SyncCryptoKdfParams, type SyncCryptoPrimitives, type SyncKeyMaterial } from './sync-crypto';
 
@@ -129,7 +130,7 @@ export async function downloadDropboxAppData(
             });
             if (probe.status === 401) throw new DropboxUnauthorizedError('Dropbox download failed: HTTP 401');
             if (probe.ok) {
-                const encBytes = new Uint8Array(await probe.arrayBuffer());
+                const encBytes = new Uint8Array(await readResponseBody(probe, undefined, MAX_SYNC_DOCUMENT_BYTES));
                 const inspected = inspectSyncArtifact(encBytes);
                 if (inspected.kind === 'encrypted') {
                     return { data: null, rev: null, encryptedNoKey: { salt: inspected.salt, params: inspected.params } };
@@ -147,7 +148,7 @@ export async function downloadDropboxAppData(
                 },
             });
             if (probe.status === 401) throw new DropboxUnauthorizedError('Dropbox download failed: HTTP 401');
-            if (probe.ok && isPlaintextSyncArtifact(new Uint8Array(await probe.arrayBuffer()))) {
+            if (probe.ok && isPlaintextSyncArtifact(new Uint8Array(await readResponseBody(probe, undefined, MAX_SYNC_DOCUMENT_BYTES)))) {
                 return { data: null, rev: null, remotePlaintext: true };
             }
         }
@@ -163,7 +164,7 @@ export async function downloadDropboxAppData(
     const metadata = parseDropboxMetadataRev(response.headers.get('dropbox-api-result'));
 
     if (crypto.material) {
-        const bodyBytes = new Uint8Array(await response.arrayBuffer());
+        const bodyBytes = new Uint8Array(await readResponseBody(response, undefined, MAX_SYNC_DOCUMENT_BYTES));
         const plaintext = await decryptRemoteArtifactOrThrow(bodyBytes, crypto.material.key, crypto.cryptoPrims);
         return { data: JSON.parse(new TextDecoder().decode(plaintext)) as AppData, rev: metadata.rev };
     }
@@ -196,7 +197,7 @@ export async function downloadDropboxAppData(
                     'Dropbox-API-Arg': JSON.stringify({ path }),
                 },
             });
-            if (raw.ok) inspected = inspectSyncArtifact(new Uint8Array(await raw.arrayBuffer()));
+            if (raw.ok) inspected = inspectSyncArtifact(new Uint8Array(await readResponseBody(raw, undefined, MAX_SYNC_DOCUMENT_BYTES)));
         } catch {
             // fall through to the original error below
         }
@@ -278,7 +279,7 @@ export async function downloadDropboxFile(
     if (!response.ok) {
         throw new Error(`Dropbox file download failed: HTTP ${response.status}`);
     }
-    return response.arrayBuffer();
+    return await readResponseBody(response, undefined, MAX_DOWNLOAD_BYTES);
 }
 
 export async function uploadDropboxFile(

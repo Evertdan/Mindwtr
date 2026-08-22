@@ -3,7 +3,10 @@ import {
     assertConnectionAllowed,
     createProgressStream,
     fetchWithTimeout,
+    MAX_DOWNLOAD_BYTES,
+    MAX_SYNC_DOCUMENT_BYTES,
     readResponseBody,
+    readResponseText,
     SYNC_LOCAL_INSECURE_URL_OPTIONS,
     toUint8Array,
 } from './http-utils';
@@ -12,6 +15,9 @@ import { decryptRemoteArtifactOrThrow, isPlaintextSyncArtifact, syncEncryptedArt
 import { encryptSyncArtifact, inspectSyncArtifact, type SyncCryptoPrimitives, type SyncKeyMaterial } from './sync-crypto';
 
 export interface WebDavOptions {
+    /** Download ceiling for this call. Defaults to the per-attachment cap; the sync
+     *  document is not an attachment and passes MAX_SYNC_DOCUMENT_BYTES instead. */
+    maxBytes?: number;
     username?: string;
     password?: string;
     headers?: Record<string, string>;
@@ -358,7 +364,7 @@ export async function webdavGetJson<T>(
         throw error;
     }
 
-    const text = await res.text();
+    const text = await readResponseText(res, options.maxBytes ?? MAX_SYNC_DOCUMENT_BYTES);
     const normalizedBody = text.startsWith(UTF8_BOM) ? text.slice(1).trim() : text.trim();
     if (!normalizedBody) return null;
     try {
@@ -415,7 +421,7 @@ export async function webdavPutJson(
  *  "nothing there yet" shape the sync-document helpers below need to branch on. */
 async function webdavGetFileOrNull(url: string, options: WebDavOptions): Promise<Uint8Array | null> {
     try {
-        return new Uint8Array(await webdavGetFile(url, options));
+        return new Uint8Array(await webdavGetFile(url, { ...options, maxBytes: MAX_SYNC_DOCUMENT_BYTES }));
     } catch (err) {
         if ((err as { status?: number } | null)?.status === 404) return null;
         throw err;
@@ -687,7 +693,7 @@ export async function webdavGetFile(
         throw error;
     }
 
-    return await readResponseBody(res, options.onProgress);
+    return await readResponseBody(res, options.onProgress, options.maxBytes ?? MAX_DOWNLOAD_BYTES);
 }
 
 export async function webdavDeleteFile(

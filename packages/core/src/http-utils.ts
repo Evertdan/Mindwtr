@@ -246,6 +246,14 @@ export const concatChunks = (chunks: Uint8Array[], total: number): Uint8Array =>
  */
 export const MAX_DOWNLOAD_BYTES = 2 * DEFAULT_MAX_FILE_SIZE_BYTES;
 
+/**
+ * Ceiling for the sync document itself, which is a whole library and has nothing to do
+ * with the per-attachment cap -- a big library legitimately exceeds it. Well above any
+ * plausible library (a 100k-task export is single-digit MB) while still bounding what a
+ * hostile or broken server can make us allocate.
+ */
+export const MAX_SYNC_DOCUMENT_BYTES = 1024 * 1024 * 1024;
+
 export class ResponseTooLargeError extends Error {
     readonly limitBytes: number;
 
@@ -295,6 +303,20 @@ export const readResponseBody = async (
         throw error;
     }
     return toArrayBuffer(concatChunks(chunks, received));
+};
+
+/** Text counterpart of {@link readResponseBody}: `res.text()` is unbounded. Streams when
+ *  the response exposes a body or arrayBuffer, so a lying content-length still aborts
+ *  mid-read; a response offering only `text()` is length-checked after the fact. */
+export const readResponseText = async (res: Response, limitBytes: number): Promise<string> => {
+    const declared = Number(res.headers?.get('content-length') || 0);
+    if (Number.isFinite(declared) && declared > limitBytes) throw new ResponseTooLargeError(limitBytes);
+    if (res.body || typeof res.arrayBuffer === 'function') {
+        return new TextDecoder().decode(await readResponseBody(res, undefined, limitBytes));
+    }
+    const text = await res.text();
+    if (text.length > limitBytes) throw new ResponseTooLargeError(limitBytes);
+    return text;
 };
 
 export const createProgressStream = (bytes: Uint8Array, onProgress: (loaded: number, total: number) => void) => {

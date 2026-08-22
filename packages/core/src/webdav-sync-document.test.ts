@@ -108,3 +108,57 @@ describe('webdav sync-document encryption', () => {
         expect(await webdavGetSyncDocument(URL_, { fetcher, material })).toEqual({ state: 'data', data: null });
     });
 });
+
+describe('sync-document download cap', () => {
+    /** Wraps a fake server so GETs report `declaredLength` in content-length. The cap
+     *  rejects on that header before reading, so a huge library is simulated by the
+     *  header alone -- no need to allocate 150 MB in a test. */
+    const withDeclaredLength = (fetcher: typeof fetch, declaredLength: number): typeof fetch => (
+        async (url, init) => {
+            const res = await fetcher(url, init);
+            if ((init?.method ?? 'GET') !== 'GET' || !res.ok) return res;
+            return { ...res, headers: { get: (name: string) => (
+                name.toLowerCase() === 'content-length' ? String(declaredLength) : null
+            ) } } as Response;
+        }
+    ) as typeof fetch;
+
+    const MB = 1024 * 1024;
+
+    it('reads an encrypted sync document far larger than the per-attachment cap', async () => {
+        const { fetcher } = createFakeWebdavServer();
+        const material = await deriveSyncKeyMaterial('pw', new Uint8Array(16).fill(9), FAST_KDF);
+        const data = { tasks: [] };
+        await webdavPutSyncDocument(URL_, data, { fetcher, material });
+
+        const result = await webdavGetSyncDocument<typeof data>(URL_, {
+            fetcher: withDeclaredLength(fetcher, 150 * MB),
+            material,
+        });
+
+        expect(result).toEqual({ state: 'data', data });
+    });
+
+    it('reads a plaintext sync document far larger than the per-attachment cap', async () => {
+        const { fetcher } = createFakeWebdavServer();
+        const data = { tasks: [] };
+        await webdavPutSyncDocument(URL_, data, { fetcher });
+
+        const result = await webdavGetSyncDocument<typeof data>(URL_, {
+            fetcher: withDeclaredLength(fetcher, 150 * MB),
+        });
+
+        expect(result).toEqual({ state: 'data', data });
+    });
+
+    it('still refuses a sync document beyond the document cap', async () => {
+        const { fetcher } = createFakeWebdavServer();
+        const material = await deriveSyncKeyMaterial('pw', new Uint8Array(16).fill(9), FAST_KDF);
+        await webdavPutSyncDocument(URL_, { tasks: [] }, { fetcher, material });
+
+        await expect(webdavGetSyncDocument(URL_, {
+            fetcher: withDeclaredLength(fetcher, 2 * 1024 * MB),
+            material,
+        })).rejects.toThrow(/download limit/);
+    });
+});
