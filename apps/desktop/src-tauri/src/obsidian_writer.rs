@@ -5,7 +5,7 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 use std::sync::Mutex;
-use tempfile::Builder;
+use tempfile::{Builder, NamedTempFile};
 use time::{format_description, OffsetDateTime};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -188,25 +188,60 @@ fn atomic_write_text(path: &Path, content: &str) -> Result<(), String> {
         let _ = fs::set_permissions(temp_file.path(), existing_metadata.permissions());
     }
 
-    if cfg!(windows) && path.exists() {
-        fs::remove_file(path)
-            .map_err(|error| format!("Failed to replace the existing Obsidian file: {error}"))?;
-    }
+    persist_over_existing(temp_file, path)
+}
 
-    match temp_file.persist(path) {
+// `persist` replaces an existing file atomically on every platform Mindwtr
+// ships on (Windows goes through MoveFileEx with MOVEFILE_REPLACE_EXISTING),
+// so there is nothing to delete up front — this used to remove the note before
+// persisting on Windows, which destroyed it outright whenever the persist and
+// the copy fallback both failed.
+fn persist_over_existing(temp_file: NamedTempFile, path: &Path) -> Result<(), String> {
+    let first = match temp_file.persist(path) {
+        Ok(_) => return Ok(()),
+        Err(error) => error,
+    };
+
+    // The replacement could not land. Move the original aside — never delete
+    // it — so the retries below get a free destination and a replacement that
+    // still fails can be rolled back. A folder that rejects the rename falls
+    // through to the same in-place copy as before: no worse than the old
+    // fallback, and still the only way to update such a note.
+    let aside = path
+        .file_name()
+        // Dot-prefixed so a leftover copy is skipped by the vault scanner.
+        .map(|name| path.with_file_name(format!(".{}.mindwtr-old", name.to_string_lossy())));
+    let moved_aside = path.exists()
+        && aside.as_ref().is_some_and(|aside| {
+            let _ = fs::remove_file(aside);
+            fs::rename(path, aside).is_ok()
+        });
+
+    let outcome = match first.file.persist(path) {
         Ok(_) => Ok(()),
-        Err(error) => {
-            let temp_path = error.file.path().to_path_buf();
-            fs::copy(&temp_path, path).map_err(|copy_error| {
-                format!(
-                    "Failed to replace the Obsidian file: {}, {}",
-                    error.error, copy_error
-                )
-            })?;
-            let _ = fs::remove_file(temp_path);
-            Ok(())
+        Err(second) => {
+            let temp_path = second.file.path().to_path_buf();
+            fs::copy(&temp_path, path)
+                .map(|_| {
+                    let _ = fs::remove_file(&temp_path);
+                })
+                .map_err(|copy_error| {
+                    format!(
+                        "Failed to replace the Obsidian file: {}, {copy_error}",
+                        second.error
+                    )
+                })
+        }
+    };
+
+    if let Some(aside) = aside.filter(|_| moved_aside) {
+        if outcome.is_ok() {
+            let _ = fs::remove_file(&aside);
+        } else {
+            let _ = fs::rename(&aside, path);
         }
     }
+    outcome
 }
 
 fn is_frontmatter_boundary(line: &str) -> bool {
@@ -563,6 +598,75 @@ pub(crate) fn obsidian_create_tasknotes(
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    // A temp file on a filesystem other than the vault's, so `persist` fails
+    // with a real cross-device error instead of a simulated one. Returns None
+    // when the two paths turn out to share a device, so the test degrades to a
+    // no-op rather than asserting on a persist that quietly succeeded.
+    #[cfg(target_os = "linux")]
+    fn cross_device_temp_file(vault_dir: &Path, content: &str) -> Option<NamedTempFile> {
+        use std::os::unix::fs::MetadataExt;
+
+        let other_root = Path::new("/dev/shm");
+        if fs::metadata(other_root).ok()?.dev() == fs::metadata(vault_dir).ok()?.dev() {
+            return None;
+        }
+        let mut file = Builder::new().tempfile_in(other_root).ok()?;
+        file.write_all(content.as_bytes()).ok()?;
+        Some(file)
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn replacement_lands_by_moving_a_locked_original_aside() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp = tempdir().expect("should create temp vault");
+        let note = temp.path().join("Note.md");
+        fs::write(&note, "original").expect("should create note");
+        fs::set_permissions(&note, fs::Permissions::from_mode(0o444))
+            .expect("should make the note read-only");
+
+        let Some(replacement) = cross_device_temp_file(temp.path(), "replacement") else {
+            return;
+        };
+
+        persist_over_existing(replacement, &note).expect("should replace the note");
+
+        assert_eq!(
+            fs::read_to_string(&note).expect("should read the note"),
+            "replacement"
+        );
+        assert!(!temp.path().join(".Note.md.mindwtr-old").exists());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn replacement_that_cannot_land_leaves_the_original_note_intact() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp = tempdir().expect("should create temp vault");
+        let note = temp.path().join("Note.md");
+        fs::write(&note, "original").expect("should create note");
+
+        let Some(replacement) = cross_device_temp_file(temp.path(), "replacement") else {
+            return;
+        };
+        // Unreadable source: the cross-device persist fails, and so does the
+        // copy fallback, after the original has already been moved aside.
+        fs::set_permissions(replacement.path(), fs::Permissions::from_mode(0o000))
+            .expect("should make the replacement unreadable");
+
+        let error =
+            persist_over_existing(replacement, &note).expect_err("should refuse to replace");
+
+        assert!(error.contains("Failed to replace the Obsidian file"));
+        assert_eq!(
+            fs::read_to_string(&note).expect("should read the note"),
+            "original"
+        );
+        assert!(!temp.path().join(".Note.md.mindwtr-old").exists());
+    }
 
     #[test]
     fn toggle_task_preserves_indentation_and_line_endings() {
