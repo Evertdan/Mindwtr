@@ -2133,6 +2133,14 @@ fn duplicate_attachment_value(value: Option<&Value>, timestamp: &str) -> Option<
                 Value::String(timestamp.to_string()),
             );
             attachment.remove("deletedAt");
+            // A duplicate is a distinct attachment record; sharing the original's
+            // cloud identity would point two records at one cloud blob (A4).
+            attachment.remove("cloudKey");
+            attachment.remove("fileHash");
+            attachment.remove("localStatus");
+            attachment.remove("contentRev");
+            attachment.remove("contentMtimeMs");
+            attachment.remove("contentSize");
             Some(Value::Object(attachment))
         })
         .collect::<Vec<_>>();
@@ -4060,6 +4068,38 @@ mod tests {
         for estimate in ["5min", "4hr+", "custom:1", "custom:15"] {
             assert!(valid_time_estimate(&Value::String(estimate.to_string())));
         }
+    }
+
+    #[test]
+    fn local_api_duplicate_attachment_resets_content_identity_fields() {
+        // Mirrors core's duplicateProjectAttachmentCopy semantics: a duplicated
+        // attachment must not share cloudKey/fileHash/content-identity with the
+        // original, or two records point at one cloud blob.
+        let original = json!([{
+            "id": "attachment-1",
+            "kind": "file",
+            "title": "Report",
+            "uri": "file:///report.pdf",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z",
+            "cloudKey": "attachments/report.pdf",
+            "fileHash": "hash",
+            "localStatus": "available",
+            "contentRev": 3,
+            "contentMtimeMs": 1750000000000_u64,
+            "contentSize": 4096,
+        }]);
+        let duplicated =
+            duplicate_attachment_value(Some(&original), "2026-01-02T00:00:00.000Z")
+                .expect("duplicated attachments");
+        let copy = duplicated[0].as_object().expect("attachment object");
+        assert_eq!(copy.get("uri"), Some(&json!("file:///report.pdf")));
+        assert!(!copy.contains_key("cloudKey"));
+        assert!(!copy.contains_key("fileHash"));
+        assert!(!copy.contains_key("localStatus"));
+        assert!(!copy.contains_key("contentRev"));
+        assert!(!copy.contains_key("contentMtimeMs"));
+        assert!(!copy.contains_key("contentSize"));
     }
 
     #[test]
