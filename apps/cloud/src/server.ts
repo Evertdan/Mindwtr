@@ -87,7 +87,7 @@ import {
     getDataFileMetadata,
     isTrustedValidatedDataFile,
     jsonFileResponse,
-    loadAppDataForWrite,
+    loadAppDataOrError,
     rememberValidatedDataFile,
     writeCloudData,
 } from './server-data-cache';
@@ -228,25 +228,6 @@ const loadExistingDataForMerge = (filePath: string): AppData | { error: Response
         return { error: errorResponse('Stored data failed validation', 500) };
     }
     return validateStoredAppData(filePath, rawData);
-};
-
-/**
- * Guards the REST entity write routes (POST/PATCH/DELETE tasks/projects/sections/areas,
- * the task complete/archive action, and orphan-attachment GC) against the same class of
- * bug loadExistingDataForMerge already closes for PUT /v1/data: a namespace file that
- * exists but can't be read/parsed (EIO/EACCES/corrupt JSON) must 500, never silently
- * fall back to an empty document that then gets written back over the real data.
- */
-const loadAppDataForWriteOrError = (filePath: string): AppData | { error: Response } => {
-    const result = loadAppDataForWrite(filePath);
-    if (result.state === 'unreadable') {
-        logFailureWarn('Stored cloud data failed validation', {
-            failureClass: 'validation',
-            failureCode: 'stored_data_invalid_json',
-        });
-        return { error: errorResponse('Stored data failed validation', 500) };
-    }
-    return result.data;
 };
 
 type BunServer = {
@@ -449,7 +430,7 @@ const handleEntityRoute = async <T extends CloudEntity>(
         throwIfRequestAborted(context.signal);
         const pagination = parsePagination(url.searchParams);
         if ('error' in pagination) return errorResponse(pagination.error, 400);
-        const dataResult = loadAppDataForWriteOrError(context.filePath);
+        const dataResult = loadAppDataOrError(context.filePath);
         if ('error' in dataResult) return dataResult.error;
         const data = dataResult;
         const items = route.listItems(data, url);
@@ -469,7 +450,7 @@ const handleEntityRoute = async <T extends CloudEntity>(
 
         return await context.withWriteLock(context.key, async () => {
             throwIfRequestAborted(context.signal);
-            const dataResult = loadAppDataForWriteOrError(context.filePath);
+            const dataResult = loadAppDataOrError(context.filePath);
             if ('error' in dataResult) return dataResult.error;
             const data = dataResult;
             const nowIso = new Date().toISOString();
@@ -492,7 +473,7 @@ const handleEntityRoute = async <T extends CloudEntity>(
     if (!entityId) return errorResponse(route.invalidIdMessage, 400);
 
     if (req.method === 'GET') {
-        const dataResult = loadAppDataForWriteOrError(context.filePath);
+        const dataResult = loadAppDataOrError(context.filePath);
         if ('error' in dataResult) return dataResult.error;
         const data = dataResult;
         const entity = getEntityCollection(data, route).find((item) => item.id === entityId && !item.deletedAt);
@@ -506,7 +487,7 @@ const handleEntityRoute = async <T extends CloudEntity>(
 
         return await context.withWriteLock(context.key, async () => {
             throwIfRequestAborted(context.signal);
-            const dataResult = loadAppDataForWriteOrError(context.filePath);
+            const dataResult = loadAppDataOrError(context.filePath);
             if ('error' in dataResult) return dataResult.error;
             const data = dataResult;
             const collection = getEntityCollection(data, route);
@@ -531,7 +512,7 @@ const handleEntityRoute = async <T extends CloudEntity>(
     if (req.method === 'DELETE') {
         return await context.withWriteLock(context.key, async () => {
             throwIfRequestAborted(context.signal);
-            const dataResult = loadAppDataForWriteOrError(context.filePath);
+            const dataResult = loadAppDataOrError(context.filePath);
             if ('error' in dataResult) return dataResult.error;
             const data = dataResult;
             const collection = getEntityCollection(data, route);
@@ -1194,7 +1175,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
 
                             return await withRequestWriteLock(ctx.key, async () => {
                                 throwIfRequestAborted(requestAbortController.signal);
-                                const dataResult = loadAppDataForWriteOrError(ctx.filePath);
+                                const dataResult = loadAppDataOrError(ctx.filePath);
                                 if ('error' in dataResult) return dataResult.error;
                                 const data = dataResult;
                                 const idx = data.tasks.findIndex((t) => t.id === taskId && !t.deletedAt);
@@ -1246,7 +1227,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                             if (typeof taskLimit !== 'number') return errorResponse(taskLimit.error, 400);
                             const projectLimit = parseSearchPaginationValue(url.searchParams, 'projectLimit', pagination.limit);
                             if (typeof projectLimit !== 'number') return errorResponse(projectLimit.error, 400);
-                            const dataResult = loadAppDataForWriteOrError(ctx.filePath);
+                            const dataResult = loadAppDataOrError(ctx.filePath);
                             if ('error' in dataResult) return dataResult.error;
                             const data = dataResult;
                             const tasks = filterNotDeleted(data.tasks);

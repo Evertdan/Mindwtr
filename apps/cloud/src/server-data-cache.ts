@@ -1,7 +1,7 @@
 import { lstatSync, type Stats } from 'fs';
 import type { AppData } from '@mindwtr/core';
 
-import { corsOrigin, logFailureWarn } from './server-config';
+import { corsOrigin, errorResponse, logFailureWarn } from './server-config';
 import {
     loadAppDataForWriteUncached,
     loadAppDataUncached,
@@ -162,6 +162,25 @@ export const loadAppDataForWrite = (filePath: string): AppDataForWriteResult => 
     if (result.state === 'unreadable') return result;
     rememberParsedDataFile(filePath, result.data);
     return result;
+};
+
+/**
+ * Guards every namespace-data read (REST reads/writes, search, the calendar feed) against
+ * a namespace file that exists but can't be read/parsed (EIO/EACCES/corrupt JSON): that
+ * must 500, never silently fall back to an empty document — a write path would then save
+ * the empty document over the real data, and a read path would serve empty results as if
+ * the namespace were genuinely empty.
+ */
+export const loadAppDataOrError = (filePath: string): AppData | { error: Response } => {
+    const result = loadAppDataForWrite(filePath);
+    if (result.state === 'unreadable') {
+        logFailureWarn('Stored cloud data failed validation', {
+            failureClass: 'validation',
+            failureCode: 'stored_data_invalid_json',
+        });
+        return { error: errorResponse('Stored data failed validation', 500) };
+    }
+    return result.data;
 };
 
 export const rememberValidatedDataFile = (filePath: string): void => {

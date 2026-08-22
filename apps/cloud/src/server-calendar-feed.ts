@@ -12,7 +12,7 @@ import { join } from 'path';
 import { buildCalendarFeed } from '@mindwtr/core';
 
 import { corsOrigin } from './server-config';
-import { loadAppData } from './server-data-cache';
+import { loadAppDataOrError } from './server-data-cache';
 import { durablyRemoveFile, writeData, type DurableRemovalFileSystem } from './server-storage';
 
 const FEED_FILE_SUFFIX = '.ics.json';
@@ -138,8 +138,9 @@ export const parseCalendarFeedPathToken = (pathname: string): string | null => {
 };
 
 export const calendarFeedResponse = (dataDir: string, key: string): Response => {
-    const data = loadAppData(join(dataDir, `${key}.json`));
-    const body = buildCalendarFeed(data);
+    const dataResult = loadAppDataOrError(join(dataDir, `${key}.json`));
+    if ('error' in dataResult) return dataResult.error;
+    const body = buildCalendarFeed(dataResult);
     return new Response(body, {
         status: 200,
         headers: {
