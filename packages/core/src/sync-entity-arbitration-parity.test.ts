@@ -30,6 +30,7 @@ const PINNED_CATEGORY_COUNTS = {
     'rev-by-both': 1,
     'rev-by-missing': 1,
     'revision-dominance': 1,
+    'revision-vs-delete-window': 2,
     'revisionless-skew': 2,
     'timestamp-offset-equivalence': 1,
 } as const;
@@ -64,7 +65,7 @@ describe('shared entity-arbitration parity fixture', () => {
             result[testCase.category] = (result[testCase.category] ?? 0) + 1;
             return result;
         }, {});
-        expect(fixture.cases).toHaveLength(16);
+        expect(fixture.cases).toHaveLength(18);
         expect(counts).toEqual(PINNED_CATEGORY_COUNTS);
     });
 

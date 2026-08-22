@@ -316,6 +316,64 @@
             "expected": { "forward": "right", "reverse": "right", "converges": true }
         },
         {
+            "name": "later tombstone outside the window beats a higher revision live edit",
+            "category": "revision-vs-delete-window",
+            "nowIso": "2026-01-10T00:00:00.000Z",
+            "left": {
+                "id": "parity-delete-window-live",
+                "title": "Higher revision live",
+                "status": "next",
+                "tags": [],
+                "contexts": [],
+                "createdAt": "2025-01-01T00:00:00.000Z",
+                "updatedAt": "2026-01-01T00:00:00.000Z",
+                "rev": 10,
+                "revBy": "device-a"
+            },
+            "right": {
+                "id": "parity-delete-window-live",
+                "title": "Lower revision tombstone",
+                "status": "next",
+                "tags": [],
+                "contexts": [],
+                "createdAt": "2025-01-01T00:00:00.000Z",
+                "updatedAt": "2026-01-01T00:00:31.000Z",
+                "deletedAt": "2026-01-01T00:00:31.000Z",
+                "rev": 3,
+                "revBy": "device-z"
+            },
+            "expected": { "forward": "right", "reverse": "right", "converges": true }
+        },
+        {
+            "name": "later live edit outside the window beats a higher revision tombstone",
+            "category": "revision-vs-delete-window",
+            "nowIso": "2026-01-10T00:00:00.000Z",
+            "left": {
+                "id": "parity-delete-window-tombstone",
+                "title": "Higher revision tombstone",
+                "status": "next",
+                "tags": [],
+                "contexts": [],
+                "createdAt": "2025-01-01T00:00:00.000Z",
+                "updatedAt": "2026-01-01T00:00:00.000Z",
+                "deletedAt": "2026-01-01T00:00:00.000Z",
+                "rev": 10,
+                "revBy": "device-a"
+            },
+            "right": {
+                "id": "parity-delete-window-tombstone",
+                "title": "Lower revision live",
+                "status": "next",
+                "tags": [],
+                "contexts": [],
+                "createdAt": "2025-01-01T00:00:00.000Z",
+                "updatedAt": "2026-01-01T00:00:31.000Z",
+                "rev": 3,
+                "revBy": "device-z"
+            },
+            "expected": { "forward": "right", "reverse": "right", "converges": true }
+        },
+        {
             "name": "backup restore can resurrect over a higher revision tombstone",
             "category": "backup-resurrection",
             "nowIso": "2026-01-10T00:00:00.000Z",

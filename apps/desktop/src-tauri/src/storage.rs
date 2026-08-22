@@ -8638,7 +8638,7 @@ mod tests {
             .get("cases")
             .and_then(Value::as_array)
             .expect("fixture cases");
-        assert_eq!(cases.len(), 16, "fixture cardinality is pinned");
+        assert_eq!(cases.len(), 18, "fixture cardinality is pinned");
 
         let expected_category_counts = HashMap::from([
             ("backup-resurrection", 1),
@@ -8652,6 +8652,7 @@ mod tests {
             ("rev-by-both", 1),
             ("rev-by-missing", 1),
             ("revision-dominance", 1),
+            ("revision-vs-delete-window", 2),
             ("revisionless-skew", 2),
             ("timestamp-offset-equivalence", 1),
         ]);
