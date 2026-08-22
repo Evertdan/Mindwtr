@@ -1,5 +1,12 @@
+import { createHash } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppData, Attachment } from '@mindwtr/core';
+
+/** Real digests, not fixtures: core's `validateAttachmentHash` now fails closed, and the
+ *  node test env has `crypto.subtle`, so the values the code computes must be the values
+ *  the tests expect. */
+const sha256Hex = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
+const base64Of = (bytes: Uint8Array): string => Buffer.from(bytes).toString('base64');
 
 const fileSystemMock = vi.hoisted(() => ({
   __esModule: true,
@@ -36,211 +43,30 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
   },
 }));
 
-// These five moved out of attachment-sync-utils.ts and into core
-// (packages/core/src/attachment-paths.ts) so desktop and mobile compute the
-// same cloud-key wire format from one place; mirror the real, pure
-// implementations here rather than pulling in the whole real module.
-const attachmentPathMocks = vi.hoisted(() => {
-  const extractExtension = (value?: string) => {
-    if (!value) return '';
-    const stripped = value.split('?')[0].split('#')[0];
-    const leaf = stripped.split(/[\\/]/).pop() || '';
-    const match = leaf.match(/\.[A-Za-z0-9]{1,8}$/);
-    return match ? match[0].toLowerCase() : '';
-  };
+// Only the network transports are stubbed. Everything else — the shared transfer
+// lifecycle (packages/core/src/attachment-transfer.ts), SHA-256 hashing and
+// fail-closed hash validation, cloud-key/path derivation, upload validation, the
+// WebDAV download backoff — is the REAL core code, so what this file asserts is
+// what actually ships. (It used to be a vi.hoisted hand-copy of the lifecycle
+// with `computeSha256Hex` pinned to null, which proved nothing about core and
+// covered none of #1057's check-on-touch behaviour.)
+vi.mock('@mindwtr/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@mindwtr/core')>();
   return {
-    ATTACHMENTS_DIR_NAME: 'attachments',
-    extractExtension,
-    buildCloudKey: (attachment: { id: string; title: string; uri: string }) => (
-      `attachments/${attachment.id}${extractExtension(attachment.title) || extractExtension(attachment.uri)}`
-    ),
-    getBaseSyncUrl: (fullUrl: string) => {
-      const trimmed = fullUrl.replace(/\/+$/, '');
-      if (trimmed.toLowerCase().endsWith('.json')) {
-        const lastSlash = trimmed.lastIndexOf('/');
-        return lastSlash >= 0 ? trimmed.slice(0, lastSlash) : trimmed;
-      }
-      return trimmed;
-    },
-    getCloudBaseUrl: (fullUrl: string) => {
-      const trimmed = fullUrl.replace(/\/+$/, '');
-      if (trimmed.toLowerCase().endsWith('/data')) {
-        return trimmed.slice(0, -'/data'.length);
-      }
-      return trimmed;
-    },
+    ...actual,
+    cloudGetFile: vi.fn(),
+    cloudDeleteFile: vi.fn(),
+    cloudPutFile: vi.fn(),
+    webdavGetFile: vi.fn(),
+    webdavFileExists: vi.fn(),
+    webdavMakeDirectory: vi.fn(),
+    webdavPutFile: vi.fn(),
+    // Retry/backoff is transport timing, not behaviour under test: the real
+    // helper sleeps up to a minute between attempts.
+    withRetry: vi.fn(async (fn: () => Promise<unknown>) => await fn()),
+    sleep: vi.fn().mockResolvedValue(undefined),
   };
 });
-
-// This batch adopted the shared core reconciliation loop (packages/core/src/
-// attachment-transfer.ts) for the webdav/cloudkit/file backends. Mirror its pure logic here too
-// — same rationale as attachmentPathMocks above: real, faithful copies rather than pulling in
-// the whole @mindwtr/core module graph. `globalProgressTracker`/`computeSha256Hex` are hoisted
-// alongside so reportProgress/validateAttachmentHash's mirrors can call the SAME mock instances
-// the rest of this file already asserts against.
-const coreRuntimeMocks = vi.hoisted(() => {
-  const globalProgressTracker = { updateProgress: vi.fn() };
-  const computeSha256Hex = vi.fn().mockResolvedValue(null);
-
-  const collectAttachmentsById = (appData: any) => {
-    const attachmentsById = new Map();
-    for (const task of appData.tasks) {
-      if (task.deletedAt) continue;
-      for (const attachment of task.attachments || []) attachmentsById.set(attachment.id, attachment);
-    }
-    for (const project of appData.projects) {
-      if (project.deletedAt) continue;
-      for (const attachment of project.attachments || []) attachmentsById.set(attachment.id, attachment);
-    }
-    return attachmentsById;
-  };
-
-  const reportProgress = (
-    attachmentId: string,
-    operation: 'upload' | 'download',
-    loaded: number,
-    total: number,
-    status: 'active' | 'completed' | 'failed',
-    error?: string
-  ) => {
-    const percentage = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
-    globalProgressTracker.updateProgress(attachmentId, {
-      operation,
-      bytesTransferred: loaded,
-      totalBytes: total,
-      percentage,
-      status,
-      error,
-    });
-  };
-
-  const validateAttachmentHash = async (attachment: { fileHash?: string }, bytes: Uint8Array): Promise<void> => {
-    const expected = attachment.fileHash;
-    if (!expected || expected.length !== 64) return;
-    const computed = await computeSha256Hex(bytes);
-    if (!computed) return;
-    if (computed.toLowerCase() !== expected.toLowerCase()) {
-      throw new Error('Integrity validation failed');
-    }
-  };
-
-  const defaultResolveLocalPath = (uri: string): string => {
-    if (!/^file:\/\//i.test(uri)) return uri;
-    try {
-      const parsed = new URL(uri);
-      let path = decodeURIComponent(parsed.pathname);
-      if (/^\/[A-Za-z]:\//.test(path)) path = path.slice(1);
-      return path;
-    } catch {
-      return uri.replace(/^file:\/\//i, '');
-    }
-  };
-
-  const runAttachmentTransferLifecycle = async (options: any): Promise<boolean> => {
-    let didMutate = false;
-    const hasCloudCopy = options.hasCloudCopy ?? ((attachment: any) => Boolean(attachment.cloudKey));
-
-    for (const attachment of options.attachmentsById.values()) {
-      await options.beforeEachAttachment?.();
-      if (attachment.kind !== 'file') continue;
-      if (attachment.deletedAt) continue;
-      if (options.policy?.shouldSkip?.(attachment)) continue;
-
-      const rawUri = attachment.uri ? (options.resolveLocalPath ?? defaultResolveLocalPath)(attachment.uri) : '';
-      const isHttp = /^https?:\/\//i.test(rawUri);
-      const localPath = isHttp ? '' : rawUri;
-      const hasLocalPath = Boolean(localPath);
-      const existsLocally = hasLocalPath ? await options.localFileExists(localPath) : false;
-
-    const nextStatus = existsLocally ? 'available' : 'missing';
-      if (attachment.localStatus !== nextStatus) {
-        attachment.localStatus = nextStatus;
-      didMutate = true;
-    }
-
-    if (options.forceUploadExistingLocal && existsLocally && attachment.cloudKey !== undefined) {
-      attachment.cloudKey = undefined;
-      didMutate = true;
-    }
-
-    if (!hasCloudCopy(attachment) && existsLocally) {
-        if (!options.policy?.shouldUpload || options.policy.shouldUpload(attachment)) {
-          try {
-            if (await options.onUpload(attachment, localPath)) didMutate = true;
-          } catch (error) {
-            if (options.isFatalError?.(error)) throw error;
-            options.onUploadError(attachment, error);
-          }
-        }
-      }
-
-      if (hasCloudCopy(attachment) && !existsLocally) {
-        if (!options.policy?.shouldDownload || options.policy.shouldDownload(attachment)) {
-          try {
-            if (await options.onDownload(attachment)) didMutate = true;
-          } catch (error) {
-            if (options.isFatalError?.(error)) throw error;
-            options.onDownloadError(attachment, error);
-          }
-        }
-      }
-    }
-
-    return didMutate;
-  };
-
-  return {
-    globalProgressTracker,
-    computeSha256Hex,
-    collectAttachmentsById,
-    reportProgress,
-    validateAttachmentHash,
-    runAttachmentTransferLifecycle,
-  };
-});
-
-vi.mock('@mindwtr/core', () => ({
-  ...attachmentPathMocks,
-  ...coreRuntimeMocks,
-  validateAttachmentForUpload: vi.fn().mockResolvedValue({ valid: true }),
-  cloudGetFile: vi.fn(),
-  cloudDeleteFile: vi.fn(),
-  cloudPutFile: vi.fn(),
-  isAbortError: vi.fn().mockReturnValue(false),
-  isDropboxUnauthorizedError: vi.fn((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
-    return message.toLowerCase().includes('unauthorized') || message.includes('401');
-  }),
-  markAttachmentUnrecoverable: vi.fn((attachment: Attachment) => {
-    attachment.cloudKey = undefined;
-    attachment.fileHash = undefined;
-    attachment.localStatus = 'missing';
-    attachment.deletedAt = attachment.deletedAt || new Date().toISOString();
-    attachment.updatedAt = new Date().toISOString();
-    return true;
-  }),
-  decodeUriSafe: vi.fn((value: string) => {
-    try {
-      return decodeURIComponent(value);
-    } catch {
-      return value;
-    }
-  }),
-  sleep: vi.fn().mockResolvedValue(undefined),
-  webdavGetFile: vi.fn(),
-  webdavFileExists: vi.fn(),
-  webdavMakeDirectory: vi.fn(),
-  webdavPutFile: vi.fn(),
-  withRetry: vi.fn(async (fn: () => Promise<unknown>) => await fn()),
-  createWebdavDownloadBackoff: vi.fn(() => ({
-    getBlockedUntil: vi.fn().mockReturnValue(null),
-    setFromError: vi.fn(),
-    prune: vi.fn(),
-    deleteEntry: vi.fn(),
-  })),
-  isWebdavRateLimitedError: vi.fn().mockReturnValue(false),
-  getErrorStatus: vi.fn().mockReturnValue(undefined),
-}));
 
 vi.mock('./dropbox-sync', () => ({
   DropboxFileNotFoundError: class DropboxFileNotFoundError extends Error {},
@@ -261,8 +87,13 @@ vi.mock('./app-log', () => ({
 }));
 
 describe('attachment sync', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    // The real lifecycle keeps a module-scoped "stat we already failed to hash" map
+    // (BUG-16); leaking it between tests would silently skip a re-read a later test
+    // is asserting on.
+    (await import('@mindwtr/core')).resetUnhashableAttachmentStatsForTests();
+    fileSystemMock.getInfoAsync.mockReset();
     fileSystemMock.makeDirectoryAsync.mockResolvedValue(undefined);
     fileSystemMock.copyAsync.mockResolvedValue(undefined);
     fileSystemMock.moveAsync.mockResolvedValue(undefined);
@@ -980,7 +811,11 @@ describe('attachment sync', () => {
     );
   });
 
-  it('uploads cloud attachments from the original URI when local cache migration fails', async () => {
+  // SEC-07: `uri` travels inside the synced document, so an attachment that still points
+  // outside the managed attachments directory after the migration pre-pass is refused as
+  // an upload source — its bytes are never read for upload and never leave the device —
+  // while its localStatus is still reconciled like any other attachment.
+  it('never uploads a cloud attachment whose uri stayed outside the managed attachments directory', async () => {
     const originalUri = 'file://document/audio-captures/audio.m4a';
     const managedUri = 'file://document/attachments/audio.m4a';
     fileSystemMock.getInfoAsync.mockImplementation(async (uri: string) => {
@@ -988,6 +823,7 @@ describe('attachment sync', () => {
       if (uri === originalUri) return { exists: true, size: 3 };
       return { exists: false };
     });
+    // Migration into the managed dir fails, so the uri stays where the document put it.
     fileSystemMock.copyAsync.mockRejectedValueOnce(new Error('copy failed'));
     fileSystemMock.writeAsStringAsync.mockRejectedValueOnce(new Error('write failed'));
     fileSystemMock.readAsStringAsync.mockResolvedValue('AQID');
@@ -1008,7 +844,7 @@ describe('attachment sync', () => {
               uri: originalUri,
               mimeType: 'audio/mp4',
               size: 3,
-              localStatus: 'available',
+              localStatus: 'missing',
               createdAt: '2026-06-09T14:26:59.059Z',
               updatedAt: '2026-06-09T14:26:59.059Z',
             },
@@ -1031,18 +867,16 @@ describe('attachment sync', () => {
       'https://cloud.example/v1'
     );
 
+    expect(core.cloudPutFile).not.toHaveBeenCalled();
+    // The single read is the migration pre-pass's byte fallback; the refused upload
+    // adds none of its own (without the guard it reads the file a second time).
+    expect(fileSystemMock.readAsStringAsync).toHaveBeenCalledTimes(1);
     expect(didMutate).toBe(true);
-    expect(core.cloudPutFile).toHaveBeenCalledWith(
-      'https://cloud.example/v1/attachments/audio.m4a',
-      expect.any(ArrayBuffer),
-      'audio/mp4',
-      { token: 'token' }
-    );
     expect(appData.tasks[0].attachments?.[0]).toMatchObject({
-      cloudKey: 'attachments/audio.m4a',
       localStatus: 'available',
       uri: originalUri,
     });
+    expect(appData.tasks[0].attachments?.[0]?.cloudKey).toBeUndefined();
   });
 
   it('re-uploads an existing local attachment when proving a candidate cloud backend', async () => {
@@ -1527,5 +1361,209 @@ describe('attachment sync', () => {
       'https://cloud.example/v1/attachments/first.txt',
       { token: 'token' }
     );
+  });
+
+  // #1057 check-on-touch content detection, running through the REAL core lifecycle.
+  // The same stat+hash mismatch means opposite things in the two halves of a sync
+  // cycle, and getting the direction backwards would ping-pong two devices' uploads
+  // against each other forever — so each direction is pinned per backend.
+  describe('check-on-touch content changes', () => {
+    const OLD_BYTES = new Uint8Array([1, 2, 3]);
+    const NEW_BYTES = new Uint8Array([1, 2, 3, 4]);
+
+    const makeEditedAppData = (id: string, overrides: Partial<Attachment> = {}): AppData => ({
+      tasks: [
+        {
+          id: 'task-1',
+          title: 'Task',
+          status: 'inbox',
+          tags: [],
+          contexts: [],
+          attachments: [
+            {
+              id,
+              kind: 'file',
+              title: `${id}.txt`,
+              uri: `file://document/attachments/${id}.txt`,
+              cloudKey: `attachments/${id}.txt`,
+              localStatus: 'available',
+              fileHash: sha256Hex(OLD_BYTES),
+              contentMtimeMs: 1000,
+              contentSize: OLD_BYTES.length,
+              createdAt: '2026-04-18T10:00:00.000Z',
+              updatedAt: '2026-04-18T10:00:00.000Z',
+              ...overrides,
+            },
+          ],
+          createdAt: '2026-04-18T10:00:00.000Z',
+          updatedAt: '2026-04-18T10:00:00.000Z',
+        },
+      ],
+      projects: [],
+      sections: [],
+      areas: [],
+      settings: {},
+    });
+
+    it('re-uploads a file-backend attachment whose local bytes changed, during the prepare phase', async () => {
+      const syncPath = 'file://sync/data.json';
+      const localUri = 'file://document/attachments/edited.txt';
+      const remoteUri = 'file://sync/attachments/edited.txt';
+
+      fileSystemMock.getInfoAsync.mockImplementation(async (uri: string) => {
+        if (uri === localUri) return { exists: true, size: NEW_BYTES.length, modificationTime: 2 };
+        if (uri === remoteUri) return { exists: true, size: OLD_BYTES.length };
+        return { exists: false };
+      });
+      fileSystemMock.readAsStringAsync.mockResolvedValue(base64Of(NEW_BYTES));
+
+      const { syncFileAttachments } = await import('./attachment-sync');
+      const appData = makeEditedAppData('edited');
+
+      const didMutate = await syncFileAttachments(appData, syncPath, undefined, { phase: 'prepare' });
+      const attachment = appData.tasks[0].attachments?.[0];
+
+      expect(didMutate).toBe(true);
+      expect(fileSystemMock.copyAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          from: localUri,
+          to: expect.stringMatching(/^file:\/\/sync\/attachments\/edited\.txt\.tmp-/),
+        })
+      );
+      // Only a confirmed upload records the new baseline and bumps the revision.
+      expect(attachment?.fileHash).toBe(sha256Hex(NEW_BYTES));
+      expect(attachment?.contentMtimeMs).toBe(2000);
+      expect(attachment?.contentSize).toBe(NEW_BYTES.length);
+      expect(attachment?.contentRev).toBe(1);
+    });
+
+    it('re-uploads a WebDAV attachment during prepare but re-downloads the very same mismatch post-merge', async () => {
+      const localUri = 'file://document/attachments/edited-webdav.txt';
+      const config = { url: 'https://example.com/data.json', username: 'u', password: 'p' };
+      const core = await import('@mindwtr/core');
+      const { syncWebdavAttachments } = await import('./attachment-sync');
+
+      const primeFileSystem = () => {
+        fileSystemMock.getInfoAsync.mockImplementation(async (uri: string) => (
+          uri === localUri
+            ? { exists: true, size: NEW_BYTES.length, modificationTime: 2 }
+            : { exists: false }
+        ));
+        fileSystemMock.readAsStringAsync.mockResolvedValue(base64Of(NEW_BYTES));
+        vi.mocked(core.webdavFileExists).mockResolvedValue(true);
+        vi.mocked(core.webdavPutFile).mockResolvedValue(undefined);
+        // Remote still holds the bytes the recorded fileHash describes.
+        vi.mocked(core.webdavGetFile).mockResolvedValue(
+          OLD_BYTES.slice().buffer as ArrayBuffer
+        );
+      };
+
+      primeFileSystem();
+      const prepared = makeEditedAppData('edited-webdav');
+      await syncWebdavAttachments(prepared, config, 'https://example.com', undefined, { phase: 'prepare' });
+
+      expect(core.webdavPutFile).toHaveBeenCalledWith(
+        'https://example.com/attachments/edited-webdav.txt',
+        expect.any(ArrayBuffer),
+        'application/octet-stream',
+        expect.anything()
+      );
+      expect(core.webdavGetFile).not.toHaveBeenCalled();
+      expect(prepared.tasks[0].attachments?.[0]?.fileHash).toBe(sha256Hex(NEW_BYTES));
+      expect(prepared.tasks[0].attachments?.[0]?.contentRev).toBe(1);
+
+      vi.clearAllMocks();
+      (await import('@mindwtr/core')).resetUnhashableAttachmentStatsForTests();
+      primeFileSystem();
+      const merged = makeEditedAppData('edited-webdav');
+      await syncWebdavAttachments(merged, config, 'https://example.com', undefined, { phase: 'post-merge' });
+
+      expect(core.webdavPutFile).not.toHaveBeenCalled();
+      expect(core.webdavGetFile).toHaveBeenCalledWith(
+        'https://example.com/attachments/edited-webdav.txt',
+        expect.anything()
+      );
+      // The stale local copy is overwritten with the remote bytes (temp-then-rename).
+      expect(fileSystemMock.writeAsStringAsync).toHaveBeenCalledWith(
+        expect.stringMatching(/^file:\/\/document\/attachments\/edited-webdav\.txt\.tmp-/),
+        base64Of(OLD_BYTES),
+        { encoding: 'base64' }
+      );
+    });
+
+    // BUG-16: an attachment predating `fileHash` cannot have had newer remote content
+    // adopted by the merge (fileHash is synced), so post-merge records what is on disk
+    // as the baseline instead of downloading over it. Prepare still treats the same
+    // state as this device's edit and publishes the missing hash by re-uploading.
+    it('adopts the observed hash post-merge for an attachment with no recorded fileHash, and still uploads it during prepare', async () => {
+      const localUri = 'file://document/attachments/nohash.txt';
+      const config = { url: 'https://example.com/data.json', username: 'u', password: 'p' };
+      const core = await import('@mindwtr/core');
+      const { syncWebdavAttachments } = await import('./attachment-sync');
+
+      fileSystemMock.getInfoAsync.mockImplementation(async (uri: string) => (
+        uri === localUri
+          ? { exists: true, size: NEW_BYTES.length, modificationTime: 2 }
+          : { exists: false }
+      ));
+      fileSystemMock.readAsStringAsync.mockResolvedValue(base64Of(NEW_BYTES));
+      vi.mocked(core.webdavFileExists).mockResolvedValue(true);
+      vi.mocked(core.webdavPutFile).mockResolvedValue(undefined);
+
+      const merged = makeEditedAppData('nohash', { fileHash: undefined });
+      const mergedMutated = await syncWebdavAttachments(
+        merged, config, 'https://example.com', undefined, { phase: 'post-merge' },
+      );
+      const mergedAttachment = merged.tasks[0].attachments?.[0];
+
+      expect(mergedMutated).toBe(true);
+      expect(core.webdavGetFile).not.toHaveBeenCalled();
+      expect(core.webdavPutFile).not.toHaveBeenCalled();
+      expect(mergedAttachment?.fileHash).toBe(sha256Hex(NEW_BYTES));
+      expect(mergedAttachment?.contentMtimeMs).toBe(2000);
+      expect(mergedAttachment?.contentRev).toBeUndefined();
+
+      const prepared = makeEditedAppData('nohash', { fileHash: undefined });
+      await syncWebdavAttachments(
+        prepared, config, 'https://example.com', undefined, { phase: 'prepare' },
+      );
+
+      expect(core.webdavPutFile).toHaveBeenCalledWith(
+        'https://example.com/attachments/nohash.txt',
+        expect.any(ArrayBuffer),
+        'application/octet-stream',
+        expect.anything()
+      );
+      expect(prepared.tasks[0].attachments?.[0]?.contentRev).toBe(1);
+    });
+
+    // BUG-16: an unhashable file used to be re-read (up to the 50 MB cap) every single
+    // cycle with nothing to show for it. The retry now waits for the stat to move again.
+    it('re-reads an unhashable changed file only once per observed stat', async () => {
+      const syncPath = 'file://sync/data.json';
+      const localUri = 'file://document/attachments/unhashable.txt';
+
+      fileSystemMock.getInfoAsync.mockImplementation(async (uri: string) => {
+        if (uri === localUri) return { exists: true, size: NEW_BYTES.length, modificationTime: 2 };
+        if (uri === 'file://sync/attachments/unhashable.txt') return { exists: true, size: OLD_BYTES.length };
+        return { exists: false };
+      });
+      fileSystemMock.readAsStringAsync.mockRejectedValue(new Error('permission revoked'));
+
+      const { syncFileAttachments } = await import('./attachment-sync');
+      const appData = makeEditedAppData('unhashable');
+
+      await syncFileAttachments(appData, syncPath, undefined, { phase: 'prepare' });
+      expect(fileSystemMock.readAsStringAsync).toHaveBeenCalledTimes(1);
+
+      await syncFileAttachments(appData, syncPath, undefined, { phase: 'prepare' });
+      expect(fileSystemMock.readAsStringAsync).toHaveBeenCalledTimes(1);
+
+      // Nothing is published on an unconfirmed guess.
+      const attachment = appData.tasks[0].attachments?.[0];
+      expect(attachment?.fileHash).toBe(sha256Hex(OLD_BYTES));
+      expect(attachment?.contentMtimeMs).toBe(1000);
+      expect(attachment?.contentRev).toBeUndefined();
+    });
   });
 });
