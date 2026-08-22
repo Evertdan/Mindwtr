@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppData, Attachment } from '@mindwtr/core';
 
 /** Real digests, not fixtures: core's `validateAttachmentHash` now fails closed, and the
@@ -86,6 +86,15 @@ vi.mock('./app-log', () => ({
   sanitizeLogMessage: (value: string) => value,
 }));
 
+// Loaded once, in a hook: the first import pulls the real @mindwtr/core barrel through
+// `importOriginal` and costs seconds. Inside a test body that cost lands on whichever test
+// runs first and can blow the 5s test timeout under parallel load.
+let attachmentSync: typeof import('./attachment-sync');
+
+beforeAll(async () => {
+  attachmentSync = await import('./attachment-sync');
+}, 30_000);
+
 describe('attachment sync', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -112,7 +121,7 @@ describe('attachment sync', () => {
       .mockResolvedValueOnce({ exists: false })
       .mockResolvedValueOnce({ exists: true, size: 3 });
 
-    const { persistAttachmentLocally } = await import('./attachment-sync');
+    const { persistAttachmentLocally } = attachmentSync;
 
     const result = await persistAttachmentLocally({
       id: 'att-1',
@@ -150,7 +159,7 @@ describe('attachment sync', () => {
     fileSystemMock.copyAsync.mockRejectedValue(new Error('copy failed'));
     fileSystemMock.readAsStringAsync.mockResolvedValue('AQID');
 
-    const { persistAttachmentLocally } = await import('./attachment-sync');
+    const { persistAttachmentLocally } = attachmentSync;
 
     const result = await persistAttachmentLocally({
       id: 'audio-1',
@@ -191,7 +200,7 @@ describe('attachment sync', () => {
       .mockResolvedValueOnce({ exists: true, size: 3 });
     fileSystemMock.readAsStringAsync.mockResolvedValue('AQID');
 
-    const { ensureAttachmentAvailable } = await import('./attachment-sync');
+    const { ensureAttachmentAvailable } = attachmentSync;
 
     const result = await ensureAttachmentAvailable({
       id: 'att-available',
@@ -252,7 +261,7 @@ describe('attachment sync', () => {
       return [];
     });
 
-    const { syncFileAttachments } = await import('./attachment-sync');
+    const { syncFileAttachments } = attachmentSync;
 
     const didMutate = await syncFileAttachments({
       tasks: [
@@ -301,7 +310,7 @@ describe('attachment sync', () => {
       return [];
     });
 
-    const { syncFileAttachments } = await import('./attachment-sync');
+    const { syncFileAttachments } = attachmentSync;
     const appData: AppData = {
       tasks: [{
         id: 'task-remote-only',
@@ -361,7 +370,7 @@ describe('attachment sync', () => {
       return [];
     });
 
-    const { syncFileAttachments } = await import('./attachment-sync');
+    const { syncFileAttachments } = attachmentSync;
 
     const didMutate = await syncFileAttachments({
       tasks: [
@@ -433,7 +442,7 @@ describe('attachment sync', () => {
       return [];
     });
 
-    const { syncFileAttachments } = await import('./attachment-sync');
+    const { syncFileAttachments } = attachmentSync;
     const appData: AppData = {
       tasks: [
         {
@@ -501,7 +510,7 @@ describe('attachment sync', () => {
       return [];
     });
 
-    const { ATTACHMENT_LOCAL_MIGRATION_MAX_PER_SYNC, syncFileAttachments } = await import('./attachment-sync');
+    const { ATTACHMENT_LOCAL_MIGRATION_MAX_PER_SYNC, syncFileAttachments } = attachmentSync;
     const appData: AppData = {
       tasks: [
         {
@@ -543,7 +552,7 @@ describe('attachment sync', () => {
   });
 
   it('detects pending attachment work from metadata without touching stable managed files', async () => {
-    const { hasPendingAttachmentSyncWork } = await import('./attachment-sync');
+    const { hasPendingAttachmentSyncWork } = attachmentSync;
     const makeData = (attachment: Attachment, settings: AppData['settings'] = {}): AppData => ({
       tasks: [
         {
@@ -649,7 +658,7 @@ describe('attachment sync', () => {
     });
     fileSystemMock.StorageAccessFramework.createFileAsync.mockResolvedValue(createdRemoteFileUri);
 
-    const { syncFileAttachments } = await import('./attachment-sync');
+    const { syncFileAttachments } = attachmentSync;
 
     const appData: AppData = {
       tasks: [
@@ -718,7 +727,7 @@ describe('attachment sync', () => {
       return 'AQID';
     });
 
-    const { syncFileAttachments } = await import('./attachment-sync');
+    const { syncFileAttachments } = attachmentSync;
     const appData: AppData = {
       tasks: [
         {
@@ -763,7 +772,7 @@ describe('attachment sync', () => {
     vi.mocked(core.webdavFileExists).mockResolvedValue(false);
 
     const controller = new AbortController();
-    const { syncWebdavAttachments } = await import('./attachment-sync');
+    const { syncWebdavAttachments } = attachmentSync;
     const appData: AppData = {
       tasks: [
         {
@@ -859,7 +868,7 @@ describe('attachment sync', () => {
       settings: {},
     };
 
-    const { syncCloudAttachments } = await import('./attachment-sync');
+    const { syncCloudAttachments } = attachmentSync;
 
     const didMutate = await syncCloudAttachments(
       appData,
@@ -912,7 +921,7 @@ describe('attachment sync', () => {
       settings: {},
     };
 
-    const { syncCloudAttachments } = await import('./attachment-sync');
+    const { syncCloudAttachments } = attachmentSync;
     const didMutate = await syncCloudAttachments(
       appData,
       { url: 'https://candidate.example/v1/data', token: 'candidate-token' },
@@ -968,7 +977,7 @@ describe('attachment sync', () => {
       settings: {},
     };
 
-    const { syncCloudAttachments } = await import('./attachment-sync');
+    const { syncCloudAttachments } = attachmentSync;
 
     await expect(syncCloudAttachments(
       appData,
@@ -1036,7 +1045,7 @@ describe('attachment sync', () => {
       throw uploadError;
     });
 
-    const { syncCloudAttachments } = await import('./attachment-sync');
+    const { syncCloudAttachments } = attachmentSync;
 
     await expect(syncCloudAttachments(
       appData,
@@ -1092,7 +1101,7 @@ describe('attachment sync', () => {
       throw uploadError;
     });
 
-    const { syncDropboxAttachments } = await import('./attachment-sync');
+    const { syncDropboxAttachments } = attachmentSync;
 
     await expect(syncDropboxAttachments(
       appData,
@@ -1142,7 +1151,7 @@ describe('attachment sync', () => {
       settings: {},
     };
 
-    const { syncDropboxAttachments } = await import('./attachment-sync');
+    const { syncDropboxAttachments } = attachmentSync;
     const didMutate = await syncDropboxAttachments(
       appData,
       'dropbox-client-id',
@@ -1207,7 +1216,7 @@ describe('attachment sync', () => {
       settings: {},
     };
 
-    const { syncDropboxAttachments } = await import('./attachment-sync');
+    const { syncDropboxAttachments } = attachmentSync;
     const didMutate = await syncDropboxAttachments(
       appData,
       'dropbox-client-id',
@@ -1270,7 +1279,7 @@ describe('attachment sync', () => {
       settings: {},
     };
 
-    const { syncCloudAttachments } = await import('./attachment-sync');
+    const { syncCloudAttachments } = attachmentSync;
 
     await expect(syncCloudAttachments(
       appData,
@@ -1342,7 +1351,7 @@ describe('attachment sync', () => {
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(networkError);
 
-    const { syncCloudAttachments } = await import('./attachment-sync');
+    const { syncCloudAttachments } = attachmentSync;
 
     const didMutate = await syncCloudAttachments(
       appData,
@@ -1417,7 +1426,7 @@ describe('attachment sync', () => {
       });
       fileSystemMock.readAsStringAsync.mockResolvedValue(base64Of(NEW_BYTES));
 
-      const { syncFileAttachments } = await import('./attachment-sync');
+      const { syncFileAttachments } = attachmentSync;
       const appData = makeEditedAppData('edited');
 
       const didMutate = await syncFileAttachments(appData, syncPath, undefined, { phase: 'prepare' });
@@ -1439,7 +1448,7 @@ describe('attachment sync', () => {
 
     it('never puts an attachment title or file name into a log line (SEC-16, #854)', async () => {
       const appLog = await import('./app-log');
-      const { syncWebdavAttachments } = await import('./attachment-sync');
+      const { syncWebdavAttachments } = attachmentSync;
       const core = await import('@mindwtr/core');
       const appData = makeEditedAppData('logged-webdav');
       const attachment = appData.tasks[0].attachments![0];
@@ -1465,7 +1474,7 @@ describe('attachment sync', () => {
       // guard never sees it; without the mobile guard this streamed Basic credentials
       // and the file's bytes in the clear.
       const core = await import('@mindwtr/core');
-      const { syncWebdavAttachments } = await import('./attachment-sync');
+      const { syncWebdavAttachments } = attachmentSync;
       const config = { url: 'http://public.example/data.json', username: 'u', password: 'p' };
 
       await expect(
@@ -1480,7 +1489,7 @@ describe('attachment sync', () => {
       const localUri = 'file://document/attachments/edited-webdav.txt';
       const config = { url: 'https://example.com/data.json', username: 'u', password: 'p' };
       const core = await import('@mindwtr/core');
-      const { syncWebdavAttachments } = await import('./attachment-sync');
+      const { syncWebdavAttachments } = attachmentSync;
 
       const primeFileSystem = () => {
         fileSystemMock.getInfoAsync.mockImplementation(async (uri: string) => (
@@ -1538,7 +1547,7 @@ describe('attachment sync', () => {
       const localUri = 'file://document/attachments/nohash.txt';
       const config = { url: 'https://example.com/data.json', username: 'u', password: 'p' };
       const core = await import('@mindwtr/core');
-      const { syncWebdavAttachments } = await import('./attachment-sync');
+      const { syncWebdavAttachments } = attachmentSync;
 
       fileSystemMock.getInfoAsync.mockImplementation(async (uri: string) => (
         uri === localUri
@@ -1589,7 +1598,7 @@ describe('attachment sync', () => {
       });
       fileSystemMock.readAsStringAsync.mockRejectedValue(new Error('permission revoked'));
 
-      const { syncFileAttachments } = await import('./attachment-sync');
+      const { syncFileAttachments } = attachmentSync;
       const appData = makeEditedAppData('unhashable');
 
       await syncFileAttachments(appData, syncPath, undefined, { phase: 'prepare' });
