@@ -600,6 +600,52 @@ describe('desktop sync attachment backends', () => {
         expect(appData.tasks[0].attachments?.[0]?.cloudKey).toBeUndefined();
     });
 
+    it('aborts the transfer pass as soon as the local snapshot goes stale (BUG-26)', async () => {
+        const fetcher = vi.fn(async (_url: string, _init?: RequestInit) => new Response(null, { status: 200 }));
+        const appData = createCandidateAttachmentData();
+        const first = appData.tasks[0].attachments![0];
+        appData.tasks[0].attachments!.push({
+            ...first,
+            id: 'attachment-2',
+            title: 'second.txt',
+            uri: '/app-data/mindwtr/attachments/second.txt',
+            cloudKey: undefined,
+        });
+        first.cloudKey = undefined;
+        const deps: AttachmentBackendDeps = {
+            getTauriFetch: async () => fetcher as unknown as typeof fetch,
+            isTauriRuntimeEnv: () => true,
+            logSyncInfo: vi.fn(),
+            logSyncWarning: vi.fn(),
+            resolveWebdavPassword: vi.fn(async () => 'secret'),
+        };
+        fsMocks.exists.mockResolvedValue(true);
+        fsMocks.readFile.mockResolvedValue(new Uint8Array([1, 2, 3]));
+        coreMocks.webdavFileExists.mockResolvedValue(true);
+
+        let checks = 0;
+        const ensureLocalSnapshotFresh = vi.fn(() => {
+            checks += 1;
+            if (checks > 1) {
+                const abort = new Error('local data changed mid-sync');
+                abort.name = 'LocalSyncAbort';
+                throw abort;
+            }
+        });
+
+        await expect(syncWebdavAttachments(
+            appData,
+            { url: 'https://dav.example/mindwtr', username: 'alice' },
+            'https://dav.example/mindwtr',
+            deps,
+            { activationProbe: false, ensureLocalSnapshotFresh, phase: 'prepare' },
+        )).rejects.toMatchObject({ name: 'LocalSyncAbort' });
+
+        expect(ensureLocalSnapshotFresh).toHaveBeenCalledTimes(2);
+        const putCalls = fetcher.mock.calls.filter(([, init]) => (init as RequestInit)?.method === 'PUT');
+        expect(putCalls).toHaveLength(1);
+    });
+
     describe('check-on-touch content change detection (#1057)', () => {
         const bytes = new Uint8Array([1, 2, 3]);
         // Real SHA-256 of `bytes` above — computed once so "hash matches" and "hash

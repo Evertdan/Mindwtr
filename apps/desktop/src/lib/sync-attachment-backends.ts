@@ -406,6 +406,7 @@ export async function syncWebdavAttachments(
     const syncMutated = await syncBasicRemoteAttachments({
         attachmentsById,
         forceUploadExistingLocal: helpers?.activationProbe === true,
+        ensureLocalSnapshotFresh: helpers?.ensureLocalSnapshotFresh,
         localFileExists,
         getLocalFileStat: statLocalFile,
         computeLocalFileHash,
@@ -614,6 +615,7 @@ export async function syncCloudAttachments(
     return await syncBasicRemoteAttachments({
         attachmentsById,
         forceUploadExistingLocal: helpers?.activationProbe === true,
+        ensureLocalSnapshotFresh: helpers?.ensureLocalSnapshotFresh,
         localFileExists,
         getLocalFileStat: statLocalFile,
         computeLocalFileHash,
@@ -782,6 +784,7 @@ export async function syncDropboxAttachments(
     return await syncBasicRemoteAttachments({
         attachmentsById,
         forceUploadExistingLocal: helpers?.activationProbe === true,
+        ensureLocalSnapshotFresh: helpers?.ensureLocalSnapshotFresh,
         localFileExists,
         getLocalFileStat: statLocalFile,
         computeLocalFileHash,
@@ -937,6 +940,7 @@ export async function syncCloudKitAttachments(
     const syncMutated = await syncBasicRemoteAttachments({
         attachmentsById,
         forceUploadExistingLocal: helpers?.activationProbe === true,
+        ensureLocalSnapshotFresh: helpers?.ensureLocalSnapshotFresh,
         localFileExists,
         getLocalFileStat: statLocalFile,
         computeLocalFileHash,
@@ -1096,6 +1100,7 @@ export async function syncFileAttachments(
     const syncMutated = await syncBasicRemoteAttachments({
         attachmentsById,
         forceUploadExistingLocal: helpers?.activationProbe === true,
+        ensureLocalSnapshotFresh: helpers?.ensureLocalSnapshotFresh,
         localFileExists,
         getLocalFileStat: statLocalFile,
         computeLocalFileHash,
