@@ -28,7 +28,7 @@
     "@dnd-kit/core": "^6.1.0",
     "@dnd-kit/sortable": "^8.0.0",
     "@dnd-kit/utilities": "^3.2.2",
-    "@mindwtr/core": "file:../../packages/core",
+    "@mindwtr/core": "workspace:*",
     "@tanstack/react-virtual": "^3.13.2",
     "@tauri-apps/api": "2.9.1",
     "@tauri-apps/plugin-dialog": "2.4.2",
