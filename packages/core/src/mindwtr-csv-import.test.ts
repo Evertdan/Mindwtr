@@ -470,6 +470,54 @@ describe('mindwtr csv import', () => {
         });
     });
 
+    // BUG-12 (plan 029): the historical-id fallback scan used to rebuild each candidate
+    // key with one encodeSourceKeyTuple(...area, project, sourceId) call per (row, project)
+    // pair; ff816361a precomputes each project's tuplePrefix = encodeSourceKeyTuple(area,
+    // project) + ':' once and appends encodeURIComponent(sourceId) per row instead. The two
+    // constructions are algebraically identical (encodeURIComponent never emits a literal
+    // ':'), but this pins it as a byte-identical id-resolution equality check across an
+    // area-scoped project with a colon in both the project name and the source id -- the
+    // shape the escaping exists for in the first place (see encodeSourceKeyTuple's doc
+    // comment) -- rather than trusting the algebra.
+    it('resolves a moved task to a hand-computed historical id through the area-scoped tuple prefix (BUG-12)', () => {
+        const beforeCsv = buildCsv(
+            ['Title', 'Area', 'Project', 'ID'],
+            [['Move within area', 'Work', 'Legacy:Team', 'north:9']],
+        );
+        const afterCsv = buildCsv(
+            ['Title', 'Area', 'Project', 'ID'],
+            [['Move within area', 'Work', 'New:Team', 'north:9']],
+        );
+        const beforeParsed = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: beforeCsv })
+            .parsedData as ParsedMindwtrCsvImportData;
+        const afterParsed = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: afterCsv })
+            .parsedData as ParsedMindwtrCsvImportData;
+        const first = applyMindwtrCsvImport(mockAppData([], [], []), beforeParsed, {
+            now: '2026-08-08T12:00:00.000Z',
+        });
+
+        // Hand-computed via encodeSourceKeyTuple's own formula (each component
+        // encodeURIComponent'd, joined by ':'), not read off `first.data` -- this is the
+        // independent expectation the refactor's tuplePrefix + encodeURIComponent(sourceId)
+        // split must still land on.
+        const priorTaskId = generateDeterministicUUID(
+            'mindwtr:csv-import:v1:task:work:legacy%3Ateam:north%3A9',
+        );
+        const priorData = {
+            ...first.data,
+            tasks: first.data.tasks.map((task) => ({ ...task, id: priorTaskId })),
+        };
+
+        const second = applyMindwtrCsvImport(priorData, afterParsed, {
+            now: '2026-08-09T12:00:00.000Z',
+        });
+        const migratedTask = second.data.tasks.find((task) => task.title === 'Move within area');
+
+        expect(second.importedTaskCount).toBe(0);
+        expect(second.data.tasks).toHaveLength(1);
+        expect(migratedTask?.id).toBe(priorTaskId);
+    });
+
     it('does not collapse rows at the same position across two CSVs in one ZIP (C1)', () => {
         const csvA = buildCsv(['Title', 'Project'], [['Task from A', 'Ops']]);
         const csvB = buildCsv(['Title', 'Project'], [['Task from B', 'Ops']]);
