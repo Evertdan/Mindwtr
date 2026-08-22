@@ -236,7 +236,7 @@ export function CalendarSelectedDayPanel({ controller }: CalendarSelectedDayPane
                                             "group flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors hover:bg-muted/50",
                                             projected
                                                 ? "border border-dashed border-primary/50 bg-primary/5"
-                                                : kind === 'scheduled' ? "bg-primary/5" : "border-l-[3px] border-destructive/70 bg-background/60"
+                                                : kind === 'scheduled' ? "bg-primary/5" : "border-l-[3px] border-muted-foreground/60 bg-background/60"
                                         )}
                                         style={!projected && kind !== 'scheduled'
                                             ? { borderLeftColor: getTaskAccentColor(task) }

@@ -630,7 +630,7 @@ export function CalendarView() {
                                                         ? "bg-muted/60 text-muted-foreground"
                                                         : item.kind === 'scheduled'
                                                         ? "bg-primary/10 text-primary"
-                                                        : "border-l-[3px] border-destructive/70 bg-background/60 text-foreground",
+                                                        : "border-l-[3px] border-muted-foreground/60 bg-background/60 text-foreground",
                                                     taskMenuRingClass(task.id)
                                                 )}
                                                 style={!projected && !completed && item.kind !== 'scheduled'
@@ -769,7 +769,7 @@ export function CalendarView() {
                                                             ? "border-transparent bg-muted/60 text-muted-foreground line-through"
                                                             : item.kind === 'scheduled'
                                                             ? "border-primary/70 bg-primary/5"
-                                                            : "border-destructive/70 bg-background/70",
+                                                            : "border-muted-foreground/60 bg-background/70",
                                                         taskMenuRingClass(item.task.id)
                                                     )}
                                                     style={!projected && !completed && item.kind !== 'scheduled'
@@ -993,7 +993,7 @@ export function CalendarView() {
                                                                 ? "border border-dashed border-primary/50 bg-primary/5 text-primary"
                                                                 : completed
                                                                 ? "bg-muted/50 text-muted-foreground"
-                                                                : item.kind === 'scheduled' ? "bg-primary/10 text-primary" : "border-l-[3px] border-destructive/70 bg-background",
+                                                                : item.kind === 'scheduled' ? "bg-primary/10 text-primary" : "border-l-[3px] border-muted-foreground/60 bg-background",
                                                             taskMenuRingClass(item.task.id)
                                                         )}
                                                         style={!projected && !completed && item.kind !== 'scheduled'

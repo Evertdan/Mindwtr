@@ -506,7 +506,7 @@ describe('CalendarView', () => {
         expect(storeMocks.taskStoreState.addTask).not.toHaveBeenCalled();
     });
 
-    it('colors the month due bar by project or area, keeping red for unfiled tasks', async () => {
+    it('colors the month due bar by project or area, falling back to neutral for unfiled tasks', async () => {
         storeMocks.taskStoreState.projects = [
             makeProject({ id: 'project-green', title: 'Green project', color: '#22c55e' }),
         ];
@@ -524,8 +524,14 @@ describe('CalendarView', () => {
 
         expect(screen.getByRole('button', { name: /Project due task/ })).toHaveStyle({ borderLeftColor: '#22c55e' });
         expect(screen.getByRole('button', { name: /Area due task/ })).toHaveStyle({ borderLeftColor: '#8b5cf6' });
-        // No project or area: the inline override stays unset so the themed red applies.
-        expect(screen.getByRole('button', { name: /Unfiled due task/ }).style.borderLeftColor).toBe('');
+        // No project or area: the inline override stays unset, so the chip falls back
+        // to the theme's neutral bar. Red is reserved for overdue/urgency, and a
+        // deadline chip is not automatically either — the bar carries identity, not
+        // alarm. Scheduled chips stay primary-tinted, so the two are still distinct.
+        const unfiled = screen.getByRole('button', { name: /Unfiled due task/ });
+        expect(unfiled.style.borderLeftColor).toBe('');
+        expect(unfiled.className).toContain('border-muted-foreground/60');
+        expect(unfiled.className).not.toContain('border-destructive');
     });
 
     it('parses quick-add syntax when creating a scheduled task from the calendar composer', async () => {
