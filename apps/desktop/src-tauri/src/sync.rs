@@ -10135,7 +10135,15 @@ pub(crate) fn sync_fs_create_dir(app: tauri::AppHandle, path: String) -> Result<
 
 #[tauri::command(async)]
 pub(crate) fn sync_fs_remove_file(app: tauri::AppHandle, path: String) -> Result<(), String> {
-    fs::remove_file(sync_fs_path(&app, path)?).map_err(|error| error.to_string())
+    // Idempotent like mobile's file-backend delete: a missing target means the
+    // delete already happened (e.g. the user removed the file by hand), and an
+    // error here would requeue it as a retryable pending attachment delete
+    // that can never succeed (#1064).
+    match fs::remove_file(sync_fs_path(&app, path)?) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error.to_string()),
+    }
 }
 
 #[tauri::command(async)]
