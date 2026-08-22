@@ -3238,7 +3238,9 @@ fn valid_attachments(value: &Value) -> bool {
                     .as_str()
                     .is_some_and(|kind| matches!(kind, "file" | "link")),
                 "mimeType" | "deletedAt" | "cloudKey" | "fileHash" => value.is_string(),
-                "size" => value.as_u64().is_some(),
+                "size" | "contentRev" | "contentMtimeMs" | "contentSize" => {
+                    value.as_u64().is_some()
+                }
                 "localStatus" => value.as_str().is_some_and(|status| {
                     matches!(
                         status,
@@ -4067,6 +4069,47 @@ mod tests {
 
         for estimate in ["5min", "4hr+", "custom:1", "custom:15"] {
             assert!(valid_time_estimate(&Value::String(estimate.to_string())));
+        }
+    }
+
+    #[test]
+    fn local_api_valid_attachments_accepts_content_identity_fields() {
+        // #370b74f09 added contentRev/contentMtimeMs/contentSize; a GET-edit-PUT
+        // round trip of a task with a synced file attachment must not be rejected.
+        let round_trip = json!([{
+            "id": "attachment-1",
+            "kind": "file",
+            "title": "Report",
+            "uri": "file:///report.pdf",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z",
+            "cloudKey": "attachments/report.pdf",
+            "fileHash": "hash",
+            "localStatus": "available",
+            "size": 4096,
+            "contentRev": 3,
+            "contentMtimeMs": 1750000000000_u64,
+            "contentSize": 4096,
+        }]);
+        assert!(valid_attachments(&round_trip));
+
+        for field in ["contentRev", "contentMtimeMs", "contentSize"] {
+            for bad_value in [json!("not-a-number"), json!(null), json!(-1)] {
+                let mut attachment = json!({
+                    "id": "attachment-1",
+                    "kind": "file",
+                    "title": "Report",
+                    "uri": "file:///report.pdf",
+                    "createdAt": "2026-01-01T00:00:00.000Z",
+                    "updatedAt": "2026-01-01T00:00:00.000Z",
+                });
+                attachment[field] = bad_value.clone();
+                let patch = json!([attachment]);
+                assert!(
+                    !valid_attachments(&patch),
+                    "{field} should reject {bad_value:?}"
+                );
+            }
         }
     }
 
