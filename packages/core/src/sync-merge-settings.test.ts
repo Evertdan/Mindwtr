@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { mergeSettingsForSync } from './sync-merge-settings';
-import type { AppData } from './types';
+import { mergeSettingsForSync, sanitizeMergedSettingsForSync } from './sync-merge-settings';
+import type { AppData, SettingsSyncGroup } from './types';
 
 type Settings = AppData['settings'];
 
@@ -68,5 +68,214 @@ describe('mergeSettingsForSync > gtd.naturalLanguageDates', () => {
         const merged = mergeSettingsForSync(local, incoming);
 
         expect(merged.gtd?.naturalLanguageDates).toBeUndefined();
+    });
+});
+
+const OLDER = '2026-07-01T00:00:00.000Z';
+const NEWER = '2026-08-01T00:00:00.000Z';
+
+const stamp = (settings: Settings, group: SettingsSyncGroup | 'preferences', at: string): Settings => ({
+    ...settings,
+    syncPreferencesUpdatedAt: { ...settings.syncPreferencesUpdatedAt, [group]: at },
+});
+
+// One representative field per value-replacing group. savedFilters is excluded on
+// purpose: it merges by filter id with its own per-filter LWW, covered separately below.
+const GROUP_CASES: Array<{
+    group: SettingsSyncGroup;
+    local: Settings;
+    incoming: Settings;
+    read: (settings: Settings) => unknown;
+    localValue: unknown;
+    incomingValue: unknown;
+}> = [
+    {
+        group: 'appearance',
+        local: { theme: 'dark' },
+        incoming: { theme: 'light' },
+        read: (settings) => settings.theme,
+        localValue: 'dark',
+        incomingValue: 'light',
+    },
+    {
+        group: 'language',
+        local: { language: 'en' },
+        incoming: { language: 'de' },
+        read: (settings) => settings.language,
+        localValue: 'en',
+        incomingValue: 'de',
+    },
+    {
+        group: 'gtd',
+        local: { gtd: { defaultScheduleTime: '09:00' } },
+        incoming: { gtd: { defaultScheduleTime: '17:00' } },
+        read: (settings) => settings.gtd?.defaultScheduleTime,
+        localValue: '09:00',
+        incomingValue: '17:00',
+    },
+    {
+        group: 'externalCalendars',
+        local: { externalCalendars: [{ id: 'cal-1', name: 'Local', url: 'https://example.com/local.ics', enabled: true }] },
+        incoming: { externalCalendars: [{ id: 'cal-1', name: 'Incoming', url: 'https://example.com/incoming.ics', enabled: true }] },
+        read: (settings) => settings.externalCalendars?.[0]?.url,
+        localValue: 'https://example.com/local.ics',
+        incomingValue: 'https://example.com/incoming.ics',
+    },
+    {
+        group: 'ai',
+        local: { ai: { model: 'local-model' } },
+        incoming: { ai: { model: 'incoming-model' } },
+        read: (settings) => settings.ai?.model,
+        localValue: 'local-model',
+        incomingValue: 'incoming-model',
+    },
+];
+
+describe('mergeSettingsForSync > group arbitration', () => {
+    it.each(GROUP_CASES)('$group: the incoming side wins when its group timestamp is newer', (testCase) => {
+        const merged = mergeSettingsForSync(
+            stamp(testCase.local, testCase.group, OLDER),
+            stamp(testCase.incoming, testCase.group, NEWER),
+        );
+
+        expect(testCase.read(merged)).toEqual(testCase.incomingValue);
+        expect(merged.syncPreferencesUpdatedAt?.[testCase.group]).toBe(NEWER);
+    });
+
+    it.each(GROUP_CASES)('$group: the local side wins when its group timestamp is newer', (testCase) => {
+        const merged = mergeSettingsForSync(
+            stamp(testCase.local, testCase.group, NEWER),
+            stamp(testCase.incoming, testCase.group, OLDER),
+        );
+
+        expect(testCase.read(merged)).toEqual(testCase.localValue);
+        expect(merged.syncPreferencesUpdatedAt?.[testCase.group]).toBe(NEWER);
+    });
+
+    it.each(GROUP_CASES)('$group: a local opt-out keeps the local value even against a newer incoming side', (testCase) => {
+        const merged = mergeSettingsForSync(
+            stamp({ ...testCase.local, syncPreferences: { [testCase.group]: false } }, testCase.group, OLDER),
+            stamp(testCase.incoming, testCase.group, NEWER),
+        );
+
+        expect(testCase.read(merged)).toEqual(testCase.localValue);
+    });
+
+    it.each(GROUP_CASES)('$group: an empty newer incoming side never clears the local value', (testCase) => {
+        const merged = mergeSettingsForSync(
+            stamp(testCase.local, testCase.group, OLDER),
+            stamp({}, testCase.group, NEWER),
+        );
+
+        expect(testCase.read(merged)).toEqual(testCase.localValue);
+    });
+
+    it.each(GROUP_CASES)('$group: an empty local side takes the incoming value', (testCase) => {
+        const merged = mergeSettingsForSync(
+            stamp({}, testCase.group, OLDER),
+            stamp(testCase.incoming, testCase.group, NEWER),
+        );
+
+        expect(testCase.read(merged)).toEqual(testCase.incomingValue);
+    });
+});
+
+describe('mergeSettingsForSync > savedFilters', () => {
+    const localFilter = {
+        id: 'filter-1',
+        name: 'Local name',
+        view: 'tasks' as const,
+        criteria: {},
+        createdAt: OLDER,
+        updatedAt: OLDER,
+    };
+
+    it('keeps filters only one side knows about', () => {
+        const merged = mergeSettingsForSync(
+            { savedFilters: [localFilter] },
+            { savedFilters: [{ ...localFilter, id: 'filter-2', name: 'Incoming only' }] },
+        );
+
+        expect(merged.savedFilters?.map((filter) => filter.id).sort()).toEqual(['filter-1', 'filter-2']);
+    });
+
+    it('resolves a same-id conflict by the filter updatedAt, not the group timestamp', () => {
+        const merged = mergeSettingsForSync(
+            stamp({ savedFilters: [{ ...localFilter, updatedAt: NEWER, name: 'Local newer' }] }, 'savedFilters', OLDER),
+            stamp({ savedFilters: [{ ...localFilter, name: 'Incoming older' }] }, 'savedFilters', NEWER),
+        );
+
+        expect(merged.savedFilters?.[0]?.name).toBe('Local newer');
+    });
+
+    it('a local opt-out keeps the local filter set', () => {
+        const merged = mergeSettingsForSync(
+            stamp({ savedFilters: [localFilter], syncPreferences: { savedFilters: false } }, 'savedFilters', OLDER),
+            stamp({ savedFilters: [{ ...localFilter, id: 'filter-2', name: 'Incoming only' }] }, 'savedFilters', NEWER),
+        );
+
+        expect(merged.savedFilters?.map((filter) => filter.id)).toEqual(['filter-1']);
+    });
+});
+
+describe('sanitizeMergedSettingsForSync', () => {
+    it('is a no-op on an already merged document (round-trip)', () => {
+        const local: Settings = stamp({ theme: 'dark', language: 'en', gtd: { defaultScheduleTime: '09:00' } }, 'appearance', OLDER);
+        const incoming: Settings = stamp({ theme: 'light', language: 'de' }, 'appearance', NEWER);
+
+        const merged = mergeSettingsForSync(local, incoming);
+
+        expect(sanitizeMergedSettingsForSync(merged, local)).toEqual(merged);
+    });
+
+    it('falls back to the local value for an out-of-range incoming value', () => {
+        const local: Settings = { theme: 'dark', gtd: { focusTaskLimit: 5 } };
+        const merged = sanitizeMergedSettingsForSync(
+            { theme: 'neon' as Settings['theme'], gtd: { focusTaskLimit: 9999 } },
+            local,
+        );
+
+        expect(merged.theme).toBe('dark');
+        expect(merged.gtd?.focusTaskLimit).toBe(5);
+    });
+});
+
+// Two behaviours worth pinning because they read as accidents. Both are reported
+// rather than changed: they are the current, shipped arbitration.
+describe('mergeSettingsForSync > documented quirks', () => {
+    // mergeGroup reads localSettings.syncPreferences, not the preferences it just
+    // merged, so a remote that re-enables a group only takes effect on the NEXT
+    // merge. The merged preference itself is stored immediately, so it converges.
+    it('honors the pre-merge opt-out even when the incoming side re-enabled the group', () => {
+        const local = stamp(
+            stamp({ theme: 'dark', syncPreferences: { appearance: false } }, 'appearance', OLDER),
+            'preferences',
+            OLDER,
+        );
+        const incoming = stamp(
+            stamp({ theme: 'light', syncPreferences: { appearance: true } }, 'appearance', NEWER),
+            'preferences',
+            NEWER,
+        );
+
+        const merged = mergeSettingsForSync(local, incoming);
+
+        expect(merged.syncPreferences?.appearance).toBe(true);
+        expect(merged.theme).toBe('dark');
+        // Second round, now that the opt-out is gone, the incoming value lands.
+        expect(mergeSettingsForSync(merged, incoming).theme).toBe('light');
+    });
+
+    // isSameValue compares with JSON.stringify, which is key-order sensitive, so
+    // two semantically identical objects count as a difference and the winner's
+    // copy (key order included) replaces the local one.
+    it('treats key-order-only differences as a change and takes the winner copy', () => {
+        const local = stamp({ ai: { enabled: true, model: 'shared-model' } }, 'ai', OLDER);
+        const incoming = stamp({ ai: { model: 'shared-model', enabled: true } }, 'ai', NEWER);
+
+        const merged = mergeSettingsForSync(local, incoming);
+
+        expect(merged.ai).toEqual({ enabled: true, model: 'shared-model', apiKey: undefined });
+        expect(Object.keys(merged.ai ?? {}).slice(0, 2)).toEqual(['model', 'enabled']);
     });
 });
