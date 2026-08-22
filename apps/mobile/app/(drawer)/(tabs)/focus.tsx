@@ -40,6 +40,7 @@ import {
   generateUUID,
   getProjectDeadlineBoosts,
   markSavedFilterDeleted,
+  getFocusStarBlockedText,
   normalizeFocusTaskLimit,
   resolveFeatureFlags,
   sortTasksBySavedPreference,
@@ -259,6 +260,8 @@ export default function FocusScreen() {
   const focusReorderPositionRef = useRef<number | null>(null);
   const { priorities: prioritiesEnabled, timeEstimates: timeEstimatesEnabled, pomodoro: pomodoroEnabled } = resolveFeatureFlags(settings);
   const focusTaskLimit = normalizeFocusTaskLimit(settings?.gtd?.focusTaskLimit);
+  const upcomingFocusBlockedLabel = getFocusStarBlockedText(t, { blockedReason: 'deferred' }, focusTaskLimit)
+    ?? undefined;
   const focusGroupBy = normalizeFocusGroupBy(settings?.gtd?.focusGroupBy);
   const { areaById, projectById, resolvedAreaFilter, visibleTasks } = useVisibleTaskContext();
   const visibleProjects = useMemo(() => (
@@ -1335,6 +1338,9 @@ export default function FocusScreen() {
           actions={rowActions}
           isHighlighted={item.task.id === highlightTaskId}
           showFocusToggle
+          // Every Upcoming row is deferred by construction, so the star could only
+          // ever refuse — disabled with the reason beats a tap that just toasts.
+          focusToggleDisabledLabel={section.type === 'upcoming' ? upcomingFocusBlockedLabel : undefined}
           showFocusHighlight={section.type !== 'focus'}
           hideStatusBadge={section.type !== 'reviewDue'}
           projectDeadlineLabel={projectDeadlineLabel}

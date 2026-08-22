@@ -71,6 +71,9 @@ export interface SwipeableTaskItemProps {
     onToggleSelect?: () => void;
     isHighlighted?: boolean;
     showFocusToggle?: boolean;
+    /** Announce-and-disable the star instead of offering a tap that can only refuse
+     *  (Focus "Upcoming": every row there is deferred by construction). */
+    focusToggleDisabledLabel?: string;
     /** Keep the focus star while allowing context-specific lists to avoid a redundant card outline. */
     showFocusHighlight?: boolean;
     hideStatusBadge?: boolean;
@@ -226,6 +229,7 @@ function SwipeableTaskItemInner({
     onToggleSelect,
     isHighlighted = false,
     showFocusToggle = false,
+    focusToggleDisabledLabel,
     showFocusHighlight = true,
     hideStatusBadge = false,
     statusBadgeAsIcon = false,
@@ -683,6 +687,7 @@ function SwipeableTaskItemInner({
             onToggleChecklist={toggleChecklist}
             onToggleChecklistItem={toggleChecklistItem}
             onToggleFocus={toggleFocus}
+            focusToggleDisabledLabel={task.isFocusedToday ? undefined : focusToggleDisabledLabel}
             projects={projects}
             selectionMode={selectionMode}
             sequenceCue={sequenceCue}

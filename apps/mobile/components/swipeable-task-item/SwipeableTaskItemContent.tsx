@@ -32,6 +32,8 @@ interface SwipeableTaskItemContentProps {
     accessibilityHint: string;
     accessibilityLabel: string;
     canShowFocusToggle: boolean;
+    /** When set, the star renders disabled with this as its label. */
+    focusToggleDisabledLabel?: string;
     checklistProgress: { completed: number; percent: number; total: number } | null;
     hideChecklistProgress: boolean;
     hideContexts: boolean;
@@ -78,6 +80,7 @@ export function SwipeableTaskItemContent({
     accessibilityLabel,
     areas,
     canShowFocusToggle,
+    focusToggleDisabledLabel,
     checklistProgress,
     hideChecklistProgress,
     hideContexts,
@@ -516,10 +519,13 @@ export function SwipeableTaskItemContent({
                                 event.stopPropagation();
                                 onToggleFocus();
                             }}
+                            disabled={Boolean(focusToggleDisabledLabel)}
                             hitSlop={8}
-                            style={styles.focusButton}
+                            style={[styles.focusButton, focusToggleDisabledLabel ? styles.focusButtonDisabled : null]}
                             accessibilityRole="button"
-                            accessibilityLabel={task.isFocusedToday ? t('agenda.removeFromFocus') : t('agenda.addToFocus')}
+                            accessibilityState={{ disabled: Boolean(focusToggleDisabledLabel) }}
+                            accessibilityLabel={focusToggleDisabledLabel
+                                ?? (task.isFocusedToday ? t('agenda.removeFromFocus') : t('agenda.addToFocus'))}
                         >
                             <FocusStarIcon
                                 focused={task.isFocusedToday === true}

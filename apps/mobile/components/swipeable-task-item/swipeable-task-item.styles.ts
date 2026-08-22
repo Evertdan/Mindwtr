@@ -50,6 +50,9 @@ export const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    focusButtonDisabled: {
+        opacity: 0.35,
+    },
     taskDescription: {
         fontSize: 12,
         marginTop: 2,

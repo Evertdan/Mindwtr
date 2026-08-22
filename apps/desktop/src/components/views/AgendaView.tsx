@@ -866,6 +866,18 @@ export function AgendaView() {
         };
     }, [focusTaskLimit, focusedCount, handleToggleFocus, t]);
 
+    // Every Upcoming row is deferred by construction, so the star can only ever
+    // refuse — the cap-only render gate above would show an enabled "Add to Focus"
+    // whose sole outcome is a toast. Disabled-with-the-reason instead, matching
+    // how the project Order row states an unavailable action rather than hiding it.
+    const buildUpcomingFocusToggle = useCallback((task: Task) => {
+        const toggle = buildFocusToggle(task);
+        if (toggle.isFocused) return toggle;
+        const deferredText = getFocusStarBlockedText(t, { blockedReason: 'deferred' }, focusTaskLimit)
+            ?? toggle.title;
+        return { ...toggle, canToggle: false, title: deferredText, ariaLabel: deferredText };
+    }, [buildFocusToggle, focusTaskLimit, t]);
+
     const toggleSection = useCallback((sectionKey: FocusSectionKey) => {
         setPersistedViewState((current) => ({
             ...current,
@@ -1266,7 +1278,7 @@ export function AgendaView() {
                             >
                                 <AgendaTaskList
                                     tasks={sections.upcoming}
-                                    buildFocusToggle={buildFocusToggle}
+                                    buildFocusToggle={buildUpcomingFocusToggle}
                                     showListDetails={showListDetails}
                                     highlightTaskId={highlightTaskId}
                                 />

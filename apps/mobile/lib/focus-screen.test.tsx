@@ -829,6 +829,31 @@ describe('FocusScreen', () => {
     vi.useRealTimers();
   });
 
+  it('disables the Upcoming star for rows that are deferred', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 3, 5, 12, 0, 0, 0));
+    storeState.tasks = [
+      makeTask('deferred-soon', { title: 'Deferred soon', startTime: '2026-04-08' }),
+      makeTask('plain-next', { title: 'Plain next' }),
+    ];
+
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<FocusScreen />);
+    });
+
+    const rows = tree.root.findAllByType(SwipeableTaskItem);
+    const upcomingRow = rows.find((node) => node.props.task.id === 'deferred-soon');
+    const nextRow = rows.find((node) => node.props.task.id === 'plain-next');
+    // Deferred by construction: the star can only refuse, so it announces why
+    // rather than offering a tap that ends in a toast.
+    expect(upcomingRow?.props.focusToggleDisabledLabel)
+      .toBe('This task is deferred; change its start date before focusing it.');
+    expect(nextRow?.props.focusToggleDisabledLabel).toBeUndefined();
+    vi.useRealTimers();
+  });
+
   it('renders mobile Next Actions flat by default', () => {
     storeState.tasks = [
       makeTask('work-next', { title: 'Work next', contexts: ['@work'] }),

@@ -372,6 +372,41 @@ it('uses the shared rounded star treatment for focused tasks', () => {
   expect(star.props.strokeWidth).toBe(2);
 });
 
+it('renders the focus star disabled with its reason when the caller blocks it', () => {
+  let tree!: renderer.ReactTestRenderer;
+  renderer.act(() => {
+    tree = renderer.create(
+      <SwipeableTaskItem
+        task={{
+          id: 'task-1',
+          title: 'File taxes',
+          status: 'next',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        } as any}
+        isDark={true}
+        tc={{
+          taskItemBg: '#111111',
+          border: '#222222',
+          text: '#ffffff',
+          secondaryText: '#999999',
+          tint: '#3b82f6',
+          warning: '#f59e0b',
+        } as any}
+        onPress={vi.fn()}
+        onStatusChange={vi.fn()}
+        onDelete={vi.fn()}
+        showFocusToggle
+        focusToggleDisabledLabel="This task is deferred"
+      />
+    );
+  });
+
+  const focusButton = tree.root.find((node) => node.props.accessibilityLabel === 'This task is deferred');
+  expect(focusButton.props.disabled).toBe(true);
+  expect(focusButton.props.accessibilityState).toEqual({ disabled: true });
+});
+
 it('can keep the focus star without adding a redundant focus outline', () => {
   let tree!: renderer.ReactTestRenderer;
   renderer.act(() => {

@@ -299,6 +299,42 @@ describe('AgendaView', () => {
         expect(queryByText('Far away task')).not.toBeInTheDocument();
     });
 
+    it('disables the Upcoming star for rows that are deferred', () => {
+        const now = new Date();
+        const inThreeDays = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 3, 9, 0, 0, 0);
+        const deferredTask: Task = {
+            id: 'deferred-task',
+            title: 'Deferred prep task',
+            status: 'next',
+            startTime: inThreeDays.toISOString(),
+            tags: [],
+            contexts: [],
+            createdAt: nowIso,
+            updatedAt: nowIso,
+        };
+
+        useTaskStore.setState({
+            tasks: [deferredTask],
+            _allTasks: [deferredTask],
+            projects: [],
+            _allProjects: [],
+            areas: [],
+            _allAreas: [],
+            settings: {},
+            highlightTaskId: null,
+        });
+
+        const { getByLabelText } = renderAgenda();
+
+        const upcomingSection = document.getElementById('agenda-section-upcoming');
+        expect(upcomingSection).not.toBeNull();
+        // Every Upcoming row is deferred, so the star states the reason instead of
+        // offering an "Add to Focus" whose only outcome is a refusal toast.
+        const star = getByLabelText('This task is deferred; change its start date before focusing it.');
+        expect(upcomingSection).toContainElement(star);
+        expect(star).toBeDisabled();
+    });
+
     it('shows an empty state when active tasks do not produce agenda sections', () => {
         const inboxTask: Task = {
             id: 'inbox-task',
