@@ -503,20 +503,6 @@ export const replaceEntityInMap = <T extends EntityWithId>(
     return nextItemsById;
 };
 
-export const replaceEntitiesInMap = <T extends EntityWithId>(
-    itemsById: Map<string, T>,
-    nextItems: readonly T[]
-): Map<string, T> => {
-    if (nextItems.length === 0) return itemsById;
-    let nextItemsById: Map<string, T> | null = null;
-    for (const nextItem of nextItems) {
-        if (itemsById.get(nextItem.id) === nextItem) continue;
-        if (!nextItemsById) nextItemsById = new Map(itemsById);
-        nextItemsById.set(nextItem.id, nextItem);
-    }
-    return nextItemsById ?? itemsById;
-};
-
 export const reuseArrayIfShallowEqual = <T>(previous: T[], next: T[]): T[] => (
     previous.length === next.length && previous.every((item, index) => item === next[index])
         ? previous
