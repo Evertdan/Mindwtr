@@ -1437,6 +1437,22 @@ describe('attachment sync', () => {
       expect(attachment?.contentRev).toBe(1);
     });
 
+    it('refuses a public http WebDAV target before making any request (SEC-10a)', async () => {
+      // The expo-file-system uploader talks to the server directly, so core's cleartext
+      // guard never sees it; without the mobile guard this streamed Basic credentials
+      // and the file's bytes in the clear.
+      const core = await import('@mindwtr/core');
+      const { syncWebdavAttachments } = await import('./attachment-sync');
+      const config = { url: 'http://public.example/data.json', username: 'u', password: 'p' };
+
+      await expect(
+        syncWebdavAttachments(makeEditedAppData('insecure-webdav'), config, 'http://public.example')
+      ).rejects.toThrow(/HTTPS/);
+
+      expect(core.webdavMakeDirectory).not.toHaveBeenCalled();
+      expect(core.webdavPutFile).not.toHaveBeenCalled();
+    });
+
     it('re-uploads a WebDAV attachment during prepare but re-downloads the very same mismatch post-merge', async () => {
       const localUri = 'file://document/attachments/edited-webdav.txt';
       const config = { url: 'https://example.com/data.json', username: 'u', password: 'p' };

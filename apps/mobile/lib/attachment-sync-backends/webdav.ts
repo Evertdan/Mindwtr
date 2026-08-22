@@ -41,7 +41,7 @@ import {
   WEBDAV_ATTACHMENT_RETRY_OPTIONS,
   writeBytesSafely,
 } from '../attachment-sync-utils';
-import { getMobileWebDavRequestOptions } from '../webdav-request-options';
+import { assertMobileWebdavConnection, getMobileWebDavRequestOptions } from '../webdav-request-options';
 import {
   assertAttachmentSyncNotAborted,
   isAttachmentSyncAbortError,
@@ -100,6 +100,9 @@ export const syncWebdavAttachments = async (
   };
 
   const attachmentsDirUrl = `${baseSyncUrl}/${ATTACHMENTS_DIR_NAME}`;
+  // Outside the try below: a refused connection is not a "directory already exists"
+  // failure to shrug off, and swallowing it let the whole insecure pass continue (SEC-10a).
+  assertMobileWebdavConnection(attachmentsDirUrl, webDavConfig.allowInsecureHttp);
   try {
     await webdavMakeDirectory(attachmentsDirUrl, {
       ...getMobileWebDavRequestOptions(webDavConfig.allowInsecureHttp),
@@ -270,6 +273,7 @@ export const syncWebdavAttachments = async (
               attachment.mimeType || DEFAULT_CONTENT_TYPE,
               webDavConfig.username,
               webDavConfig.password,
+              webDavConfig.allowInsecureHttp,
               (loaded, total) => reportProgress(attachment.id, 'upload', loaded, total, 'active'),
               uploadBytes,
               signal

@@ -16,6 +16,7 @@ import {
   DEFAULT_CONTENT_TYPE,
 } from '../attachment-sync-utils';
 import { mobileSyncCryptoPrimitives } from '../sync-crypto-native';
+import { assertMobileWebdavConnection } from '../webdav-request-options';
 
 /**
  * Attachment bytes at the storage seam (#1056). Local attachment files always stay
@@ -229,10 +230,14 @@ export const uploadWebdavFileWithFileSystem = async (
   contentType: string,
   username: string,
   password: string,
+  allowInsecureHttp: boolean | undefined,
   onProgress?: (sent: number, total: number) => void,
   totalBytes?: number,
   signal?: AbortSignal
 ): Promise<boolean> => {
+  // Before anything is read or sent: this uploader bypasses core's transports, so it is
+  // the only place the cleartext guard can run for it (SEC-10a).
+  assertMobileWebdavConnection(url, allowInsecureHttp);
   assertUploadNotAborted(signal);
   const uploadAsync = (FileSystem as any).uploadAsync;
   if (typeof uploadAsync !== 'function') return false;
