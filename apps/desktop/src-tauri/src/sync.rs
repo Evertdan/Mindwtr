@@ -8433,6 +8433,53 @@ mod tests {
         );
         assert!(!is_sync_lock_contention(&error));
     }
+
+    fn cheap_encrypted_artifact(passphrase: &str) -> Vec<u8> {
+        let params = SyncCryptoKdfParams { m_kib: 64, t: 1, p: 1 };
+        let material = derive_sync_key_material(passphrase, random_salt(), params)
+            .expect("derive test key material");
+        crate::sync_crypto::encrypt_sync_artifact(b"{\"tasks\":[]}", &material)
+            .expect("encrypt test artifact")
+    }
+
+    #[test]
+    fn passphrase_verify_accepts_correct_passphrase_on_stable_bytes() {
+        let artifact = cheap_encrypted_artifact("correct horse");
+        let outcome = verify_sync_passphrase_with_reread("correct horse", "test", || {
+            Ok(artifact.clone())
+        })
+        .expect("verify should not error");
+        assert!(outcome.is_some());
+    }
+
+    #[test]
+    fn passphrase_verify_reports_wrong_passphrase_once_bytes_read_stable() {
+        let artifact = cheap_encrypted_artifact("correct horse");
+        let mut reads = 0;
+        let outcome = verify_sync_passphrase_with_reread("battery staple", "test", || {
+            reads += 1;
+            Ok(artifact.clone())
+        })
+        .expect("verify should not error");
+        assert!(outcome.is_none());
+        // One initial read plus exactly one reread confirming the bytes settled.
+        assert_eq!(reads, 2);
+    }
+
+    #[test]
+    fn passphrase_verify_retries_a_torn_read_instead_of_reporting_wrong_passphrase() {
+        let artifact = cheap_encrypted_artifact("correct horse");
+        let mut torn = artifact.clone();
+        let last = torn.len() - 1;
+        torn[last] ^= 0x01;
+        let mut reads = 0;
+        let outcome = verify_sync_passphrase_with_reread("correct horse", "test", move || {
+            reads += 1;
+            Ok(if reads == 1 { torn.clone() } else { artifact.clone() })
+        })
+        .expect("verify should not error");
+        assert!(outcome.is_some());
+    }
 }
 
 #[tauri::command]
@@ -10305,6 +10352,50 @@ pub(crate) fn change_sync_encryption_passphrase(
     persist_enabled_material(&app, &next)
 }
 
+/// Core of the passphrase check, with the artifact read injected so the
+/// stable-bytes rule is testable without an AppHandle.
+///
+/// An AES-GCM auth failure is also what a torn read of a file another device is
+/// mid-writing produces (network mounts don't guarantee atomic visibility), and
+/// reporting that as "wrong passphrase" sent a tester chasing a passphrase that
+/// was correct (#1056). A wrong passphrase fails the same way against a settled
+/// file, so an auth failure only counts once the bytes read stable.
+fn verify_sync_passphrase_with_reread(
+    passphrase: &str,
+    artifact_label: &str,
+    mut read_artifact: impl FnMut() -> Result<Vec<u8>, String>,
+) -> Result<Option<SyncKeyMaterial>, String> {
+    let mut bytes = read_artifact()?;
+    // ponytail: bounded reread loop, not a folder lock — a concurrent writer can
+    // still slip between the auth failure and the reread, and the next attempt
+    // by the user covers that.
+    for attempt in 0..3 {
+        let header = match inspect_sync_artifact(&bytes) {
+            SyncArtifactInspection::Encrypted(header) => header,
+            SyncArtifactInspection::Unsupported(reason) => return Err(terminal_error(reason)),
+            SyncArtifactInspection::Plaintext => {
+                return Err(terminal_error(format!(
+                    "{artifact_label} is not an encrypted sync document"
+                )))
+            }
+        };
+        let material = derive_sync_key_material(passphrase, header.salt, header.params)
+            .map_err(|error| terminal_error(error))?;
+        match decrypt_sync_artifact(&bytes, &material.key) {
+            Ok(_) => return Ok(Some(material)),
+            Err(SyncCryptoError::Auth) => {
+                let reread = read_artifact()?;
+                if reread == bytes || attempt == 2 {
+                    return Ok(None);
+                }
+                bytes = reread;
+            }
+            Err(error) => return Err(terminal_error(error)),
+        }
+    }
+    Ok(None)
+}
+
 /// Validates a passphrase against the folder's current `.enc` base document. Never mutates the
 /// remote either way: a wrong passphrase is a plain answer, not an error and not a write.
 #[tauri::command(async)]
@@ -10315,27 +10406,16 @@ pub(crate) fn provide_sync_encryption_passphrase(
 ) -> Result<String, String> {
     let sync_dir = require_file_backend_dir(&app, path)?;
     let encrypted = sync_dir.join(encrypted_artifact_name(DATA_FILE_NAME));
-    let bytes = fs::read(&encrypted)
-        .map_err(|error| format!("Failed to read {}: {error}", encrypted.display()))?;
-    let header = match inspect_sync_artifact(&bytes) {
-        SyncArtifactInspection::Encrypted(header) => header,
-        SyncArtifactInspection::Unsupported(reason) => return Err(terminal_error(reason)),
-        SyncArtifactInspection::Plaintext => {
-            return Err(terminal_error(format!(
-                "{} is not an encrypted sync document",
-                encrypted.display()
-            )))
-        }
-    };
-    let material = derive_sync_key_material(&passphrase, header.salt, header.params)
-        .map_err(|error| terminal_error(error))?;
-    match decrypt_sync_artifact(&bytes, &material.key) {
-        Ok(_) => {
+    let label = encrypted.display().to_string();
+    let outcome = verify_sync_passphrase_with_reread(&passphrase, &label, || {
+        fs::read(&encrypted).map_err(|error| format!("Failed to read {label}: {error}"))
+    })?;
+    match outcome {
+        Some(material) => {
             persist_enabled_material(&app, &material)?;
             Ok("ok".to_string())
         }
-        Err(SyncCryptoError::Auth) => Ok("wrong-passphrase".to_string()),
-        Err(error) => Err(terminal_error(error)),
+        None => Ok("wrong-passphrase".to_string()),
     }
 }
 
