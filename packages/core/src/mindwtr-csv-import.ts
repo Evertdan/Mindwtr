@@ -895,9 +895,10 @@ export const applyMindwtrCsvImport = (
     // or moved, preserve the task and repair only its container references after creation.
     tasksForImport.forEach((task) => {
         // An `ID` column holding a live task's own id IS the identity — that is what Mindwtr's
-        // own CSV export writes, so a round trip must update those tasks rather than mint
-        // derived ids and duplicate them (D1). Only non-explicit identities fall through to the
-        // derived-id chain below.
+        // own CSV export writes, so a round trip resolves back onto those same tasks rather than
+        // minting derived ids and duplicating them (D1). `import-apply.ts` then SKIPS every id
+        // that already exists, so a round trip is a no-op, not an update: CSV edits are not
+        // applied. Only non-explicit identities fall through to the derived-id chain below.
         if (task.sourceIdentityKind === 'explicit-id' && currentTaskById.has(task.sourceId)) {
             resolvedIds.task.set(task.sourceKey, task.sourceId);
             return;

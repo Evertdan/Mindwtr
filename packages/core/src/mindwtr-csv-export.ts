@@ -2,9 +2,10 @@ import { MINDWTR_CSV_COLUMNS } from './mindwtr-csv-columns';
 import type { AppData, Task } from './types';
 
 /**
- * Writes the format `mindwtr-csv-import.ts` reads, so an export can be edited in
- * a spreadsheet and imported back onto the same tasks (the ID column is always
- * written, which is what makes the re-import an update rather than a duplicate).
+ * Writes the format `mindwtr-csv-import.ts` reads. The ID column is always written,
+ * which is what keeps a re-import from duplicating tasks: `import-apply.ts` SKIPS
+ * every row whose id already exists. It does not update them, so edits made to an
+ * exported file are deliberately not pushed back in — the app is the edit surface.
  *
  * TOMBSTONES ARE EXCLUDED, which diverges from `serializeBackupData` — that keeps
  * soft-deleted and purged rows because a JSON backup has to restore sync state.
