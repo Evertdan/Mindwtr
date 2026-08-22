@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest';
 const plugin = require('./android-manifest-fixes');
 
 const {
+    BACKUP_RULES_XML,
+    DATA_EXTRACTION_RULES_XML,
     buildContextIntentFilter,
+    ensureBackupRules,
     ensureContextAutomationHeadlessService,
     ensureContextAutomationReceiver,
     removeContextIntentFilters,
@@ -60,6 +63,41 @@ describe('android-manifest-fixes', () => {
         },
       },
     ]);
+  });
+
+  it('takes over the backup rules from expo-secure-store', () => {
+    const application = {
+      $: {
+        'android:fullBackupContent': '@xml/secure_store_backup_rules',
+        'android:dataExtractionRules': '@xml/secure_store_data_extraction_rules',
+        'android:allowBackup': 'true',
+      },
+    };
+
+    ensureBackupRules(application);
+
+    expect(application.$['android:fullBackupContent']).toBe('@xml/mindwtr_backup_rules');
+    expect(application.$['android:dataExtractionRules']).toBe('@xml/mindwtr_data_extraction_rules');
+    expect(application.$['android:allowBackup']).toBe('true');
+  });
+
+  it('enrolls nothing in backup or device transfer', () => {
+    // expo-secure-store's rules include every sharedpref file, so any new one
+    // would be silently enrolled. Ours name a path that does not exist, which
+    // is how an exhaustive include list says "nothing" — an empty rule set
+    // would mean "everything".
+    [BACKUP_RULES_XML, DATA_EXTRACTION_RULES_XML].forEach((xml) => {
+      const includes = xml.match(/<include [^>]*\/>/g) ?? [];
+      expect(includes.length).toBeGreaterThan(0);
+      includes.forEach((include) => {
+        expect(include).toContain('path="mindwtr_backup_none"');
+      });
+      expect(xml).not.toContain('path="."');
+    });
+
+    expect(BACKUP_RULES_XML).toContain('<full-backup-content>');
+    expect(DATA_EXTRACTION_RULES_XML).toContain('<cloud-backup>');
+    expect(DATA_EXTRACTION_RULES_XML).toContain('<device-transfer>');
   });
 
   it('removes profileable shell access by default', () => {
