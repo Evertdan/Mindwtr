@@ -56,7 +56,7 @@ import { useTheme } from '../../contexts/theme-context';
 import { useToast } from '../../contexts/toast-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { useVisibleTaskContext } from '@/hooks/use-visible-tasks';
-import { getAssignedToSuggestions } from '../task-metadata-suggestions';
+import { getAssignedToSuggestions, rankTokenSuggestions } from '../task-metadata-suggestions';
 import { buildAIConfig, isAIKeyRequired, loadAIKey } from '../../lib/ai-config';
 import { logWarn } from '../../lib/app-log';
 import {
@@ -282,28 +282,14 @@ export function useInboxProcessingController({
     () => getAssignedToSuggestions(tasks, delegateWho, MAX_TOKEN_SUGGESTIONS, people),
     [delegateWho, people, tasks],
   );
-  const contextCopilotSuggestions = useMemo(() => {
-    const selected = new Set(selectedContexts);
-    const candidates = contextSuggestionPool.filter((token) => !selected.has(token));
-    if (candidates.length === 0) return [];
-    const fromInput = candidates.filter((token) => {
-      const normalizedToken = token.slice(1).toLowerCase();
-      return suggestionTerms.some((term) => normalizedToken.includes(term));
-    });
-    const merged = [...fromInput, ...candidates.filter((token) => !fromInput.includes(token))];
-    return merged.slice(0, MAX_TOKEN_SUGGESTIONS);
-  }, [contextSuggestionPool, selectedContexts, suggestionTerms]);
-  const tagCopilotSuggestions = useMemo(() => {
-    const selected = new Set(selectedTags);
-    const candidates = tagSuggestionPool.filter((token) => !selected.has(token));
-    if (candidates.length === 0) return [];
-    const fromInput = candidates.filter((token) => {
-      const normalizedToken = token.slice(1).toLowerCase();
-      return suggestionTerms.some((term) => normalizedToken.includes(term));
-    });
-    const merged = [...fromInput, ...candidates.filter((token) => !fromInput.includes(token))];
-    return merged.slice(0, MAX_TOKEN_SUGGESTIONS);
-  }, [selectedTags, suggestionTerms, tagSuggestionPool]);
+  const contextCopilotSuggestions = useMemo(
+    () => rankTokenSuggestions(contextSuggestionPool, selectedContexts, suggestionTerms, MAX_TOKEN_SUGGESTIONS),
+    [contextSuggestionPool, selectedContexts, suggestionTerms],
+  );
+  const tagCopilotSuggestions = useMemo(
+    () => rankTokenSuggestions(tagSuggestionPool, selectedTags, suggestionTerms, MAX_TOKEN_SUGGESTIONS),
+    [selectedTags, suggestionTerms, tagSuggestionPool],
+  );
 
   const projectFilterAreaId = selectedAreaId || undefined;
   const areaFilteredProjects = useMemo(

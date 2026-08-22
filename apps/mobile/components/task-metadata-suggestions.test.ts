@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Task } from '@mindwtr/core';
 
-import { getAssignedToSuggestions } from './task-metadata-suggestions';
+import { getAssignedToSuggestions, rankTokenSuggestions } from './task-metadata-suggestions';
 
 const task = (id: string, assignedTo: string | undefined, updatedAt: string): Task => ({
   id,
@@ -37,5 +37,27 @@ describe('task metadata suggestions', () => {
     };
 
     expect(getAssignedToSuggestions([deletedTask], 'ale', 5)).toEqual([]);
+  });
+});
+
+describe('rankTokenSuggestions', () => {
+  const pool = ['@home', '@work', '@calls'];
+
+  it('floats term matches ahead of the rest of the pool', () => {
+    expect(rankTokenSuggestions(pool, [], ['cal'], 5)).toEqual(['@calls', '@home', '@work']);
+  });
+
+  it('drops already-selected tokens', () => {
+    expect(rankTokenSuggestions(pool, ['@home'], [], 5)).toEqual(['@work', '@calls']);
+    expect(rankTokenSuggestions(pool, pool, ['cal'], 5)).toEqual([]);
+  });
+
+  it('matches on the token body, not its prefix character', () => {
+    expect(rankTokenSuggestions(['#home'], [], ['#'], 5)).toEqual(['#home']);
+    expect(rankTokenSuggestions(['#home'], [], ['home'], 5)).toEqual(['#home']);
+  });
+
+  it('caps the result at the limit', () => {
+    expect(rankTokenSuggestions(pool, [], ['o'], 2)).toEqual(['@home', '@work']);
   });
 });
