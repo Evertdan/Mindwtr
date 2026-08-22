@@ -863,8 +863,13 @@ function App() {
 
         const autoSyncController = createDesktopAutoSyncController({
             canSync: () => canDesktopAutoSync(SyncService),
-            isSyncEncryptionLocked: async () =>
-                (await SyncService.getSyncEncryptionStatus()).state === 'remote-encrypted-no-key',
+            isSyncEncryptionLocked: async () => {
+                // Both states are terminal until the user acts, so neither may keep auto-sync
+                // retrying: no key for an encrypted remote, or a key for a remote that went
+                // back to plaintext.
+                const { state } = await SyncService.getSyncEncryptionStatus();
+                return state === 'remote-encrypted-no-key' || state === 'remote-plaintext';
+            },
             performSync,
             flushPendingSave,
             reportError,

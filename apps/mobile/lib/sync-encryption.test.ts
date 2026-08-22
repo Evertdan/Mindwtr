@@ -131,6 +131,7 @@ import {
   deriveSyncKeyMaterial,
   inspectSyncArtifact,
   SYNC_CRYPTO_DEFAULT_KDF_PARAMS,
+  SyncEncryptionRemotePlaintextError,
   SyncEncryptionTerminalError,
   encryptSyncArtifact,
   type SyncKeyMaterial,
@@ -148,8 +149,10 @@ import {
 } from './sync-crypto-native';
 import {
   __resetSyncEncryptionStateForTests,
+  flushSyncEncryptionLocalState,
   getMobileSyncEncryptionStatus,
   getSyncEncryptionMaterial,
+  isSyncEncryptionBlocked,
   SyncEncryptionKeyMissingError,
   SyncEncryptionNoKeyError,
   syncEncryptionKeyCache,
@@ -545,4 +548,43 @@ describe('File Sync transitions through core orchestration', () => {
       tasks: [{ title: 'cycle-write' }],
     });
   }, 30_000);
+});
+
+describe('local-state persistence and the remote-plaintext state', () => {
+  it('File Sync: a keyed device treats a peer-disabled folder as terminal, not as an empty folder', async () => {
+    // The inverse of `discoverEncryptedSyncFolder`: a peer ran the disable transition, so the
+    // `.enc` artifact is gone and the plaintext original is back.
+    syncEncryptionLocalState.write({ state: 'enabled', discoveredSalt: 'aabb', discoveredParams: FAST_PARAMS });
+    fs.files.set(SYNC_URI, new TextEncoder().encode(JSON.stringify(appData('peer'), null, 2)));
+
+    await expect(readSyncFile(SYNC_URI, { material })).rejects.toBeInstanceOf(SyncEncryptionRemotePlaintextError);
+
+    await flushSyncEncryptionLocalState();
+    expect(syncEncryptionLocalState.read()?.state).toBe('remote-plaintext');
+    // Nothing on the folder is touched on this path.
+    expect(JSON.parse(new TextDecoder().decode(fs.files.get(SYNC_URI)!))).toMatchObject({ tasks: [{ title: 'peer' }] });
+  });
+
+  it('File Sync: a genuinely empty folder still reads as empty', async () => {
+    syncEncryptionLocalState.write({ state: 'enabled', discoveredSalt: 'aabb', discoveredParams: FAST_PARAMS });
+    await expect(readSyncFile(SYNC_URI, { material })).resolves.toBeNull();
+  });
+
+  it('remote-plaintext blocks auto-sync but keeps the key resolvable so disable can still run', async () => {
+    await syncEncryptionKeyCache.setKey(material.key);
+    syncEncryptionLocalState.write({
+      state: 'remote-plaintext',
+      discoveredSalt: Array.from(material.salt, (byte) => byte.toString(16).padStart(2, '0')).join(''),
+      discoveredParams: FAST_PARAMS,
+    });
+    await flushSyncEncryptionLocalState();
+    __resetSyncEncryptionStateForTests(); // prove it survives a reload, not just the cache
+
+    await expect(isSyncEncryptionBlocked()).resolves.toBe(true);
+    await expect(getSyncEncryptionMaterial()).resolves.toMatchObject({ key: material.key });
+    await expect(getMobileSyncEncryptionStatus()).resolves.toEqual({
+      state: 'remote-plaintext',
+      kdfParams: FAST_PARAMS,
+    });
+  });
 });

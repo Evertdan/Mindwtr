@@ -1024,6 +1024,8 @@ export const zhHant: Record<string, string> = {
         'settings.syncEncryptionDecline': '暫時不要',
         'settings.syncEncryptionPausedDesc': '在您輸入密碼短語之前，本裝置的自動同步會保持暫停。',
         'settings.syncEncryptionRemoteEncrypted': '此同步位置已加密。請輸入其同步密碼短語以繼續同步。',
+        'settings.syncEncryptionRemotePlaintext': '同步已停止：此同步位置不再加密。請在此裝置上關閉同步加密，或在該同步位置重新啟用加密。',
+        'settings.syncEncryptionRemotePlaintextDesc': '另一台裝置在此同步位置關閉了加密。此裝置上的內容沒有被變更或降級。若要以純文字繼續同步，請在此裝置上關閉同步加密；否則請在該同步位置重新啟用加密。',
         'settings.syncEncryptionPassphraseNeeded': '同步已停止：此位置的同步密碼短語無效。請重新輸入以繼續。',
         'settings.syncPreferences': '設置同步選項',
         'settings.syncPreferencesDesc': '選擇要在設備間同步的偏好設置。',

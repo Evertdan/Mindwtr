@@ -1080,6 +1080,8 @@ export const en: Record<string, string> = {
         'settings.syncEncryptionDecline': 'Not now',
         'settings.syncEncryptionPausedDesc': 'Automatic sync stays paused on this device until you enter the passphrase.',
         'settings.syncEncryptionRemoteEncrypted': 'This sync location is encrypted. Enter its sync passphrase to continue syncing.',
+        'settings.syncEncryptionRemotePlaintext': 'Sync stopped: this sync location is no longer encrypted. Turn sync encryption off on this device, or turn it back on at the sync location.',
+        'settings.syncEncryptionRemotePlaintextDesc': 'Another device turned encryption off at this sync location. Nothing here has been changed or downgraded. Turn sync encryption off on this device to keep syncing in plain form, or turn encryption back on at the sync location.',
         'settings.syncEncryptionPassphraseNeeded': 'Sync stopped: the sync passphrase for this location did not work. Enter it again to continue.',
         'settings.syncPreferences': 'Settings sync options',
         'settings.syncPreferencesDesc': 'Choose which preferences stay in sync across devices.',

@@ -23,7 +23,9 @@ import {
     runDisableSyncEncryptionOverRemote,
     runEnableSyncEncryptionOverRemote,
     runProvideSyncEncryptionPassphraseOverRemote,
+    SYNC_ENCRYPTION_KEYED_STATES,
     SyncCryptoUnsupportedError,
+    SyncEncryptionRemotePlaintextError,
     SyncEncryptionTerminalError,
     uploadDropboxFile,
     webdavDeleteFile,
@@ -108,7 +110,8 @@ export async function getSyncEncryptionMaterial(): Promise<SyncKeyMaterial | nul
         invokeNativeOr<NativeStatus | null>(null, 'get_sync_encryption_status'),
     ]);
     const material = payload ? toMaterial(payload) : null;
-    materialCache = { material, enabledButLocked: status?.state === 'enabled' && !material };
+    const keyed = Boolean(status && SYNC_ENCRYPTION_KEYED_STATES.includes(status.state));
+    materialCache = { material, enabledButLocked: keyed && !material };
     return material;
 }
 
@@ -142,6 +145,14 @@ export async function markRemoteSyncEncryptionDiscovered(discovered: {
         salt: bytesToHex(discovered.salt),
         kdfParams: discovered.params,
     });
+    clearSyncEncryptionMaterialCache();
+}
+
+/** Persists `remote-plaintext` when a TS seam holds a key and finds the sync location back in
+ *  plaintext (a peer disabled encryption there). Mirrors core's `markRemotePlaintextDiscovered`;
+ *  Rust refuses to move any state but `enabled`, so this is safe to call from a read path. */
+export async function markRemoteSyncEncryptionPlaintext(): Promise<void> {
+    await invokeNativeOr(null, 'mark_sync_encryption_remote_plaintext');
     clearSyncEncryptionMaterialCache();
 }
 
@@ -447,14 +458,16 @@ export async function openAttachmentBytes(bytes: Uint8Array): Promise<Uint8Array
 /** Rust's sentinels, mirrored from apps/desktop/src-tauri/src/sync_encryption.rs. */
 export const SYNC_ENCRYPTION_TERMINAL = 'SYNC_ENCRYPTION_TERMINAL';
 export const SYNC_ENCRYPTION_REMOTE_ENCRYPTED = 'SYNC_ENCRYPTION_REMOTE_ENCRYPTED';
+export const SYNC_ENCRYPTION_REMOTE_PLAINTEXT = 'SYNC_ENCRYPTION_REMOTE_PLAINTEXT';
 
-export type SyncEncryptionFailure = 'needs-passphrase' | 'remote-encrypted-no-key';
+export type SyncEncryptionFailure = 'needs-passphrase' | 'remote-encrypted-no-key' | 'remote-plaintext';
 
 /** A decrypt failure is never a permission problem and never "corrupt data we repaired" — it
  *  is always "this device needs the passphrase again". Returning a discriminant (rather than a
  *  message) keeps the prose out of this module: desktop's toast-i18n test scans showToast's
  *  first argument for literals, so the caller resolves the string. */
 export function classifySyncEncryptionFailure(error: unknown): SyncEncryptionFailure | null {
+    if (error instanceof SyncEncryptionRemotePlaintextError) return 'remote-plaintext';
     if (error instanceof SyncEncryptionTerminalError) return 'needs-passphrase';
     const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
     // `includes`, not `startsWith`: a Tauri rejection travels through the sync run's own error
@@ -462,6 +475,7 @@ export function classifySyncEncryptionFailure(error: unknown): SyncEncryptionFai
     // way. The two sentinels do not share a prefix, so order only decides which wins on the
     // (impossible) both-present case.
     if (message.includes(SYNC_ENCRYPTION_REMOTE_ENCRYPTED)) return 'remote-encrypted-no-key';
+    if (message.includes(SYNC_ENCRYPTION_REMOTE_PLAINTEXT)) return 'remote-plaintext';
     if (message.includes(SYNC_ENCRYPTION_TERMINAL)) return 'needs-passphrase';
     return null;
 }

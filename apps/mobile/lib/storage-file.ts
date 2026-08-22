@@ -8,18 +8,25 @@ import {
     decryptRemoteArtifactOrThrow,
     encryptSyncArtifact,
     inspectSyncArtifact,
+    isPlaintextSyncArtifact,
     LEGACY_SYNC_FILE_NAME,
     markRemoteEncryptionDiscovered,
+    markRemotePlaintextDiscovered,
     sleep,
     SYNC_FILE_NAME,
     syncEncryptedArtifactName,
+    SyncEncryptionRemotePlaintextError,
     SyncEncryptionTerminalError,
     type SyncKeyMaterial,
 } from '@mindwtr/core';
 import { Platform } from 'react-native';
 import { logError, logInfo, logWarn } from './app-log';
 import { mobileSyncCryptoPrimitives } from './sync-crypto-native';
-import { SyncEncryptionNoKeyError, syncEncryptionLocalState } from './sync-encryption-state';
+import {
+    flushSyncEncryptionLocalState,
+    SyncEncryptionNoKeyError,
+    syncEncryptionLocalState,
+} from './sync-encryption-state';
 import {
     readSyncArtifactBytes,
     resolveSyncArtifactSiblingUri,
@@ -615,9 +622,20 @@ const readEncryptedSyncFile = async (
     const encUri = await resolveSyncArtifactSiblingUri(resolvedUri, encryptedLeafNameFor(resolvedUri), {
         createIfMissing: false,
     });
-    if (!encUri) return null;
-    const bytes = await readSyncArtifactBytes(encUri);
-    if (!bytes || bytes.length === 0) return null;
+    const bytes = encUri ? await readSyncArtifactBytes(encUri) : null;
+    if (!bytes || bytes.length === 0) {
+        // Inverse of discoverEncryptedSyncFolder: a peer ran the disable transition here, so
+        // the `.enc` artifact is gone and the plaintext original is back. Never "no data" —
+        // that would merge this device's store into a fresh plaintext generation and fork the
+        // folder, and this device never follows the remote down to plaintext on its own.
+        const plain = await readSyncArtifactBytes(resolvedUri).catch(() => null);
+        if (isPlaintextSyncArtifact(plain)) {
+            markRemotePlaintextDiscovered(syncEncryptionLocalState);
+            await flushSyncEncryptionLocalState();
+            throw new SyncEncryptionRemotePlaintextError();
+        }
+        return null;
+    }
     const plaintext = await decryptRemoteArtifactOrThrow(bytes, material.key, mobileSyncCryptoPrimitives);
     return parseAppData(new TextDecoder().decode(plaintext));
 };
@@ -712,7 +730,9 @@ export const readSyncFile = async (fileUri: string, options?: SyncFileAccessOpti
         // three lines does not fail a test today. They exist so that a future wording
         // change ("...is not valid JSON container...") cannot silently turn a wrong
         // passphrase into "no remote data, overwrite it".
-        if (error instanceof SyncEncryptionNoKeyError || error instanceof SyncEncryptionTerminalError) {
+        if (error instanceof SyncEncryptionNoKeyError
+            || error instanceof SyncEncryptionRemotePlaintextError
+            || error instanceof SyncEncryptionTerminalError) {
             void logWarn('Sync file is encrypted and could not be read with the current key', { scope: 'sync' });
             throw error;
         }

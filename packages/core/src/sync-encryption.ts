@@ -26,7 +26,17 @@ import {
     type SyncKeyMaterial,
 } from './sync-crypto';
 
-export type SyncEncryptionState = 'off' | 'enabled' | 'remote-encrypted-no-key';
+/** `remote-plaintext` is the inverse of `remote-encrypted-no-key`: this device holds a key
+ *  and the sync location has gone back to plaintext (a peer disabled encryption there). It
+ *  behaves exactly like `enabled` wherever key material is resolved — the key is still valid
+ *  and the user's remedy (disabling encryption here too) needs it — and differs only in what
+ *  status reports and in that sync is terminal until the user acts. */
+export type SyncEncryptionState = 'off' | 'enabled' | 'remote-encrypted-no-key' | 'remote-plaintext';
+
+/** The states in which this device owns a usable key. Every material/key resolver must treat
+ *  them alike: dropping to "off" for `remote-plaintext` is precisely the silent downgrade
+ *  that state exists to prevent. */
+export const SYNC_ENCRYPTION_KEYED_STATES: readonly SyncEncryptionState[] = ['enabled', 'remote-plaintext'];
 
 export type SyncEncryptionStatus = {
     state: SyncEncryptionState;
@@ -92,6 +102,29 @@ export class SyncEncryptionTerminalError extends Error {
         super(cause.message);
         this.name = 'SyncEncryptionTerminalError';
     }
+}
+
+/**
+ * Thrown by a read seam that holds a key, finds no encrypted artifact, and finds a plaintext
+ * document in its place — a peer disabled encryption at the sync location. Terminal on
+ * purpose: merging would fork the folder into two generations, and following the remote down
+ * to plaintext automatically would let anyone with write access to the storage strip
+ * encryption from every device. The user disables encryption here (or re-enables it there).
+ */
+export class SyncEncryptionRemotePlaintextError extends Error {
+    constructor(message = 'the sync location is no longer encrypted') {
+        super(message);
+        this.name = 'SyncEncryptionRemotePlaintextError';
+    }
+}
+
+/** True when `bytes` are a present, non-empty, non-MWENC1 artifact — i.e. a plaintext sync
+ * document sitting where a keyed device expects ciphertext. An empty or whitespace-only file
+ * is not evidence of anything and stays "empty remote". */
+export function isPlaintextSyncArtifact(bytes: Uint8Array | null | undefined): boolean {
+    if (!bytes || bytes.length === 0) return false;
+    if (inspectSyncArtifact(bytes).kind !== 'plaintext') return false;
+    return bytes.some((byte) => byte > 0x20);
 }
 
 /** Decrypt-or-fail-closed: the one function every storage seam should call instead of
@@ -226,12 +259,24 @@ export function markRemoteEncryptionDiscovered(
     discovered: { salt: Uint8Array; params: SyncCryptoKdfParams },
 ): void {
     const current = localState.read();
-    if (current && current.state === 'enabled') return;
+    if (current && SYNC_ENCRYPTION_KEYED_STATES.includes(current.state)) return;
     localState.write({
         state: 'remote-encrypted-no-key',
         discoveredSalt: bytesToHex(discovered.salt),
         discoveredParams: discovered.params,
     });
+}
+
+/** The inverse direction of `markRemoteEncryptionDiscovered`, called from a read seam that
+ * holds a key and finds the sync location back in plaintext. Only an `enabled` device can
+ * reach this state — a device with no key of its own has nothing to fork. Salt and params are
+ * carried over deliberately: the key must stay resolvable so the user can run the disable
+ * transition, which is the only sanctioned way out. Mirrored by Rust's
+ * `mark_remote_plaintext` for the file backend. */
+export function markRemotePlaintextDiscovered(localState: SyncEncryptionLocalStatePort): void {
+    const current = localState.read();
+    if (!current || current.state !== 'enabled') return;
+    localState.write({ ...current, state: 'remote-plaintext' });
 }
 
 /** declineSyncEncryptionPassphrase(): re-affirms (never clears) the persisted no-key

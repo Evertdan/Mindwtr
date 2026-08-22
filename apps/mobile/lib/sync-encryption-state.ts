@@ -21,6 +21,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
+    SYNC_ENCRYPTION_KEYED_STATES,
     type SyncCryptoKdfParams,
     type SyncEncryptionKeyCachePort,
     type SyncEncryptionLocalState,
@@ -82,7 +83,9 @@ const parseLocalState = (raw: string | null): SyncEncryptionLocalState | null =>
     if (!raw) return null;
     try {
         const parsed = JSON.parse(raw) as Partial<SyncEncryptionLocalState>;
-        if (parsed?.state !== 'enabled' && parsed?.state !== 'remote-encrypted-no-key') return null;
+        if (parsed?.state !== 'enabled'
+            && parsed?.state !== 'remote-encrypted-no-key'
+            && parsed?.state !== 'remote-plaintext') return null;
         return {
             state: parsed.state,
             discoveredSalt: typeof parsed.discoveredSalt === 'string' ? parsed.discoveredSalt : undefined,
@@ -110,6 +113,16 @@ export const loadSyncEncryptionLocalState = async (): Promise<SyncEncryptionLoca
     return cachedLocalState;
 };
 
+// Core's port shape is synchronous while AsyncStorage is not, so writes are queued behind this
+// chain and `flushSyncEncryptionLocalState()` awaits them — mirroring desktop's queued/flush
+// pair. Without it a transition could return (and its caller report success) while the state
+// that survives a restart was still in flight, or had failed silently.
+let pendingLocalStateWrites: Promise<unknown> = Promise.resolve();
+
+export const flushSyncEncryptionLocalState = async (): Promise<void> => {
+    await pendingLocalStateWrites;
+};
+
 export const syncEncryptionLocalState: SyncEncryptionLocalStatePort = {
     read: () => cachedLocalState,
     write: (state) => {
@@ -118,12 +131,13 @@ export const syncEncryptionLocalState: SyncEncryptionLocalStatePort = {
         const persist = state === null
             ? AsyncStorage.removeItem(SYNC_ENCRYPTION_STATE_KEY)
             : AsyncStorage.setItem(SYNC_ENCRYPTION_STATE_KEY, JSON.stringify(state));
-        void persist.catch((error: unknown) => {
+        const settled = persist.catch((error: unknown) => {
             void logWarn('Failed to persist sync encryption state', {
                 scope: 'sync',
                 extra: { error: error instanceof Error ? error.message : String(error) },
             });
         });
+        pendingLocalStateWrites = pendingLocalStateWrites.then(() => settled);
     },
 };
 
@@ -166,7 +180,9 @@ const hexToBytes = (hex: string): Uint8Array => {
  */
 export const getSyncEncryptionMaterial = async (): Promise<SyncKeyMaterial | null> => {
     const state = await loadSyncEncryptionLocalState();
-    if (state?.state !== 'enabled') return null;
+    // `remote-plaintext` keeps resolving material on purpose: treating it as "off" is exactly
+    // the silent downgrade that state exists to prevent (see SYNC_ENCRYPTION_KEYED_STATES).
+    if (!state || !SYNC_ENCRYPTION_KEYED_STATES.includes(state.state)) return null;
     if (!state.discoveredSalt || !state.discoveredParams) throw new SyncEncryptionKeyMissingError();
     const key = await syncEncryptionKeyCache.getKey();
     if (!key) throw new SyncEncryptionKeyMissingError();
@@ -182,10 +198,17 @@ export const getMobileSyncEncryptionStatus = async (): Promise<SyncEncryptionSta
 /** True when this device must NOT auto-sync: the remote is encrypted and we have no key
  *  (pinned decision #5 — automatic and background sync stay off until the user supplies
  *  the passphrase through an explicit manual action). */
-export const isSyncEncryptionBlocked = async (): Promise<boolean> =>
-    (await loadSyncEncryptionLocalState())?.state === 'remote-encrypted-no-key';
+/** True when this device must NOT auto-sync. Two shapes: the remote is encrypted and we have
+ *  no key, or the remote went back to plaintext while we hold one. Both are terminal until the
+ *  user acts (supply the passphrase / turn encryption off here), and both would corrupt the
+ *  remote's generation if a background cycle went ahead. */
+export const isSyncEncryptionBlocked = async (): Promise<boolean> => {
+    const state = (await loadSyncEncryptionLocalState())?.state;
+    return state === 'remote-encrypted-no-key' || state === 'remote-plaintext';
+};
 
 export const __resetSyncEncryptionStateForTests = (): void => {
     cachedLocalState = null;
     hydrated = false;
+    pendingLocalStateWrites = Promise.resolve();
 };

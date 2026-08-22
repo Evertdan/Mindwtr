@@ -77,6 +77,28 @@ describe('dropbox sync-document encryption', () => {
         expect(result.encryptedNoKey!.salt.length).toBe(16);
     });
 
+    // The other direction of the same one-extra-probe rule: a peer disabled encryption, so
+    // `/data.json.enc` is gone and `/data.json` is back. "Empty remote" here would push this
+    // device's whole store into a fresh generation and fork the two silently.
+    it('an enabled device reports a peer-disabled (plaintext-restored) remote instead of treating it as empty', async () => {
+        const { files, fetcher } = createFakeDropbox();
+        const material = await deriveSyncKeyMaterial('pw', new Uint8Array(16).fill(4), FAST_KDF);
+        await uploadDropboxAppData('token', { tasks: [] } as unknown as AppData, null, fetcher); // the peer's plaintext write
+        expect(files.has('/data.json.enc')).toBe(false);
+
+        const result = await downloadDropboxAppData('token', fetcher, { material });
+        expect(result.data).toBeNull();
+        expect(result.remotePlaintext).toBe(true);
+    });
+
+    it('an enabled device still reports an empty remote when neither path exists', async () => {
+        const { fetcher } = createFakeDropbox();
+        const material = await deriveSyncKeyMaterial('pw', new Uint8Array(16).fill(5), FAST_KDF);
+        const result = await downloadDropboxAppData('token', fetcher, { material });
+        expect(result.data).toBeNull();
+        expect(result.remotePlaintext).toBeUndefined();
+    });
+
     it('a wrong key fails closed on download instead of returning garbage', async () => {
         const { fetcher } = createFakeDropbox();
         const material = await deriveSyncKeyMaterial('pw', new Uint8Array(16).fill(3), FAST_KDF);

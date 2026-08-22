@@ -1056,6 +1056,8 @@ export const svOverrides: Record<string, string> = {
         'settings.syncEncryptionDecline': 'Inte nu',
         'settings.syncEncryptionPausedDesc': 'Automatisk synkronisering är pausad på den här enheten tills du anger lösenfrasen.',
         'settings.syncEncryptionRemoteEncrypted': 'Den här synkplatsen är krypterad. Ange synklösenfrasen för att fortsätta synka.',
+        'settings.syncEncryptionRemotePlaintext': 'Synkningen stoppades: den här synkplatsen är inte längre krypterad. Stäng av synkkryptering på den här enheten, eller slå på den igen på synkplatsen.',
+        'settings.syncEncryptionRemotePlaintextDesc': 'En annan enhet stängde av krypteringen på den här synkplatsen. Ingenting här har ändrats eller nedgraderats. Stäng av synkkryptering på den här enheten för att fortsätta synka i klartext, eller slå på krypteringen igen på synkplatsen.',
         'settings.syncEncryptionPassphraseNeeded': 'Synkroniseringen stoppades: synklösenfrasen för den här platsen fungerade inte. Ange den igen för att fortsätta.',
         'settings.syncPreferences': 'Synkalternativ för inställningar',
         'settings.syncPreferencesDesc': 'Välj vilka inställningar som synkas mellan enheter.',

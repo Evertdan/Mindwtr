@@ -44,12 +44,21 @@ pub(crate) const SYNC_ENCRYPTION_TERMINAL: &str = "SYNC_ENCRYPTION_TERMINAL";
 /// The command layer persists `remote-encrypted-no-key` before surfacing this to TS.
 pub(crate) const SYNC_ENCRYPTION_REMOTE_ENCRYPTED: &str = "SYNC_ENCRYPTION_REMOTE_ENCRYPTED";
 
+/// The inverse: returned when a device that HOLDS a key finds no encrypted artifact and a
+/// plaintext document in its place -- a peer disabled encryption at the sync location. The
+/// command layer persists `remote-plaintext` before surfacing it. Never auto-downgrades:
+/// following the remote to plaintext would let anyone with write access to the storage strip
+/// encryption from every device.
+pub(crate) const SYNC_ENCRYPTION_REMOTE_PLAINTEXT: &str = "SYNC_ENCRYPTION_REMOTE_PLAINTEXT";
+
 pub(crate) fn terminal_error(reason: impl std::fmt::Display) -> String {
     format!("{SYNC_ENCRYPTION_TERMINAL}: {reason}")
 }
 
 pub(crate) fn is_terminal_error(error: &str) -> bool {
-    error.starts_with(SYNC_ENCRYPTION_TERMINAL) || error.starts_with(SYNC_ENCRYPTION_REMOTE_ENCRYPTED)
+    error.starts_with(SYNC_ENCRYPTION_TERMINAL)
+        || error.starts_with(SYNC_ENCRYPTION_REMOTE_ENCRYPTED)
+        || error.starts_with(SYNC_ENCRYPTION_REMOTE_PLAINTEXT)
 }
 
 /// `data.json` -> `data.json.enc`; `data.json.bak` -> `data.json.enc.bak`; `data.json.bak.previous`
@@ -127,7 +136,7 @@ impl From<KdfParamsPayload> for SyncCryptoKdfParams {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SyncEncryptionLocalState {
-    /// "off" | "enabled" | "remote-encrypted-no-key"
+    /// "off" | "enabled" | "remote-encrypted-no-key" | "remote-plaintext"
     pub state: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub salt: Option<String>,
@@ -142,6 +151,15 @@ pub(crate) struct SyncEncryptionLocalState {
 pub(crate) const STATE_OFF: &str = "off";
 pub(crate) const STATE_ENABLED: &str = "enabled";
 pub(crate) const STATE_REMOTE_ENCRYPTED_NO_KEY: &str = "remote-encrypted-no-key";
+pub(crate) const STATE_REMOTE_PLAINTEXT: &str = "remote-plaintext";
+
+/// The states in which this device owns a usable key. `remote-plaintext` is one of them on
+/// purpose: dropping to "encryption off" there is exactly the silent downgrade the state
+/// exists to prevent, and the user's only sanctioned way out -- running the disable
+/// transition -- needs the key. Mirrors core's `SYNC_ENCRYPTION_KEYED_STATES`.
+pub(crate) fn state_holds_key(state: &str) -> bool {
+    state == STATE_ENABLED || state == STATE_REMOTE_PLAINTEXT
+}
 
 // Serializes the sidecar's read-modify-write spans. Deliberately NOT
 // lock_config_read_modify_write: this file is not config.toml, nothing here goes through
@@ -168,7 +186,7 @@ fn sync_encryption_state_path(app: &tauri::AppHandle) -> PathBuf {
 fn read_state_file(path: &Path) -> Option<SyncEncryptionLocalState> {
     let raw = std::fs::read_to_string(path).ok()?;
     let parsed: SyncEncryptionLocalState = serde_json::from_str(&raw).ok()?;
-    if parsed.state == STATE_ENABLED || parsed.state == STATE_REMOTE_ENCRYPTED_NO_KEY {
+    if state_holds_key(&parsed.state) || parsed.state == STATE_REMOTE_ENCRYPTED_NO_KEY {
         Some(parsed)
     } else {
         None
@@ -258,7 +276,7 @@ fn decode_key(encoded: &str) -> Option<[u8; KEY_LEN]> {
 /// treat that as "encryption off for this read/write", which is the pre-feature behavior.
 pub(crate) fn resolve_key_material(app: &tauri::AppHandle) -> Option<SyncKeyMaterial> {
     let state = read_local_state(app)?;
-    if state.state != STATE_ENABLED {
+    if !state_holds_key(&state.state) {
         return None;
     }
     let salt_bytes = hex_to_bytes(state.salt.as_deref()?)?;
@@ -272,7 +290,7 @@ pub(crate) fn resolve_key_material(app: &tauri::AppHandle) -> Option<SyncKeyMate
 /// True when this device believes the remote is encrypted, whether or not it has the key.
 /// Used by the seams to decide between the `.enc` names and the plaintext ones.
 pub(crate) fn is_encryption_enabled(app: &tauri::AppHandle) -> bool {
-    read_local_state(app).is_some_and(|state| state.state == STATE_ENABLED)
+    read_local_state(app).is_some_and(|state| state_holds_key(&state.state))
 }
 
 pub(crate) fn persist_enabled_material(
@@ -300,7 +318,7 @@ pub(crate) fn mark_remote_encrypted_no_key(
     params: SyncCryptoKdfParams,
 ) -> Result<(), String> {
     if let Some(current) = read_local_state(app) {
-        if current.state == STATE_ENABLED {
+        if state_holds_key(&current.state) {
             return Ok(());
         }
     }
@@ -312,6 +330,23 @@ pub(crate) fn mark_remote_encrypted_no_key(
             kdf_params: Some(params.into()),
             fallback_key: None,
         }),
+    )
+}
+
+/// Mirrors core's `markRemotePlaintextDiscovered`: only an `enabled` device can reach this
+/// state, and its salt/params/fallback key are carried over unchanged so the key stays
+/// resolvable -- running the disable transition is the only sanctioned way out and it needs
+/// one.
+pub(crate) fn mark_remote_plaintext(app: &tauri::AppHandle) -> Result<(), String> {
+    let Some(current) = read_local_state(app) else {
+        return Ok(());
+    };
+    if current.state != STATE_ENABLED {
+        return Ok(());
+    }
+    write_local_state(
+        app,
+        Some(&SyncEncryptionLocalState { state: STATE_REMOTE_PLAINTEXT.to_string(), ..current }),
     )
 }
 
@@ -381,7 +416,7 @@ pub(crate) fn get_sync_encryption_status(
             has_key: false,
         });
     };
-    let has_key = state.state == STATE_ENABLED
+    let has_key = state_holds_key(&state.state)
         && keyring_key_available(&app)
             .or_else(|| state.fallback_key.clone())
             .and_then(|encoded| decode_key(&encoded))
@@ -451,6 +486,13 @@ pub(crate) fn mark_sync_encryption_remote_discovered(
 ) -> Result<(), String> {
     let salt_bytes = hex_to_bytes(&salt).ok_or_else(|| "Sync encryption salt must be hex".to_string())?;
     mark_remote_encrypted_no_key(&app, &salt_bytes, kdf_params.into())
+}
+
+/// Called by the TS seams (Dropbox / WebDAV-under-override) the moment they find the sync
+/// location back in plaintext while this device still holds a key.
+#[tauri::command(async)]
+pub(crate) fn mark_sync_encryption_remote_plaintext(app: tauri::AppHandle) -> Result<(), String> {
+    mark_remote_plaintext(&app)
 }
 
 #[cfg(test)]

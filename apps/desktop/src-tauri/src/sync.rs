@@ -36,9 +36,9 @@ use crate::sync_crypto::{
 };
 use crate::sync_encryption::{
     bytes_to_hex, clear_encryption_state, encrypted_artifact_name, hex_to_bytes,
-    is_encryption_enabled, is_terminal_error, mark_remote_encrypted_no_key,
+    is_encryption_enabled, is_terminal_error, mark_remote_encrypted_no_key, mark_remote_plaintext,
     persist_enabled_material, plaintext_artifact_name, resolve_key_material, terminal_error,
-    SYNC_ENCRYPTION_REMOTE_ENCRYPTED,
+    SYNC_ENCRYPTION_REMOTE_ENCRYPTED, SYNC_ENCRYPTION_REMOTE_PLAINTEXT,
 };
 #[cfg(target_os = "macos")]
 use crate::{
@@ -4596,6 +4596,36 @@ mod tests {
         assert!(is_terminal_error(&error), "expected a terminal error, got: {error}");
         assert_eq!(fs::read(dir.path().join("data.json.enc")).expect("after"), before);
         assert!(!dir.path().join(DATA_FILE_NAME).exists());
+    }
+
+    #[test]
+    fn an_enabled_device_treats_a_peer_disabled_folder_as_terminal_rather_than_empty() {
+        // The inverse of `plain_named_ciphertext_is_classified_before_...`: a peer ran the
+        // disable transition, so `data.json.enc` is gone and `data.json` is back. Reporting an
+        // empty remote here would merge this device's whole store into a fresh plaintext
+        // generation and fork the folder permanently.
+        let dir = tempfile::tempdir().expect("temp dir");
+        let material = test_material(2);
+        fs::write(dir.path().join(DATA_FILE_NAME), br#"{"tasks":[{"id":"peer"}]}"#).expect("plain");
+
+        let error = read_sync_file_versioned_from_dir_with(dir.path(), SyncFileCrypto::Enabled(&material))
+            .expect_err("a plaintext-restored folder must not read as empty");
+
+        assert_eq!(error, SYNC_ENCRYPTION_REMOTE_PLAINTEXT);
+        assert!(is_terminal_error(&error), "the sentinel must classify as terminal");
+        assert_eq!(
+            fs::read(dir.path().join(DATA_FILE_NAME)).expect("plain"),
+            br#"{"tasks":[{"id":"peer"}]}"#
+        );
+    }
+
+    #[test]
+    fn an_enabled_device_still_reads_a_genuinely_empty_folder_as_empty() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let material = test_material(3);
+        let read = read_sync_file_with_source_from_dir_with(dir.path(), SyncFileCrypto::Enabled(&material))
+            .expect("an empty folder is not a fork");
+        assert_eq!(read.source, SyncFileReadSource::Empty);
     }
 
     #[test]
@@ -9192,14 +9222,18 @@ fn read_sync_file_with_source_from_dir_with(
         if let Some(result) = read_seed_or_legacy_file() {
             return result;
         }
-        // Detection (decision #2): only an off-state device, and only once the whole plaintext
-        // chain has come up empty — which is exactly the "first sync" / "a peer enabled
-        // encryption and removed the plaintext" shape. A populated plaintext folder never gets
-        // here, so an existing install pays no extra IO for this (invariant #1).
+        // Detection (decision #2): only once the whole chain for THIS device's generation has
+        // come up empty — which is exactly the "first sync" / "a peer flipped encryption at
+        // the sync location" shape. A populated folder never gets here, so an existing install
+        // pays no extra IO for this (invariant #1). Off-state looks for ciphertext; a keyed
+        // device looks for the plaintext a peer's disable transition restored, because
+        // treating that as an empty remote would merge into a fresh generation and fork.
         if !crypto.is_on() {
             if let Some(discovery) = detect_encrypted_sync_document(sync_dir) {
                 return Err(discovery);
             }
+        } else if plaintext_sync_document_exists(sync_dir) {
+            return Err(SYNC_ENCRYPTION_REMOTE_PLAINTEXT.to_string());
         }
         return Ok(SyncFileRead {
             data: empty_remote_app_data(),
@@ -9253,6 +9287,16 @@ fn classify_encrypted_bytes(path: &Path) -> Option<String> {
         SyncArtifactInspection::Unsupported(reason) => Some(terminal_error(reason)),
         SyncArtifactInspection::Plaintext => None,
     }
+}
+
+/// True when a non-empty, non-MWENC1 sync document sits at the plaintext name. Mirrors core's
+/// `isPlaintextSyncArtifact`; an empty or whitespace-only file is evidence of nothing.
+fn plaintext_sync_document_exists(sync_dir: &Path) -> bool {
+    let Ok(bytes) = fs::read(sync_dir.join(DATA_FILE_NAME)) else {
+        return false;
+    };
+    matches!(inspect_sync_artifact(&bytes), SyncArtifactInspection::Plaintext)
+        && bytes.iter().any(|byte| *byte > 0x20)
 }
 
 fn detect_encrypted_sync_document(sync_dir: &Path) -> Option<String> {
@@ -9352,6 +9396,9 @@ fn persist_discovery_and_reduce<T>(
             if let Some((salt, params)) = parse_encrypted_discovery(&error) {
                 mark_remote_encrypted_no_key(app, &salt, params)?;
                 return Err(SYNC_ENCRYPTION_REMOTE_ENCRYPTED.to_string());
+            }
+            if error == SYNC_ENCRYPTION_REMOTE_PLAINTEXT {
+                mark_remote_plaintext(app)?;
             }
             Err(error)
         }

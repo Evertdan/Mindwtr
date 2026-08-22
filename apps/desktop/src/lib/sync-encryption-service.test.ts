@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { inspectSyncArtifact, SyncEncryptionTerminalError } from '@mindwtr/core';
 
 type NativeState = {
-    state: 'off' | 'enabled' | 'remote-encrypted-no-key';
+    state: 'off' | 'enabled' | 'remote-encrypted-no-key' | 'remote-plaintext';
     salt?: string;
     kdfParams?: { mKib: number; t: number; p: number };
     key?: string;
@@ -43,7 +43,10 @@ vi.mock('./tauri-invoke', () => {
                     ? { state: 'off', hasKey: false }
                     : { state: native.state.state, kdfParams: native.state.kdfParams, hasKey: Boolean(native.state.key) };
             case 'get_sync_encryption_key_material':
-                return native.state.state === 'enabled' && native.state.key
+                // `remote-plaintext` still holds a key on purpose (see SYNC_ENCRYPTION_KEYED_STATES).
+                return native.state.state !== 'off'
+                    && native.state.state !== 'remote-encrypted-no-key'
+                    && native.state.key
                     ? { key: native.state.key, salt: native.state.salt, kdfParams: native.state.kdfParams }
                     : null;
             case 'set_sync_encryption_key_material':
@@ -56,6 +59,11 @@ vi.mock('./tauri-invoke', () => {
                 return null;
             case 'clear_sync_encryption_key_material':
                 native.state = { state: 'off' };
+                return null;
+            case 'mark_sync_encryption_remote_plaintext':
+                if (native.state.state === 'enabled') {
+                    native.state = { ...native.state, state: 'remote-plaintext' };
+                }
                 return null;
             case 'mark_sync_encryption_remote_discovered':
                 if (native.state.state !== 'enabled') {
@@ -91,6 +99,7 @@ const {
     createDropboxRemotePort,
     createWebdavRemotePort,
     getSyncEncryptionStatus,
+    markRemoteSyncEncryptionPlaintext,
     openAttachmentBytes,
     runDisableOverRemote,
     runEnableOverRemote,
@@ -335,11 +344,29 @@ describe('attachment bytes', () => {
 });
 
 describe('failure classification', () => {
+    it('persists remote-plaintext without disturbing the cached key', async () => {
+        native.state = {
+            state: 'enabled',
+            key: bytesToBase64(new Uint8Array(32).fill(7)),
+            salt: '00'.repeat(16),
+            kdfParams: { mKib: 19456, t: 2, p: 1 },
+        };
+        clearSyncEncryptionMaterialCache();
+
+        await markRemoteSyncEncryptionPlaintext();
+
+        expect(native.state.state).toBe('remote-plaintext');
+        // The key must survive: running the disable transition is the only way out and needs it.
+        expect(native.state.key).toBeTruthy();
+    });
+
     it('maps decrypt failures to a passphrase signal and leaves everything else alone', () => {
         expect(classifySyncEncryptionFailure('SYNC_ENCRYPTION_TERMINAL: wrong passphrase or corrupted data'))
             .toBe('needs-passphrase');
         expect(classifySyncEncryptionFailure('SYNC_ENCRYPTION_REMOTE_ENCRYPTED'))
             .toBe('remote-encrypted-no-key');
+        expect(classifySyncEncryptionFailure('SYNC_ENCRYPTION_REMOTE_PLAINTEXT'))
+            .toBe('remote-plaintext');
         expect(classifySyncEncryptionFailure(new Error('SYNC_ENCRYPTION_TERMINAL: nope')))
             .toBe('needs-passphrase');
         // The two failure classes it must never be confused with.

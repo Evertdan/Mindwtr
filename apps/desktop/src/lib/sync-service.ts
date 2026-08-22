@@ -14,6 +14,7 @@ import {
     webdavPutSyncDocument,
     syncEncryptedArtifactName,
     SyncCryptoUnsupportedError,
+    SyncEncryptionRemotePlaintextError,
     SyncEncryptionTerminalError,
     buildCloudCalendarFeedUrl,
     cloudGetJson,
@@ -37,6 +38,7 @@ import {
     computeSyncPayloadFingerprint,
     computeCoveredSettingsFingerprint,
     areSyncPayloadsEqual,
+    collectAttachmentsById,
     findDeletedAttachmentsForFileCleanup,
     findOrphanedAttachments,
     injectExternalCalendars as injectExternalCalendarsForSync,
@@ -113,6 +115,7 @@ import {
     getSyncEncryptionStatus as readSyncEncryptionStatus,
     isSyncEncryptionFailure,
     markRemoteSyncEncryptionDiscovered,
+    markRemoteSyncEncryptionPlaintext,
     runChangePassphraseOverRemote,
     runDisableOverRemote,
     runEnableOverRemote,
@@ -309,6 +312,11 @@ const resolveSyncText = (key: string, fallback: string): string => resolveI18nTe
  *  carry the wording until its locale keys land. */
 const resolveSyncFailureMessage = (rawError: string | undefined): string => {
     switch (classifySyncEncryptionFailure(rawError)) {
+        case 'remote-plaintext':
+            return resolveSyncText(
+                'settings.syncEncryptionRemotePlaintext',
+                'Sync stopped: this sync location is no longer encrypted. Turn sync encryption off on this device, or turn it back on at the sync location.',
+            );
         case 'remote-encrypted-no-key':
             return resolveSyncText(
                 'settings.syncEncryptionRemoteEncrypted',
@@ -735,6 +743,25 @@ const getAttachmentCleanupDeps = (
     logSyncWarning,
     resolveWebdavPassword,
 });
+
+/**
+ * Pure in-memory gate for the attachment phases, mirroring mobile's
+ * `hasPendingAttachmentSyncWork`. `preSyncAttachmentsBeforeFastCheck` makes the
+ * prepare phase run on every tick (#1057), and every desktop backend opens with
+ * directory-ensure / rate-limit-probe IO before it looks at a single attachment —
+ * so a store with no file attachments paid a network round trip per cycle for
+ * loops it was always going to run zero times. Same shape as the
+ * `runAttachmentCleanup` short-circuit below: no IO, only what is already loaded.
+ */
+const hasAttachmentSyncWork = (data: AppData): boolean => {
+    if ((data.settings.attachments?.pendingRemoteDeletes?.length ?? 0) > 0) return true;
+    for (const attachment of collectAttachmentsById(data).values()) {
+        if (attachment.kind !== 'file') continue;
+        if (attachment.deletedAt) continue;
+        return true;
+    }
+    return false;
+};
 
 const getSyncConfigDeps = () => ({
     isTauriRuntimeEnv,
@@ -2138,6 +2165,10 @@ export class SyncService {
                         new SyncCryptoUnsupportedError('the WebDAV remote is encrypted and this device has no key'),
                     );
                 }
+                if (result.state === 'remote-plaintext') {
+                    await markRemoteSyncEncryptionPlaintext();
+                    throw new SyncEncryptionRemotePlaintextError('the WebDAV remote is no longer encrypted');
+                }
                 return logMissingRemote(result.data);
             },
             webdavPut: async (sanitized) => {
@@ -2313,6 +2344,14 @@ export class SyncService {
                 throw new SyncEncryptionTerminalError(
                     new SyncCryptoUnsupportedError('the Dropbox remote is encrypted and this device has no key'),
                 );
+            }
+            // The mirror case: this device has a key and the remote is back in plaintext, so a
+            // peer disabled encryption there. Also never "no data" — merging would fork the
+            // account into two generations, and writing plaintext would follow whoever removed
+            // the ciphertext down to it.
+            if (result.remotePlaintext) {
+                await markRemoteSyncEncryptionPlaintext();
+                throw new SyncEncryptionRemotePlaintextError('the Dropbox remote is no longer encrypted');
             }
             return result;
         };
@@ -2758,6 +2797,7 @@ export class SyncService {
                     },
                     acceptCoveredSnapshot: (expectedData) => SyncService.isCoveredLocalSnapshot(expectedData),
                     cleanupAttachmentTempFiles: () => cleanupAttachmentTempFiles(getAttachmentCleanupDeps()),
+                    shouldRunAttachmentPhase: async (data) => hasAttachmentSyncWork(data),
                     runAttachmentCleanup: async (data, cleanupContext) => {
                         const orphanedAttachments = findOrphanedAttachments(data);
                         const deletedAttachments = findDeletedAttachmentsForFileCleanup(data);

@@ -4,6 +4,7 @@ import {
     decryptRemoteArtifactOrThrow,
     getSyncEncryptionStatusFromLocalState,
     markRemoteEncryptionDiscovered,
+    markRemotePlaintextDiscovered,
     reaffirmRemoteEncryptionNoKey,
     runChangeSyncEncryptionPassphraseOverRemote,
     runDisableSyncEncryptionOverRemote,
@@ -367,5 +368,41 @@ describe('fail-closed decrypt', () => {
         const sealed = await encryptSyncArtifact(utf8('secret'), material);
         const wrongKey = new Uint8Array(32).fill(9);
         await expect(decryptSyncArtifact(sealed, wrongKey)).rejects.toBeInstanceOf(SyncCryptoAuthError);
+    });
+});
+
+describe('remote-plaintext discovery (a peer disabled encryption at the sync location)', () => {
+    it('marks an enabled device terminal while keeping its salt/params (the key stays usable)', () => {
+        const localState = createFakeLocalState();
+        localState.write({ state: 'enabled', discoveredSalt: 'aabb', discoveredParams: FAST_KDF });
+
+        markRemotePlaintextDiscovered(localState);
+
+        expect(localState.value).toEqual({
+            state: 'remote-plaintext',
+            discoveredSalt: 'aabb',
+            discoveredParams: FAST_KDF,
+        });
+        expect(getSyncEncryptionStatusFromLocalState(localState).state).toBe('remote-plaintext');
+    });
+
+    it('never touches a device that holds no key of its own', () => {
+        const localState = createFakeLocalState();
+        markRemotePlaintextDiscovered(localState);
+        expect(localState.value).toBeNull();
+
+        markRemoteEncryptionDiscovered(localState, { salt: new Uint8Array(16).fill(1), params: SYNC_CRYPTO_DEFAULT_KDF_PARAMS });
+        markRemotePlaintextDiscovered(localState);
+        expect(localState.value?.state).toBe('remote-encrypted-no-key');
+    });
+
+    it('does not let a later ciphertext discovery downgrade it to no-key', () => {
+        const localState = createFakeLocalState();
+        localState.write({ state: 'enabled', discoveredSalt: 'aabb', discoveredParams: FAST_KDF });
+        markRemotePlaintextDiscovered(localState);
+
+        markRemoteEncryptionDiscovered(localState, { salt: new Uint8Array(16).fill(2), params: SYNC_CRYPTO_DEFAULT_KDF_PARAMS });
+
+        expect(localState.value?.state).toBe('remote-plaintext');
     });
 });

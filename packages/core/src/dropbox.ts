@@ -5,7 +5,7 @@ import {
     parseDropboxMetadataRev,
     resolveDropboxPath,
 } from './dropbox-sync-utils';
-import { decryptRemoteArtifactOrThrow, syncEncryptedArtifactName } from './sync-encryption';
+import { decryptRemoteArtifactOrThrow, isPlaintextSyncArtifact, syncEncryptedArtifactName } from './sync-encryption';
 import { encryptSyncArtifact, inspectSyncArtifact, type SyncCryptoKdfParams, type SyncCryptoPrimitives, type SyncKeyMaterial } from './sync-crypto';
 
 const DROPBOX_SYNC_PATH = '/data.json';
@@ -51,6 +51,10 @@ export type DropboxDownloadResult = {
      *  like it is) MWENC1-encrypted. Callers persist this via sync-encryption.ts's
      *  markRemoteEncryptionDiscovered; never treated as "no data". */
     encryptedNoKey?: { salt: Uint8Array; params: SyncCryptoKdfParams };
+    /** Set instead of `data` when this call HAS a key, `/data.json.enc` is gone, and a
+     *  plaintext `/data.json` is in its place — a peer disabled encryption at the sync
+     *  location. Callers persist `remote-plaintext` and abort; never treated as "no data". */
+    remotePlaintext?: true;
 };
 
 export type DropboxSyncCrypto = {
@@ -130,6 +134,21 @@ export async function downloadDropboxAppData(
                 if (inspected.kind === 'encrypted') {
                     return { data: null, rev: null, encryptedNoKey: { salt: inspected.salt, params: inspected.params } };
                 }
+            }
+        } else {
+            // Mirror of the probe above, in the other direction and gated the same way: this
+            // device HAS a key and its `.enc` path is empty, so one look at the plain path
+            // tells "first sync" apart from "a peer disabled encryption here".
+            const probe = await fetcher(DOWNLOAD_ENDPOINT, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Dropbox-API-Arg': JSON.stringify({ path: DROPBOX_SYNC_PATH }),
+                },
+            });
+            if (probe.status === 401) throw new DropboxUnauthorizedError('Dropbox download failed: HTTP 401');
+            if (probe.ok && isPlaintextSyncArtifact(new Uint8Array(await probe.arrayBuffer()))) {
+                return { data: null, rev: null, remotePlaintext: true };
             }
         }
         return { data: null, rev: null };

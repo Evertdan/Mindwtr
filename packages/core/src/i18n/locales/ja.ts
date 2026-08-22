@@ -1087,6 +1087,8 @@ export const jaOverrides: Record<string, string> = {
         'settings.syncEncryptionDecline': '後で',
         'settings.syncEncryptionPausedDesc': 'パスフレーズを入力するまで、この端末の自動同期は停止したままになります。',
         'settings.syncEncryptionRemoteEncrypted': 'この同期先は暗号化されています。同期を続けるには、同期パスフレーズを入力してください。',
+        'settings.syncEncryptionRemotePlaintext': '同期を停止しました: この同期先はもう暗号化されていません。このデバイスで同期の暗号化をオフにするか、同期先で暗号化をもう一度オンにしてください。',
+        'settings.syncEncryptionRemotePlaintextDesc': '別のデバイスがこの同期先の暗号化をオフにしました。この端末側では何も変更も解除もされていません。平文のまま同期を続けるにはこのデバイスで同期の暗号化をオフにし、そうでなければ同期先で暗号化をもう一度オンにしてください。',
         'settings.syncEncryptionPassphraseNeeded': '同期を停止しました。この同期先のパスフレーズが使えませんでした。もう一度入力して続けてください。',
         'settings.syncPreferences': '設定の同期範囲',
         'settings.syncPreferencesDesc': 'どの設定を端末間でそろえるかを選べます。',

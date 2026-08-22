@@ -9,7 +9,7 @@ import {
     toUint8Array,
 } from './http-utils';
 import { logWarn } from './logger';
-import { decryptRemoteArtifactOrThrow, syncEncryptedArtifactName } from './sync-encryption';
+import { decryptRemoteArtifactOrThrow, isPlaintextSyncArtifact, syncEncryptedArtifactName } from './sync-encryption';
 import { encryptSyncArtifact, inspectSyncArtifact, type SyncCryptoPrimitives, type SyncKeyMaterial } from './sync-crypto';
 
 export interface WebDavOptions {
@@ -473,7 +473,13 @@ export type WebDavSyncDataResult<T> =
      *  this call has no key for. Callers persist this via
      *  sync-encryption.ts's markRemoteEncryptionDiscovered and must not treat it as
      *  "no data" or attempt any repair/rotation. */
-    | { state: 'encrypted-no-key'; salt: Uint8Array; params: import('./sync-crypto').SyncCryptoKdfParams };
+    | { state: 'encrypted-no-key'; salt: Uint8Array; params: import('./sync-crypto').SyncCryptoKdfParams }
+    /** This call has a key, the `.enc` artifact is gone, and a plaintext document is in its
+     *  place: a peer disabled encryption at the sync location. Callers persist this via
+     *  sync-encryption.ts's markRemotePlaintextDiscovered and abort the cycle — merging would
+     *  fork the folder, and writing plaintext would let whoever removed the ciphertext strip
+     *  encryption from every device. */
+    | { state: 'remote-plaintext' };
 
 /**
  * Encryption-aware sync-document read. `url` is always the PLAIN document URL — this
@@ -495,7 +501,13 @@ export async function webdavGetSyncDocument<T>(
     const { material, cryptoPrims, ...webdavOptions } = options;
     if (material) {
         const bytes = await webdavGetFileOrNull(syncEncryptedArtifactName(url), webdavOptions);
-        if (!bytes) return { state: 'data', data: null };
+        if (!bytes) {
+            // Mirror of the off-state probe below, in the other direction, and gated the same
+            // way: only the "nothing at my name" shape pays for it, so a healthy encrypted
+            // install never reaches it.
+            const plain = await webdavGetFileOrNull(url, webdavOptions).catch(() => null);
+            return isPlaintextSyncArtifact(plain) ? { state: 'remote-plaintext' } : { state: 'data', data: null };
+        }
         const plaintext = await decryptRemoteArtifactOrThrow(bytes, material.key, cryptoPrims);
         return { state: 'data', data: JSON.parse(new TextDecoder().decode(plaintext)) as T };
     }

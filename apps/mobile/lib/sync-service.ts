@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { AppData, MergeStats, createSyncOrchestrator, runSerializedSyncDocumentOperation, runSharedSyncCycle, useTaskStore, webdavGetJson, webdavGetSyncDocument, webdavHeadFile, webdavPutJson, webdavPutSyncDocument, markRemoteEncryptionDiscovered, SyncEncryptionTerminalError, type SyncKeyMaterial, cloudGetJson, cloudHeadJson, cloudPutJson, flushPendingSave, performSyncCycle, withRetry, isRetryableError, isRetryableWebdavReadError, isWebdavInvalidJsonError, normalizeWebdavUrl, normalizeCloudUrl, createSyncBackendIO, buildFastSyncScope, hasPendingSyncSideEffects, injectExternalCalendars as injectExternalCalendarsForSync, persistExternalCalendars as persistExternalCalendarsForSync, getInMemoryAppDataSnapshot, createAbortableFetch, normalizeCloudProvider as normalizeCoreCloudProvider, isDropboxUnauthorizedError, parseFastSyncState, serializeFastSyncState, summarizeTaskLifecycleCounts, decodeUriSafe, SYNC_FILE_NAME, CLOUD_PROVIDER_DROPBOX, CLOUD_PROVIDER_SELF_HOSTED, type Attachment, type CloudProvider, type FastSyncState, type SyncBackendContext, type SyncBackendIO, type SyncRunDiagnosticEvent, type SyncRunNotifier, type SyncRunPlatformHooks, type SyncRunStorage, type SyncTransport } from '@mindwtr/core';
+import { AppData, MergeStats, createSyncOrchestrator, runSerializedSyncDocumentOperation, runSharedSyncCycle, useTaskStore, webdavGetJson, webdavGetSyncDocument, webdavHeadFile, webdavPutJson, webdavPutSyncDocument, markRemoteEncryptionDiscovered, markRemotePlaintextDiscovered, SyncEncryptionRemotePlaintextError, SyncEncryptionTerminalError, type SyncKeyMaterial, cloudGetJson, cloudHeadJson, cloudPutJson, flushPendingSave, performSyncCycle, withRetry, isRetryableError, isRetryableWebdavReadError, isWebdavInvalidJsonError, normalizeWebdavUrl, normalizeCloudUrl, createSyncBackendIO, buildFastSyncScope, hasPendingSyncSideEffects, injectExternalCalendars as injectExternalCalendarsForSync, persistExternalCalendars as persistExternalCalendarsForSync, getInMemoryAppDataSnapshot, createAbortableFetch, normalizeCloudProvider as normalizeCoreCloudProvider, isDropboxUnauthorizedError, parseFastSyncState, serializeFastSyncState, summarizeTaskLifecycleCounts, decodeUriSafe, SYNC_FILE_NAME, CLOUD_PROVIDER_DROPBOX, CLOUD_PROVIDER_SELF_HOSTED, type Attachment, type CloudProvider, type FastSyncState, type SyncBackendContext, type SyncBackendIO, type SyncRunDiagnosticEvent, type SyncRunNotifier, type SyncRunPlatformHooks, type SyncRunStorage, type SyncTransport } from '@mindwtr/core';
 import { mobileStorage } from './storage-adapter';
 import { logInfo, logSyncError, logWarn, sanitizeLogMessage } from './app-log';
 import { readSyncFile, resolveSyncFileUri, writeSyncFile } from './storage-file';
@@ -46,6 +46,7 @@ import {
 import { getSecureConfigValue, isSecretConfigKey } from './secure-config';
 import { mobileSyncCryptoPrimitives } from './sync-crypto-native';
 import {
+  flushSyncEncryptionLocalState,
   getSyncEncryptionMaterial,
   isSyncEncryptionBlocked,
   SyncEncryptionNoKeyError,
@@ -68,7 +69,9 @@ export {
  *  not feed the WebDAV rate limiter) nor for generic permission errors in the toast
  *  mapping — see classifySyncFailure in sync-service-utils.ts. */
 const isSyncEncryptionError = (error: unknown): boolean =>
-  error instanceof SyncEncryptionNoKeyError || error instanceof SyncEncryptionTerminalError;
+  error instanceof SyncEncryptionNoKeyError
+  || error instanceof SyncEncryptionRemotePlaintextError
+  || error instanceof SyncEncryptionTerminalError;
 import { getMobileCloudRequestOptions, getMobileWebDavRequestOptions } from './webdav-request-options';
 
 const DEFAULT_SYNC_TIMEOUT_MS = 30_000;
@@ -1236,6 +1239,14 @@ class MobileSyncRun {
                 }),
               WEBDAV_READ_RETRY_OPTIONS
             );
+            if (result.state === 'remote-plaintext') {
+              // A peer disabled encryption at the sync location. Persist first (the state must
+              // survive a restart), then fail the cycle. Nothing on the remote is touched, and
+              // this device never follows the remote down to plaintext on its own.
+              markRemotePlaintextDiscovered(syncEncryptionLocalState);
+              await flushSyncEncryptionLocalState();
+              throw new SyncEncryptionRemotePlaintextError();
+            }
             return result.state === 'data' ? result.data : null;
           }
 
@@ -1257,6 +1268,7 @@ class MobileSyncRun {
             // Persist first (decision #5: the state must survive a restart), then fail
             // the cycle. Nothing on the remote is touched on this path.
             markRemoteEncryptionDiscovered(syncEncryptionLocalState, probe);
+            await flushSyncEncryptionLocalState();
             throw new SyncEncryptionNoKeyError();
           }
           return null;
@@ -1383,7 +1395,13 @@ class MobileSyncRun {
         );
         if (result.encryptedNoKey) {
           markRemoteEncryptionDiscovered(syncEncryptionLocalState, result.encryptedNoKey);
+          await flushSyncEncryptionLocalState();
           throw new SyncEncryptionNoKeyError();
+        }
+        if (result.remotePlaintext) {
+          markRemotePlaintextDiscovered(syncEncryptionLocalState);
+          await flushSyncEncryptionLocalState();
+          throw new SyncEncryptionRemotePlaintextError();
         }
         await this.persistDropboxRev(result.rev);
         return result;

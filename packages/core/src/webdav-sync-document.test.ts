@@ -88,4 +88,23 @@ describe('webdav sync-document encryption', () => {
         const result = await webdavGetSyncDocument(URL_, { fetcher });
         expect(result).toEqual({ state: 'data', data: null });
     });
+
+    // Mirror of the off-state discovery above, in the other direction: a peer DISABLED
+    // encryption at the sync location, so the `.enc` artifact is gone and a plaintext
+    // document is back. Reporting "empty" here would merge this device's whole store into a
+    // fresh remote generation and fork the two silently.
+    it('an enabled device treats a peer-disabled (plaintext-restored) remote as terminal, not as empty', async () => {
+        const { fetcher } = createFakeWebdavServer();
+        const material = await deriveSyncKeyMaterial('pw', new Uint8Array(16).fill(4), FAST_KDF);
+        await webdavPutSyncDocument(URL_, { tasks: [] }, { fetcher }); // the peer's plaintext write
+
+        const result = await webdavGetSyncDocument(URL_, { fetcher, material });
+        expect(result.state).toBe('remote-plaintext');
+    });
+
+    it('an enabled device still reports an empty remote when neither artifact exists', async () => {
+        const { fetcher } = createFakeWebdavServer();
+        const material = await deriveSyncKeyMaterial('pw', new Uint8Array(16).fill(5), FAST_KDF);
+        expect(await webdavGetSyncDocument(URL_, { fetcher, material })).toEqual({ state: 'data', data: null });
+    });
 });
