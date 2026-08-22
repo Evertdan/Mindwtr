@@ -781,26 +781,30 @@ const detectSelectionReplacement = (
 
 const escapeMarkdownLinkLabel = (label: string): string => label.replace(/\\/g, '\\\\').replace(/\]/g, '\\]');
 
-const MARKDOWN_INSERTION_PAIRS: Record<string, string> = {
-    '[': ']',
-    '(': ')',
-    '{': '}',
-    '<': '>',
-    '`': '`',
-    "'": "'",
-    '"': '"',
-    '~': '~~',
-};
+// Maps, not object literals: these are indexed by user-typed/pasted text, and a
+// plain object would resolve a key like "constructor" or "toString" through
+// Object.prototype instead of returning undefined, injecting native function
+// source into the note (SEC-13).
+const MARKDOWN_INSERTION_PAIRS: Map<string, string> = new Map([
+    ['[', ']'],
+    ['(', ')'],
+    ['{', '}'],
+    ['<', '>'],
+    ['`', '`'],
+    ["'", "'"],
+    ['"', '"'],
+    ['~', '~~'],
+]);
 
 // Auto-close only the characters that carry Markdown meaning (links and code).
 // Quotes, angle brackets, and braces were removed: auto-closing them while typing
 // fights normal prose and pasted URLs with no Markdown benefit (discussion #742).
 // Selection wrapping (MARKDOWN_INSERTION_PAIRS) still supports the full set.
-const MARKDOWN_AUTO_INSERTION_PAIRS: Record<string, string> = {
-    '[': ']',
-    '(': ')',
-    '`': '`',
-};
+const MARKDOWN_AUTO_INSERTION_PAIRS: Map<string, string> = new Map([
+    ['[', ']'],
+    ['(', ')'],
+    ['`', '`'],
+]);
 
 const MARKDOWN_CLOSING_INSERTIONS = new Set<string>([
     ']',
@@ -914,7 +918,7 @@ const shouldAutoPairInsertion = (
     cursor: number,
     insertedText: string,
 ): boolean => {
-    if (!MARKDOWN_AUTO_INSERTION_PAIRS[insertedText]) return false;
+    if (!MARKDOWN_AUTO_INSERTION_PAIRS.has(insertedText)) return false;
     if (insertedText !== "'") return true;
 
     return !isAsciiAlphaNumeric(previousValue[cursor - 1]) && !isAsciiAlphaNumeric(previousValue[cursor]);
@@ -949,7 +953,7 @@ const applyCollapsedPairInsertion = (
         }
 
         if (!shouldAutoPairInsertion(previousValue, cursor, insertedText)) continue;
-        const suffix = MARKDOWN_AUTO_INSERTION_PAIRS[insertedText];
+        const suffix = MARKDOWN_AUTO_INSERTION_PAIRS.get(insertedText);
         const next = `${previousValue.slice(0, cursor)}${insertedText}${suffix}${previousValue.slice(cursor)}`;
         return {
             value: next,
@@ -974,7 +978,7 @@ export function applyMarkdownPairInsertion(
     if (replacement.insertedText === '```') {
         return wrapSelectionInFencedCodeBlock(previousValue, replacement.selection, replacement.selectedText);
     }
-    const suffix = MARKDOWN_INSERTION_PAIRS[replacement.insertedText];
+    const suffix = MARKDOWN_INSERTION_PAIRS.get(replacement.insertedText);
     if (!suffix) return null;
 
     const prefix = replacement.insertedText === '~' ? '~~' : replacement.insertedText;

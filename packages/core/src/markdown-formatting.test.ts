@@ -290,6 +290,17 @@ describe('applyMarkdownPairInsertion', () => {
             applyMarkdownPairInsertion('read docs', 'read adocs', { start: 5, end: 5 }),
         ).toBeNull();
     });
+
+    it('does not resolve a typed/pasted "constructor" through Object.prototype (SEC-13)', () => {
+        // Collapsed-cursor path (shouldAutoPairInsertion / applyCollapsedPairInsertion).
+        expect(
+            applyMarkdownPairInsertion('', 'constructor', { start: 11, end: 11 }),
+        ).toBeNull();
+        // Selection-replacement path (MARKDOWN_INSERTION_PAIRS lookup).
+        expect(
+            applyMarkdownPairInsertion('read docs', 'constructor', { start: 0, end: 9 }),
+        ).toBeNull();
+    });
 });
 
 describe('parseInlineMarkdown', () => {
@@ -298,6 +309,12 @@ describe('parseInlineMarkdown', () => {
             { type: 'text', text: 'keep ' },
             { type: 'strike', text: 'drop' },
             { type: 'text', text: ' done' },
+        ]);
+    });
+
+    it('drops a javascript: link href to plain text instead of a clickable link', () => {
+        expect(parseInlineMarkdown('[click me](javascript:void 0)')).toEqual([
+            { type: 'text', text: 'click me' },
         ]);
     });
 });

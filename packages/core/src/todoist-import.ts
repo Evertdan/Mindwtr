@@ -248,7 +248,12 @@ const parseTodoistDate = (
         saturday: 6,
     };
     const weekday = weekdayMap[normalized];
-    if (weekday !== undefined) {
+    // A plain-object lookup keyed by parsed CSV cell text resolves a value like
+    // "constructor" through Object.prototype instead of returning undefined;
+    // `typeof === 'number'` rejects that inherited function (SEC-13) instead of
+    // letting `(weekday - target.getDay() + 7) % 7 || 7` turn NaN into a
+    // fabricated one-week-out due date.
+    if (typeof weekday === 'number') {
         const target = new Date(now);
         const delta = (weekday - target.getDay() + 7) % 7 || 7;
         target.setDate(target.getDate() + delta);

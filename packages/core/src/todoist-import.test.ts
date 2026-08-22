@@ -62,6 +62,22 @@ describe('todoist import', () => {
         expect(project.tasks[1].description).toContain('Imported from Todoist recurring schedule: every Monday');
     });
 
+    it('does not fabricate a due date when a DATE cell is "constructor" (SEC-13)', () => {
+        const csv = [
+            'TYPE,CONTENT,PRIORITY,INDENT,DATE,DESCRIPTION',
+            'task,Odd date value,4,1,constructor,',
+        ].join('\n');
+
+        const result = parseTodoistImportSource({
+            fileName: 'Bug.csv',
+            text: csv,
+        });
+
+        expect(result.valid).toBe(true);
+        expect(result.parsedProjects[0]?.tasks[0]?.dueDate).toBeUndefined();
+        expect(result.warnings).toContain('1 Todoist due date could not be parsed and was skipped.');
+    });
+
     it('parses a Todoist ZIP export and skips unsupported archive entries', () => {
         const inboxCsv = 'TYPE,CONTENT\n task,Inbox task';
         const errandsCsv = [
