@@ -1980,7 +1980,16 @@ fn migrate_legacy_secrets(app: &tauri::AppHandle, config: &mut AppConfigToml) {
         }
     }
     if migrated {
-        let _ = write_config_files(&get_config_path(app), &get_secrets_path(app), config);
+        // The secrets are in the keyring now, but this write is what removes
+        // the plaintext copies from config.toml. Swallowing its failure left
+        // them on disk silently, to be re-read (and re-migrated) every launch.
+        // read_config cannot fail, so say it out loud instead.
+        if let Err(error) =
+            write_config_files(&get_config_path(app), &get_secrets_path(app), config)
+        {
+            log::warn!("Failed to clear migrated plaintext secrets from config.toml: {error}");
+            emit_keyring_fallback_warning(app, "Migrated secrets");
+        }
     }
 }
 
@@ -2055,11 +2064,28 @@ pub(crate) fn get_ai_key(app: tauri::AppHandle, provider: String) -> Option<Stri
                 "gemini" => config.ai_key_gemini = None,
                 _ => {}
             }
-            let _ = write_config_files(&get_config_path(&app), &get_secrets_path(&app), &config);
+            // Same as migrate_legacy_secrets: this write is what removes the
+            // plaintext key. The command's Option return can't carry the
+            // failure — the key itself is fine — so warn instead of dropping it.
+            if let Err(error) =
+                write_config_files(&get_config_path(&app), &get_secrets_path(&app), &config)
+            {
+                log::warn!("Failed to clear the migrated plaintext AI key: {error}");
+                emit_keyring_fallback_warning(&app, ai_key_label(&provider));
+            }
         }
         return Some(legacy);
     }
     None
+}
+
+fn ai_key_label(provider: &str) -> &'static str {
+    match provider {
+        "openai" => "OpenAI API key",
+        "anthropic" => "Anthropic API key",
+        "gemini" => "Gemini API key",
+        _ => "Secret",
+    }
 }
 
 // Held across the whole read+mutate+write (B3) — see lock_config_read_modify_write.
@@ -2093,8 +2119,9 @@ pub(crate) fn set_ai_key(
                 "gemini" => config.ai_key_gemini = None,
                 _ => {}
             }
-            let _ = write_config_files(&get_config_path(&app), &get_secrets_path(&app), &config);
-            Ok(())
+            // Propagated, like the keyring-unavailable branch below: a failure
+            // here leaves the previous plaintext key in config.toml.
+            write_config_files(&get_config_path(&app), &get_secrets_path(&app), &config)
         }
         Err(_) => {
             let mut config = read_config(&app);
@@ -2105,14 +2132,8 @@ pub(crate) fn set_ai_key(
                 "gemini" => config.ai_key_gemini = next_value,
                 _ => {}
             }
-            let label = match provider.as_str() {
-                "openai" => "OpenAI API key",
-                "anthropic" => "Anthropic API key",
-                "gemini" => "Gemini API key",
-                _ => "Secret",
-            };
             if should_emit_warning {
-                emit_keyring_fallback_warning(&app, label);
+                emit_keyring_fallback_warning(&app, ai_key_label(&provider));
             }
             write_config_files(&get_config_path(&app), &get_secrets_path(&app), &config)
         }
