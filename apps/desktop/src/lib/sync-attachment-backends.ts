@@ -6,6 +6,7 @@ import {
     buildCloudKitAttachmentKey,
     cloudGetFile,
     cloudPutFile,
+    computeSha256Hex,
     getErrorStatus,
     isWebdavRateLimitedError,
     parseCloudKitAttachmentKey,
@@ -41,6 +42,7 @@ import {
     mkdir as syncFsMkdir,
     remove as syncFsRemove,
     rename as syncFsRename,
+    stat as syncFsStat,
 } from './sync-fs';
 import {
     clearAttachmentValidationFailure,
@@ -239,7 +241,7 @@ export async function syncWebdavAttachments(
     }
 
     const fetcher = await deps.getTauriFetch();
-    const { BaseDirectory, exists, mkdir, readFile, writeFile, rename, remove } = await import('@tauri-apps/plugin-fs');
+    const { BaseDirectory, exists, mkdir, readFile, stat, writeFile, rename, remove } = await import('@tauri-apps/plugin-fs');
     const { dataDir, join } = await import('@tauri-apps/api/path');
     const password = await deps.resolveWebdavPassword(webDavConfig);
 
@@ -291,13 +293,16 @@ export async function syncWebdavAttachments(
         return markWebdavAttachmentRateLimited(error, deps.logSyncWarning);
     };
 
-    const { readLocalFile, localFileExists } = createLocalAttachmentFs(deps.logSyncWarning, {
+    const { readLocalFile, localFileExists, statLocalFile } = createLocalAttachmentFs(deps.logSyncWarning, {
         baseDataDir,
         dataBaseDir: BaseDirectory.Data,
         exists,
         readFile,
         managedAttachmentsDir,
+        stat,
     });
+    const computeLocalFileHash = async (path: string, attachment: Attachment): Promise<string | null> =>
+        computeSha256Hex(await readLocalFile(path, attachment));
 
     let abortedByRateLimit = false;
 
@@ -401,6 +406,9 @@ export async function syncWebdavAttachments(
         attachmentsById,
         forceUploadExistingLocal: helpers?.activationProbe === true,
         localFileExists,
+        getLocalFileStat: statLocalFile,
+        computeLocalFileHash,
+        contentChangePhase: helpers?.phase,
         policy: {
             shouldSkip: () => abortedByRateLimit,
             shouldUpload,
@@ -571,7 +579,7 @@ export async function syncCloudAttachments(
     if (!deps.isTauriRuntimeEnv() || !cloudConfig.url) return false;
 
     const fetcher = await deps.getTauriFetch();
-    const { BaseDirectory, exists, mkdir, readFile, writeFile, rename, remove } = await import('@tauri-apps/plugin-fs');
+    const { BaseDirectory, exists, mkdir, readFile, stat, writeFile, rename, remove } = await import('@tauri-apps/plugin-fs');
     const { dataDir, join } = await import('@tauri-apps/api/path');
 
     try {
@@ -584,18 +592,24 @@ export async function syncCloudAttachments(
     const managedAttachmentsDir = await getManagedPath(ATTACHMENTS_DIR_NAME);
     const attachmentsById = collectAttachmentsById(appData);
 
-    const { readLocalFile, localFileExists } = createLocalAttachmentFs(deps.logSyncWarning, {
+    const { readLocalFile, localFileExists, statLocalFile } = createLocalAttachmentFs(deps.logSyncWarning, {
         baseDataDir,
         dataBaseDir: BaseDirectory.Data,
         exists,
         readFile,
         managedAttachmentsDir,
+        stat,
     });
+    const computeLocalFileHash = async (path: string, attachment: Attachment): Promise<string | null> =>
+        computeSha256Hex(await readLocalFile(path, attachment));
 
     return await syncBasicRemoteAttachments({
         attachmentsById,
         forceUploadExistingLocal: helpers?.activationProbe === true,
         localFileExists,
+        getLocalFileStat: statLocalFile,
+        computeLocalFileHash,
+        contentChangePhase: helpers?.phase,
         onUpload: async (attachment, localPath) => {
             const cloudKey = buildCloudKey(attachment);
             const fileData = await readLocalFile(localPath, attachment);
@@ -722,7 +736,7 @@ export async function syncDropboxAttachments(
 
     const fetcher = await deps.getTauriFetch();
     const dropboxFetcher = fetcher ?? fetch;
-    const { BaseDirectory, exists, mkdir, readFile, writeFile, rename, remove } = await import('@tauri-apps/plugin-fs');
+    const { BaseDirectory, exists, mkdir, readFile, stat, writeFile, rename, remove } = await import('@tauri-apps/plugin-fs');
     const { dataDir, join } = await import('@tauri-apps/api/path');
 
     try {
@@ -746,18 +760,24 @@ export async function syncDropboxAttachments(
         }
     };
 
-    const { readLocalFile, localFileExists } = createLocalAttachmentFs(deps.logSyncWarning, {
+    const { readLocalFile, localFileExists, statLocalFile } = createLocalAttachmentFs(deps.logSyncWarning, {
         baseDataDir,
         dataBaseDir: BaseDirectory.Data,
         exists,
         readFile,
         managedAttachmentsDir,
+        stat,
     });
+    const computeLocalFileHash = async (path: string, attachment: Attachment): Promise<string | null> =>
+        computeSha256Hex(await readLocalFile(path, attachment));
 
     return await syncBasicRemoteAttachments({
         attachmentsById,
         forceUploadExistingLocal: helpers?.activationProbe === true,
         localFileExists,
+        getLocalFileStat: statLocalFile,
+        computeLocalFileHash,
+        contentChangePhase: helpers?.phase,
         onUpload: async (attachment, localPath) => {
             const cloudKey = buildCloudKey(attachment);
             const fileData = await readLocalFile(localPath, attachment);
@@ -872,7 +892,7 @@ export async function syncCloudKitAttachments(
 ): Promise<boolean> {
     if (!deps.isTauriRuntimeEnv()) return false;
 
-    const { BaseDirectory, exists, mkdir, readFile } = await import('@tauri-apps/plugin-fs');
+    const { BaseDirectory, exists, mkdir, readFile, stat } = await import('@tauri-apps/plugin-fs');
     const { dataDir, join } = await import('@tauri-apps/api/path');
 
     try {
@@ -892,11 +912,13 @@ export async function syncCloudKitAttachments(
     );
     const flushMutated = await flushPendingCloudKitAttachmentDeletes(appData);
 
-    const { readLocalFile, localFileExists } = createLocalAttachmentFs(
+    const { readLocalFile, localFileExists, statLocalFile } = createLocalAttachmentFs(
         deps.logSyncWarning,
-        { baseDataDir, dataBaseDir: BaseDirectory.Data, exists, readFile, managedAttachmentsDir },
+        { baseDataDir, dataBaseDir: BaseDirectory.Data, exists, readFile, managedAttachmentsDir, stat },
         'Failed to check CloudKit attachment file',
     );
+    const computeLocalFileHash = async (path: string, attachment: Attachment): Promise<string | null> =>
+        computeSha256Hex(await readLocalFile(path, attachment));
 
     deps.logSyncInfo('CloudKit attachment sync start', {
         count: String(attachmentsById.size),
@@ -906,6 +928,9 @@ export async function syncCloudKitAttachments(
         attachmentsById,
         forceUploadExistingLocal: helpers?.activationProbe === true,
         localFileExists,
+        getLocalFileStat: statLocalFile,
+        computeLocalFileHash,
+        contentChangePhase: helpers?.phase,
         // A cloudKey written by a different backend before a provider switch isn't a valid
         // CloudKit record key, so CloudKit must still treat the attachment as needing upload.
         hasCloudCopy: (attachment) => Boolean(parseCloudKitAttachmentKey(attachment.cloudKey)),
@@ -997,7 +1022,7 @@ export async function syncFileAttachments(
     // #1037: every fs call below can land on the sync folder, which may be a
     // slow mount, so the ones the plugin runs on the main thread come from
     // ./sync-fs instead. The plugin's own readFile/writeFile are already async.
-    const { BaseDirectory, exists, readFile, writeFile } = await import('@tauri-apps/plugin-fs');
+    const { BaseDirectory, exists, readFile, stat, writeFile } = await import('@tauri-apps/plugin-fs');
     const { dataDir, join } = await import('@tauri-apps/api/path');
 
     const attachmentsDir = await join(baseSyncDir, ATTACHMENTS_DIR_NAME);
@@ -1017,7 +1042,7 @@ export async function syncFileAttachments(
     const managedAttachmentsDir = await getManagedPath(ATTACHMENTS_DIR_NAME);
     const attachmentsById = collectAttachmentsById(appData);
 
-    const { readLocalFile, localFileExists } = createLocalAttachmentFs(deps.logSyncWarning, {
+    const { readLocalFile, localFileExists, statLocalFile } = createLocalAttachmentFs(deps.logSyncWarning, {
         baseDataDir,
         dataBaseDir: BaseDirectory.Data,
         // An absolute attachment uri can point at the slow mount too; only the
@@ -1025,7 +1050,17 @@ export async function syncFileAttachments(
         exists: (path, options) => (options ? exists(path, options) : syncFsExists(path)),
         readFile,
         managedAttachmentsDir,
+        // Same #1037 risk as `exists` above — the fs plugin's `stat` is main-thread
+        // too (review S5), so a non-managed-dir path goes through the async Rust
+        // command instead.
+        stat: async (path, options) => {
+            if (options) return stat(path, options);
+            const result = await syncFsStat(path);
+            return { mtime: new Date(result.mtimeMs), size: result.size };
+        },
     });
+    const computeLocalFileHash = async (path: string, attachment: Attachment): Promise<string | null> =>
+        computeSha256Hex(await readLocalFile(path, attachment));
 
     // Mirror the WebDAV presence pre-pass: a cloudKey recorded against a
     // previous sync folder (or a file deleted from this one) must not stop
@@ -1052,6 +1087,9 @@ export async function syncFileAttachments(
         attachmentsById,
         forceUploadExistingLocal: helpers?.activationProbe === true,
         localFileExists,
+        getLocalFileStat: statLocalFile,
+        computeLocalFileHash,
+        contentChangePhase: helpers?.phase,
         onUpload: async (attachment, localPath) => {
             const cloudKey = buildCloudKey(attachment);
             const fileData = await readLocalFile(localPath, attachment);

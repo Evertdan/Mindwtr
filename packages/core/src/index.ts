@@ -99,6 +99,7 @@ export * from './attachment-hash';
 export * from './attachment-link-utils';
 export * from './cloudkit-attachments';
 export * from './attachment-validation';
+export * from './attachment-change-detection';
 export * from './attachment-progress';
 export * from './attachment-transfer';
 export * from './attachment-paths';

@@ -5,6 +5,7 @@ import {
   buildCloudKey,
   bytesToBase64,
   collectAttachments,
+  computeAttachmentFileHash,
   copyFileSafely,
   createAttachmentLocalMigrationLimiter,
   DEFAULT_CONTENT_TYPE,
@@ -19,6 +20,7 @@ import {
   readSafDirectoryEntriesByName,
   readFileAsBytes,
   resolveFileSyncDir,
+  statAttachmentFile,
   StorageAccessFramework,
   writeBytesSafely,
 } from '../attachment-sync-utils';
@@ -32,7 +34,7 @@ export const syncFileAttachments = async (
   appData: AppData,
   syncPath: string,
   signal?: AbortSignal,
-  options: { activationProbe?: boolean } = {}
+  options: { activationProbe?: boolean; phase?: 'prepare' | 'post-merge' } = {}
 ): Promise<boolean> => {
   assertAttachmentSyncNotAborted(signal);
   const syncDir = await resolveFileSyncDir(syncPath);
@@ -96,6 +98,9 @@ export const syncFileAttachments = async (
     attachmentsById,
     localFileExists: fileExists,
     forceUploadExistingLocal: options.activationProbe === true,
+    getLocalFileStat: (path) => statAttachmentFile(path),
+    computeLocalFileHash: (path) => computeAttachmentFileHash(path),
+    contentChangePhase: options.phase,
     isFatalError: (error) => isAttachmentSyncAbortError(error, signal),
     // Normal background sync leaves remote-only files for on-demand fetch. An
     // activation probe is different: its cloned snapshot must prove that every

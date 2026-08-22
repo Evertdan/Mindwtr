@@ -856,6 +856,50 @@ export function mergeAppDataWithStats(local: AppData, incoming: AppData, options
                 || incomingAttachment?.cloudKey;
         };
 
+        // #1057: content-revision conflicts resolve independently of which side wins
+        // the task-level LWW above — a higher `contentRev` always wins outright. On a
+        // tie (including the common case where neither side ever set one — old
+        // clients, or genuinely identical content) there's no separate signal to
+        // prefer, so this defers to `winner`: deterministic and symmetric, since
+        // `winner` is computed the same way regardless of which side calls itself
+        // "local" vs "incoming", so both devices converge on the same merged object.
+        //
+        // `contentMtimeMs`/`contentSize` follow the same `contentSource` as `fileHash`
+        // (review B1's actual mechanism, not a separate rule): these two fields never
+        // travel over the wire (`sanitizeAppDataForRemote` strips them — see there), so
+        // `incomingAttachment`'s copy is always already absent by the time it reaches this
+        // merge. When `contentSource` is `incoming` (its `contentRev` won), the merged
+        // result correctly ends up with an ABSENT recorded stat — which is exactly what
+        // makes the receiving device's next check-on-touch pass detect a mismatch against
+        // its own (stale) disk file and re-download, per design point 4. If this instead
+        // preferred `localAttachment` unconditionally, a losing device's own unchanged
+        // stat would keep matching its own disk forever and it would never re-download.
+        const resolveContentIdentity = (
+            winner: Attachment,
+            localAttachment: Attachment,
+            incomingAttachment: Attachment,
+        ): Pick<Attachment, 'fileHash' | 'contentRev' | 'contentMtimeMs' | 'contentSize'> => {
+            if (winner.deletedAt) {
+                return {
+                    fileHash: winner.fileHash,
+                    contentRev: winner.contentRev,
+                    contentMtimeMs: winner.contentMtimeMs,
+                    contentSize: winner.contentSize,
+                };
+            }
+            const localRev = localAttachment.contentRev ?? 0;
+            const incomingRev = incomingAttachment.contentRev ?? 0;
+            const contentSource = localRev === incomingRev
+                ? winner
+                : (localRev > incomingRev ? localAttachment : incomingAttachment);
+            return {
+                fileHash: contentSource.fileHash || localAttachment.fileHash || incomingAttachment.fileHash,
+                contentRev: contentSource.contentRev,
+                contentMtimeMs: contentSource.contentMtimeMs,
+                contentSize: contentSource.contentSize,
+            };
+        };
+
         const merged = mergeEntitiesWithStats(localList, incomingList, (localAttachment, incomingAttachment, winner) => {
             if (winner.kind !== 'file' || localAttachment.kind !== 'file' || incomingAttachment.kind !== 'file') {
                 return winner;
@@ -893,9 +937,7 @@ export function mergeAppDataWithStats(local: AppData, incoming: AppData, options
             return {
                 ...winner,
                 cloudKey: resolveCloudKey(winner, localAttachment, incomingAttachment),
-                fileHash: winner.deletedAt
-                    ? winner.fileHash
-                    : winner.fileHash || localAttachment.fileHash || incomingAttachment.fileHash,
+                ...resolveContentIdentity(winner, localAttachment, incomingAttachment),
                 uri,
                 localStatus,
             };

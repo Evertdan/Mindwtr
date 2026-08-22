@@ -166,6 +166,24 @@ export interface Attachment {
     /** Optional hash (e.g., SHA-256) for integrity checks. */
     fileHash?: string;
     /**
+     * Content revision counter for check-on-touch change propagation (#1057). Bumped
+     * whenever a device confirms (via {@link fileHash}) that the underlying bytes
+     * actually changed since the last known-synced content — never on a cosmetic
+     * mtime touch. Missing is equivalent to 0, so older clients merge in cleanly.
+     */
+    contentRev?: number;
+    /**
+     * Local file mtime (ms since epoch) as of the last known-synced content, i.e.
+     * the last successful upload or download of this attachment's bytes. Compared
+     * against the live file's mtime on every sync pre-pass; a mismatch triggers a
+     * {@link fileHash} recheck before anything is treated as a real content change.
+     */
+    contentMtimeMs?: number;
+    /** Local file byte size as of the last known-synced content. Paired with
+     *  {@link contentMtimeMs}; distinct from `size`, which predates content
+     *  tracking and is display-only. */
+    contentSize?: number;
+    /**
      * Local availability/transfer status. Persisted locally, but not synced to remote.
      * - available: File exists at `uri`
      * - missing: Metadata exists, file not found at `uri`

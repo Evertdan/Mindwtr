@@ -2573,7 +2573,12 @@ export class SyncService {
                     },
                 },
                 policy: {
-                    preSyncAttachmentsBeforeFastCheck: false,
+                    // #1057 (review S1): must run before the fast unchanged-check, or an
+                    // attachment-only edit (which changes no document field) has its
+                    // fingerprint compared as "unchanged" and the pre-pass never runs at
+                    // all — content propagation would only ever happen on a manual sync
+                    // (which bypasses the fast check) or piggyback on an unrelated edit.
+                    preSyncAttachmentsBeforeFastCheck: true,
                     enableReadCheckSkip: false,
                     postMergeAttachmentErrorPolicy: 'warn',
                     attachmentPhasesEnabled: isTauriRuntimeEnv(),

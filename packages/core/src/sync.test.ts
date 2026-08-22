@@ -5,6 +5,8 @@ import { chooseDeterministicWinner } from './sync-signatures';
 import { MAX_SYNC_REVISION } from './sync-revision';
 import { createMockArea, createMockProject, createMockSection, createMockTask, mockAppData } from './sync-test-utils';
 import { AppData, Task, Project, Attachment, Section, Area } from './types';
+import { sanitizeAppDataForRemote, areSyncPayloadsEqual } from './sync-helpers';
+import { runAttachmentTransferLifecycle } from './attachment-transfer';
 
 const parseLoggedContext = (value: unknown): Record<string, unknown> => {
     expect(typeof value).toBe('string');
@@ -228,6 +230,217 @@ describe('Sync Logic', () => {
             expect(attachment?.uri).toBe('/incoming/doc.txt');
             expect(attachment?.localStatus).toBe('available');
             expect(attachment?.cloudKey).toBe('attachments/att-1.txt');
+        });
+
+        describe('content-revision conflicts (#1057)', () => {
+            it('a higher contentRev wins the content fields even when the other side wins the task-level LWW', () => {
+                const localAttachment: Attachment = {
+                    id: 'att-rev',
+                    kind: 'file',
+                    title: 'local-title.txt',
+                    uri: '/local/doc.txt',
+                    cloudKey: 'attachments/att-rev.txt',
+                    fileHash: 'local-hash',
+                    contentRev: 2,
+                    contentMtimeMs: 1000,
+                    contentSize: 10,
+                    createdAt: '2023-01-01T00:00:00.000Z',
+                    updatedAt: '2023-01-03T00:00:00.000Z',
+                };
+                const incomingAttachment: Attachment = {
+                    id: 'att-rev',
+                    kind: 'file',
+                    title: 'incoming-title.txt',
+                    uri: '/incoming/doc.txt',
+                    cloudKey: 'attachments/att-rev.txt',
+                    fileHash: 'incoming-hash',
+                    contentRev: 5,
+                    contentMtimeMs: 2000,
+                    contentSize: 20,
+                    createdAt: '2023-01-01T00:00:00.000Z',
+                    updatedAt: '2023-01-02T00:00:00.000Z',
+                };
+                const localTask: Task = { ...createMockTask('1', '2023-01-03'), attachments: [localAttachment] };
+                const incomingTask: Task = { ...createMockTask('1', '2023-01-02'), attachments: [incomingAttachment] };
+
+                const forward = mergeAppData(mockAppData([localTask]), mockAppData([incomingTask]));
+                const forwardAttachment = forward.tasks[0].attachments?.find((a) => a.id === 'att-rev');
+                // Task-level (attachment-level) LWW picks local (the later updatedAt), so
+                // non-content fields like title come from local...
+                expect(forwardAttachment?.title).toBe('local-title.txt');
+                // ...but the higher contentRev (incoming) wins the content identity outright.
+                expect(forwardAttachment?.contentRev).toBe(5);
+                expect(forwardAttachment?.fileHash).toBe('incoming-hash');
+                expect(forwardAttachment?.contentMtimeMs).toBe(2000);
+                expect(forwardAttachment?.contentSize).toBe(20);
+
+                // Convergent regardless of merge direction.
+                const reverse = mergeAppData(mockAppData([incomingTask]), mockAppData([localTask]));
+                const reverseAttachment = reverse.tasks[0].attachments?.find((a) => a.id === 'att-rev');
+                expect(reverseAttachment?.contentRev).toBe(forwardAttachment?.contentRev);
+                expect(reverseAttachment?.fileHash).toBe(forwardAttachment?.fileHash);
+                expect(reverseAttachment?.title).toBe(forwardAttachment?.title);
+            });
+
+            it('a tied contentRev defers to whatever the attachment-level LWW already picked', () => {
+                const localAttachment: Attachment = {
+                    id: 'att-tie',
+                    kind: 'file',
+                    title: 'doc.txt',
+                    uri: '/local/doc.txt',
+                    cloudKey: 'attachments/att-tie.txt',
+                    fileHash: 'local-hash',
+                    contentRev: 3,
+                    createdAt: '2023-01-01T00:00:00.000Z',
+                    updatedAt: '2023-01-03T00:00:00.000Z',
+                };
+                const incomingAttachment: Attachment = {
+                    id: 'att-tie',
+                    kind: 'file',
+                    title: 'doc.txt',
+                    uri: '/incoming/doc.txt',
+                    cloudKey: 'attachments/att-tie.txt',
+                    fileHash: 'incoming-hash',
+                    contentRev: 3,
+                    createdAt: '2023-01-01T00:00:00.000Z',
+                    updatedAt: '2023-01-02T00:00:00.000Z',
+                };
+                const localTask: Task = { ...createMockTask('1', '2023-01-03'), attachments: [localAttachment] };
+                const incomingTask: Task = { ...createMockTask('1', '2023-01-02'), attachments: [incomingAttachment] };
+
+                const merged = mergeAppData(mockAppData([localTask]), mockAppData([incomingTask]));
+                const attachment = merged.tasks[0].attachments?.find((a) => a.id === 'att-tie');
+                // Local wins the attachment-level LWW (later updatedAt); a tied contentRev
+                // means there's nothing else to prefer, so its content fields come along.
+                expect(attachment?.contentRev).toBe(3);
+                expect(attachment?.fileHash).toBe('local-hash');
+            });
+
+            it('merges cleanly against an old client that never set the new fields (missing is equivalent to 0)', () => {
+                const oldClientAttachment: Attachment = {
+                    id: 'att-old-client',
+                    kind: 'file',
+                    title: 'doc.txt',
+                    uri: '/old/doc.txt',
+                    cloudKey: 'attachments/att-old-client.txt',
+                    fileHash: 'old-client-hash',
+                    createdAt: '2023-01-01T00:00:00.000Z',
+                    updatedAt: '2023-01-02T00:00:00.000Z',
+                };
+                const newClientAttachment: Attachment = {
+                    id: 'att-old-client',
+                    kind: 'file',
+                    title: 'doc.txt',
+                    uri: '/new/doc.txt',
+                    cloudKey: 'attachments/att-old-client.txt',
+                    fileHash: 'new-client-hash',
+                    contentRev: 1,
+                    contentMtimeMs: 5000,
+                    contentSize: 50,
+                    createdAt: '2023-01-01T00:00:00.000Z',
+                    updatedAt: '2023-01-01T00:00:00.000Z',
+                };
+                const oldClientTask: Task = { ...createMockTask('1', '2023-01-02'), attachments: [oldClientAttachment] };
+                const newClientTask: Task = { ...createMockTask('1', '2023-01-01'), attachments: [newClientAttachment] };
+
+                // New client's contentRev (1) beats the old client's implicit 0 regardless
+                // of which side is "local" vs "incoming", and regardless of which side wins
+                // the (irrelevant, older-updatedAt) attachment-level LWW.
+                const oldLocal = mergeAppData(mockAppData([oldClientTask]), mockAppData([newClientTask]));
+                const newLocal = mergeAppData(mockAppData([newClientTask]), mockAppData([oldClientTask]));
+                for (const merged of [oldLocal, newLocal]) {
+                    const attachment = merged.tasks[0].attachments?.find((a) => a.id === 'att-old-client');
+                    expect(attachment?.contentRev).toBe(1);
+                    expect(attachment?.fileHash).toBe('new-client-hash');
+                    expect(attachment?.contentMtimeMs).toBe(5000);
+                    expect(attachment?.contentSize).toBe(50);
+                }
+
+                // Merging the already-merged result against itself is a no-op (second-merge
+                // idempotence): re-merging never re-derives a different content identity.
+                const second = mergeAppData(oldLocal, oldLocal);
+                const secondAttachment = second.tasks[0].attachments?.find((a) => a.id === 'att-old-client');
+                expect(secondAttachment?.contentRev).toBe(1);
+                expect(secondAttachment?.fileHash).toBe('new-client-hash');
+            });
+
+            it('two devices with byte-identical content and different local mtimes converge to zero remote writes (review B1)', async () => {
+                // Reproduces the reviewer's exact scenario: two devices hold the same bytes but
+                // recorded their own stat at different times (1000ms vs 2000ms) — nothing about
+                // the actual content ever changes. Before the fix, contentMtimeMs/contentSize
+                // traveled on the wire, so the merge would force one device to "adopt" the
+                // other's foreign mtime, which its own next check-on-touch pass would "correct"
+                // back — an unbounded remote-write loop on both sides.
+                const sharedFile = (contentMtimeMs: number): Attachment => ({
+                    id: 'att-shared',
+                    kind: 'file',
+                    title: 'shared.txt',
+                    uri: '/device/shared.txt',
+                    cloudKey: 'attachments/att-shared.txt',
+                    fileHash: 'same-hash',
+                    contentRev: 1,
+                    contentMtimeMs,
+                    contentSize: 10,
+                    localStatus: 'available',
+                    createdAt: '2023-01-01T00:00:00.000Z',
+                    updatedAt: '2023-01-01T00:00:00.000Z',
+                });
+                const taskFor = (attachment: Attachment): Task => ({
+                    ...createMockTask('shared', '2023-01-01'),
+                    attachments: [attachment],
+                });
+
+                let localA = mockAppData([taskFor(sharedFile(1000))]);
+                let localB = mockAppData([taskFor(sharedFile(2000))]);
+                // Remote starts already converged (both devices previously fully synced).
+                let remote = sanitizeAppDataForRemote(localA);
+
+                // One sync cycle for one device: merge against remote, run the post-merge
+                // attachment lifecycle against that device's own (unchanging) disk file, then
+                // report whether the resulting sanitized document differs from remote.
+                const runCycle = async (
+                    local: AppData,
+                    ownStat: { mtimeMs: number; size: number },
+                ): Promise<{ local: AppData; remoteWrite: boolean; sanitized: AppData }> => {
+                    const merged = mergeAppData(local, remote);
+                    await runAttachmentTransferLifecycle({
+                        attachmentsById: new Map(
+                            merged.tasks.flatMap((task) => (task.attachments ?? []).map((a) => [a.id, a] as const)),
+                        ),
+                        localFileExists: async () => true,
+                        getLocalFileStat: async () => ownStat,
+                        computeLocalFileHash: async () => 'same-hash',
+                        contentChangePhase: 'post-merge',
+                        onUpload: async () => { throw new Error('must not upload: nothing changed'); },
+                        onUploadError: vi.fn(),
+                        onDownload: async () => { throw new Error('must not download: bytes are already correct'); },
+                        onDownloadError: vi.fn(),
+                    });
+                    const sanitized = sanitizeAppDataForRemote(merged);
+                    const remoteWrite = !areSyncPayloadsEqual(sanitized, remote);
+                    return { local: merged, remoteWrite, sanitized };
+                };
+
+                // Cycle 1 may legitimately write once per device while remote catches up
+                // to whichever's sanitized shape wins the tie.
+                const cycle1A = await runCycle(localA, { mtimeMs: 1000, size: 10 });
+                if (cycle1A.remoteWrite) remote = cycle1A.sanitized;
+                localA = cycle1A.local;
+                const cycle1B = await runCycle(localB, { mtimeMs: 2000, size: 10 });
+                if (cycle1B.remoteWrite) remote = cycle1B.sanitized;
+                localB = cycle1B.local;
+
+                // Cycles 2 and 3: nothing changed anywhere on either device — must be
+                // complete no-ops (the acceptance-critical invariant).
+                for (let cycle = 0; cycle < 2; cycle += 1) {
+                    const cycleA = await runCycle(localA, { mtimeMs: 1000, size: 10 });
+                    expect(cycleA.remoteWrite).toBe(false);
+                    localA = cycleA.local;
+                    const cycleB = await runCycle(localB, { mtimeMs: 2000, size: 10 });
+                    expect(cycleB.remoteWrite).toBe(false);
+                    localB = cycleB.local;
+                }
+            });
         });
 
         it('does not copy attachment uris with traversal segments from the winning side', () => {

@@ -23,6 +23,11 @@ const fsMocks = vi.hoisted(() => ({
     readFile: vi.fn(),
     remove: vi.fn(),
     rename: vi.fn(),
+    // #1057: check-on-touch content detection stats the local file; default to a
+    // rejection so tests that don't care about it see "no stat available" (the
+    // lifecycle treats that as if getLocalFileStat were omitted) rather than a
+    // silently-resolved bogus value.
+    stat: vi.fn().mockRejectedValue(new Error('not stubbed')),
     writeFile: vi.fn(),
 }));
 
@@ -546,6 +551,92 @@ describe('desktop sync attachment backends', () => {
             expect.objectContaining({ method: 'PUT' }),
         );
         expect(result?.tasks[0].attachments?.[0]?.cloudKey).toBe('attachments/attachment-1.txt');
+    });
+
+    describe('check-on-touch content change detection (#1057)', () => {
+        const bytes = new Uint8Array([1, 2, 3]);
+        // Real SHA-256 of `bytes` above — computed once so "hash matches" and "hash
+        // differs" tests can both use realistic hashes rather than a stubbed hasher.
+        const BYTES_HASH = '039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81';
+
+        const prepareHelpers = () => ({
+            activationProbe: false,
+            ensureLocalSnapshotFresh: vi.fn(),
+            phase: 'prepare' as const,
+        });
+
+        it('leaves an unchanged attachment alone: no PUT, no mutation, on a normal sync with check-on-touch active', async () => {
+            const fetcher = vi.fn(async (_url: string, _init?: RequestInit) => new Response(null, { status: 200 }));
+            const appData = createCandidateAttachmentData();
+            appData.tasks[0].attachments![0].fileHash = BYTES_HASH;
+            appData.tasks[0].attachments![0].contentMtimeMs = 1000;
+            appData.tasks[0].attachments![0].contentSize = 3;
+            const deps: AttachmentBackendDeps = {
+                getTauriFetch: async () => fetcher as unknown as typeof fetch,
+                isTauriRuntimeEnv: () => true,
+                logSyncInfo: vi.fn(),
+                logSyncWarning: vi.fn(),
+                resolveWebdavPassword: vi.fn(async () => 'secret'),
+            };
+            fsMocks.exists.mockResolvedValue(true);
+            fsMocks.readFile.mockResolvedValue(bytes);
+            fsMocks.stat.mockResolvedValue({ mtime: new Date(1000), size: 3 });
+            coreMocks.webdavFileExists.mockResolvedValue(true);
+
+            const result = await syncWebdavAttachments(
+                appData,
+                { url: 'https://dav.example/mindwtr', username: 'alice' },
+                'https://dav.example/mindwtr',
+                deps,
+                prepareHelpers(),
+            );
+
+            const putCalls = fetcher.mock.calls.filter(([, init]) => (init as RequestInit)?.method === 'PUT');
+            expect(putCalls).toHaveLength(0);
+            expect(result).toBeNull();
+        });
+
+        it('re-uploads to the same cloud key when the local file content actually changed (prepare phase)', async () => {
+            const fetcher = vi.fn(async () => new Response(null, { status: 200 }));
+            const appData = createCandidateAttachmentData();
+            const attachment = appData.tasks[0].attachments![0];
+            attachment.fileHash = 'stale-hash-from-a-previous-version';
+            attachment.contentRev = 2;
+            attachment.contentMtimeMs = 1000;
+            attachment.contentSize = 3;
+            const deps: AttachmentBackendDeps = {
+                getTauriFetch: async () => fetcher as unknown as typeof fetch,
+                isTauriRuntimeEnv: () => true,
+                logSyncInfo: vi.fn(),
+                logSyncWarning: vi.fn(),
+                resolveWebdavPassword: vi.fn(async () => 'secret'),
+            };
+            fsMocks.exists.mockResolvedValue(true);
+            fsMocks.readFile.mockResolvedValue(bytes);
+            // mtime moved on, so the pre-pass hashes the file to confirm the change.
+            fsMocks.stat.mockResolvedValue({ mtime: new Date(9_999), size: 3 });
+            coreMocks.webdavFileExists.mockResolvedValue(true);
+
+            const result = await syncWebdavAttachments(
+                appData,
+                { url: 'https://dav.example/mindwtr', username: 'alice' },
+                'https://dav.example/mindwtr',
+                deps,
+                prepareHelpers(),
+            );
+
+            expect(fetcher).toHaveBeenCalledWith(
+                'https://dav.example/mindwtr/attachments/attachment-1.txt',
+                expect.objectContaining({ method: 'PUT' }),
+            );
+            const merged = result?.tasks[0].attachments?.[0];
+            // Same cloudKey — re-upload overwrites in place, never renames (identity keying).
+            expect(merged?.cloudKey).toBe('attachments/attachment-1.txt');
+            expect(merged?.contentRev).toBe(3);
+            expect(merged?.fileHash).toBe(BYTES_HASH);
+            expect(merged?.contentMtimeMs).toBe(9_999);
+            expect(merged?.contentSize).toBe(3);
+        });
     });
 
     it('uploads local attachments to CloudKit and flushes CloudKit pending deletes', async () => {

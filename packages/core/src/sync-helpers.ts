@@ -238,6 +238,8 @@ export const sanitizeAppDataForRemote = (data: AppData): AppData => {
                         updatedAt: fallbackUpdatedAt,
                         uri: '',
                         localStatus: undefined,
+                        contentMtimeMs: undefined,
+                        contentSize: undefined,
                     };
                 }
             }
@@ -245,6 +247,14 @@ export const sanitizeAppDataForRemote = (data: AppData): AppData => {
                 ...attachment,
                 uri: '',
                 localStatus: undefined,
+                // #1057 (review B1): recorded mtime/size describe THIS device's disk file
+                // and must never travel — two devices holding byte-identical content would
+                // otherwise carry permanently different values for a field the merge (and
+                // the fast unchanged-check) both compare, causing a remote write every cycle
+                // forever. Only `contentRev`/`fileHash` are synced content-identity; each
+                // device re-derives its own stat locally after its own upload/download.
+                contentMtimeMs: undefined,
+                contentSize: undefined,
             };
         });
     };

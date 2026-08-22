@@ -203,6 +203,18 @@ export type SyncRunAttachmentHelpers = {
     ensureLocalSnapshotFresh(): void;
     /** Candidate transports must prove attachment bytes before activation. */
     activationProbe: boolean;
+    /**
+     * Which attachment phase this call is running (#1057's check-on-touch content
+     * change detection is phase-sensitive — see `contentChangePhase` on
+     * `AttachmentTransferLifecycleOptions`). `'prepare'` for the pre-merge pass
+     * (`runAttachmentPreSyncPhase`); `'post-merge'` for everything after the merge
+     * (`runPostMergeAttachmentPhase` and the final pending-upload flush in
+     * `prepareRemoteWriteData`, both of which only ever see already-merged data).
+     * Optional so existing test call sites that construct this object by hand don't
+     * all need updating; a backend that omits it when wiring `contentChangePhase`
+     * simply leaves check-on-touch detection off, same as before this field existed.
+     */
+    phase?: SyncRunAttachmentPhase;
 };
 
 export type SyncRunAttachmentCleanupContext = {

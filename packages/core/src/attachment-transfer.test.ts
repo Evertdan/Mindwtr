@@ -308,6 +308,326 @@ describe('runAttachmentTransferLifecycle', () => {
         expect(first.cloudKey).toBe('attachments/first.txt');
     });
 
+    describe('check-on-touch content change detection (#1057)', () => {
+        it('prepare phase: a hash-confirmed local edit bumps contentRev and re-uploads', async () => {
+            const attachment = makeAttachment({
+                cloudKey: 'attachments/attachment-1.txt',
+                fileHash: 'aaaa',
+                contentRev: 2,
+                contentMtimeMs: 1000,
+                contentSize: 10,
+            });
+            const onUpload = vi.fn(async () => true);
+            const didMutate = await runAttachmentTransferLifecycle({
+                attachmentsById: new Map([[attachment.id, attachment]]),
+                localFileExists: vi.fn(async () => true),
+                getLocalFileStat: vi.fn(async () => ({ mtimeMs: 2000, size: 20 })),
+                computeLocalFileHash: vi.fn(async () => 'bbbb'),
+                contentChangePhase: 'prepare',
+                onUpload,
+                onUploadError: vi.fn(),
+                onDownload: vi.fn(),
+                onDownloadError: vi.fn(),
+            });
+
+            expect(didMutate).toBe(true);
+            expect(attachment.contentRev).toBe(3);
+            expect(attachment.fileHash).toBe('bbbb');
+            expect(attachment.contentMtimeMs).toBe(2000);
+            expect(attachment.contentSize).toBe(20);
+            expect(onUpload).toHaveBeenCalledWith(attachment, '/local/file.txt');
+        });
+
+        describe('prepare phase: a failed/skipped upload must not publish metadata (review B2)', () => {
+            const staleAttachment = () => makeAttachment({
+                cloudKey: 'attachments/attachment-1.txt',
+                fileHash: 'stale-hash',
+                contentRev: 2,
+                contentMtimeMs: 1000,
+                contentSize: 10,
+            });
+            const baseOptions = {
+                localFileExists: vi.fn(async () => true),
+                getLocalFileStat: vi.fn(async () => ({ mtimeMs: 2000, size: 20 })),
+                computeLocalFileHash: vi.fn(async () => 'new-hash'),
+                contentChangePhase: 'prepare' as const,
+                onUploadError: vi.fn(),
+                onDownload: vi.fn(),
+                onDownloadError: vi.fn(),
+            };
+
+            it('onUpload returns false (validation/rate-limit failure)', async () => {
+                const attachment = staleAttachment();
+                await runAttachmentTransferLifecycle({
+                    ...baseOptions,
+                    attachmentsById: new Map([[attachment.id, attachment]]),
+                    onUpload: vi.fn(async () => false),
+                });
+                expect(attachment.contentRev).toBe(2);
+                expect(attachment.fileHash).toBe('stale-hash');
+                expect(attachment.contentMtimeMs).toBe(1000);
+                expect(attachment.contentSize).toBe(10);
+            });
+
+            it('onUpload throws (network failure)', async () => {
+                const attachment = staleAttachment();
+                await runAttachmentTransferLifecycle({
+                    ...baseOptions,
+                    attachmentsById: new Map([[attachment.id, attachment]]),
+                    onUpload: vi.fn(async () => { throw new Error('network error'); }),
+                });
+                expect(attachment.contentRev).toBe(2);
+                expect(attachment.fileHash).toBe('stale-hash');
+            });
+
+            it('policy.shouldUpload returns false (per-sync cap)', async () => {
+                const attachment = staleAttachment();
+                const onUpload = vi.fn(async () => true);
+                await runAttachmentTransferLifecycle({
+                    ...baseOptions,
+                    attachmentsById: new Map([[attachment.id, attachment]]),
+                    onUpload,
+                    policy: { shouldUpload: () => false },
+                });
+                expect(onUpload).not.toHaveBeenCalled();
+                expect(attachment.contentRev).toBe(2);
+                expect(attachment.fileHash).toBe('stale-hash');
+            });
+
+            it('a later cycle with a working upload still detects and retries the same change', async () => {
+                // Proves the "leave it untouched" fix actually enables retry, not just
+                // "nothing happens forever": the stat/hash are still recorded as stale, so
+                // the exact same mismatch is detected again next cycle.
+                const attachment = staleAttachment();
+                await runAttachmentTransferLifecycle({
+                    ...baseOptions,
+                    attachmentsById: new Map([[attachment.id, attachment]]),
+                    onUpload: vi.fn(async () => false),
+                });
+                const onUpload = vi.fn(async () => true);
+                await runAttachmentTransferLifecycle({
+                    ...baseOptions,
+                    attachmentsById: new Map([[attachment.id, attachment]]),
+                    onUpload,
+                });
+                expect(onUpload).toHaveBeenCalledTimes(1);
+                expect(attachment.contentRev).toBe(3);
+                expect(attachment.fileHash).toBe('new-hash');
+            });
+        });
+
+        it('prepare phase: an unconfirmable hash does not bump, upload, or publish a stale fileHash (review S2)', async () => {
+            const attachment = makeAttachment({
+                cloudKey: 'attachments/attachment-1.txt',
+                fileHash: 'old-hash',
+                contentRev: 2,
+                contentMtimeMs: 1000,
+                contentSize: 10,
+                localStatus: 'available',
+            });
+            const onUpload = vi.fn(async () => true);
+            const didMutate = await runAttachmentTransferLifecycle({
+                attachmentsById: new Map([[attachment.id, attachment]]),
+                localFileExists: vi.fn(async () => true),
+                getLocalFileStat: vi.fn(async () => ({ mtimeMs: 2000, size: 20 })),
+                computeLocalFileHash: vi.fn(async () => null),
+                contentChangePhase: 'prepare',
+                onUpload,
+                onUploadError: vi.fn(),
+                onDownload: vi.fn(),
+                onDownloadError: vi.fn(),
+            });
+
+            expect(didMutate).toBe(false);
+            expect(onUpload).not.toHaveBeenCalled();
+            expect(attachment.contentRev).toBe(2);
+            expect(attachment.fileHash).toBe('old-hash');
+            expect(attachment.contentMtimeMs).toBe(1000);
+        });
+
+        it('post-merge phase: a local edit landing mid-cycle is never overwritten (review S3)', async () => {
+            const attachment = makeAttachment({
+                cloudKey: 'attachments/attachment-1.txt',
+                fileHash: 'winner-hash',
+                contentRev: 5,
+                contentMtimeMs: 9000,
+                contentSize: 90,
+                localStatus: 'available',
+            });
+            const onDownload = vi.fn(async () => true);
+            const onLocalEditRace = vi.fn();
+            // First stat call (the detection pass) reports the state that triggers the
+            // mismatch; the second (the re-stat immediately before overwrite, S3) reports
+            // that the file changed AGAIN in between — simulating the user's editor saving
+            // mid-cycle.
+            const getLocalFileStat = vi.fn()
+                .mockResolvedValueOnce({ mtimeMs: 1234, size: 12 })
+                .mockResolvedValueOnce({ mtimeMs: 5678, size: 34 });
+            const didMutate = await runAttachmentTransferLifecycle({
+                attachmentsById: new Map([[attachment.id, attachment]]),
+                localFileExists: vi.fn(async () => true),
+                getLocalFileStat,
+                computeLocalFileHash: vi.fn(async () => 'loser-hash'),
+                contentChangePhase: 'post-merge',
+                onUpload: vi.fn(),
+                onUploadError: vi.fn(),
+                onDownload,
+                onDownloadError: vi.fn(),
+                onLocalEditRace,
+            });
+
+            expect(onDownload).not.toHaveBeenCalled();
+            expect(onLocalEditRace).toHaveBeenCalledWith(attachment);
+            expect(didMutate).toBe(false);
+            // The record is untouched — the next cycle's prepare pass picks this up as an
+            // ordinary local edit.
+            expect(attachment.fileHash).toBe('winner-hash');
+            expect(attachment.contentMtimeMs).toBe(9000);
+        });
+
+        it('prepare phase: a cosmetic mtime touch with the same hash refreshes stat but does not bump or re-upload', async () => {
+            const attachment = makeAttachment({
+                cloudKey: 'attachments/attachment-1.txt',
+                fileHash: 'aaaa',
+                contentRev: 2,
+                contentMtimeMs: 1000,
+                contentSize: 10,
+            });
+            const onUpload = vi.fn(async () => true);
+            const didMutate = await runAttachmentTransferLifecycle({
+                attachmentsById: new Map([[attachment.id, attachment]]),
+                localFileExists: vi.fn(async () => true),
+                getLocalFileStat: vi.fn(async () => ({ mtimeMs: 5000, size: 10 })),
+                computeLocalFileHash: vi.fn(async () => 'aaaa'),
+                contentChangePhase: 'prepare',
+                onUpload,
+                onUploadError: vi.fn(),
+                onDownload: vi.fn(),
+                onDownloadError: vi.fn(),
+            });
+
+            expect(didMutate).toBe(true);
+            expect(attachment.contentRev).toBe(2);
+            expect(attachment.contentMtimeMs).toBe(5000);
+            expect(attachment.contentSize).toBe(10);
+            expect(onUpload).not.toHaveBeenCalled();
+        });
+
+        it('leaves an unchanged file (matching stat) completely alone — no hash call, no mutation', async () => {
+            const attachment = makeAttachment({
+                cloudKey: 'attachments/attachment-1.txt',
+                fileHash: 'aaaa',
+                contentMtimeMs: 1000,
+                contentSize: 10,
+                localStatus: 'available',
+            });
+            const computeLocalFileHash = vi.fn(async () => 'aaaa');
+            const didMutate = await runAttachmentTransferLifecycle({
+                attachmentsById: new Map([[attachment.id, attachment]]),
+                localFileExists: vi.fn(async () => true),
+                getLocalFileStat: vi.fn(async () => ({ mtimeMs: 1000, size: 10 })),
+                computeLocalFileHash,
+                contentChangePhase: 'prepare',
+                onUpload: vi.fn(),
+                onUploadError: vi.fn(),
+                onDownload: vi.fn(),
+                onDownloadError: vi.fn(),
+            });
+
+            expect(didMutate).toBe(false);
+            expect(computeLocalFileHash).not.toHaveBeenCalled();
+        });
+
+        it('post-merge phase: a hash mismatch (another device won the merge) re-downloads instead of re-uploading', async () => {
+            // Simulates the losing side of a concurrent edit: the merge already adopted
+            // the other device's fileHash/contentRev into this attachment object, but the
+            // file still on this device's disk is the old, losing content.
+            const attachment = makeAttachment({
+                cloudKey: 'attachments/attachment-1.txt',
+                fileHash: 'winner-hash',
+                contentRev: 5,
+                contentMtimeMs: 9000,
+                contentSize: 90,
+                localStatus: 'available',
+            });
+            const onUpload = vi.fn(async () => true);
+            const onDownload = vi.fn(async (item: Attachment) => {
+                item.uri = '/local/downloaded.txt';
+                return true;
+            });
+            const didMutate = await runAttachmentTransferLifecycle({
+                attachmentsById: new Map([[attachment.id, attachment]]),
+                localFileExists: vi.fn(async () => true),
+                getLocalFileStat: vi.fn(async () => ({ mtimeMs: 1234, size: 12 })),
+                computeLocalFileHash: vi.fn(async () => 'loser-hash'),
+                contentChangePhase: 'post-merge',
+                onUpload,
+                onUploadError: vi.fn(),
+                onDownload,
+                onDownloadError: vi.fn(),
+            });
+
+            expect(didMutate).toBe(true);
+            expect(onUpload).not.toHaveBeenCalled();
+            expect(onDownload).toHaveBeenCalledWith(attachment);
+            // contentRev/fileHash are untouched by the download branch itself — they
+            // already carry the winning side's values from the merge.
+            expect(attachment.contentRev).toBe(5);
+            expect(attachment.fileHash).toBe('winner-hash');
+        });
+
+        it('loop safety: a downloaded file is immediately stat-recorded so a second, unchanged pass is a byte-for-byte no-op', async () => {
+            const attachment = makeAttachment({ cloudKey: 'attachments/attachment-1.txt' });
+            const onDownload = vi.fn(async (item: Attachment) => {
+                item.uri = '/local/downloaded.txt';
+                item.fileHash = 'downloaded-hash';
+                item.localStatus = 'available';
+                return true;
+            });
+            // Round 1: not on disk yet — the existing "missing -> download" path fires.
+            let existsLocally = false;
+            const localFileExists = vi.fn(async () => existsLocally);
+            // The freshly-written file's real stat, as the caller's getLocalFileStat would report it.
+            const getLocalFileStat = vi.fn(async () => ({ mtimeMs: 42_000, size: 42 }));
+
+            const firstPassMutated = await runAttachmentTransferLifecycle({
+                attachmentsById: new Map([[attachment.id, attachment]]),
+                localFileExists,
+                getLocalFileStat,
+                computeLocalFileHash: vi.fn(async () => 'downloaded-hash'),
+                contentChangePhase: 'post-merge',
+                onUpload: vi.fn(),
+                onUploadError: vi.fn(),
+                onDownload,
+                onDownloadError: vi.fn(),
+            });
+            expect(firstPassMutated).toBe(true);
+            expect(onDownload).toHaveBeenCalledTimes(1);
+            // The invariant under test: contentMtimeMs/contentSize already match the
+            // fresh file immediately after download, without waiting for a second cycle.
+            expect(attachment.contentMtimeMs).toBe(42_000);
+            expect(attachment.contentSize).toBe(42);
+
+            // Round 2: the file is now on disk and its stat is unchanged.
+            existsLocally = true;
+            const secondPassMutated = await runAttachmentTransferLifecycle({
+                attachmentsById: new Map([[attachment.id, attachment]]),
+                localFileExists,
+                getLocalFileStat,
+                computeLocalFileHash: vi.fn(async () => 'downloaded-hash'),
+                contentChangePhase: 'post-merge',
+                onUpload: vi.fn(),
+                onUploadError: vi.fn(),
+                onDownload,
+                onDownloadError: vi.fn(),
+            });
+
+            // Byte-for-byte no-op: no second download, no further mutation.
+            expect(onDownload).toHaveBeenCalledTimes(1);
+            expect(secondPassMutated).toBe(false);
+        });
+    });
+
     it('lets platform adapters resolve local URI paths', async () => {
         const attachment = makeAttachment({ uri: 'file:///tmp/upload.txt' });
         const localFileExists = vi.fn(async () => true);

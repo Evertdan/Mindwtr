@@ -989,9 +989,16 @@ class MobileSyncRun {
       },
       shouldRunAttachmentPhase: async (data, phase) => {
         const backend = this.backend;
+        // #1057 (review B3): only file/webdav/cloudkit wire check-on-touch content
+        // detection on mobile today (Dropbox and self-hosted Cloud use their own
+        // bespoke loops, unaffected). Without this, the steady state — cloudKey +
+        // managed local file + localStatus 'available' — always reported "no
+        // pending work" and both attachment phases never ran, so edit detection
+        // and cross-device re-download were dead code on every wired backend.
+        const contentCheckEnabled = backend === 'file' || backend === 'webdav' || backend === 'cloudkit';
         if (phase === 'prepare') {
           const prepareCheckStartedAt = Date.now();
-          const hasAttachmentWork = await hasPendingAttachmentSyncWork(data);
+          const hasAttachmentWork = await hasPendingAttachmentSyncWork(data, { contentCheckEnabled });
           if (hasPendingSyncSideEffects(data) || hasAttachmentWork) {
             this.startVisibleSyncActivity();
           }
@@ -1006,7 +1013,7 @@ class MobileSyncRun {
           this.attachmentPrepareStartedAt = Date.now();
           return true;
         }
-        const hasAttachmentWork = await hasPendingAttachmentSyncWork(data);
+        const hasAttachmentWork = await hasPendingAttachmentSyncWork(data, { contentCheckEnabled });
         if (!hasAttachmentWork) {
           logSyncInfo('Attachment sync skipped', { backend, reason: 'no-pending-work' });
           return false;
@@ -1291,12 +1298,13 @@ class MobileSyncRun {
         const baseSyncUrl = getBaseSyncUrl(webdavConfig.url);
         return syncWebdavAttachments(data, webdavConfig, baseSyncUrl, this.requestAbortController.signal, {
           activationProbe: helpers.activationProbe,
+          phase: helpers.phase,
         });
       },
       syncCloudKitAttachments: async (data, helpers) => syncCloudKitAttachments(
         data,
         this.requestAbortController.signal,
-        { activationProbe: helpers.activationProbe }
+        { activationProbe: helpers.activationProbe, phase: helpers.phase }
       ),
       syncCloudAttachments: async (data, helpers) => {
         const cloudConfig = this.cloudConfig!;
@@ -1316,7 +1324,7 @@ class MobileSyncRun {
         data,
         this.fileSyncPath!,
         this.requestAbortController.signal,
-        { activationProbe: helpers.activationProbe }
+        { activationProbe: helpers.activationProbe, phase: helpers.phase }
       ),
     };
   }

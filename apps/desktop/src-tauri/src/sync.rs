@@ -4326,6 +4326,7 @@ mod tests {
             "sync_fs_create_dir",
             "sync_fs_remove_file",
             "sync_fs_rename",
+            "sync_fs_stat",
         ] {
             assert!(
                 handler.contains(&format!("{name},")),
@@ -8850,6 +8851,32 @@ pub(crate) fn sync_fs_exists(app: tauri::AppHandle, path: String) -> Result<bool
     sync_fs_path(&app, path)?
         .try_exists()
         .map_err(|error| error.to_string())
+}
+
+#[derive(serde::Serialize)]
+pub(crate) struct SyncFsStat {
+    /// Milliseconds since the Unix epoch, matching the JS side's `LocalFileStat.mtimeMs`.
+    #[serde(rename = "mtimeMs")]
+    mtime_ms: u64,
+    size: u64,
+}
+
+// #1057 (review S5): a linked attachment's path can point at the same slow mount as
+// the sync folder itself, same as `sync_fs_exists` above — this must not go through
+// the fs plugin's plain (main-thread) `stat` command for a non-managed-dir path.
+#[tauri::command(async)]
+pub(crate) fn sync_fs_stat(app: tauri::AppHandle, path: String) -> Result<SyncFsStat, String> {
+    let metadata = fs::metadata(sync_fs_path(&app, path)?).map_err(|error| error.to_string())?;
+    let mtime_ms = metadata
+        .modified()
+        .map_err(|error| error.to_string())?
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| error.to_string())?
+        .as_millis() as u64;
+    Ok(SyncFsStat {
+        mtime_ms,
+        size: metadata.len(),
+    })
 }
 
 #[tauri::command(async)]

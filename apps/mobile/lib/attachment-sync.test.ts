@@ -747,6 +747,14 @@ describe('attachment sync', () => {
     expect(fileSystemMock.readDirectoryAsync).not.toHaveBeenCalled();
     expect(fileSystemMock.StorageAccessFramework.readDirectoryAsync).not.toHaveBeenCalled();
 
+    // #1057 (review B3): the exact same steady-state attachment (cloudKey + managed
+    // local file + localStatus 'available') must count as pending work once a backend
+    // wires check-on-touch content detection — otherwise both attachment phases never
+    // run on mobile and content edits/cross-device updates are never detected.
+    await expect(
+      hasPendingAttachmentSyncWork(makeData(baseAttachment), { contentCheckEnabled: true }),
+    ).resolves.toBe(true);
+
     const legacyManagedAttachment: Attachment = {
       ...baseAttachment,
       id: 'legacy-managed',

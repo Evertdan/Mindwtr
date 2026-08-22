@@ -150,10 +150,27 @@ final class CloudKitSyncManager {
         let destinationURL = try fileURL(from: targetPath)
         let parentURL = destinationURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: parentURL, withIntermediateDirectories: true)
-        if FileManager.default.fileExists(atPath: destinationURL.path) {
-            try FileManager.default.removeItem(at: destinationURL)
+
+        // Copy to a temp file in the same directory first, then atomically replace
+        // the destination (#1057). The previous copy-in-place (remove destination,
+        // then copy over it) could leave `destinationURL` missing or truncated if the
+        // app was killed or the volume hiccuped mid-copy — a later sync would then
+        // treat that truncated file as new content and re-upload it.
+        let tempURL = parentURL.appendingPathComponent(".tmp-\(UUID().uuidString)-\(destinationURL.lastPathComponent)")
+        if FileManager.default.fileExists(atPath: tempURL.path) {
+            try? FileManager.default.removeItem(at: tempURL)
         }
-        try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+        do {
+            try FileManager.default.copyItem(at: sourceURL, to: tempURL)
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                _ = try FileManager.default.replaceItemAt(destinationURL, withItemAt: tempURL)
+            } else {
+                try FileManager.default.moveItem(at: tempURL, to: destinationURL)
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: tempURL)
+            throw error
+        }
 
         var metadata = attachmentMetadata(from: record)
         metadata["filePath"] = destinationURL.absoluteString

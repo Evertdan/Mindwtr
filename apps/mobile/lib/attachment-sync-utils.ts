@@ -5,6 +5,7 @@ import {
   ATTACHMENTS_DIR_NAME,
   buildCloudKey,
   collectAttachmentsById,
+  computeSha256Hex,
   createWebdavDownloadBackoff,
   decodeUriSafe,
   extractExtension,
@@ -15,6 +16,7 @@ import {
   reportProgress,
   sleep,
   validateAttachmentHash,
+  type LocalFileStat,
 } from '@mindwtr/core';
 import {
   CLOUD_TOKEN_KEY,
@@ -507,6 +509,42 @@ export const fileExists = async (uri: string): Promise<boolean> => {
   }
 };
 
+// #1057: check-on-touch content-change detection. A `content://` (Android SAF)
+// uri's mtime isn't reliably comparable across accesses, so this returns null for
+// those — the per-sync pre-pass simply skips detection for them, matching the
+// scope note that linked-file detection is desktop-first; SAF-backed files still
+// participate fully on the re-download side via the ordinary cloudKey/hasCloudCopy
+// path, unaffected by this being null.
+export const statAttachmentFile = async (uri: string): Promise<LocalFileStat | null> => {
+  if (uri.startsWith('content://')) return null;
+  try {
+    const info = await FileSystem.getInfoAsync(uri);
+    if (!info.exists || typeof info.size !== 'number' || typeof info.modificationTime !== 'number') return null;
+    // expo-file-system reports modificationTime with only whole-second resolution
+    // (review S6). The recorded value is never itself transported cross-device
+    // (sanitizeAppDataForRemote strips contentMtimeMs/contentSize before any sync
+    // write — see sync-helpers.ts), so this coarseness can't corrupt another
+    // device's view; the accepted, narrow gap is purely local: an edit that lands
+    // within the same second as the last recorded stat AND preserves the exact
+    // byte size is invisible to the cheap compare until a later stat call sees a
+    // different second. A hash-confirming re-check (e.g. after the file is opened
+    // through Mindwtr) closes that window; this cheap path alone does not.
+    return { mtimeMs: Math.round(info.modificationTime * 1000), size: info.size };
+  } catch (error) {
+    logAttachmentWarn('Failed to stat attachment file', error);
+    return null;
+  }
+};
+
+export const computeAttachmentFileHash = async (uri: string): Promise<string | null> => {
+  try {
+    return await computeSha256Hex(await readFileAsBytes(uri));
+  } catch (error) {
+    logAttachmentWarn('Failed to hash attachment file', error);
+    return null;
+  }
+};
+
 export type PersistAttachmentOutcome = {
   attachment: Attachment;
   /**
@@ -636,7 +674,10 @@ export const createAttachmentLocalMigrationLimiter = (
   };
 };
 
-export const hasPendingAttachmentSyncWork = async (appData: AppData): Promise<boolean> => {
+export const hasPendingAttachmentSyncWork = async (
+  appData: AppData,
+  options: { contentCheckEnabled?: boolean } = {},
+): Promise<boolean> => {
   if (appData.settings.attachments?.pendingRemoteDeletes?.length) return true;
 
   const attachmentsById = collectAttachments(appData);
@@ -656,6 +697,16 @@ export const hasPendingAttachmentSyncWork = async (appData: AppData): Promise<bo
       return true;
     }
     if (attachment.cloudKey && (!uri || attachment.localStatus === 'missing' || attachment.localStatus === 'downloading')) {
+      return true;
+    }
+    // #1057 (review B3): the steady state — cloudKey + a managed local file +
+    // localStatus 'available' — used to fall all the way through to "no pending
+    // work", which is exactly the case check-on-touch content detection exists to
+    // catch (an edited-in-place file, or another device's newer upload). Only
+    // counted as pending when the caller's backend actually wires content
+    // detection; the lifecycle's own cheap mtime/size compare is the real cost
+    // gate, this is just what lets the phase run at all.
+    if (options.contentCheckEnabled && attachment.cloudKey && hasLocalUri && attachment.localStatus === 'available') {
       return true;
     }
     if (hasLocalUri) {

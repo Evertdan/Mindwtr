@@ -100,6 +100,9 @@ export const toAttachments = (value: unknown): Attachment[] | undefined => {
             deletedAt: typeof item.deletedAt === 'string' ? item.deletedAt : undefined,
             cloudKey: typeof item.cloudKey === 'string' ? item.cloudKey : undefined,
             fileHash: typeof item.fileHash === 'string' ? item.fileHash : undefined,
+            contentRev: typeof item.contentRev === 'number' && Number.isFinite(item.contentRev) ? item.contentRev : undefined,
+            contentMtimeMs: typeof item.contentMtimeMs === 'number' && Number.isFinite(item.contentMtimeMs) ? item.contentMtimeMs : undefined,
+            contentSize: typeof item.contentSize === 'number' && Number.isFinite(item.contentSize) ? item.contentSize : undefined,
             localStatus: typeof item.localStatus === 'string' && allowedStatuses.has(item.localStatus as Attachment['localStatus'])
                 ? (item.localStatus as Attachment['localStatus'])
                 : undefined,

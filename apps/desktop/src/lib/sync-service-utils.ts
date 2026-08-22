@@ -111,11 +111,15 @@ export const createLocalAttachmentFs = (
         /** Current managed attachments dir, used to recover from stale absolute
          *  paths left behind by a relocated portable profile (#1038). */
         managedAttachmentsDir?: string;
+        /** Optional: enables `statLocalFile` for check-on-touch content-change
+         *  detection (#1057). Omitted by callers that don't need it. */
+        stat?: (path: string, options?: { baseDir: any }) => Promise<{ mtime: Date | null; size: number }>;
     },
     warningMessage = 'Failed to check attachment file',
 ): {
     readLocalFile: (path: string, attachment: Pick<Attachment, 'id'>) => Promise<Uint8Array>;
     localFileExists: (path: string, attachment: Pick<Attachment, 'id'>) => Promise<boolean>;
+    statLocalFile: (path: string, attachment: Pick<Attachment, 'id'>) => Promise<{ mtimeMs: number; size: number } | null>;
 } => {
     const baseDataDir = deps.baseDataDir.replace(/[\\/]+$/, '');
     const isWithinDataDir = (path: string): boolean => Boolean(baseDataDir) && (
@@ -179,7 +183,33 @@ export const createLocalAttachmentFs = (
         }
     };
 
-    return { readLocalFile, localFileExists };
+    const statLocalFile = async (
+        path: string,
+        attachment: Pick<Attachment, 'id'>,
+    ): Promise<{ mtimeMs: number; size: number } | null> => {
+        if (!deps.stat) return null;
+        const toStat = (info: { mtime: Date | null; size: number }) => ({
+            mtimeMs: info.mtime ? info.mtime.getTime() : 0,
+            size: info.size,
+        });
+        try {
+            if (isWithinDataDir(path)) {
+                return toStat(await deps.stat(toRelative(path), { baseDir: deps.dataBaseDir }));
+            }
+            try {
+                return toStat(await deps.stat(normalizeAttachmentFsPath(path)));
+            } catch (error) {
+                const fallback = managedFallbackPath(path, attachment);
+                if (!fallback) throw error;
+                return toStat(await deps.stat(fallback));
+            }
+        } catch (error) {
+            logSyncWarning(warningMessage, error);
+            return null;
+        }
+    };
+
+    return { readLocalFile, localFileExists, statLocalFile };
 };
 
 const buildTempPath = (relativePath: string): string => {

@@ -104,6 +104,10 @@ const fsMocks = vi.hoisted(() => ({
     rename: vi.fn(),
     remove: vi.fn(),
     readDir: vi.fn(),
+    // #1057: check-on-touch content detection stats the local file; rejecting by
+    // default means these tests (which don't exercise that feature) see "no stat
+    // available", identical to omitting getLocalFileStat entirely.
+    stat: vi.fn().mockRejectedValue(new Error('not stubbed')),
 }));
 // The sync folder's exists/mkdir/remove/rename go through async Rust commands,
 // not the fs plugin's main-thread ones (#1037).
@@ -1183,7 +1187,13 @@ describe('desktop sync-service runtime', () => {
         expect(headFetchMock.mock.calls.some(([input, init]) =>
             init?.method === 'HEAD' || (typeof Request !== 'undefined' && input instanceof Request && input.method === 'HEAD')
         )).toBe(true);
-        expect(headFetchMock.mock.calls).toHaveLength(1);
+        // #1057 (review S1): the attachment prepare phase now runs before the fast
+        // unchanged-check (desktop's `preSyncAttachmentsBeforeFastCheck: true`) so an
+        // attachment-only edit isn't skipped along with everything else — the
+        // deliberate cost is one extra WebDAV directory-ensure/rate-limit-probe call
+        // per cycle even when the fast check ultimately finds nothing changed. Mobile
+        // has paid this same cost on every cycle since before this feature existed.
+        expect(headFetchMock.mock.calls).toHaveLength(2);
         expect(invokeMock.mock.calls.some(([command]) => command === 'save_data')).toBe(false);
         expect(JSON.parse(localStorage.getItem('mindwtr-local-sync-status-v1') ?? '{}')).toMatchObject({
             lastSyncStatus: 'success',

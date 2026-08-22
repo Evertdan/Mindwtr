@@ -15,6 +15,7 @@ import {
   buildCloudKey,
   clearWebdavDownloadBackoff,
   collectAttachments,
+  computeAttachmentFileHash,
   DEFAULT_CONTENT_TYPE,
   extractExtension,
   fileExists,
@@ -29,6 +30,7 @@ import {
   readAttachmentBytesForUpload,
   reportProgress,
   setWebdavDownloadBackoff,
+  statAttachmentFile,
   toArrayBuffer,
   type WebDavConfig,
   validateAttachmentHash,
@@ -64,7 +66,7 @@ export const syncWebdavAttachments = async (
   webDavConfig: WebDavConfig,
   baseSyncUrl: string,
   signal?: AbortSignal,
-  options: { activationProbe?: boolean } = {}
+  options: { activationProbe?: boolean; phase?: 'prepare' | 'post-merge' } = {}
 ): Promise<boolean> => {
   assertAttachmentSyncNotAborted(signal);
   let lastRequestAt = 0;
@@ -212,6 +214,9 @@ export const syncWebdavAttachments = async (
     attachmentsById,
     localFileExists: fileExists,
     forceUploadExistingLocal: options.activationProbe === true,
+    getLocalFileStat: (path) => statAttachmentFile(path),
+    computeLocalFileHash: (path) => computeAttachmentFileHash(path),
+    contentChangePhase: options.phase,
     isFatalError: (error) => isAttachmentSyncAbortError(error, signal),
     policy: options.activationProbe
       ? undefined

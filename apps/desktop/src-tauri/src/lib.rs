@@ -117,7 +117,8 @@ use sync::{
     promote_staged_dropbox_credentials, read_sync_file, read_sync_file_versioned,
     recover_dropbox_credentials_before_sync_configuration, recover_dropbox_credentials_on_startup,
     rollback_staged_dropbox_credentials, set_sync_path, sync_fs_create_dir, sync_fs_exists,
-    sync_fs_remove_file, sync_fs_rename, webdav_get_json, webdav_put_json, write_sync_file,
+    sync_fs_remove_file, sync_fs_rename, sync_fs_stat, webdav_get_json, webdav_put_json,
+    write_sync_file,
     DropboxStagedCredentialState, DropboxStartupRecoveryOutcome,
 };
 use ui::{
@@ -1645,6 +1646,7 @@ pub fn run() {
             sync_fs_create_dir,
             sync_fs_remove_file,
             sync_fs_rename,
+            sync_fs_stat,
             set_tray_visible,
             set_tray_tooltip,
             set_macos_activation_policy,

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createLocalAttachmentFs } from './sync-service-utils';
+import { createLocalAttachmentFs, writeFileSafelyAbsolute } from './sync-service-utils';
 
 const BASE_DATA_DIR = '/os-data';
 const MANAGED_DIR = '/new-profile/attachments';
@@ -95,5 +95,54 @@ describe('createLocalAttachmentFs managed-dir fallback', () => {
         expect(await fs.localFileExists(STALE_URI, { id: 'different-id' })).toBe(false);
         await expect(fs.readLocalFile(STALE_URI, { id: 'different-id' })).rejects.toThrow();
         expect(exists).not.toHaveBeenCalledWith(MANAGED_FILE);
+    });
+});
+
+// #1057: attachment downloads must be write-temp-then-rename so a cut connection
+// can never leave a truncated file at the real target path that a later sync would
+// mistake for new content.
+describe('writeFileSafelyAbsolute', () => {
+    it('never touches the target path until the temp write has fully succeeded', async () => {
+        const target = '/managed/attachments/a1.pdf';
+        const previousBytes = new Uint8Array([9, 9, 9]);
+        const files = new Map<string, Uint8Array>([[target, previousBytes]]);
+        const writeFile = vi.fn(async (path: string, data: Uint8Array) => {
+            if (path === target) throw new Error('should never write the target directly on the happy path');
+            files.set(path, data);
+        });
+        const rename = vi.fn(async (from: string, to: string) => {
+            files.set(to, files.get(from)!);
+            files.delete(from);
+        });
+        const remove = vi.fn(async (path: string) => { files.delete(path); });
+
+        await writeFileSafelyAbsolute(target, new Uint8Array([1, 2, 3]), { writeFile, rename, remove });
+
+        expect(files.get(target)).toEqual(new Uint8Array([1, 2, 3]));
+        // The first writeFile call landed on a temp path, not the target.
+        expect(writeFile.mock.calls[0]?.[0]).not.toBe(target);
+    });
+
+    it('a failed temp write leaves the previously-downloaded file completely untouched', async () => {
+        const target = '/managed/attachments/a1.pdf';
+        const previousBytes = new Uint8Array([9, 9, 9]);
+        const files = new Map<string, Uint8Array>([[target, previousBytes]]);
+        const tempWriteError = new Error('connection cut mid-download');
+        const writeFile = vi.fn(async (path: string, data: Uint8Array) => {
+            if (path !== target) throw tempWriteError;
+            files.set(path, data);
+        });
+        const rename = vi.fn();
+        const remove = vi.fn();
+
+        await expect(
+            writeFileSafelyAbsolute(target, new Uint8Array([1, 2, 3]), { writeFile, rename, remove }),
+        ).rejects.toThrow(tempWriteError);
+
+        // The interrupted download never reached the rename step, so the file that
+        // was there before this sync pass is exactly as it was — never truncated,
+        // never partially overwritten.
+        expect(files.get(target)).toEqual(previousBytes);
+        expect(rename).not.toHaveBeenCalled();
     });
 });

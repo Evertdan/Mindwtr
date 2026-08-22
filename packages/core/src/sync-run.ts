@@ -9,6 +9,7 @@ import type {
     SyncRunNotifier,
     SyncRunOptions,
     SyncRunPlatformHooks,
+    SyncRunAttachmentPhase,
     SyncRunPolicy,
     SyncRunPorts,
     SyncRunResult,
@@ -288,10 +289,11 @@ class SharedSyncRunMachine {
         this.hooks.requestFollowUp();
     }
 
-    private attachmentHelpers() {
+    private attachmentHelpers(phase: SyncRunAttachmentPhase) {
         return {
             ensureLocalSnapshotFresh: () => this.ensureLocalSnapshotFresh(),
             activationProbe: this.options.activationProbe === true,
+            phase,
         };
     }
 
@@ -619,7 +621,7 @@ class SharedSyncRunMachine {
             if (isRemoteSyncBackend(this.backend)) {
                 await this.ensureNetwork();
             }
-            const result = await io.syncAttachments(localData, this.attachmentHelpers());
+            const result = await io.syncAttachments(localData, this.attachmentHelpers('prepare'));
             const mutated = result === true || (Boolean(result) && typeof result === 'object');
             const mutatedData = result && typeof result === 'object' ? result : localData;
             if (mutated) {
@@ -659,7 +661,7 @@ class SharedSyncRunMachine {
             }
             const result = await io.syncAttachments(
                 activationSnapshot.data,
-                this.attachmentHelpers(),
+                this.attachmentHelpers('post-merge'),
             );
             const provenData = result && typeof result === 'object'
                 ? result
@@ -687,7 +689,7 @@ class SharedSyncRunMachine {
         if (isRemoteSyncBackend(this.backend)) {
             await this.ensureNetwork();
         }
-        const result = await io.syncAttachments(data, this.attachmentHelpers());
+        const result = await io.syncAttachments(data, this.attachmentHelpers('post-merge'));
         const nextData = result && typeof result === 'object' ? result : data;
         const remainingUploads = findPendingAttachmentUploads(nextData);
         this.notifier.logInfo('Attachment final sync done', {
@@ -724,7 +726,7 @@ class SharedSyncRunMachine {
                 await this.ensureNetwork();
             }
             const candidateData = cloneAppData(currentData);
-            const result = await io.syncAttachments(candidateData, this.attachmentHelpers());
+            const result = await io.syncAttachments(candidateData, this.attachmentHelpers('post-merge'));
             const nextData = result && typeof result === 'object'
                 ? result
                 : result

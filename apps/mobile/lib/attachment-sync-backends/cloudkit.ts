@@ -8,6 +8,7 @@ import {
 } from '../cloudkit-sync';
 import {
     collectAttachments,
+    computeAttachmentFileHash,
     extractExtension,
     fileExists,
     getAttachmentByteSize,
@@ -17,6 +18,7 @@ import {
     readAttachmentBytesForUpload,
     readFileAsBytes,
     reportProgress,
+    statAttachmentFile,
     validateAttachmentHash,
     writeBytesSafely,
 } from '../attachment-sync-utils';
@@ -128,7 +130,7 @@ const flushPendingCloudKitDeletes = async (appData: AppData, signal?: AbortSigna
 export const syncCloudKitAttachments = async (
     appData: AppData,
     signal?: AbortSignal,
-    options: { activationProbe?: boolean } = {},
+    options: { activationProbe?: boolean; phase?: 'prepare' | 'post-merge' } = {},
 ): Promise<boolean> => {
     assertAttachmentSyncNotAborted(signal);
     const attachmentsDir = await getAttachmentsDir();
@@ -150,6 +152,9 @@ export const syncCloudKitAttachments = async (
         attachmentsById,
         localFileExists: fileExists,
         forceUploadExistingLocal: options.activationProbe === true,
+        getLocalFileStat: (path) => statAttachmentFile(path),
+        computeLocalFileHash: (path) => computeAttachmentFileHash(path),
+        contentChangePhase: options.phase,
         isFatalError: (error) => isAttachmentSyncAbortError(error, signal),
         // A cloudKey written by a different backend before a provider switch isn't a valid
         // CloudKit record key, so CloudKit must still treat the attachment as needing upload.

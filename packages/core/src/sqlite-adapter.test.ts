@@ -155,6 +155,11 @@ describeSqlite('SqliteAdapter', () => {
                             createdAt: now,
                             updatedAt: now,
                             localStatus: 'available',
+                            cloudKey: 'attachments/a1.pdf',
+                            fileHash: 'abc123',
+                            contentRev: 3,
+                            contentMtimeMs: 1_700_000_000_000,
+                            contentSize: 2048,
                         },
                     ],
                     createdAt: now,
@@ -292,6 +297,12 @@ describeSqlite('SqliteAdapter', () => {
         expect(task.checklist?.[0]?.title).toBe('Outline');
         expect(task.attachments?.[0]?.title).toBe('spec.pdf');
         expect(task.attachments?.[0]?.localStatus).toBe('available');
+        // #1057: content-tracking fields (SQLite -> AppData round trip).
+        expect(task.attachments?.[0]?.cloudKey).toBe('attachments/a1.pdf');
+        expect(task.attachments?.[0]?.fileHash).toBe('abc123');
+        expect(task.attachments?.[0]?.contentRev).toBe(3);
+        expect(task.attachments?.[0]?.contentMtimeMs).toBe(1_700_000_000_000);
+        expect(task.attachments?.[0]?.contentSize).toBe(2048);
         expect(task.completedAt).toBe(archivedAt);
         expect(task.statusBeforeProjectArchive).toBe('next');
         expect(task.completedAtBeforeProjectArchive).toBeNull();
