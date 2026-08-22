@@ -34,6 +34,9 @@ const duplicateProjectAttachmentCopy = (attachment: NonNullable<Project['attachm
     cloudKey: undefined,
     fileHash: undefined,
     localStatus: undefined,
+    contentRev: undefined,
+    contentMtimeMs: undefined,
+    contentSize: undefined,
 });
 
 const collectRetainedAttachmentCloudKeys = (

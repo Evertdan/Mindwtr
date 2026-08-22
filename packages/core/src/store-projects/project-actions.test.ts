@@ -198,6 +198,9 @@ describe('project actions', () => {
                 cloudKey: 'attachments/project-brief.pdf',
                 fileHash: 'project-hash',
                 localStatus: 'available',
+                contentRev: 3,
+                contentMtimeMs: 1750000000000,
+                contentSize: 4096,
             }],
         });
         expect(project).not.toBeNull();
@@ -216,6 +219,9 @@ describe('project actions', () => {
                 cloudKey: 'attachments/task-brief.pdf',
                 fileHash: 'task-hash',
                 localStatus: 'available',
+                contentRev: 2,
+                contentMtimeMs: 1750000000000,
+                contentSize: 2048,
             }],
         });
         expect(taskResult.success).toBe(true);
@@ -239,6 +245,9 @@ describe('project actions', () => {
         expect(copiedProjectAttachment?.cloudKey).toBeUndefined();
         expect(copiedProjectAttachment?.fileHash).toBeUndefined();
         expect(copiedProjectAttachment?.localStatus).toBeUndefined();
+        expect(copiedProjectAttachment?.contentRev).toBeUndefined();
+        expect(copiedProjectAttachment?.contentMtimeMs).toBeUndefined();
+        expect(copiedProjectAttachment?.contentSize).toBeUndefined();
 
         const copiedTaskAttachment = state._allTasks
             .find((task) => task.projectId === duplicatedProject.id)
@@ -253,6 +262,9 @@ describe('project actions', () => {
         expect(copiedTaskAttachment?.cloudKey).toBeUndefined();
         expect(copiedTaskAttachment?.fileHash).toBeUndefined();
         expect(copiedTaskAttachment?.localStatus).toBeUndefined();
+        expect(copiedTaskAttachment?.contentRev).toBeUndefined();
+        expect(copiedTaskAttachment?.contentMtimeMs).toBeUndefined();
+        expect(copiedTaskAttachment?.contentSize).toBeUndefined();
     });
 
     it('keeps reference tasks as reference (not next) when duplicating a project', async () => {
