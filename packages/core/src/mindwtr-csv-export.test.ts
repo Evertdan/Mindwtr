@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { serializeMindwtrCsv } from './mindwtr-csv-export';
 import { MINDWTR_CSV_COLUMNS, MINDWTR_CSV_KNOWN_COLUMNS } from './mindwtr-csv-columns';
 import { applyMindwtrCsvImport, parseMindwtrCsvImportSource } from './mindwtr-csv-import';
-import type { AppData, Project, Section, Task } from './types';
+import type { AppData, Project, Recurrence, Section, Task } from './types';
 
 const task = (overrides: Partial<Task> = {}): Task => ({
     id: 'task-1',
@@ -294,5 +294,102 @@ describe('serializeMindwtrCsv', () => {
         expect(parsed.projects).toEqual([]);
         expect(parsed.sections).toEqual([]);
         expect(parsed.tasks[0].projectSourceKey).toBeUndefined();
+    });
+
+    // Every family the recurrence editors can produce, pinned as an exact cell AND as the
+    // recurrence the importer reads back out of it. Anything the RRULE subset cannot carry
+    // (seriesId, occurrence counters, clamped anchor days) is dropped on purpose: an
+    // imported task starts a fresh series.
+    const RECURRENCE_MATRIX: Array<{ name: string; recurrence: Recurrence; cell: string; imported: Recurrence }> = [
+        {
+            name: 'daily',
+            recurrence: { rule: 'daily' },
+            cell: 'FREQ=DAILY',
+            imported: { rule: 'daily', rrule: 'FREQ=DAILY' },
+        },
+        {
+            name: 'every 3 days after completion',
+            recurrence: { rule: 'daily', strategy: 'fluid', rrule: 'FREQ=DAILY;INTERVAL=3' },
+            cell: 'FREQ=DAILY;INTERVAL=3;X-MINDWTR-STRATEGY=FLUID',
+            imported: { rule: 'daily', strategy: 'fluid', rrule: 'FREQ=DAILY;INTERVAL=3' },
+        },
+        {
+            name: 'weekly on two weekdays',
+            recurrence: { rule: 'weekly', byDay: ['MO', 'WE'], rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+            cell: 'FREQ=WEEKLY;BYDAY=MO,WE',
+            imported: { rule: 'weekly', byDay: ['MO', 'WE'], rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+        },
+        {
+            name: 'fortnightly with an explicit week start',
+            recurrence: { rule: 'weekly', byDay: ['SU'], weekStart: 'MO', rrule: 'FREQ=WEEKLY;INTERVAL=2;BYDAY=SU;WKST=MO' },
+            cell: 'FREQ=WEEKLY;INTERVAL=2;BYDAY=SU;WKST=MO',
+            imported: { rule: 'weekly', byDay: ['SU'], weekStart: 'MO', rrule: 'FREQ=WEEKLY;INTERVAL=2;BYDAY=SU;WKST=MO' },
+        },
+        {
+            name: 'monthly on days of the month',
+            recurrence: { rule: 'monthly', byMonthDay: [1, 15], rrule: 'FREQ=MONTHLY;BYMONTHDAY=1,15' },
+            cell: 'FREQ=MONTHLY;BYMONTHDAY=1,15',
+            imported: { rule: 'monthly', byMonthDay: [1, 15], rrule: 'FREQ=MONTHLY;BYMONTHDAY=1,15' },
+        },
+        {
+            name: 'monthly on the nth weekday',
+            recurrence: { rule: 'monthly', byDay: ['2TU'], rrule: 'FREQ=MONTHLY;BYDAY=2TU' },
+            cell: 'FREQ=MONTHLY;BYDAY=2TU',
+            imported: { rule: 'monthly', byDay: ['2TU'], rrule: 'FREQ=MONTHLY;BYDAY=2TU' },
+        },
+        {
+            name: 'monthly on the last weekday',
+            recurrence: { rule: 'monthly', byDay: ['-1FR'], strategy: 'fluid', rrule: 'FREQ=MONTHLY;BYDAY=-1FR' },
+            cell: 'FREQ=MONTHLY;BYDAY=-1FR;X-MINDWTR-STRATEGY=FLUID',
+            imported: { rule: 'monthly', byDay: ['-1FR'], strategy: 'fluid', rrule: 'FREQ=MONTHLY;BYDAY=-1FR' },
+        },
+        {
+            name: 'every other year',
+            recurrence: { rule: 'yearly', rrule: 'FREQ=YEARLY;INTERVAL=2' },
+            cell: 'FREQ=YEARLY;INTERVAL=2',
+            imported: { rule: 'yearly', rrule: 'FREQ=YEARLY;INTERVAL=2' },
+        },
+        {
+            name: 'a counted series',
+            recurrence: { rule: 'daily', count: 5, completedOccurrences: 2, seriesId: 'series-a', rrule: 'FREQ=DAILY;COUNT=5' },
+            cell: 'FREQ=DAILY;COUNT=5',
+            imported: { rule: 'daily', count: 5, rrule: 'FREQ=DAILY;COUNT=5' },
+        },
+        {
+            name: 'a series ending on a date',
+            recurrence: { rule: 'weekly', until: '2026-12-31', rrule: 'FREQ=WEEKLY' },
+            cell: 'FREQ=WEEKLY;UNTIL=20261231',
+            imported: { rule: 'weekly', until: '2026-12-31', rrule: 'FREQ=WEEKLY;UNTIL=20261231' },
+        },
+        {
+            name: 'a series ending at an instant',
+            recurrence: { rule: 'weekly', until: '2026-12-31T17:00:00.000Z', rrule: 'FREQ=WEEKLY' },
+            cell: 'FREQ=WEEKLY;UNTIL=20261231T170000Z',
+            imported: { rule: 'weekly', until: '2026-12-31T17:00:00.000Z', rrule: 'FREQ=WEEKLY;UNTIL=20261231T170000Z' },
+        },
+    ];
+
+    // Tab-delimited so the cell is never quote-wrapped and can be compared literally;
+    // BYDAY/BYMONTHDAY lists would otherwise be quoted for their commas.
+    const recurrenceCell = (recurrence?: Task['recurrence']): string => {
+        const rows = serializeMindwtrCsv(appData({ tasks: [task({ recurrence })] }), { delimiter: '\t' }).split('\n');
+        return rows[1].split('\t')[rows[0].split('\t').indexOf('Recurrence')];
+    };
+
+    it.each(RECURRENCE_MATRIX)('round-trips recurrence: $name', ({ recurrence, cell, imported }) => {
+        expect(recurrenceCell(recurrence)).toBe(cell);
+        expect(reimport(serializeMindwtrCsv(appData({ tasks: [task({ recurrence })] }))).tasks[0].recurrence)
+            .toEqual(imported);
+    });
+
+    it('leaves the Recurrence cell empty for a task that does not repeat', () => {
+        expect(recurrenceCell()).toBe('');
+        expect(reimport(serializeMindwtrCsv(appData({ tasks: [task()] }))).tasks[0].recurrence).toBeUndefined();
+    });
+
+    it('normalizes a legacy bare-string recurrence into a rule the importer reads', () => {
+        const csv = serializeMindwtrCsv(appData({ tasks: [task({ recurrence: 'weekly' })] }));
+
+        expect(reimport(csv).tasks[0].recurrence).toEqual({ rule: 'weekly', rrule: 'FREQ=WEEKLY' });
     });
 });

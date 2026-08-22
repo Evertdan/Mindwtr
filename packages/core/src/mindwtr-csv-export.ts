@@ -1,4 +1,5 @@
-import { MINDWTR_CSV_COLUMNS } from './mindwtr-csv-columns';
+import { MINDWTR_CSV_COLUMNS, MINDWTR_CSV_FLUID_RECURRENCE_TOKEN } from './mindwtr-csv-columns';
+import { buildRRuleString, normalizeRecurrenceForLoad, parseRRuleString } from './recurrence';
 import type { AppData, Task } from './types';
 
 /**
@@ -32,6 +33,27 @@ const escapeCell = (value: string, delimiter: string): string => (
 const formatChecklist = (task: Task): string => (task.checklist ?? [])
     .map((item) => `[${item.isCompleted ? 'x' : ' '}] ${item.title}`)
     .join('|');
+
+// Rebuilt from the normalized rule rather than echoing task.recurrence.rrule, so a stored
+// rule carrying tokens Mindwtr ignores (a foreign BYSETPOS, the internal series id) exports
+// as what the app actually does with it. The interval only exists inside the rrule, which is
+// why it is read back out of the string.
+const formatRecurrence = (task: Task): string => {
+    const recurrence = normalizeRecurrenceForLoad(task.recurrence);
+    if (!recurrence) return '';
+    const rrule = buildRRuleString(
+        recurrence.rule,
+        recurrence.byDay,
+        parseRRuleString(recurrence.rrule ?? '').interval,
+        {
+            byMonthDay: recurrence.byMonthDay,
+            weekStart: recurrence.weekStart,
+            count: recurrence.count,
+            until: recurrence.until,
+        },
+    );
+    return recurrence.strategy === 'fluid' ? `${rrule};${MINDWTR_CSV_FLUID_RECURRENCE_TOKEN}` : rrule;
+};
 
 export function serializeMindwtrCsv(data: AppData, options: MindwtrCsvExportOptions = {}): string {
     const delimiter = options.delimiter ?? ',';
@@ -68,6 +90,7 @@ export function serializeMindwtrCsv(data: AppData, options: MindwtrCsvExportOpti
             'Order': String(task.order ?? 0),
             'ID': task.id,
             'Created At': task.createdAt,
+            'Recurrence': formatRecurrence(task),
         };
     };
 

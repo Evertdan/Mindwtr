@@ -3,7 +3,7 @@
 // Apply delegates to the shared import-apply.ts seam, which also creates this importer's
 // Sections (the only ImportSource caller that supplies any).
 import { safeParseDate } from './date';
-import { MINDWTR_CSV_KNOWN_COLUMNS } from './mindwtr-csv-columns';
+import { MINDWTR_CSV_FLUID_RECURRENCE_TOKEN, MINDWTR_CSV_KNOWN_COLUMNS } from './mindwtr-csv-columns';
 import { applyImport, type ImportExecutionResult, type ImportParseResult } from './import-apply';
 import {
     appendWarning,
@@ -26,6 +26,7 @@ import {
     toImportBytes,
     type ImportArchiveBudget,
 } from './import-source-reader';
+import { normalizeRecurrenceForLoad } from './recurrence';
 import { createProjectOrderReserver, normalizeTagId } from './store-helpers';
 import { nextRevision } from './sync-revision';
 import { buildTaskContainerMovePatch } from './task-container-rules';
@@ -53,12 +54,13 @@ type MindwtrCsvWarningCounters = {
     invalidCsvFiles: number;
     nestedZipFiles: number;
     nonCsvEntries: number;
-    recurrenceColumnsIgnored: number;
     sectionWithoutProject: number;
     unclosedQuotedFiles: number;
     unknownColumns: number;
     unknownStatuses: number;
     unparsedDates: number;
+    unsupportedRecurrenceRules: number;
+    unsupportedRecurrenceSamples: string[];
 };
 
 export type ParsedMindwtrCsvArea = {
@@ -95,6 +97,7 @@ export type ParsedMindwtrCsvTask = {
     order: number;
     priority?: TaskPriority;
     projectSourceKey?: string;
+    recurrence?: Task['recurrence'];
     reviewAt?: string;
     sectionSourceKey?: string;
     sourceId: string;
@@ -147,12 +150,13 @@ const createWarningCounters = (): MindwtrCsvWarningCounters => ({
     invalidCsvFiles: 0,
     nestedZipFiles: 0,
     nonCsvEntries: 0,
-    recurrenceColumnsIgnored: 0,
     sectionWithoutProject: 0,
     unclosedQuotedFiles: 0,
     unknownColumns: 0,
     unknownStatuses: 0,
     unparsedDates: 0,
+    unsupportedRecurrenceRules: 0,
+    unsupportedRecurrenceSamples: [],
 });
 
 const buildWarnings = (counters: MindwtrCsvWarningCounters): string[] => {
@@ -160,7 +164,10 @@ const buildWarnings = (counters: MindwtrCsvWarningCounters): string[] => {
     appendWarning(warnings, counters.unknownColumns, '1 unknown column was ignored.', '{count} unknown columns were ignored.');
     appendWarning(warnings, counters.unknownStatuses, '1 task status could not be mapped and was imported to Inbox.', '{count} task statuses could not be mapped and were imported to Inbox.');
     appendWarning(warnings, counters.sectionWithoutProject, '1 Section was ignored because its row had no Project.', '{count} Sections were ignored because their rows had no Project.');
-    appendWarning(warnings, counters.recurrenceColumnsIgnored, '1 Recurrence value was ignored; this importer does not create recurring tasks.', '{count} Recurrence values were ignored; this importer does not create recurring tasks.');
+    appendWarning(warnings, counters.unsupportedRecurrenceRules, '1 Recurrence rule could not be understood; that task was imported without recurrence.', '{count} Recurrence rules could not be understood; those tasks were imported without recurrence.');
+    if (counters.unsupportedRecurrenceSamples.length > 0) {
+        warnings.push(`Unsupported Recurrence rules: ${counters.unsupportedRecurrenceSamples.join('; ')}.`);
+    }
     appendWarning(warnings, counters.unparsedDates, '1 date value could not be parsed and was skipped.', '{count} date values could not be parsed and were skipped.');
     appendWarning(warnings, counters.duplicateIds, '1 row had an ID that duplicated an earlier row in this import and was dropped.', '{count} rows had an ID that duplicated an earlier row in this import and were dropped.');
     appendWarning(warnings, counters.emptyTitleRows, '1 row with an empty title was skipped.', '{count} rows with empty titles were skipped.');
@@ -404,6 +411,42 @@ type MindwtrCsvRowSource = {
     name: string;
 };
 
+// Everything the Mindwtr recurrence model can act on. A rule carrying anything else
+// (BYSETPOS, BYMONTH, a frequency below daily) would import as the nearest rule the model
+// CAN express — "second Tuesday" silently becoming "every Tuesday" — so the row is named in
+// a warning and its task is imported without recurrence instead.
+const SUPPORTED_RRULE_KEYS = new Set(['FREQ', 'INTERVAL', 'BYDAY', 'BYMONTHDAY', 'COUNT', 'UNTIL', 'WKST']);
+const UNSUPPORTED_RECURRENCE_SAMPLE_LIMIT = 3;
+
+const parseRecurrenceCell = (
+    raw: string,
+    counters: MindwtrCsvWarningCounters,
+    rowNumber: number,
+    source: MindwtrCsvRowSource,
+): Task['recurrence'] => {
+    const value = raw.trim();
+    if (!value) return undefined;
+
+    const parts = value.split(';').map((part) => part.trim()).filter(Boolean);
+    const isFluid = parts.some((part) => part.toUpperCase() === MINDWTR_CSV_FLUID_RECURRENCE_TOKEN);
+    const ruleParts = parts.filter((part) => part.toUpperCase() !== MINDWTR_CSV_FLUID_RECURRENCE_TOKEN);
+    const recurrence = ruleParts.every((part) => SUPPORTED_RRULE_KEYS.has(part.split('=')[0].toUpperCase()))
+        ? normalizeRecurrenceForLoad(ruleParts.join(';'))
+        : undefined;
+
+    if (!recurrence) {
+        counters.unsupportedRecurrenceRules += 1;
+        if (counters.unsupportedRecurrenceSamples.length < UNSUPPORTED_RECURRENCE_SAMPLE_LIMIT) {
+            counters.unsupportedRecurrenceSamples.push(
+                `${source.kind === 'zip-entry' ? `${source.name} ` : ''}row ${rowNumber}: ${value}`,
+            );
+        }
+        return undefined;
+    }
+
+    return isFluid ? { ...recurrence, strategy: 'fluid' } : recurrence;
+};
+
 const parseMindwtrCsvRows = (
     csvText: string,
     counters: MindwtrCsvWarningCounters,
@@ -440,7 +483,6 @@ const parseMindwtrCsvRows = (
         const projectName = readCell(row, headerIndex, 'PROJECT').trim();
         const sectionName = readCell(row, headerIndex, 'SECTION').trim();
         const areaName = readCell(row, headerIndex, 'AREA').trim();
-        if (readCell(row, headerIndex, 'RECURRENCE')) counters.recurrenceColumnsIgnored += 1;
 
         const areaSourceKey = areaName ? normalizeSourceKey(areaName) : undefined;
         const projectSourceKey = projectName
@@ -513,6 +555,7 @@ const parseMindwtrCsvRows = (
             order: toNumber(readCell(row, headerIndex, 'ORDER'), rowIndex),
             priority: parsePriority(readCell(row, headerIndex, 'PRIORITY')),
             projectSourceKey,
+            recurrence: parseRecurrenceCell(readCell(row, headerIndex, 'RECURRENCE'), counters, rowNumber, source),
             reviewAt: parseDateCell(readCell(row, headerIndex, 'REVIEW DATE'), counters),
             sectionSourceKey,
             sourceId,

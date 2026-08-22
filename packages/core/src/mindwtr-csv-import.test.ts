@@ -1019,12 +1019,78 @@ describe('mindwtr csv import', () => {
         expect(byOrder.map((task) => task.title)).toEqual(['First', 'Second-a', 'Second-b', 'Third']);
     });
 
-    it('warns when a Recurrence value is present (T4)', () => {
-        const csv = buildCsv(['Title', 'Recurrence'], [['Repeats weekly', 'FREQ=WEEKLY']]);
+    it('imports a Recurrence rule onto the task (T4)', () => {
+        const csv = buildCsv(['Title', 'Recurrence'], [['Repeats weekly', 'FREQ=WEEKLY;BYDAY=MO,TH']]);
 
         const result = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: csv });
 
-        expect(result.warnings).toContain('1 Recurrence value was ignored; this importer does not create recurring tasks.');
+        expect(result.warnings).toEqual([]);
+        expect(result.parsedData?.tasks[0].recurrence).toEqual({
+            rule: 'weekly',
+            byDay: ['MO', 'TH'],
+            rrule: 'FREQ=WEEKLY;BYDAY=MO,TH',
+        });
+    });
+
+    it('reads the after-completion token back as the fluid strategy', () => {
+        const csv = buildCsv(['Title', 'Recurrence'], [['Water plants', 'FREQ=DAILY;INTERVAL=3;X-MINDWTR-STRATEGY=FLUID']]);
+
+        const result = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: csv });
+
+        expect(result.warnings).toEqual([]);
+        expect(result.parsedData?.tasks[0].recurrence).toEqual({
+            rule: 'daily',
+            strategy: 'fluid',
+            rrule: 'FREQ=DAILY;INTERVAL=3',
+        });
+    });
+
+    it('applies an imported recurrence to the created task', () => {
+        const csv = buildCsv(['Title', 'Recurrence'], [['Pay rent', 'FREQ=MONTHLY;BYMONTHDAY=1']]);
+        const parsedData = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: csv }).parsedData as ParsedMindwtrCsvImportData;
+
+        const result = applyMindwtrCsvImport(mockAppData([], [], []), parsedData, { now: '2026-08-08T12:00:00.000Z' });
+
+        expect(result.data.tasks[0].recurrence).toMatchObject({ rule: 'monthly', byMonthDay: [1] });
+    });
+
+    // A rule the model cannot express must never be imported as the nearest thing it can:
+    // FREQ=MONTHLY;BYSETPOS=2;BYDAY=TU means "second Tuesday", and dropping BYSETPOS would
+    // silently turn it into "every Tuesday".
+    it.each([
+        ['unparseable text', 'every other Tuesday'],
+        ['an unsupported frequency', 'FREQ=HOURLY;INTERVAL=6'],
+        ['an unsupported rule part', 'FREQ=MONTHLY;BYSETPOS=2;BYDAY=TU'],
+    ])('imports the task without recurrence and names the row when the rule has %s', (_label, rule) => {
+        const csv = buildCsv(['Title', 'Recurrence'], [['Fine row', 'FREQ=DAILY'], ['Odd row', rule]]);
+
+        const result = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: csv });
+
+        expect(result.parsedData?.tasks.map((item) => item.title)).toEqual(['Fine row', 'Odd row']);
+        expect(result.parsedData?.tasks[1].recurrence).toBeUndefined();
+        expect(result.warnings).toContain('1 Recurrence rule could not be understood; that task was imported without recurrence.');
+        expect(result.warnings).toContain(`Unsupported Recurrence rules: row 3: ${rule}.`);
+    });
+
+    it('lists at most three unsupported Recurrence rules alongside the total', () => {
+        const csv = buildCsv(
+            ['Title', 'Recurrence'],
+            Array.from({ length: 4 }, (_unused, index) => [`Row ${index}`, `every ${index} Tuesdays`]),
+        );
+
+        const result = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: csv });
+
+        expect(result.warnings).toContain('4 Recurrence rules could not be understood; those tasks were imported without recurrence.');
+        expect(result.warnings).toContain('Unsupported Recurrence rules: row 2: every 0 Tuesdays; row 3: every 1 Tuesdays; row 4: every 2 Tuesdays.');
+    });
+
+    it('imports a file with no Recurrence column unchanged', () => {
+        const csv = buildCsv(['Title', 'Due Date'], [['No column', '2026-09-01']]);
+
+        const result = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: csv });
+
+        expect(result.warnings).toEqual([]);
+        expect(result.parsedData?.tasks[0].recurrence).toBeUndefined();
     });
 
     it('warns when a date cell cannot be parsed', () => {
