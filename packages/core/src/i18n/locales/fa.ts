@@ -1042,7 +1042,7 @@ export const faOverrides: Record<string, string> = {
         'settings.syncEncryptionWarningDevices': 'پیش از روشن کردن این گزینه، همه دستگاه‌هایی را که با آن‌ها همگام می‌شوید به نسخه‌ای با پشتیبانی از رمزگذاری به‌روزرسانی کنید. دستگاه‌هایی که روی نسخه قدیمی بمانند تا زمان به‌روزرسانی همگام‌سازی را متوقف می‌کنند.',
         'settings.syncEncryptionErrorMismatch': 'دو عبارت عبور یکسان نیستند.',
         'settings.syncEncryptionErrorWrongPassphrase': 'این عبارت عبور، این محل همگام‌سازی را باز نمی‌کند. آن را بررسی و دوباره تلاش کنید.',
-        'settings.syncEncryptionErrorGeneric': 'این تغییر کامل نشد. چیزی حذف نشده است، بنابراین تلاش دوباره بی‌خطر است.',
+        'settings.syncEncryptionErrorGeneric': 'این تغییر کامل نشد. چیزی از دست نرفته است — هر نسخهٔ اصلی که حذف شد، پیش از آن یک نسخهٔ رمزگذاری‌شدهٔ تأییدشده جایگزینش شده بود، بنابراین تلاش دوباره بی‌خطر است.',
         'settings.syncEncryptionErrorRotationFirst': 'یک تغییر عبارت عبور نیمه‌کاره، این محل همگام‌سازی را ناقص باقی گذاشته است. ابتدا دوباره «تغییر عبارت عبور» را اجرا کنید تا کامل شود، سپس رمزگذاری را خاموش کنید.',
         'settings.syncEncryptionProgressAttachments': 'در حال به‌روزرسانی پیوست‌ها',
         'settings.syncEncryptionProgressDocuments': 'در حال به‌روزرسانی فایل‌های همگام‌سازی',

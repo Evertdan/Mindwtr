@@ -1010,7 +1010,7 @@ export const zhHans: Record<string, string> = {
         'settings.syncEncryptionWarningDevices': '开启之前，请先把所有参与同步的设备升级到支持加密的版本。仍在旧版本的设备会停止同步，直到完成升级。',
         'settings.syncEncryptionErrorMismatch': '两次输入的密码短语不一致。',
         'settings.syncEncryptionErrorWrongPassphrase': '该密码短语无法打开此同步位置。请核对后重试。',
-        'settings.syncEncryptionErrorGeneric': '此次更改未能完成。没有删除任何内容，可以安全地重试。',
+        'settings.syncEncryptionErrorGeneric': '此次更改未能完成。没有丢失任何内容——每个被删除的原文件都已有经过验证的加密副本，可以安全地重试。',
         'settings.syncEncryptionErrorRotationFirst': '上次更改密码短语被中断，此同步位置只更新了一半。请先再次执行“更改密码短语”将其完成，然后再关闭加密。',
         'settings.syncEncryptionProgressAttachments': '正在更新附件',
         'settings.syncEncryptionProgressDocuments': '正在更新同步文件',

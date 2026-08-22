@@ -1042,7 +1042,7 @@ export const svOverrides: Record<string, string> = {
         'settings.syncEncryptionWarningDevices': 'Uppdatera alla enheter du synkar med till en version som stöder kryptering innan du slår på det här. Enheter som är kvar på en äldre version slutar synka tills de uppdateras.',
         'settings.syncEncryptionErrorMismatch': 'De två lösenfraserna stämmer inte överens.',
         'settings.syncEncryptionErrorWrongPassphrase': 'Den lösenfrasen öppnar inte den här synkplatsen. Kontrollera den och försök igen.',
-        'settings.syncEncryptionErrorGeneric': 'Ändringen kunde inte slutföras. Inget har raderats, så det är säkert att försöka igen.',
+        'settings.syncEncryptionErrorGeneric': 'Ändringen kunde inte slutföras. Ingenting har gått förlorat – varje original som togs bort hade redan en verifierad krypterad kopia på plats, så det är säkert att försöka igen.',
         'settings.syncEncryptionErrorRotationFirst': 'Ett avbrutet lösenfrasbyte lämnade den här synkplatsen halvfärdig. Kör Byt lösenfras en gång till för att slutföra det, och stäng sedan av krypteringen.',
         'settings.syncEncryptionProgressAttachments': 'Uppdaterar bilagor',
         'settings.syncEncryptionProgressDocuments': 'Uppdaterar synkfiler',

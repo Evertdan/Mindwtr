@@ -1073,7 +1073,7 @@ export const jaOverrides: Record<string, string> = {
         'settings.syncEncryptionWarningDevices': '有効にする前に、同期しているすべての端末を暗号化に対応したバージョンへ更新してください。古いバージョンのままの端末は、更新するまで同期が止まります。',
         'settings.syncEncryptionErrorMismatch': '2つのパスフレーズが一致しません。',
         'settings.syncEncryptionErrorWrongPassphrase': 'このパスフレーズではこの同期先を開けません。確認してもう一度お試しください。',
-        'settings.syncEncryptionErrorGeneric': '変更を完了できませんでした。何も削除されていないため、安全にやり直せます。',
+        'settings.syncEncryptionErrorGeneric': '変更を完了できませんでした。失われたものはありません。削除された元ファイルには、いずれも検証済みの暗号化されたコピーがすでに存在していたため、安全にやり直せます。',
         'settings.syncEncryptionErrorRotationFirst': 'パスフレーズの変更が中断され、この同期先は途中までしか更新されていません。まず「パスフレーズを変更」をもう一度実行して完了させてから、暗号化を解除してください。',
         'settings.syncEncryptionProgressAttachments': '添付ファイルを更新中',
         'settings.syncEncryptionProgressDocuments': '同期ファイルを更新中',

@@ -1010,7 +1010,7 @@ export const zhHant: Record<string, string> = {
         'settings.syncEncryptionWarningDevices': '啟用之前，請先將所有參與同步的裝置更新到支援加密的版本。仍使用舊版本的裝置會停止同步，直到完成更新。',
         'settings.syncEncryptionErrorMismatch': '兩次輸入的密碼短語不一致。',
         'settings.syncEncryptionErrorWrongPassphrase': '這個密碼短語無法開啟此同步位置。請核對後再試。',
-        'settings.syncEncryptionErrorGeneric': '這次變更未能完成。沒有刪除任何內容，可以安全地重試。',
+        'settings.syncEncryptionErrorGeneric': '這次變更未能完成。沒有遺失任何內容——每個被刪除的原檔案都已有經過驗證的加密副本，可以安全地重試。',
         'settings.syncEncryptionErrorRotationFirst': '上次變更密碼短語時被中斷，此同步位置只更新了一半。請先再次執行「變更密碼短語」將其完成，再關閉加密。',
         'settings.syncEncryptionProgressAttachments': '正在更新附件',
         'settings.syncEncryptionProgressDocuments': '正在更新同步檔案',

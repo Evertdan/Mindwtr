@@ -1066,7 +1066,7 @@ export const en: Record<string, string> = {
         'settings.syncEncryptionWarningDevices': 'Update every device you sync with to a version that supports encryption before you turn this on. Devices still on an older version stop syncing until they are updated.',
         'settings.syncEncryptionErrorMismatch': 'The two passphrases do not match.',
         'settings.syncEncryptionErrorWrongPassphrase': 'That passphrase does not open this sync location. Check it and try again.',
-        'settings.syncEncryptionErrorGeneric': 'The change could not be completed. Nothing was deleted, so it is safe to try again.',
+        'settings.syncEncryptionErrorGeneric': 'The change could not be completed. Nothing was lost — every original that was removed already had a verified encrypted copy in its place, so it is safe to try again.',
         'settings.syncEncryptionErrorRotationFirst': 'An interrupted passphrase change left this sync location half-updated. Run Change passphrase again to finish it, then turn encryption off.',
         'settings.syncEncryptionProgressAttachments': 'Updating attachments',
         'settings.syncEncryptionProgressDocuments': 'Updating sync files',
