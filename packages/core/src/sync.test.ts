@@ -240,7 +240,7 @@ describe('Sync Logic', () => {
                     title: 'local-title.txt',
                     uri: '/local/doc.txt',
                     cloudKey: 'attachments/att-rev.txt',
-                    fileHash: 'local-hash',
+                    fileHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
                     contentRev: 2,
                     contentMtimeMs: 1000,
                     contentSize: 10,
@@ -253,7 +253,7 @@ describe('Sync Logic', () => {
                     title: 'incoming-title.txt',
                     uri: '/incoming/doc.txt',
                     cloudKey: 'attachments/att-rev.txt',
-                    fileHash: 'incoming-hash',
+                    fileHash: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
                     contentRev: 5,
                     contentMtimeMs: 2000,
                     contentSize: 20,
@@ -270,7 +270,7 @@ describe('Sync Logic', () => {
                 expect(forwardAttachment?.title).toBe('local-title.txt');
                 // ...but the higher contentRev (incoming) wins the content identity outright.
                 expect(forwardAttachment?.contentRev).toBe(5);
-                expect(forwardAttachment?.fileHash).toBe('incoming-hash');
+                expect(forwardAttachment?.fileHash).toBe('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb');
                 expect(forwardAttachment?.contentMtimeMs).toBe(2000);
                 expect(forwardAttachment?.contentSize).toBe(20);
 
@@ -289,7 +289,7 @@ describe('Sync Logic', () => {
                     title: 'doc.txt',
                     uri: '/local/doc.txt',
                     cloudKey: 'attachments/att-tie.txt',
-                    fileHash: 'local-hash',
+                    fileHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
                     contentRev: 3,
                     createdAt: '2023-01-01T00:00:00.000Z',
                     updatedAt: '2023-01-03T00:00:00.000Z',
@@ -300,7 +300,7 @@ describe('Sync Logic', () => {
                     title: 'doc.txt',
                     uri: '/incoming/doc.txt',
                     cloudKey: 'attachments/att-tie.txt',
-                    fileHash: 'incoming-hash',
+                    fileHash: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
                     contentRev: 3,
                     createdAt: '2023-01-01T00:00:00.000Z',
                     updatedAt: '2023-01-02T00:00:00.000Z',
@@ -313,7 +313,7 @@ describe('Sync Logic', () => {
                 // Local wins the attachment-level LWW (later updatedAt); a tied contentRev
                 // means there's nothing else to prefer, so its content fields come along.
                 expect(attachment?.contentRev).toBe(3);
-                expect(attachment?.fileHash).toBe('local-hash');
+                expect(attachment?.fileHash).toBe('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
             });
 
             it('merges cleanly against an old client that never set the new fields (missing is equivalent to 0)', () => {
@@ -323,7 +323,7 @@ describe('Sync Logic', () => {
                     title: 'doc.txt',
                     uri: '/old/doc.txt',
                     cloudKey: 'attachments/att-old-client.txt',
-                    fileHash: 'old-client-hash',
+                    fileHash: 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
                     createdAt: '2023-01-01T00:00:00.000Z',
                     updatedAt: '2023-01-02T00:00:00.000Z',
                 };
@@ -333,7 +333,7 @@ describe('Sync Logic', () => {
                     title: 'doc.txt',
                     uri: '/new/doc.txt',
                     cloudKey: 'attachments/att-old-client.txt',
-                    fileHash: 'new-client-hash',
+                    fileHash: 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
                     contentRev: 1,
                     contentMtimeMs: 5000,
                     contentSize: 50,
@@ -351,7 +351,7 @@ describe('Sync Logic', () => {
                 for (const merged of [oldLocal, newLocal]) {
                     const attachment = merged.tasks[0].attachments?.find((a) => a.id === 'att-old-client');
                     expect(attachment?.contentRev).toBe(1);
-                    expect(attachment?.fileHash).toBe('new-client-hash');
+                    expect(attachment?.fileHash).toBe('dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd');
                     expect(attachment?.contentMtimeMs).toBe(5000);
                     expect(attachment?.contentSize).toBe(50);
                 }
@@ -361,7 +361,7 @@ describe('Sync Logic', () => {
                 const second = mergeAppData(oldLocal, oldLocal);
                 const secondAttachment = second.tasks[0].attachments?.find((a) => a.id === 'att-old-client');
                 expect(secondAttachment?.contentRev).toBe(1);
-                expect(secondAttachment?.fileHash).toBe('new-client-hash');
+                expect(secondAttachment?.fileHash).toBe('dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd');
             });
 
             it('two devices with byte-identical content and different local mtimes converge to zero remote writes (review B1)', async () => {
@@ -377,7 +377,7 @@ describe('Sync Logic', () => {
                     title: 'shared.txt',
                     uri: '/device/shared.txt',
                     cloudKey: 'attachments/att-shared.txt',
-                    fileHash: 'same-hash',
+                    fileHash: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
                     contentRev: 1,
                     contentMtimeMs,
                     contentSize: 10,
@@ -409,7 +409,7 @@ describe('Sync Logic', () => {
                         ),
                         localFileExists: async () => true,
                         getLocalFileStat: async () => ownStat,
-                        computeLocalFileHash: async () => 'same-hash',
+                        computeLocalFileHash: async () => 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
                         contentChangePhase: 'post-merge',
                         onUpload: async () => { throw new Error('must not upload: nothing changed'); },
                         onUploadError: vi.fn(),
@@ -948,7 +948,7 @@ describe('Sync Logic', () => {
                 title: 'doc.txt',
                 uri: '/incoming/../secret.txt',
                 cloudKey: 'attachments/att-orphaned.txt',
-                fileHash: 'hash-1',
+                fileHash: 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
                 createdAt: '2023-01-01T00:00:00.000Z',
                 updatedAt: '2023-01-03T00:00:00.000Z',
             };
@@ -967,7 +967,7 @@ describe('Sync Logic', () => {
             expect(attachment?.uri).toBe('');
             expect(attachment?.localStatus).toBe('missing');
             expect(attachment?.cloudKey).toBe('attachments/att-orphaned.txt');
-            expect(attachment?.fileHash).toBe('hash-1');
+            expect(attachment?.fileHash).toBe('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
         });
 
         it('enriches incoming-only attachments with localStatus when uri exists', () => {
@@ -1059,7 +1059,7 @@ describe('Sync Logic', () => {
                 title: 'local.txt',
                 uri: '/tmp/incoming.txt',
                 cloudKey: 'attachments/att-1.txt',
-                fileHash: 'hash-1',
+                fileHash: 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
                 createdAt: '2023-01-01T00:00:00.000Z',
                 updatedAt: '2023-01-03T00:00:00.000Z',
             };
@@ -1608,7 +1608,7 @@ describe('Sync Logic', () => {
                     title: 'doc.txt',
                     uri: '',
                     cloudKey: 'attachments/att-1.txt',
-                    fileHash: 'hash-1',
+                    fileHash: 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
                     createdAt: '2023-01-01T00:00:00.000Z',
                     updatedAt: '2023-01-02T00:00:00.000Z',
                 }],
@@ -1623,7 +1623,7 @@ describe('Sync Logic', () => {
             expect(attachment?.uri).toBe('/local/doc.txt');
             expect(attachment?.localStatus).toBe('available');
             expect(attachment?.cloudKey).toBe('attachments/att-1.txt');
-            expect(attachment?.fileHash).toBe('hash-1');
+            expect(attachment?.fileHash).toBe('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
         });
 
         it('does not count conflict when attachment order differs but content matches', () => {
