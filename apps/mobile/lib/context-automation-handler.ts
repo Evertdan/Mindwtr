@@ -13,10 +13,19 @@ export type ResolveContextAutomationText = (key: string, fallback: string) => st
 const RECENT_CONTEXT_AUTOMATION_TTL_MS = 10_000;
 const recentlyHandledContextAutomation = new Map<string, number>();
 
+// The Android receiver is open to every automation app by design, and each
+// accepted trigger wakes a headless task that runs a full fetchData(). The
+// per-key dedupe below is defeated by simply varying the context, so the number
+// of starts is capped per window regardless of what the payload says.
+export const CONTEXT_AUTOMATION_RATE_WINDOW_MS = 60_000;
+export const CONTEXT_AUTOMATION_MAX_STARTS_PER_WINDOW = 12;
+let contextAutomationStarts: number[] = [];
+
 export const defaultContextAutomationText: ResolveContextAutomationText = (_key, fallback) => fallback;
 
 export function __resetContextAutomationDedupeForTests(): void {
   recentlyHandledContextAutomation.clear();
+  contextAutomationStarts = [];
 }
 
 export function wasContextAutomationRecentlyHandled(payload: ContextAutomationPayload, nowMs = Date.now()): boolean {
@@ -31,6 +40,14 @@ export function wasContextAutomationRecentlyHandled(payload: ContextAutomationPa
   if (previousHandledAtMs !== undefined && nowMs - previousHandledAtMs <= RECENT_CONTEXT_AUTOMATION_TTL_MS) {
     return true;
   }
+
+  contextAutomationStarts = contextAutomationStarts.filter(
+    (startedAtMs) => nowMs - startedAtMs <= CONTEXT_AUTOMATION_RATE_WINDOW_MS
+  );
+  if (contextAutomationStarts.length >= CONTEXT_AUTOMATION_MAX_STARTS_PER_WINDOW) {
+    return true;
+  }
+  contextAutomationStarts.push(nowMs);
 
   recentlyHandledContextAutomation.set(key, nowMs);
   return false;
