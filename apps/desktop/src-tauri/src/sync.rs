@@ -4598,6 +4598,47 @@ mod tests {
         assert!(!dir.path().join(DATA_FILE_NAME).exists());
     }
 
+    /// Magic present, header short — `inspect_sync_artifact` reports `Unsupported`. Neither
+    /// plaintext to seal nor ciphertext to open, so every transition must refuse it.
+    fn truncated_container() -> Vec<u8> {
+        let mut bytes = b"MWENC1".to_vec();
+        bytes.extend_from_slice(&[0u8; 14]);
+        bytes
+    }
+
+    #[test]
+    fn enable_refuses_an_unsupported_container_instead_of_sealing_it_a_second_time() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        seed_transition_folder(dir.path());
+        let attachment = dir.path().join("attachments").join("a1.png");
+        fs::write(&attachment, truncated_container()).expect("plant");
+
+        let error = enable_sync_encryption_in_dir(dir.path(), "correct horse battery")
+            .expect_err("an unsupported container must not be double-wrapped");
+
+        assert!(is_terminal_error(&error), "expected a terminal error, got: {error}");
+        assert_eq!(fs::read(&attachment).expect("attachment"), truncated_container());
+        assert!(!dir.path().join("data.json.enc").exists());
+        assert!(dir.path().join(DATA_FILE_NAME).exists());
+    }
+
+    #[test]
+    fn disable_refuses_an_unsupported_container_instead_of_skipping_it_as_plaintext() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        seed_transition_folder(dir.path());
+        let material = enable_sync_encryption_in_dir(dir.path(), "correct horse battery").expect("enable");
+        let attachment = dir.path().join("attachments").join("a1.png");
+        fs::write(&attachment, truncated_container()).expect("plant");
+
+        let error = disable_sync_encryption_in_dir(dir.path(), &material.key)
+            .expect_err("an unsupported container must not be silently left behind");
+
+        assert!(is_terminal_error(&error), "expected a terminal error, got: {error}");
+        assert_eq!(fs::read(&attachment).expect("attachment"), truncated_container());
+        assert!(dir.path().join("data.json.enc").exists());
+        assert!(!dir.path().join(DATA_FILE_NAME).exists());
+    }
+
     #[test]
     fn an_enabled_device_treats_a_peer_disabled_folder_as_terminal_rather_than_empty() {
         // The inverse of `plain_named_ciphertext_is_classified_before_...`: a peer ran the
@@ -9784,6 +9825,15 @@ fn transition_tmp_path(target: &Path) -> PathBuf {
     PathBuf::from(name)
 }
 
+/// An artifact whose MWENC1 header is present but unreadable (truncated, a future format
+/// version, a cost above the accepted ceiling) is neither plaintext to seal nor ciphertext we
+/// can open. Every transition raises this instead of guessing: sealing it would double-wrap a
+/// container nothing can recover, and skipping it would silently leave it behind. Mirrors
+/// core's `unsupportedArtifact`.
+fn unsupported_artifact(path: &Path, reason: String) -> String {
+    terminal_error(format!("{}: {reason}", path.display()))
+}
+
 /// Writes `bytes` at `target` through a scratch file, then reads it back and runs `verify`
 /// before returning. Nothing downstream may delete a predecessor until this has succeeded.
 fn write_and_verify<Verify>(target: &Path, bytes: &[u8], verify: Verify) -> Result<(), String>
@@ -9808,8 +9858,10 @@ fn verify_decrypts(material: &SyncKeyMaterial) -> impl Fn(&[u8]) -> Result<(), S
 
 fn seal_artifact_in_place(path: &Path, material: &SyncKeyMaterial) -> Result<(), String> {
     let bytes = fs::read(path).map_err(|error| format!("Failed to read {}: {error}", path.display()))?;
-    if matches!(inspect_sync_artifact(&bytes), SyncArtifactInspection::Encrypted(_)) {
-        return Ok(()); // already migrated (resume)
+    match inspect_sync_artifact(&bytes) {
+        SyncArtifactInspection::Encrypted(_) => return Ok(()), // already migrated (resume)
+        SyncArtifactInspection::Unsupported(reason) => return Err(unsupported_artifact(path, reason)),
+        SyncArtifactInspection::Plaintext => {}
     }
     let sealed = encrypt_sync_artifact(&bytes, material).map_err(|error| terminal_error(error))?;
     write_and_verify(path, &sealed, verify_decrypts(material))
@@ -9817,8 +9869,10 @@ fn seal_artifact_in_place(path: &Path, material: &SyncKeyMaterial) -> Result<(),
 
 fn open_artifact_in_place(path: &Path, key: &[u8; KEY_LEN]) -> Result<(), String> {
     let bytes = fs::read(path).map_err(|error| format!("Failed to read {}: {error}", path.display()))?;
-    if !matches!(inspect_sync_artifact(&bytes), SyncArtifactInspection::Encrypted(_)) {
-        return Ok(()); // already plaintext (resume)
+    match inspect_sync_artifact(&bytes) {
+        SyncArtifactInspection::Plaintext => return Ok(()), // already plaintext (resume)
+        SyncArtifactInspection::Unsupported(reason) => return Err(unsupported_artifact(path, reason)),
+        SyncArtifactInspection::Encrypted(_) => {}
     }
     let plain = decrypt_sync_artifact(&bytes, key).map_err(|error| terminal_error(error))?;
     write_and_verify(path, &plain, |written| {
@@ -9915,8 +9969,12 @@ fn enable_sync_encryption_in_dir(
         for path in &artifacts.documents {
             let bytes = fs::read(path)
                 .map_err(|error| format!("Failed to read {}: {error}", path.display()))?;
-            if matches!(inspect_sync_artifact(&bytes), SyncArtifactInspection::Encrypted(_)) {
-                continue;
+            match inspect_sync_artifact(&bytes) {
+                SyncArtifactInspection::Encrypted(_) => continue,
+                SyncArtifactInspection::Unsupported(reason) => {
+                    return Err(unsupported_artifact(path, reason))
+                }
+                SyncArtifactInspection::Plaintext => {}
             }
             let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
                 continue;
@@ -9945,8 +10003,12 @@ fn disable_sync_encryption_in_dir(sync_dir: &Path, key: &[u8; KEY_LEN]) -> Resul
         for path in &artifacts.documents {
             let bytes = fs::read(path)
                 .map_err(|error| format!("Failed to read {}: {error}", path.display()))?;
-            if !matches!(inspect_sync_artifact(&bytes), SyncArtifactInspection::Encrypted(_)) {
-                continue;
+            match inspect_sync_artifact(&bytes) {
+                SyncArtifactInspection::Plaintext => continue,
+                SyncArtifactInspection::Unsupported(reason) => {
+                    return Err(unsupported_artifact(path, reason))
+                }
+                SyncArtifactInspection::Encrypted(_) => {}
             }
             let plain = decrypt_sync_artifact(&bytes, key).map_err(|error| terminal_error(error))?;
             let Some(name) = path.file_name().and_then(|value| value.to_str()) else {

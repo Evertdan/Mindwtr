@@ -144,6 +144,13 @@ export async function decryptRemoteArtifactOrThrow(
     }
 }
 
+/** An artifact whose MWENC1 header is present but unreadable (truncated, a future format
+ * version, a cost above the accepted ceiling) is neither plaintext to seal nor ciphertext we
+ * can open. Every transition raises this instead of guessing: sealing it would double-wrap a
+ * container nothing can recover, and skipping it would silently leave it behind. */
+const unsupportedArtifact = (name: string, reason: string): SyncEncryptionTerminalError =>
+    new SyncEncryptionTerminalError(new SyncCryptoUnsupportedError(`${name}: ${reason}`));
+
 /** Trial-decrypt used only for resume detection (e.g. "is this artifact already sealed
  * under the new passphrase-change key?"). A wrong-key auth failure means "not yet
  * migrated" — normal during resume. An unsupported/corrupt container is a real problem
@@ -373,7 +380,8 @@ export async function runEnableSyncEncryptionOverRemote(
         const bytes = await remote.read(entry.name);
         if (bytes) {
             const inspected = inspectSyncArtifact(bytes);
-            if (inspected.kind !== 'encrypted') {
+            if (inspected.kind === 'unsupported') throw unsupportedArtifact(entry.name, inspected.reason);
+            if (inspected.kind === 'plaintext') {
                 const sealed = await encryptSyncArtifact(bytes, material, prims);
                 await remote.write(entry.name, sealed);
                 const verify = await remote.read(entry.name);
@@ -396,13 +404,20 @@ export async function runEnableSyncEncryptionOverRemote(
         report('documents');
         const bytes = await remote.read(entry.name);
         if (bytes) {
-            const encName = syncEncryptedArtifactName(entry.name);
-            const sealed = await encryptSyncArtifact(bytes, material, prims);
-            await remote.write(encName, sealed);
-            const verify = await remote.read(encName);
-            if (!verify) throw new Error(`sync encryption enable: failed to read back ${encName}`);
-            await decryptRemoteArtifactOrThrow(verify, material.key, prims);
-            await remote.remove(entry.name);
+            const inspected = inspectSyncArtifact(bytes);
+            if (inspected.kind === 'unsupported') throw unsupportedArtifact(entry.name, inspected.reason);
+            // Ciphertext under a PLAIN name is a peer's in-flight generation, not ours (this
+            // function only ever writes to `.enc` names). Leave it exactly where it is rather
+            // than double-wrapping it or removing it — same call the Rust file backend makes.
+            if (inspected.kind === 'plaintext') {
+                const encName = syncEncryptedArtifactName(entry.name);
+                const sealed = await encryptSyncArtifact(bytes, material, prims);
+                await remote.write(encName, sealed);
+                const verify = await remote.read(encName);
+                if (!verify) throw new Error(`sync encryption enable: failed to read back ${encName}`);
+                await decryptRemoteArtifactOrThrow(verify, material.key, prims);
+                await remote.remove(entry.name);
+            }
         }
         completed += 1;
     }
@@ -443,12 +458,16 @@ export async function runDisableSyncEncryptionOverRemote(
     for (const entry of attachments) {
         report('attachments');
         const bytes = await remote.read(entry.name);
-        if (bytes && inspectSyncArtifact(bytes).kind === 'encrypted') {
-            const plain = await decryptRemoteArtifactOrThrow(bytes, key, prims);
-            await remote.write(entry.name, plain);
-            const verify = await remote.read(entry.name);
-            if (!verify || !bytesMatchWithTrailingPadding(verify, plain)) {
-                throw new Error(`sync encryption disable: failed to verify ${entry.name} after write`);
+        if (bytes) {
+            const inspected = inspectSyncArtifact(bytes);
+            if (inspected.kind === 'unsupported') throw unsupportedArtifact(entry.name, inspected.reason);
+            if (inspected.kind === 'encrypted') {
+                const plain = await decryptRemoteArtifactOrThrow(bytes, key, prims);
+                await remote.write(entry.name, plain);
+                const verify = await remote.read(entry.name);
+                if (!verify || !bytesMatchWithTrailingPadding(verify, plain)) {
+                    throw new Error(`sync encryption disable: failed to verify ${entry.name} after write`);
+                }
             }
         }
         // ponytail: an attachment already lacking MWENC1 magic is treated as "already

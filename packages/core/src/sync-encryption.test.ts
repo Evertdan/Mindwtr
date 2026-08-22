@@ -406,3 +406,85 @@ describe('remote-plaintext discovery (a peer disabled encryption at the sync loc
         expect(localState.value?.state).toBe('remote-plaintext');
     });
 });
+
+describe('unsupported containers in transitions', () => {
+    /** Magic present, header short — `inspectSyncArtifact` reports `unsupported`, and every
+     *  transition must refuse rather than treat it as plaintext to seal or skip. */
+    const truncatedContainer = (): Uint8Array => {
+        const bytes = new Uint8Array(20);
+        bytes.set(utf8('MWENC1'), 0);
+        return bytes;
+    };
+
+    const unknownVersionContainer = async (): Promise<Uint8Array> => {
+        const material = await deriveSyncKeyMaterial('pw', new Uint8Array(16).fill(7), FAST_KDF);
+        const sealed = await encryptSyncArtifact(utf8('{"tasks":[]}'), material);
+        sealed[6] = 9; // format_version byte
+        return sealed;
+    };
+
+    it('enable refuses a truncated attachment container and leaves every byte where it was', async () => {
+        const remote = createFakeRemote({
+            'data.json': { bytes: utf8('{"tasks":[]}'), kind: 'document' },
+            'attachments/a1.png': { bytes: truncatedContainer(), kind: 'attachment' },
+        });
+        const keyCache = createFakeKeyCache();
+        const localState = createFakeLocalState();
+
+        await expect(runEnableSyncEncryptionOverRemote('pw', remote, keyCache, localState, undefined, undefined, FAST_KDF))
+            .rejects.toBeInstanceOf(SyncEncryptionTerminalError);
+
+        expect(remote.store.get('attachments/a1.png')).toEqual(truncatedContainer());
+        expect(remote.store.get('data.json')).toEqual(utf8('{"tasks":[]}'));
+        expect(remote.store.has('data.json.enc')).toBe(false);
+        expect(localState.value).toBeNull();
+    });
+
+    it('enable refuses an unknown-version document container instead of double-wrapping it', async () => {
+        const planted = await unknownVersionContainer();
+        const remote = createFakeRemote({ 'data.json': { bytes: planted, kind: 'document' } });
+        const keyCache = createFakeKeyCache();
+        const localState = createFakeLocalState();
+
+        await expect(runEnableSyncEncryptionOverRemote('pw', remote, keyCache, localState, undefined, undefined, FAST_KDF))
+            .rejects.toBeInstanceOf(SyncEncryptionTerminalError);
+
+        expect(remote.store.get('data.json')).toEqual(planted);
+        expect(remote.store.has('data.json.enc')).toBe(false);
+    });
+
+    it('disable refuses a truncated attachment container instead of skipping it as already-plaintext', async () => {
+        const remote = createFakeRemote({
+            'data.json': { bytes: utf8('{"tasks":[]}'), kind: 'document' },
+            'attachments/a1.png': { bytes: utf8('PNGBYTES'), kind: 'attachment' },
+        });
+        const keyCache = createFakeKeyCache();
+        const localState = createFakeLocalState();
+        await runEnableSyncEncryptionOverRemote('pw', remote, keyCache, localState, undefined, undefined, FAST_KDF);
+        remote.store.set('attachments/a1.png', truncatedContainer());
+
+        await expect(runDisableSyncEncryptionOverRemote(remote, keyCache, localState))
+            .rejects.toBeInstanceOf(SyncEncryptionTerminalError);
+
+        expect(remote.store.get('attachments/a1.png')).toEqual(truncatedContainer());
+        expect(remote.store.has('data.json.enc')).toBe(true);
+        expect(remote.store.has('data.json')).toBe(false);
+        expect(localState.value?.state).toBe('enabled');
+        expect(await keyCache.getKey()).not.toBeNull();
+    });
+
+    it('disable refuses an unknown-version document container and keeps the artifact', async () => {
+        const remote = createFakeRemote({ 'data.json': { bytes: utf8('{"tasks":[]}'), kind: 'document' } });
+        const keyCache = createFakeKeyCache();
+        const localState = createFakeLocalState();
+        await runEnableSyncEncryptionOverRemote('pw', remote, keyCache, localState, undefined, undefined, FAST_KDF);
+        const planted = await unknownVersionContainer();
+        remote.store.set('data.json.enc', planted);
+
+        await expect(runDisableSyncEncryptionOverRemote(remote, keyCache, localState))
+            .rejects.toBeInstanceOf(SyncEncryptionTerminalError);
+
+        expect(remote.store.get('data.json.enc')).toEqual(planted);
+        expect(remote.store.has('data.json')).toBe(false);
+    });
+});
