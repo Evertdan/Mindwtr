@@ -302,6 +302,34 @@ function getLocaleQuickAddChrono(): chrono.Chrono | null {
     return instance;
 }
 
+// The es/fr/pt/it chrono parsers leave the words that introduce a date out of
+// the match ("el próximo viernes" matches "próximo viernes"), so a cleaned
+// title would keep a dangling "el". Only these four need the list: de/nl/ru/sv
+// take the preposition into the match themselves.
+const TRAILING_DATE_INTRO_WORDS: Partial<Record<Language, ReadonlySet<string>>> = {
+    es: new Set(['el', 'la', 'los', 'las', 'al', 'del', 'de', 'para', 'próximo', 'próxima']),
+    fr: new Set(['le', 'la', 'les', 'du', 'au', 'aux', 'pour', 'prochain', 'prochaine']),
+    pt: new Set(['na', 'no', 'da', 'do', 'em', 'de', 'dia', 'para', 'próxima', 'próximo']),
+    it: new Set(['il', 'lo', 'la', 'al', 'per', 'di', 'prossimo', 'prossima']),
+};
+
+/**
+ * Drop the date-introducing words the locale parser excluded from its match.
+ * Only words standing directly ahead of the matched date go — a title that
+ * merely contains one keeps it ("Comprar leche del super mañana") — and the
+ * first word never goes, so the title can't be emptied out from here.
+ */
+function stripTrailingDateIntroWords(title: string, language: Language): string {
+    const words = TRAILING_DATE_INTRO_WORDS[language];
+    if (!words) return title;
+    let result = title;
+    for (let space = result.lastIndexOf(' '); space > 0; space = result.lastIndexOf(' ')) {
+        if (!words.has(result.slice(space + 1).toLowerCase())) break;
+        result = result.slice(0, space).replace(TRAILING_DATE_SEPARATOR_RE, '');
+    }
+    return result;
+}
+
 const localizedMonthNamesCache = new Map<Language, Set<string>>();
 
 function normalizeMonthToken(value: string): string {
@@ -424,7 +452,8 @@ function findTrailingDateInResults(
         if (!matchedText || !TRAILING_DATE_SUFFIX_RE.test(suffix)) continue;
         if (PURE_TIME_ONLY_RE.test(matchedText) || isBareMonthName(matchedText, language)) continue;
 
-        const titleWithoutDate = trimmed.slice(0, result.index).replace(TRAILING_DATE_SEPARATOR_RE, '').trim();
+        const beforeDate = trimmed.slice(0, result.index).replace(TRAILING_DATE_SEPARATOR_RE, '').trim();
+        const titleWithoutDate = stripTrailingDateIntroWords(beforeDate, language);
         if (!titleWithoutDate) continue;
 
         const parsed = resolveChronoDate(result, now, 'now');

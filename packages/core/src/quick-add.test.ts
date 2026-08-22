@@ -393,6 +393,7 @@ describe('quick-add', () => {
             const now = new Date('2026-08-04T10:00:00');
             const result = parseQuickAdd('Zahnarzt anrufen nächsten Freitag', undefined, now);
             expect(result.detectedDate?.date).toBeTruthy();
+            expect(result.detectedDate?.titleWithoutDate).toBe('Zahnarzt anrufen');
         });
 
         it('detects a Spanish bare date phrase', () => {
@@ -400,6 +401,47 @@ describe('quick-add', () => {
             const now = new Date('2026-08-04T10:00:00');
             const result = parseQuickAdd('Llamar al dentista el próximo viernes', undefined, now);
             expect(result.detectedDate?.matchedText).toBe('próximo viernes');
+            expect(result.detectedDate?.titleWithoutDate).toBe('Llamar al dentista');
+        });
+
+        // The es/fr/pt/it chrono parsers leave the preposition and article that
+        // introduce a date out of the match, so the cleaned title used to keep a
+        // dangling "el"/"le"/"no dia"/"il".
+        it('drops the date-introducing words the Romance parsers exclude', () => {
+            const now = new Date('2026-08-04T10:00:00');
+            const cases: Array<{ language: 'es' | 'fr' | 'pt' | 'it'; input: string; title: string }> = [
+                { language: 'es', input: 'Revisar informe el lunes', title: 'Revisar informe' },
+                { language: 'es', input: 'Enviar informe para el 5 de septiembre', title: 'Enviar informe' },
+                { language: 'fr', input: 'Revoir le rapport le lundi', title: 'Revoir le rapport' },
+                { language: 'fr', input: 'Payer le loyer pour le 5 septembre', title: 'Payer le loyer' },
+                { language: 'fr', input: 'Réunion au 12 septembre', title: 'Réunion' },
+                { language: 'pt', input: 'Pagar aluguel no dia 5 de setembro', title: 'Pagar aluguel' },
+                { language: 'pt', input: 'Revisar relatório na próxima segunda', title: 'Revisar relatório' },
+                { language: 'it', input: 'Pagare affitto il 10 settembre', title: 'Pagare affitto' },
+                { language: 'it', input: 'Rivedere report il prossimo lunedì', title: 'Rivedere report' },
+                { language: 'it', input: 'Riunione per domani', title: 'Riunione' },
+            ];
+            for (const { language, input, title } of cases) {
+                configureDateFormatting({ language });
+                const result = parseQuickAdd(input, undefined, now);
+                expect(result.detectedDate?.date, input).toBeTruthy();
+                expect(result.detectedDate?.titleWithoutDate, input).toBe(title);
+            }
+        });
+
+        it('keeps title words that only look like date-introducing words', () => {
+            const now = new Date('2026-08-04T10:00:00');
+            const cases: Array<{ language: 'es' | 'fr' | 'pt' | 'it'; input: string; title: string }> = [
+                { language: 'es', input: 'Comprar leche del super mañana', title: 'Comprar leche del super' },
+                { language: 'es', input: 'Preparar la charla para el equipo mañana', title: 'Preparar la charla para el equipo' },
+                { language: 'fr', input: 'Acheter du pain demain', title: 'Acheter du pain' },
+                { language: 'pt', input: 'Comprar pão amanhã', title: 'Comprar pão' },
+            ];
+            for (const { language, input, title } of cases) {
+                configureDateFormatting({ language });
+                const result = parseQuickAdd(input, undefined, now);
+                expect(result.detectedDate?.titleWithoutDate, input).toBe(title);
+            }
         });
 
         it('resolves a Simplified Chinese /due: command', () => {
@@ -414,6 +456,7 @@ describe('quick-add', () => {
             const now = new Date('2026-08-04T10:00:00');
             const result = parseQuickAdd('Call dentist tomorrow', undefined, now);
             expect(result.detectedDate?.matchedText).toBe('tomorrow');
+            expect(result.detectedDate?.titleWithoutDate).toBe('Call dentist');
         });
 
         it('does not auto-detect a bare month name under French', () => {
@@ -452,6 +495,7 @@ describe('quick-add', () => {
             const now = new Date('2026-08-04T10:00:00');
             const english = parseQuickAdd('Call dentist tomorrow', undefined, now);
             expect(english.detectedDate?.matchedText).toBe('tomorrow');
+            expect(english.detectedDate?.titleWithoutDate).toBe('Call dentist');
 
             const polish = parseQuickAdd('Zadzwon do dentysty jutro', undefined, now);
             expect(polish.detectedDate).toBeUndefined();
