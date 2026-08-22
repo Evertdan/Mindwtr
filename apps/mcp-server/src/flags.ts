@@ -1,3 +1,5 @@
+import { ValidationError } from './errors.js';
+
 export type FlagValue = string | boolean;
 export type FlagMap = Record<string, FlagValue>;
 export type FlagEnv = Record<string, string | undefined>;
@@ -29,14 +31,22 @@ export const parseArgs = (argv: string[]): FlagMap => {
   return flags;
 };
 
-export const parseBooleanFlag = (value: FlagValue | undefined): boolean | undefined => {
+/**
+ * A bare `--write` (no value) parses via the `typeof value === 'boolean'` branch below and is
+ * unaffected by this. An unrecognized STRING value (SEC-11: `--write=nope` used to silently
+ * parse as `true` - the opposite of what a typo'd `--write=disabled` looks like it should do)
+ * throws instead of guessing, naming the flag so the error is actionable at startup.
+ */
+export const parseBooleanFlag = (value: FlagValue | undefined, flagName: string): boolean | undefined => {
   if (value === undefined) return undefined;
   if (typeof value === 'boolean') return value;
   const normalized = value.trim().toLowerCase();
   if (!normalized) return undefined;
   if (normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on') return true;
   if (normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off') return false;
-  return true;
+  throw new ValidationError(
+    `Invalid value for --${flagName}: "${value}" (expected one of: true/false, 1/0, yes/no, on/off)`
+  );
 };
 
 export const readFlagValue = (flags: FlagMap, ...names: string[]): FlagValue | undefined => {

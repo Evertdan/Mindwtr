@@ -119,12 +119,20 @@ describe('mcp server index', () => {
   });
 
   test('parses boolean flag values explicitly', () => {
-    expect(parseBooleanFlag(true)).toBe(true);
-    expect(parseBooleanFlag(false)).toBe(false);
-    expect(parseBooleanFlag('true')).toBe(true);
-    expect(parseBooleanFlag('false')).toBe(false);
-    expect(parseBooleanFlag('0')).toBe(false);
-    expect(parseBooleanFlag(undefined)).toBeUndefined();
+    expect(parseBooleanFlag(true, 'write')).toBe(true);
+    expect(parseBooleanFlag(false, 'write')).toBe(false);
+    expect(parseBooleanFlag('true', 'write')).toBe(true);
+    expect(parseBooleanFlag('false', 'write')).toBe(false);
+    expect(parseBooleanFlag('0', 'write')).toBe(false);
+    expect(parseBooleanFlag(undefined, 'write')).toBeUndefined();
+  });
+
+  // SEC-11: an unrecognized string value used to silently parse as `true` - the OPPOSITE of
+  // what a typo like `--write=disabled` looks like it should mean. It must fail closed (throw,
+  // naming the flag) instead of guessing.
+  test('rejects an unrecognized boolean flag value instead of defaulting to true', () => {
+    expect(() => parseBooleanFlag('nope', 'write')).toThrow(/--write/);
+    expect(() => parseBooleanFlag('disabled', 'write')).toThrow(/--write/);
   });
 
   test('resolves readonly and keepalive modes from CLI flags', () => {
@@ -143,6 +151,13 @@ describe('mcp server index', () => {
       readonly: true,
       keepAlive: false,
     });
+  });
+
+  // SEC-11: `--write=nope` used to silently parse `write` as true (parseBooleanFlag's
+  // fail-open default) - enabling edits from a typo that reads like it should mean the
+  // opposite. Startup must now fail loudly instead.
+  test('rejects an unrecognized --write value at startup instead of silently enabling writes', () => {
+    expect(() => resolveServerModeFlags(parseArgs(['--write=nope']))).toThrow(/--write/);
   });
 
   test('resolves self-hosted Cloud backend as read-only by default and writable with --write', () => {

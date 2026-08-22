@@ -130,9 +130,12 @@ const withMcpErrorHandling = <TInput>(
 };
 
 export const resolveServerModeFlags = (flags: FlagMap) => {
-  const allowWrite = parseBooleanFlag(flags.write) ?? false;
-  const explicitReadonly = parseBooleanFlag(flags.readonly);
-  const keepAlive = !((parseBooleanFlag(flags.nowait) ?? false) || (parseBooleanFlag(flags.noWait) ?? false));
+  const allowWrite = parseBooleanFlag(flags.write, 'write') ?? false;
+  const explicitReadonly = parseBooleanFlag(flags.readonly, 'readonly');
+  const keepAlive = !(
+    (parseBooleanFlag(flags.nowait, 'nowait') ?? false)
+    || (parseBooleanFlag(flags.noWait, 'nowait') ?? false)
+  );
   return {
     allowWrite,
     readonly: explicitReadonly ?? !allowWrite,
@@ -179,7 +182,8 @@ export const resolveServerConfig = (
       allowInsecureHttp: parseBooleanFlag(
         flags['cloud-allow-insecure-http']
         ?? flags.cloudAllowInsecureHttp
-        ?? env.MINDWTR_MCP_CLOUD_ALLOW_INSECURE_HTTP
+        ?? env.MINDWTR_MCP_CLOUD_ALLOW_INSECURE_HTTP,
+        'cloud-allow-insecure-http'
       ) ?? false,
       readonly,
       keepAlive,

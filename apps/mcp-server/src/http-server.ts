@@ -50,7 +50,7 @@ const parseHttpPort = (raw: string | undefined): number | undefined => {
  * existing stdio behavior untouched.
  */
 export const resolveHttpConfig = (flags: FlagMap, env: FlagEnv = process.env): HttpServerConfig | undefined => {
-  const explicitHttp = parseBooleanFlag(readFlagValue(flags, 'http') ?? env.MINDWTR_MCP_HTTP);
+  const explicitHttp = parseBooleanFlag(readFlagValue(flags, 'http') ?? env.MINDWTR_MCP_HTTP, 'http');
   const host = readStringFlag(flags, 'http-host', 'httpHost') ?? env.MINDWTR_MCP_HTTP_HOST;
   const portRaw = readStringFlag(flags, 'http-port', 'httpPort') ?? env.MINDWTR_MCP_HTTP_PORT;
   const token = readStringFlag(flags, 'http-token', 'httpToken') ?? env.MINDWTR_MCP_HTTP_TOKEN;
