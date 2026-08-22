@@ -12,6 +12,7 @@ import {
     filterTasksBySearch,
     generateUUID,
     getNextProjectOrder,
+    getTaskOrder,
     isTaskFinished,
     mergeAppDataWithStats,
     normalizeTaskUpdate,
@@ -366,8 +367,12 @@ function finalizeCloudDataForWrite(
 // a follow-up is a fresh task, so it needs a reserved project order (missing sorts
 // as +Infinity in compareTasksByProjectOrder, dumping it below its siblings) and a
 // zeroed push count, same as every other task-creation path.
-const stampRecurringFollowUp = (task: Task, existingTasks: Task[]): Task => {
-    const order = getNextProjectOrder(task.projectId, existingTasks);
+// Mirrors core's stampNewRecurringFollowUp: the next occurrence inherits the
+// completed instance's place (that instance leaves the active list, and a series
+// only ever has one active instance) and only reserves a fresh order when the
+// completed task had none.
+const stampRecurringFollowUp = (task: Task, completedTask: Task, existingTasks: Task[]): Task => {
+    const order = getTaskOrder(completedTask) ?? getNextProjectOrder(task.projectId, existingTasks);
     return { ...task, pushCount: 0, order, orderNum: order };
 };
 
@@ -678,7 +683,7 @@ const ENTITY_ROUTES: Array<EntityRouteDefinition<any>> = [
                 },
                 nowIso,
             );
-            if (nextRecurringTask) data.tasks.push(stampRecurringFollowUp(nextRecurringTask, data.tasks));
+            if (nextRecurringTask) data.tasks.push(stampRecurringFollowUp(nextRecurringTask, existing, data.tasks));
             return updatedTask;
         },
     },
@@ -1207,7 +1212,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                                     nowIso,
                                 );
                                 data.tasks[idx] = updatedTask;
-                                if (nextRecurringTask) data.tasks.push(stampRecurringFollowUp(nextRecurringTask, data.tasks));
+                                if (nextRecurringTask) data.tasks.push(stampRecurringFollowUp(nextRecurringTask, existing, data.tasks));
                                 const finalized = finalizeCloudDataForWrite(data, nowIso, FINALIZE_REJECT_INVALID_REST_WRITE);
                                 if ('error' in finalized) return finalized.error;
                                 const finalizedTask = finalized.tasks.find((item) => item.id === updatedTask.id) || updatedTask;

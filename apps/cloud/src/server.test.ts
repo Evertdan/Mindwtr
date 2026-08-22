@@ -3223,7 +3223,10 @@ describe('cloud server api', () => {
         const listJson = await listResponse.json();
         const followUp = (listJson.tasks as Task[]).find((task) => task.projectId === projectId && task.id !== taskId);
         expect(followUp).toBeTruthy();
+        // REST-created tasks carry no order, so this exercises the reservation
+        // fallback; the inheritance path is covered against seeded data below.
         expect(Number.isFinite(followUp?.order)).toBe(true);
+        expect(followUp?.orderNum).toBe(followUp?.order);
         expect(followUp?.pushCount).toBe(0);
     });
 
@@ -3263,7 +3266,74 @@ describe('cloud server api', () => {
         const listJson = await listResponse.json();
         const followUp = (listJson.tasks as Task[]).find((task) => task.projectId === projectId && task.id !== taskId);
         expect(followUp).toBeTruthy();
+        // REST-created tasks carry no order, so this exercises the reservation
+        // fallback; the inheritance path is covered against seeded data below.
         expect(Number.isFinite(followUp?.order)).toBe(true);
+        expect(followUp?.orderNum).toBe(followUp?.order);
+        expect(followUp?.pushCount).toBe(0);
+    });
+
+    // Documents synced from the apps do carry an order, and there the next
+    // occurrence must hold the completed task's place rather than sort below
+    // every sibling -- matching core's stampNewRecurringFollowUp.
+    test('gives a recurring follow-up the completed task place when the document carries an order', async () => {
+        const projectId = '11111111-2222-4333-8444-555555555555';
+        const recurringId = '11111111-2222-4333-8444-666666666666';
+        const seedResponse = await fetch(`${baseUrl}/v1/data`, {
+            method: 'PUT',
+            headers: { ...authHeaders, 'content-type': 'application/json' },
+            body: JSON.stringify({
+                tasks: [
+                    makeTestTask({
+                        id: recurringId,
+                        title: 'Ordered Recurring',
+                        status: 'next',
+                        projectId,
+                        order: 0,
+                        orderNum: 0,
+                        dueDate: '2026-08-20',
+                        recurrence: { rule: 'daily' },
+                    }),
+                    makeTestTask({
+                        id: '11111111-2222-4333-8444-777777777777',
+                        title: 'Ordered Sibling',
+                        status: 'next',
+                        projectId,
+                        order: 1,
+                        orderNum: 1,
+                    }),
+                ],
+                projects: [{
+                    id: projectId,
+                    title: 'Ordered Project',
+                    status: 'active',
+                    color: '#123456',
+                    order: 0,
+                    tagIds: [],
+                    createdAt: '2026-01-01T00:00:00.000Z',
+                    updatedAt: '2026-01-01T00:00:00.000Z',
+                }],
+                sections: [],
+                areas: [],
+                settings: {},
+            } satisfies AppData),
+        });
+        expect(seedResponse.status).toBe(200);
+
+        const completeResponse = await fetch(`${baseUrl}/v1/tasks/${encodeURIComponent(recurringId)}/complete`, {
+            method: 'POST',
+            headers: authHeaders,
+        });
+        expect(completeResponse.status).toBe(200);
+
+        const listResponse = await fetch(`${baseUrl}/v1/tasks?limit=100`, { headers: authHeaders });
+        expect(listResponse.status).toBe(200);
+        const listJson = await listResponse.json();
+        const followUp = (listJson.tasks as Task[])
+            .find((task) => task.title === 'Ordered Recurring' && task.id !== recurringId);
+        expect(followUp).toBeTruthy();
+        expect(followUp?.order).toBe(0);
+        expect(followUp?.orderNum).toBe(0);
         expect(followUp?.pushCount).toBe(0);
     });
 
@@ -4490,6 +4560,24 @@ describe('cloud server calendar feed', () => {
             await fetch(`${url}/v1/calendar/feed`, { method: 'POST', headers: authHeaders });
             const namespaceFiles = readdirSync(dataDir).filter((entry) => /^[a-f0-9]{64}\.json$/.test(entry));
             expect(namespaceFiles).toHaveLength(1);
+        } finally {
+            server.stop();
+            rmSync(dataDir, { recursive: true, force: true });
+        }
+    });
+
+    test('errors instead of serving an empty feed when the namespace data is corrupt', async () => {
+        const { dataDir, server, url } = await startFeedServer();
+        try {
+            await seedData(url, [scheduledTask]);
+            const created = await fetch(`${url}/v1/calendar/feed`, { method: 'POST', headers: authHeaders });
+            const feed = (await created.json()).feed as { path: string };
+
+            const namespacePath = join(dataDir, `${tokenToKey(FEED_TOKEN)}.json`);
+            writeFileSync(namespacePath, '{"tasks":[');
+
+            const feedResponse = await fetch(`${url}${feed.path}`);
+            expect(feedResponse.status).toBe(500);
         } finally {
             server.stop();
             rmSync(dataDir, { recursive: true, force: true });

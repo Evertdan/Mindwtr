@@ -134,16 +134,20 @@ const findExistingRecurringFollowUp = (
 };
 
 // The follow-up is a fresh task, so it needs what every other creation path
-// stamps: a reserved project order (missing sorts as +Infinity in
+// stamps: a project order (missing sorts as +Infinity in
 // compareTasksByProjectOrder, dumping the next occurrence below its siblings)
-// and a zeroed push count.
+// and a zeroed push count. It inherits the completed instance's place — that
+// instance leaves the active list and a series only ever has one active
+// instance, so there is nothing to collide with — and only falls back to a
+// fresh reservation when the completed task had no order to inherit.
 const stampNewRecurringFollowUp = (
     task: Task | null,
     deviceId: string,
+    sourceOrder: number | undefined,
     reserveProjectOrder: ProjectOrderReserver,
 ): Task | null => {
     if (!task) return null;
-    const order = reserveProjectOrder(task.projectId);
+    const order = sourceOrder ?? reserveProjectOrder(task.projectId);
     return {
         ...task,
         rev: nextRevision(undefined),
@@ -553,8 +557,10 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
                 const stampedNextRecurringTask = stampNewRecurringFollowUp(
                     nextRecurringTask,
                     deviceState.deviceId,
+                    getTaskOrder(oldTask),
                     // Scans the collection only when there is a follow-up in a
-                    // project; this producer runs on every single-task update.
+                    // project and no order to inherit; this producer runs on
+                    // every single-task update.
                     (projectId) => getNextProjectOrder(projectId, state._allTasks),
                 );
                 const recurringFollowUpTask = findExistingRecurringFollowUp(state._allTasks, stampedNextRecurringTask, oldTask.id)
@@ -1095,6 +1101,7 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
                 const stampedNextRecurringTask = stampNewRecurringFollowUp(
                     nextRecurringTask,
                     deviceState.deviceId,
+                    getTaskOrder(task),
                     projectOrderReserver,
                 );
                 // Guard before the call: its arguments copy the whole collection,

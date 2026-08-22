@@ -4386,10 +4386,11 @@ describe('TaskStore', () => {
         expect(nextInstance?.revBy).toBeTruthy();
     });
 
-    // Every other creation path reserves a project order; without one the follow-up
-    // sorts as +Infinity in compareTasksByProjectOrder and lands below every
-    // ordered sibling instead of taking its turn in the project list.
-    it('reserves a project order for a recurring follow-up', async () => {
+    // The completed instance leaves the active list and a series only ever has one
+    // active instance, so the next occurrence keeps the task's place in the project
+    // instead of dropping below every sibling (which is what a missing order, sorted
+    // as +Infinity by compareTasksByProjectOrder, or a max+1 reservation would do).
+    it('gives a recurring follow-up the completed task place in the project', async () => {
         vi.setSystemTime(new Date('2026-07-01T12:00:00.000Z'));
         const { addProject, addTask, moveTask } = useTaskStore.getState();
         const project = await addProject('Ops', '#123456');
@@ -4400,18 +4401,20 @@ describe('TaskStore', () => {
             dueDate: '2026-07-01T09:00:00.000Z',
         });
         await addTask('Second action', { status: 'next', projectId: project!.id });
+        const originalOrder = useTaskStore.getState()._tasksById.get(recurring.id!)?.order;
+        expect(originalOrder).toBe(0);
 
         await moveTask(recurring.id!, 'done');
 
         const followUp = useTaskStore.getState()._allTasks
             .find((task) => task.id !== recurring.id && task.title === 'Daily standup');
         expect(followUp).toBeTruthy();
-        expect(typeof followUp?.order).toBe('number');
-        expect(followUp?.orderNum).toBe(followUp?.order);
+        expect(followUp?.order).toBe(originalOrder);
+        expect(followUp?.orderNum).toBe(originalOrder);
         expect(followUp?.pushCount).toBe(0);
     });
 
-    it('reserves a project order for a recurring follow-up created in a batch update', async () => {
+    it('keeps the completed task place for a follow-up created in a batch update', async () => {
         vi.setSystemTime(new Date('2026-07-01T12:00:00.000Z'));
         const { addProject, addTask, batchMoveTasks } = useTaskStore.getState();
         const project = await addProject('Ops batch', '#123456');
@@ -4421,13 +4424,43 @@ describe('TaskStore', () => {
             recurrence: 'daily',
             dueDate: '2026-07-01T09:00:00.000Z',
         });
+        await addTask('Second batch action', { status: 'next', projectId: project!.id });
 
         await batchMoveTasks([recurring.id!], 'done');
 
         const followUp = useTaskStore.getState()._allTasks
             .find((task) => task.id !== recurring.id && task.title === 'Daily batch standup');
-        expect(typeof followUp?.order).toBe('number');
-        expect(followUp?.orderNum).toBe(followUp?.order);
+        expect(followUp?.order).toBe(0);
+        expect(followUp?.orderNum).toBe(0);
+    });
+
+    it('reserves an order for a follow-up whose completed task had none', async () => {
+        vi.setSystemTime(new Date('2026-07-01T12:00:00.000Z'));
+        const project = createStoreProject('project-legacy');
+        const sibling = createStoreTask('sibling', { status: 'next', projectId: project.id, order: 0, orderNum: 0 });
+        // Legacy row from before project ordering: in a project, but no order.
+        const recurring = createStoreTask('legacy-recurring', {
+            status: 'next',
+            projectId: project.id,
+            recurrence: 'daily',
+            dueDate: '2026-07-01T09:00:00.000Z',
+        });
+        useTaskStore.setState({
+            tasks: [sibling, recurring],
+            _allTasks: [sibling, recurring],
+            _tasksById: buildEntityMap([sibling, recurring]),
+            projects: [project],
+            _allProjects: [project],
+            _projectsById: buildEntityMap([project]),
+            settings: { deviceId: 'device-a' },
+        });
+
+        await useTaskStore.getState().moveTask('legacy-recurring', 'done');
+
+        const followUp = useTaskStore.getState()._allTasks
+            .find((task) => task.id !== 'legacy-recurring' && task.title === recurring.title);
+        expect(followUp?.order).toBe(1);
+        expect(followUp?.orderNum).toBe(1);
     });
 
     it('does not append a duplicate recurring follow-up when one already exists', async () => {
