@@ -12,18 +12,13 @@ import {
     getNextProjectOrder,
     getTaskOrder,
     getReferenceTaskFieldClears,
-    isTaskVisible,
     nextRevision,
     normalizeTaskUpdate,
     persist,
     replaceEntitiesInArray,
-    replaceEntitiesInMap,
     replaceEntityInArray,
-    replaceEntityInMap,
     resolveCaptureStatusForStart,
     type ProjectOrderReserver,
-    toVisibleTask,
-    updateVisibleTasks,
 } from './store-helpers';
 import { logInfo, logWarn } from './logger';
 import { isTaskFinished } from './task-status';
@@ -194,46 +189,13 @@ const actionOk = (extra?: Omit<StoreActionResult, 'success'>): StoreActionResult
 const actionFail = (error: string): StoreActionResult => ({ success: false, error });
 const hasOwnField = (value: object, field: PropertyKey): boolean => Object.prototype.hasOwnProperty.call(value, field);
 
-const applyVisibleTaskChanges = (
-    visibleTasks: Task[],
-    changedTasks: readonly Task[],
-    addedTasks: readonly Task[] = []
-): Task[] => {
-    if (changedTasks.length === 0 && addedTasks.length === 0) return visibleTasks;
-    const changedById = new Map(changedTasks.map((task) => [task.id, task]));
-    const emittedIds = new Set<string>();
-    let changed = false;
-    const nextVisibleTasks: Task[] = [];
-
-    for (const visibleTask of visibleTasks) {
-        const updatedTask = changedById.get(visibleTask.id);
-        if (!updatedTask) {
-            nextVisibleTasks.push(visibleTask);
-            emittedIds.add(visibleTask.id);
-            continue;
-        }
-        changed = true;
-        emittedIds.add(visibleTask.id);
-        if (isTaskVisible(updatedTask)) {
-            nextVisibleTasks.push(toVisibleTask(updatedTask));
-        }
-    }
-
-    for (const task of [...changedTasks, ...addedTasks]) {
-        if (emittedIds.has(task.id) || !isTaskVisible(task)) continue;
-        nextVisibleTasks.push(toVisibleTask(task));
-        emittedIds.add(task.id);
-        changed = true;
-    }
-
-    return changed ? nextVisibleTasks : visibleTasks;
-};
-
+// `tasks` and `_tasksById` are derived from `_allTasks` by
+// prepareStoreStateUpdate (store.ts) on every write, so producers below only
+// ever write `_allTasks`.
 export type MutateTasksOptions = {
     selectTasks: (state: TaskStore) => Task[];
     buildUpdates: (task: Task, context: { now: string; state: TaskStore }) => Partial<Task>;
     buildSettings?: (state: TaskStore, selectedTasks: readonly Task[], context: { now: string; settings: TaskStore['settings'] }) => TaskStore['settings'] | undefined;
-    updateVisible?: boolean;
     missingMessage?: string;
     ensureDeviceIdWhenEmpty?: boolean;
 };
@@ -265,9 +227,6 @@ export const mutateTasks = async (
             };
             return compactPurgedTaskForLocalStorage(updatedTask);
         });
-        const nextVisibleTasks = options.updateVisible !== false
-            ? applyVisibleTaskChanges(state.tasks, changedTasks)
-            : state.tasks;
         const nextAllTasks = changedTasks.length > 0
             ? replaceEntitiesInArray(state._allTasks, changedTasks)
             : state._allTasks;
@@ -282,11 +241,7 @@ export const mutateTasks = async (
             ...(settingsChanged ? { settings: nextSettings } : {}),
         });
         return {
-            tasks: nextVisibleTasks,
             _allTasks: nextAllTasks,
-            _tasksById: changedTasks.length > 0
-                ? replaceEntitiesInMap(state._tasksById, changedTasks)
-                : state._tasksById,
             lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
             ...(settingsChanged ? { settings: nextSettings } : {}),
         };
@@ -613,23 +568,13 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
                 const updatedAllTasks = recurringFollowUpTask
                     ? [...updatedAllTasksBase, recurringFollowUpTask]
                     : updatedAllTasksBase;
-                const updatedTasksById = replaceEntityInMap(state._tasksById, updatedTask);
-
-                let updatedVisibleTasks = updateVisibleTasks(state.tasks, oldTask, updatedTask);
-                if (recurringFollowUpTask) {
-                    updatedVisibleTasks = updateVisibleTasks(updatedVisibleTasks, null, recurringFollowUpTask);
-                }
                 snapshot = buildSaveSnapshot(state, {
                     tasks: updatedAllTasks,
                     ...(deviceState.updated ? { settings: deviceState.settings } : {}),
                 });
                 setProducerMs = Date.now() - producerStartedAt;
                 return {
-                    tasks: updatedVisibleTasks,
                     _allTasks: updatedAllTasks,
-                    _tasksById: recurringFollowUpTask
-                        ? replaceEntityInMap(updatedTasksById, recurringFollowUpTask)
-                        : updatedTasksById,
                     lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
                     ...(deviceState.updated ? { settings: deviceState.settings } : {}),
                 };
@@ -801,7 +746,6 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
                     : undefined;
             },
             missingMessage: 'Tasks not found',
-            updateVisible: false,
         });
     },
 
@@ -822,7 +766,6 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
                     ? appendPendingRemoteDeletes(settings, pendingDeletes)
                     : undefined;
             },
-            updateVisible: false,
             ensureDeviceIdWhenEmpty: true,
         });
     },
@@ -912,13 +855,11 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
             };
 
             const newAllTasks = [...state._allTasks, newTask];
-            const newVisibleTasks = updateVisibleTasks(state.tasks, null, newTask);
             persist(set, debouncedSave, state, {
                 tasks: newAllTasks,
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             });
             return {
-                tasks: newVisibleTasks,
                 _allTasks: newAllTasks,
                 lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
@@ -1023,14 +964,12 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
                 now
             );
             const nextAllTasks = replaceEntityInArray(state._allTasks, id, updatedTask);
-            const nextVisibleTasks = updateVisibleTasks(state.tasks, sourceTask, updatedTask);
             persist(set, debouncedSave, state, {
                 tasks: nextAllTasks,
                 projects: nextAllProjects,
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             });
             return {
-                tasks: nextVisibleTasks,
                 _allTasks: nextAllTasks,
                 _allProjects: nextAllProjects,
                 lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
@@ -1173,7 +1112,6 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
             const newAllTasks = nextRecurringTasks.length > 0
                 ? [...newAllTasksBase, ...nextRecurringTasks]
                 : newAllTasksBase;
-            const newVisibleTasks = applyVisibleTaskChanges(state.tasks, changedTasks, nextRecurringTasks);
 
             persist(set, debouncedSave, state, {
                 tasks: newAllTasks,
@@ -1181,9 +1119,7 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
             });
 
             return {
-                tasks: newVisibleTasks,
                 _allTasks: newAllTasks,
-                _tasksById: replaceEntitiesInMap(state._tasksById, [...changedTasks, ...nextRecurringTasks]),
                 lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
                 ...(deviceState.updated ? { settings: deviceState.settings } : {}),
             };

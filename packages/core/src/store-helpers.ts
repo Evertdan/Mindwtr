@@ -609,26 +609,6 @@ export const reuseSettingsIfEquivalent = (
     }
 };
 
-export const updateVisibleTasks = (visible: Task[], previous?: Task | null, next?: Task | null): Task[] => {
-    const wasVisible = isTaskVisible(previous);
-    const isVisible = isTaskVisible(next);
-    const visibleNext = next && isVisible ? toVisibleTask(next) : next;
-    if (wasVisible && isVisible && next) {
-        return replaceEntityInArray(visible, visibleNext!.id, visibleNext!);
-    }
-    if (wasVisible && !isVisible && previous) {
-        const index = visible.findIndex((task) => task.id === previous.id);
-        if (index < 0) return visible;
-        const nextVisible = visible.slice();
-        nextVisible.splice(index, 1);
-        return nextVisible;
-    }
-    if (!wasVisible && isVisible && next) {
-        return [...visible, visibleNext!];
-    }
-    return visible;
-};
-
 const assertCollectionSnapshotIncludesExistingItems = <T extends EntityWithId>(
     label: string,
     nextItems: T[],

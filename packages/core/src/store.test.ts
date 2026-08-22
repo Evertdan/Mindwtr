@@ -186,6 +186,26 @@ describe('TaskStore', () => {
         expect(junk?.repeatReminderMinutes).toBeUndefined();
     });
 
+    // prepareStoreStateUpdate derives `tasks` from `_allTasks` on every write, so a
+    // task that becomes visible again takes its place in the collection's order.
+    // Appending it at the end (what a hand-maintained visible list does) is not the
+    // behavior the store has ever shown.
+    it('keeps a newly visible task in _allTasks order rather than appending it', async () => {
+        const first = createStoreTask('task-a', { status: 'next' });
+        const middle = createStoreTask('task-b', { status: 'archived' });
+        const last = createStoreTask('task-c', { status: 'next' });
+        useTaskStore.setState({
+            tasks: [first, last],
+            _allTasks: [first, middle, last],
+            _tasksById: buildEntityMap([first, middle, last]),
+            settings: { deviceId: 'device-a' },
+        });
+
+        await useTaskStore.getState().updateTask('task-b', { status: 'next' });
+
+        expect(useTaskStore.getState().tasks.map((task) => task.id)).toEqual(['task-a', 'task-b', 'task-c']);
+    });
+
     it('should update a task', () => {
         const { addTask, updateTask } = useTaskStore.getState();
         addTask('Task to Update');
