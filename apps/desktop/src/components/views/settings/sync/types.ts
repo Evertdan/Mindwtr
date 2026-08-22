@@ -1,4 +1,10 @@
-import type { AppSettings, SettingsSyncPreferences, SyncBackend } from '@mindwtr/core';
+import type {
+    AppSettings,
+    SettingsSyncPreferences,
+    SyncBackend,
+    SyncEncryptionState,
+    SyncEncryptionTransitionProgress,
+} from '@mindwtr/core';
 
 export type SettingsSyncLabels = {
     backup: string;
@@ -158,9 +164,65 @@ export type SettingsSyncLabels = {
     attachmentsCleanupPendingDeletesConfirmTitle: string;
     attachmentsCleanupRun: string;
     attachmentsCleanupRunning: string;
+    syncEncryption: string;
+    syncEncryptionDesc: string;
+    syncEncryptionEnable: string;
+    syncEncryptionPassphrase: string;
+    syncEncryptionPassphraseConfirm: string;
+    syncEncryptionCurrentPassphrase: string;
+    syncEncryptionNewPassphrase: string;
+    syncEncryptionShowPassphrase: string;
+    syncEncryptionGenerate: string;
+    syncEncryptionGeneratedHint: string;
+    syncEncryptionWarningLost: string;
+    syncEncryptionWarningDevices: string;
+    syncEncryptionErrorMismatch: string;
+    syncEncryptionErrorWrongPassphrase: string;
+    syncEncryptionErrorGeneric: string;
+    syncEncryptionErrorRotationFirst: string;
+    syncEncryptionProgressAttachments: string;
+    syncEncryptionProgressDocuments: string;
+    syncEncryptionStatusOn: string;
+    syncEncryptionChange: string;
+    syncEncryptionDisable: string;
+    syncEncryptionDisableWarning: string;
+    syncEncryptionLockedTitle: string;
+    syncEncryptionLockedDesc: string;
+    syncEncryptionUnlock: string;
+    syncEncryptionDecline: string;
+    syncEncryptionPausedDesc: string;
+    syncEncryptionCancel: string;
 };
 
 export type CloudProvider = 'selfhosted' | 'dropbox';
+
+/** Which message the section shows after a failed transition. `rotation-first` is
+ *  the one terminal case with a real remedy: an interrupted passphrase change left
+ *  the sync location on two salts, and only re-running the change can heal it. */
+export type SyncEncryptionErrorKind = 'wrong-passphrase' | 'rotation-first' | 'generic';
+
+/**
+ * Everything the Encryption section needs, as one object rather than a dozen flat
+ * props: it is a single self-contained flow, and `useSyncEncryptionSettings` is its
+ * only producer. Every action resolves to whether it succeeded, so the section can
+ * close its form without re-reading state.
+ */
+export type SyncEncryptionController = {
+    /** `null` while the first status read is in flight, or when the backend cannot encrypt. */
+    state: SyncEncryptionState | null;
+    /** File, WebDAV and Dropbox only — see `isEncryptionCapableBackend`. */
+    supported: boolean;
+    busy: boolean;
+    progress: SyncEncryptionTransitionProgress | null;
+    error: SyncEncryptionErrorKind | null;
+    clearError: () => void;
+    generatePassphrase: () => string;
+    enable: (passphrase: string) => Promise<boolean>;
+    disable: () => Promise<boolean>;
+    changePassphrase: (current: string, next: string) => Promise<boolean>;
+    unlock: (passphrase: string) => Promise<boolean>;
+    decline: () => Promise<void>;
+};
 export type DropboxTestState = 'idle' | 'success' | 'error';
 export type SyncPreferences = SettingsSyncPreferences;
 
@@ -289,7 +351,7 @@ export type SettingsAttachmentsProps = {
     isCleaningAttachments: boolean;
 };
 
-export type SettingsSyncPageProps = { t: SettingsSyncLabels }
+export type SettingsSyncPageProps = { t: SettingsSyncLabels; encryption: SyncEncryptionController }
     & SyncConfigurationProps
     & SyncStatusProps;
 

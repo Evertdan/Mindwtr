@@ -109,6 +109,9 @@ export const SETTINGS_SEARCH_PAGE_KEYS: Record<SettingsSearchPageId, readonly Se
         { key: 'webdavPassword', section: 'syncBackend' },
         { key: 'dropboxAppKey', section: 'syncBackend' },
         'calendarFeed',
+        // Only rendered for the blob backends that can be encrypted (file, WebDAV,
+        // Dropbox); the self-hosted and CloudKit variants have no such section.
+        'syncEncryption',
         'syncPreferences',
         'backgroundSync',
         'syncHistory',

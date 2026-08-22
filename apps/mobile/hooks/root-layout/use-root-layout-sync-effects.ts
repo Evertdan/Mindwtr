@@ -37,6 +37,7 @@ type SyncUiCopy = {
     openActionLabel: string;
     syncIssueAuthMessage: string;
     syncIssueConflictMessage: string;
+    syncIssueEncryptionMessage: string;
     syncIssueGenericMessage: string;
     syncIssueMisconfiguredMessage: string;
     syncIssuePermissionMessage: string;
@@ -81,6 +82,7 @@ const buildSyncUiCopy = (resolveText: ResolveText): SyncUiCopy => ({
     syncIssueRateLimitedMessage: resolveText('settings.syncFailureRateLimited', 'The sync backend is rate limiting requests. Wait a moment and try again.'),
     syncIssueMisconfiguredMessage: resolveText('settings.syncFailureMisconfigured', 'Finish configuring the selected sync backend in Settings → Sync.'),
     syncIssueConflictMessage: resolveText('settings.syncFailureConflict', 'Another device or backend reported a sync conflict. Retry after both sides finish syncing.'),
+    syncIssueEncryptionMessage: resolveText('settings.syncFailureEncryption', 'This sync location is encrypted. Enter its passphrase in Settings → Sync to continue.'),
     notificationsDisabledTitle: resolveText('settings.notificationsDisabled', 'Notifications disabled'),
     notificationsDisabledMessage: resolveText('settings.notificationsDisabledMessage', 'Mindwtr can no longer schedule reminders until notification access is restored.'),
     openActionLabel: resolveText('common.open', 'Open'),
@@ -312,6 +314,8 @@ export function useRootLayoutSyncEffects({
                                 return uiCopy.syncIssueMisconfiguredMessage;
                             case 'conflict':
                                 return uiCopy.syncIssueConflictMessage;
+                            case 'encryption':
+                                return uiCopy.syncIssueEncryptionMessage;
                             default:
                                 return uiCopy.syncIssueGenericMessage;
                         }

@@ -1,0 +1,249 @@
+import React from 'react';
+import renderer, { act } from 'react-test-renderer';
+import { Text, TextInput, TouchableOpacity } from 'react-native';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { AppData } from '@mindwtr/core';
+import type { ThemeColors } from '@/hooks/use-theme-colors';
+
+type EncryptionState = 'off' | 'enabled' | 'remote-encrypted-no-key';
+type TransitionOptions = { appData?: unknown; onProgress?: (progress: unknown) => void };
+
+const encryptionMocks = vi.hoisted(() => ({
+  changeSyncEncryptionPassphrase: vi.fn(
+    async (_current: string, _next: string, _options?: TransitionOptions): Promise<void> => undefined,
+  ),
+  declineSyncEncryptionPassphrase: vi.fn(async (): Promise<void> => undefined),
+  disableSyncEncryption: vi.fn(async (_options?: TransitionOptions): Promise<void> => undefined),
+  enableSyncEncryption: vi.fn(
+    async (_passphrase: string, _options?: TransitionOptions): Promise<void> => undefined,
+  ),
+  getSyncEncryptionStatus: vi.fn(async (): Promise<{ state: EncryptionState }> => ({ state: 'off' })),
+  provideSyncEncryptionPassphrase: vi.fn(
+    async (_passphrase: string): Promise<'ok' | 'wrong-passphrase'> => 'ok',
+  ),
+}));
+
+vi.mock('@/lib/sync-encryption-service', () => encryptionMocks);
+vi.mock('@/lib/sync-crypto-native', () => ({
+  mobileSyncCryptoPrimitives: {
+    // Deterministic so the generated phrase is assertable; the real provider is
+    // quick-crypto's OpenSSL RAND_bytes.
+    randomBytes: (n: number) => new Uint8Array(n).fill(1),
+  },
+}));
+vi.mock('@/lib/settings-utils', () => ({ logSettingsError: vi.fn() }));
+
+import { SyncEncryptionCard } from './sync-settings-encryption-card';
+
+const tc = {
+  bg: '#0f172a',
+  cardBg: '#111827',
+  border: '#334155',
+  inputBg: '#1e293b',
+  text: '#f8fafc',
+  secondaryText: '#94a3b8',
+  tint: '#3b82f6',
+} as unknown as ThemeColors;
+
+const t = (key: string) => key;
+
+const appData = {
+  tasks: [],
+  projects: [],
+  sections: [],
+  areas: [],
+  settings: {},
+} as unknown as AppData;
+
+const renderCard = async () => {
+  let tree!: renderer.ReactTestRenderer;
+  await act(async () => {
+    tree = renderer.create(<SyncEncryptionCard appData={appData} t={t} tc={tc} />);
+  });
+  return tree;
+};
+
+const texts = (tree: renderer.ReactTestRenderer): string[] =>
+  tree.root
+    .findAllByType(Text)
+    .map((node) => node.props.children)
+    .filter((child): child is string => typeof child === 'string');
+
+const press = async (tree: renderer.ReactTestRenderer, label: string) => {
+  const target = tree.root
+    .findAllByType(TouchableOpacity)
+    .find((node) => node.findAllByType(Text).some((child) => child.props.children === label));
+  if (!target) throw new Error(`No pressable containing "${label}"`);
+  await act(async () => {
+    target.props.onPress();
+  });
+};
+
+const typeInto = async (tree: renderer.ReactTestRenderer, label: string, value: string) => {
+  const input = tree.root
+    .findAllByType(TextInput)
+    .find((node) => node.props.accessibilityLabel === label);
+  if (!input) throw new Error(`No input labelled "${label}"`);
+  await act(async () => {
+    input.props.onChangeText(value);
+  });
+};
+
+const inputLabels = (tree: renderer.ReactTestRenderer): string[] =>
+  tree.root.findAllByType(TextInput).map((node) => node.props.accessibilityLabel as string);
+
+describe('SyncEncryptionCard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    encryptionMocks.getSyncEncryptionStatus.mockResolvedValue({ state: 'off' });
+    encryptionMocks.provideSyncEncryptionPassphrase.mockResolvedValue('ok');
+  });
+
+  it('shows both warnings before anything can be enabled', async () => {
+    const tree = await renderCard();
+    expect(texts(tree)).not.toContain('settings.syncEncryptionWarningLost');
+
+    await press(tree, 'settings.syncEncryptionEnable');
+
+    expect(texts(tree)).toContain('settings.syncEncryptionWarningLost');
+    expect(texts(tree)).toContain('settings.syncEncryptionWarningDevices');
+  });
+
+  it('enables with the typed passphrase and the local document', async () => {
+    const tree = await renderCard();
+    await press(tree, 'settings.syncEncryptionEnable');
+    await typeInto(tree, 'settings.syncEncryptionPassphrase', 'first swimmer bagpipe');
+    await typeInto(tree, 'settings.syncEncryptionPassphraseConfirm', 'first swimmer bagpipe');
+    await press(tree, 'settings.syncEncryptionEnable');
+
+    expect(encryptionMocks.enableSyncEncryption).toHaveBeenCalledTimes(1);
+    const [passphrase, options] = encryptionMocks.enableSyncEncryption.mock.calls[0];
+    expect(passphrase).toBe('first swimmer bagpipe');
+    // Without appData the transition silently leaves every attachment in plaintext.
+    expect(options?.appData).toBe(appData);
+  });
+
+  it('blocks a mismatch client-side and never calls the API', async () => {
+    const tree = await renderCard();
+    await press(tree, 'settings.syncEncryptionEnable');
+    await typeInto(tree, 'settings.syncEncryptionPassphrase', 'first swimmer bagpipe');
+    await typeInto(tree, 'settings.syncEncryptionPassphraseConfirm', 'first swimmer bagpipa');
+    await press(tree, 'settings.syncEncryptionEnable');
+
+    expect(encryptionMocks.enableSyncEncryption).not.toHaveBeenCalled();
+    expect(texts(tree)).toContain('settings.syncEncryptionErrorMismatch');
+  });
+
+  it('keeps the submit row disabled while either field is empty', async () => {
+    const tree = await renderCard();
+    await press(tree, 'settings.syncEncryptionEnable');
+
+    const submitRow = () => tree.root
+      .findAllByType(TouchableOpacity)
+      .filter((node) => node.findAllByType(Text)
+        .some((child) => child.props.children === 'settings.syncEncryptionEnable'))
+      .at(-1)!;
+    expect(submitRow().props.disabled).toBe(true);
+
+    await typeInto(tree, 'settings.syncEncryptionPassphrase', 'only one side');
+    expect(submitRow().props.disabled).toBe(true);
+
+    await typeInto(tree, 'settings.syncEncryptionPassphraseConfirm', 'only one side');
+    expect(submitRow().props.disabled).toBe(false);
+  });
+
+  it('fills both fields from the generator', async () => {
+    const tree = await renderCard();
+    await press(tree, 'settings.syncEncryptionEnable');
+    await press(tree, 'settings.syncEncryptionGenerate');
+    expect(texts(tree)).toContain('settings.syncEncryptionGeneratedHint');
+
+    await press(tree, 'settings.syncEncryptionEnable');
+    const [passphrase] = encryptionMocks.enableSyncEncryption.mock.calls[0];
+    expect(passphrase.split(' ')).toHaveLength(6);
+  });
+
+  it('passes both values through when changing the passphrase', async () => {
+    encryptionMocks.getSyncEncryptionStatus.mockResolvedValue({ state: 'enabled' });
+    const tree = await renderCard();
+    expect(texts(tree)).toContain('settings.syncEncryptionStatusOn');
+
+    await press(tree, 'settings.syncEncryptionChange');
+    await typeInto(tree, 'settings.syncEncryptionCurrentPassphrase', 'old phrase');
+    await typeInto(tree, 'settings.syncEncryptionNewPassphrase', 'new phrase');
+    await typeInto(tree, 'settings.syncEncryptionPassphraseConfirm', 'new phrase');
+    await press(tree, 'settings.syncEncryptionChange');
+
+    expect(encryptionMocks.changeSyncEncryptionPassphrase).toHaveBeenCalledWith(
+      'old phrase',
+      'new phrase',
+      expect.objectContaining({ appData }),
+    );
+  });
+
+  it('re-warns before turning encryption off, then disables', async () => {
+    encryptionMocks.getSyncEncryptionStatus.mockResolvedValue({ state: 'enabled' });
+    const tree = await renderCard();
+
+    await press(tree, 'settings.syncEncryptionDisable');
+    expect(texts(tree)).toContain('settings.syncEncryptionDisableWarning');
+
+    await press(tree, 'settings.syncEncryptionDisable');
+    expect(encryptionMocks.disableSyncEncryption).toHaveBeenCalled();
+  });
+
+  it('points a wedged disable at the passphrase change that has to finish first', async () => {
+    encryptionMocks.getSyncEncryptionStatus.mockResolvedValue({ state: 'enabled' });
+    encryptionMocks.disableSyncEncryption.mockRejectedValueOnce(
+      new Error('SYNC_ENCRYPTION_TERMINAL: wrong passphrase or corrupted data'),
+    );
+    const tree = await renderCard();
+
+    await press(tree, 'settings.syncEncryptionDisable');
+    await press(tree, 'settings.syncEncryptionDisable');
+
+    expect(texts(tree)).toContain('settings.syncEncryptionErrorRotationFirst');
+  });
+
+  it('re-prompts inline when the entered passphrase is wrong', async () => {
+    encryptionMocks.getSyncEncryptionStatus.mockResolvedValue({ state: 'remote-encrypted-no-key' });
+    encryptionMocks.provideSyncEncryptionPassphrase.mockResolvedValue('wrong-passphrase');
+    const tree = await renderCard();
+    expect(texts(tree)).toContain('settings.syncEncryptionLockedTitle');
+
+    await press(tree, 'settings.syncEncryptionUnlock');
+    await typeInto(tree, 'settings.syncEncryptionPassphrase', 'not the right one');
+    await press(tree, 'settings.syncEncryptionUnlock');
+
+    expect(encryptionMocks.provideSyncEncryptionPassphrase).toHaveBeenCalledWith('not the right one');
+    expect(texts(tree)).toContain('settings.syncEncryptionErrorWrongPassphrase');
+    // Still open for another attempt, and nothing suggests the data is damaged.
+    expect(inputLabels(tree)).toContain('settings.syncEncryptionPassphrase');
+  });
+
+  it('declines through the persisted API and says sync stays paused', async () => {
+    encryptionMocks.getSyncEncryptionStatus.mockResolvedValue({ state: 'remote-encrypted-no-key' });
+    const tree = await renderCard();
+
+    await press(tree, 'settings.syncEncryptionUnlock');
+    await press(tree, 'settings.syncEncryptionDecline');
+
+    expect(encryptionMocks.declineSyncEncryptionPassphrase).toHaveBeenCalled();
+    expect(texts(tree)).toContain('settings.syncEncryptionPausedDesc');
+    expect(inputLabels(tree)).not.toContain('settings.syncEncryptionPassphrase');
+  });
+
+  it('renders nothing until the first status read resolves', () => {
+    // Never resolves: the card must not guess a state it has not read.
+    encryptionMocks.getSyncEncryptionStatus.mockReturnValue(new Promise(() => undefined));
+    let tree!: renderer.ReactTestRenderer;
+    act(() => {
+      tree = renderer.create(<SyncEncryptionCard appData={appData} t={t} tc={tc} />);
+    });
+    expect(tree.root.findAllByType(Text)).toHaveLength(0);
+    act(() => {
+      tree.unmount();
+    });
+  });
+});

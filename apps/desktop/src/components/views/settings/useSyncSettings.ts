@@ -46,6 +46,7 @@ import {
     restoreDesktopBackup,
 } from '../../../lib/data-transfer';
 import { isValidHttpUrl } from './sync/sync-page-utils';
+import { useSyncEncryptionSettings } from './sync/useSyncEncryptionSettings';
 import type {
     SettingsDataTransferProps,
     SettingsSyncPageProps,
@@ -1709,6 +1710,7 @@ export const useSyncSettings = ({
             allowInsecureHttp: cloudAllowInsecureHttp,
         })
         : !cloudUrl.trim();
+    const encryption = useSyncEncryptionSettings(syncBackend, cloudProvider);
     const isSyncTargetValid =
         syncBackend === 'file'
             ? !!syncPath.trim()
@@ -1773,6 +1775,7 @@ export const useSyncSettings = ({
             onConnectDropbox: handleConnectDropbox,
             onDisconnectDropbox: handleDisconnectDropbox,
             onTestDropboxConnection: handleTestDropboxConnection,
+            encryption,
             isSyncTargetValid,
             syncPreferences,
             onUpdateSyncPreferences: handleUpdateSyncPreferences,

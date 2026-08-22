@@ -52,6 +52,7 @@ export * from './sync-backend-io';
 export * from './sync-fast-sync';
 export * from './sync-crypto';
 export * from './sync-encryption';
+export * from './diceware';
 export * from './task-utils';
 export * from './completion-grouping';
 export * from './filter-criteria';

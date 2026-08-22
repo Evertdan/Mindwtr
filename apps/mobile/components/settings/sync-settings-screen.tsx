@@ -43,6 +43,7 @@ import { AppleRemindersImportSection } from './apple-reminders-import-section';
 import { useSettingsLocalization, useSettingsScrollContent } from './settings.hooks';
 import { SyncCloudKitBackendPanel } from './sync-settings-cloudkit-panel';
 import { SyncDropboxBackendPanel } from './sync-settings-dropbox-panel';
+import { SyncEncryptionCard } from './sync-settings-encryption-card';
 import { SyncFileBackendPanel } from './sync-settings-file-panel';
 import {
     BackgroundSyncInfoCard,
@@ -240,6 +241,8 @@ function SyncSettingsView({
                 return t('settings.syncFailureMisconfigured');
             case 'conflict':
                 return t('settings.syncFailureConflict');
+            case 'encryption':
+                return t('settings.syncFailureEncryption');
             default:
                 return t('settings.syncFailureGeneric');
         }
@@ -490,6 +493,17 @@ function SyncSettingsView({
         t,
     });
     const isGettingStartedActionBusy = gettingStartedBusy || isBackupBusy || isSyncing;
+    // Encryption covers the backends Mindwtr writes whole blobs to; the self-hosted
+    // cloud and CloudKit keep structured server-side state and are out of scope.
+    const isEncryptionCapableBackend = syncBackend === 'file'
+        || syncBackend === 'webdav'
+        || (syncBackend === 'cloud' && cloudProvider === 'dropbox' && !isFossBuild);
+    // The attachment worklist a transition converts is derived from this document —
+    // without it, phase 2 leaves every attachment in plaintext.
+    const encryptionAppData = useMemo(
+        () => ({ tasks, projects, sections, areas, settings }),
+        [areas, projects, sections, settings, tasks],
+    );
     const isScheduledBackgroundSyncBackend = syncBackend === 'webdav' || syncBackend === 'cloud' || syncBackend === 'cloudkit';
     const cloudKitStatusDetails = getCloudKitStatusDetails(cloudKitAccountStatus);
     const isCloudSyncSelected = syncBackend === 'cloud' || syncBackend === 'cloudkit';
@@ -820,6 +834,10 @@ function SyncSettingsView({
                                     />
                                 ) : null}
                             </>
+                        )}
+
+                        {isEncryptionCapableBackend && (
+                            <SyncEncryptionCard appData={encryptionAppData} t={t} tc={tc} />
                         )}
 
                         <SyncPreferencesCard
