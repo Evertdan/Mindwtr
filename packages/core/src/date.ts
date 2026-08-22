@@ -661,7 +661,20 @@ export function getShortWeekdayLabels(locale?: string): string[] {
  * date-only values above all, whose local-midnight handling lives below — falls
  * through to the general path unchanged.
  */
-const ISO_INSTANT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+const ISO_INSTANT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+function isGregorianLeapYear(year: number): boolean {
+    return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
+// month is 1-indexed, matching the pattern's capture group.
+function isValidCalendarDate(year: number, month: number, day: number): boolean {
+    if (month < 1 || month > 12) return false;
+    const max = month === 2 && isGregorianLeapYear(year) ? 29 : DAYS_IN_MONTH[month - 1];
+    return day >= 1 && day <= max;
+}
 
 /**
  * Safely parses a date string to a Date object.
@@ -670,7 +683,11 @@ const ISO_INSTANT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3}
 export function safeParseDate(dateStr: string | undefined | null): Date | null {
     if (!dateStr) return null;
     try {
-        if (ISO_INSTANT_PATTERN.test(dateStr)) {
+        const instantMatch = ISO_INSTANT_PATTERN.exec(dateStr);
+        // `Date.parse` rolls calendar-invalid instants like 2023-02-30 into
+        // a neighboring day instead of rejecting them; reject them here,
+        // cheaply, before taking the fast path.
+        if (instantMatch && isValidCalendarDate(Number(instantMatch[1]), Number(instantMatch[2]), Number(instantMatch[3]))) {
             const parsed = Date.parse(dateStr);
             // A NaN here means the engine declined a string this pattern
             // accepted; the general path below still gets its turn.

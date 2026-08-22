@@ -59,6 +59,8 @@ describe('date utils', () => {
         '2025-01-02 03:04:05Z',
         '2025-01-02T03:04:05.678901Z',
         '2025-13-02T03:04:05Z',
+        '2025-02-30T10:00:00Z',
+        '2025-04-31T10:00:00.5+02:00',
     ])('parses %s identically to parseISO', (value) => {
         const parsed = safeParseDate(value);
         const reference = parseISO(value);
