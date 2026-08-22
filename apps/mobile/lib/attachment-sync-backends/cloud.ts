@@ -3,6 +3,7 @@ import { cloudDeleteFile, cloudPutFile, isAbortError, validateAttachmentForUploa
 import { logAttachmentWarn } from '../attachment-sync-utils';
 import {
   buildCloudKey,
+  canUploadAttachmentFrom,
   collectAttachments,
   DEFAULT_CONTENT_TYPE,
   fileExists,
@@ -94,7 +95,8 @@ export const syncCloudAttachments = async (
       didMutate = true;
     }
 
-    if (!attachment.cloudKey && hasLocalPath && existsLocally && !isHttp) {
+    // SEC-07: same containment the shared lifecycle applies via `canUploadFrom`.
+    if (!attachment.cloudKey && hasLocalPath && existsLocally && !isHttp && canUploadAttachmentFrom(uri)) {
       let localReadFailed = false;
       let shouldPropagateError = false;
       let uploadUrlForCleanup: string | null = null;

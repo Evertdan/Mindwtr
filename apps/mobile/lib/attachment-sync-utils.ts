@@ -637,6 +637,20 @@ export const ensureAttachmentStoredLocally = async (attachment: Attachment): Pro
   return true;
 };
 
+/**
+ * SEC-07: which local uris this device may read bytes from for sync. An attachment `uri`
+ * travels inside the synced document and survives the merge sanitizer, so without this a
+ * hostile sync document makes the next cycle upload an arbitrary local file to the remote.
+ * `migrateAttachmentsLocallyBeforeSync` runs first and copies every legitimate outside
+ * file (legacy content:// / SAF references) into the managed dir; whatever is still
+ * outside afterwards is refused rather than read.
+ */
+export const canUploadAttachmentFrom = (uri: string): boolean => {
+  const attachmentsDir = getManagedAttachmentsDir();
+  if (!attachmentsDir) return false;
+  return uri.startsWith(attachmentsDir);
+};
+
 export const attachmentNeedsManagedLocalCopy = (attachment: Attachment): boolean => {
   if (attachment.kind !== 'file') return false;
   if (attachment.deletedAt) return false;

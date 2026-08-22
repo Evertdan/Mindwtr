@@ -11,6 +11,7 @@ import {
 import * as FileSystem from '../file-system';
 import {
   bytesToBase64,
+  canUploadAttachmentFrom,
   createAttachmentLocalMigrationLimiter,
   DEFAULT_CONTENT_TYPE,
 } from '../attachment-sync-utils';
@@ -123,11 +124,12 @@ export const isAttachmentSyncAbortError = (error: unknown, signal?: AbortSignal)
  * strips `file://`).
  */
 export async function runMobileAttachmentLifecycle(
-  options: Omit<AttachmentTransferLifecycleOptions, 'resolveLocalPath'>
+  options: Omit<AttachmentTransferLifecycleOptions, 'resolveLocalPath' | 'canUploadFrom'>
 ): Promise<boolean> {
   return await runAttachmentTransferLifecycle({
     ...options,
     resolveLocalPath: (uri) => uri,
+    canUploadFrom: canUploadAttachmentFrom,
   });
 }
 

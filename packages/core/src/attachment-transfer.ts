@@ -105,6 +105,15 @@ export type AttachmentTransferLifecycleOptions = {
     onDownload: (attachment: Attachment) => Promise<boolean>;
     onDownloadError: (attachment: Attachment, error: unknown) => void;
     resolveLocalPath?: (uri: string) => string;
+    /**
+     * Byte-source containment (SEC-07). `uri` travels inside the synced document and an
+     * absolute path there passes the merge sanitizer, so without this a hostile sync
+     * document makes the next cycle read an arbitrary local file and upload it to the
+     * remote. Each platform supplies its managed-attachment-directory predicate; a
+     * refused attachment still gets its `localStatus` reconciled, but is never read,
+     * hashed, or uploaded. Omitting it (the default) allows everything, unchanged.
+     */
+    canUploadFrom?: (localPath: string, attachment: Attachment) => boolean;
     beforeEachAttachment?: () => Promise<void>;
     /**
      * Whether `attachment` already has a cloud copy. Defaults to `Boolean(attachment.cloudKey)`.
@@ -243,12 +252,15 @@ export async function runAttachmentTransferLifecycle(
             didMutate = true;
         }
 
-        if (options.forceUploadExistingLocal && existsLocally && attachment.cloudKey !== undefined) {
+        // Refused paths still reconcile localStatus above; what they never do is get read.
+        const mayReadForSync = existsLocally && (options.canUploadFrom?.(localPath, attachment) ?? true);
+
+        if (options.forceUploadExistingLocal && mayReadForSync && attachment.cloudKey !== undefined) {
             attachment.cloudKey = undefined;
             didMutate = true;
         }
 
-        if (!hasCloudCopy(attachment) && existsLocally) {
+        if (!hasCloudCopy(attachment) && mayReadForSync) {
             if (!options.policy?.shouldUpload || options.policy.shouldUpload(attachment)) {
                 try {
                     if (await options.onUpload(attachment, localPath)) {
@@ -288,7 +300,7 @@ export async function runAttachmentTransferLifecycle(
         // has a cloud copy AND exists locally was, until now, left untouched by this
         // loop. Only runs when the caller wired both stat/hash callbacks; otherwise
         // this is a no-op and behaviour is unchanged from before this feature.
-        if (hasCloudCopy(attachment) && existsLocally && options.getLocalFileStat && options.contentChangePhase) {
+        if (hasCloudCopy(attachment) && mayReadForSync && options.getLocalFileStat && options.contentChangePhase) {
             const stat = await options.getLocalFileStat(localPath, attachment).catch(() => null);
             if (stat) {
                 const check = await checkAttachmentContentChange(

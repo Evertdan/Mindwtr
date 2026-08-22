@@ -702,6 +702,90 @@ describe('collectAttachmentsById', () => {
     });
 });
 
+describe('upload source containment (SEC-07)', () => {
+    const hostile = () => makeAttachment({ uri: '/etc/passwd', localStatus: 'missing' });
+    const baseOptions = {
+        localFileExists: vi.fn(async () => true),
+        canUploadFrom: (localPath: string) => localPath.startsWith('/managed/'),
+        onUploadError: vi.fn(),
+        onDownload: vi.fn(async () => true),
+        onDownloadError: vi.fn(),
+    };
+
+    it('never reads or uploads a local path the platform disallows', async () => {
+        const attachment = hostile();
+        const onUpload = vi.fn(async () => true);
+        const computeLocalFileHash = vi.fn(async () => 'hash');
+
+        await runAttachmentTransferLifecycle({
+            ...baseOptions,
+            attachmentsById: new Map([[attachment.id, attachment]]),
+            getLocalFileStat: vi.fn(async () => ({ mtimeMs: 2000, size: 20 })),
+            computeLocalFileHash,
+            contentChangePhase: 'prepare',
+            onUpload,
+        });
+
+        expect(onUpload).not.toHaveBeenCalled();
+        expect(computeLocalFileHash).not.toHaveBeenCalled();
+        expect(attachment.cloudKey).toBeUndefined();
+        // localStatus is still reconciled — the file is there, it is just not ours to send.
+        expect(attachment.localStatus).toBe('available');
+    });
+
+    it('does not re-upload a disallowed path that already has a cloud copy', async () => {
+        const attachment = makeAttachment({
+            uri: '/etc/passwd',
+            cloudKey: 'attachments/attachment-1.txt',
+            fileHash: 'old-hash',
+            contentMtimeMs: 1000,
+            contentSize: 10,
+        });
+        const onUpload = vi.fn(async () => true);
+
+        await runAttachmentTransferLifecycle({
+            ...baseOptions,
+            attachmentsById: new Map([[attachment.id, attachment]]),
+            getLocalFileStat: vi.fn(async () => ({ mtimeMs: 2000, size: 20 })),
+            computeLocalFileHash: vi.fn(async () => 'new-hash'),
+            contentChangePhase: 'prepare',
+            onUpload,
+        });
+
+        expect(onUpload).not.toHaveBeenCalled();
+        expect(attachment.fileHash).toBe('old-hash');
+    });
+
+    it('still downloads a cloud copy whose local file is missing', async () => {
+        const attachment = makeAttachment({ uri: '/etc/passwd', cloudKey: 'attachments/attachment-1.txt' });
+        const onDownload = vi.fn(async () => true);
+
+        await runAttachmentTransferLifecycle({
+            ...baseOptions,
+            attachmentsById: new Map([[attachment.id, attachment]]),
+            localFileExists: vi.fn(async () => false),
+            onUpload: vi.fn(async () => true),
+            onDownload,
+        });
+
+        expect(onDownload).toHaveBeenCalledTimes(1);
+    });
+
+    it('uploads normally when no containment predicate is supplied', async () => {
+        const attachment = makeAttachment({ uri: '/etc/passwd' });
+        const onUpload = vi.fn(async () => true);
+
+        await runAttachmentTransferLifecycle({
+            ...baseOptions,
+            canUploadFrom: undefined,
+            attachmentsById: new Map([[attachment.id, attachment]]),
+            onUpload,
+        });
+
+        expect(onUpload).toHaveBeenCalledTimes(1);
+    });
+});
+
 describe('validateAttachmentHash', () => {
     // sha256("abc")
     const ABC_SHA256 = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';

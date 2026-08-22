@@ -93,6 +93,29 @@ export const stripFileScheme = (uri: string): string => {
 
 const normalizeAttachmentFsPath = (path: string): string => normalizeAttachmentPathForUrl(path.trim());
 
+const isPathWithin = (dir: string, path: string): boolean => {
+    const root = normalizeAttachmentFsPath(dir).replace(/\/+$/, '');
+    return Boolean(root) && (path === root || path.startsWith(`${root}/`));
+};
+
+/**
+ * SEC-07: which local paths this device may read bytes from for sync. An attachment `uri`
+ * travels inside the synced document and an absolute path there survives the merge
+ * sanitizer, so without this a hostile sync document makes the next cycle upload an
+ * arbitrary local file to the remote. Every file attachment desktop creates is written
+ * under the managed data dir (imports, dropped files, pasted images, audio captures);
+ * files the user merely points at are `kind: 'link'` and never reach the transfer loop.
+ */
+export const createManagedAttachmentSourcePredicate = async (): Promise<(localPath: string) => boolean> => {
+    const { dataDir } = await import('@tauri-apps/api/path');
+    const { getManagedDataDir } = await import('./managed-paths');
+    const roots = await Promise.all([dataDir(), getManagedDataDir()]);
+    return (localPath: string): boolean => {
+        const normalized = normalizeAttachmentFsPath(stripFileScheme(localPath));
+        return roots.some((root) => isPathWithin(root, normalized));
+    };
+};
+
 /**
  * Every attachment sync backend needs the same two local-file primitives:
  * read a path that may be relative to Tauri's app-data dir (Windows paths

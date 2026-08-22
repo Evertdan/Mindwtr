@@ -2,7 +2,11 @@ import {
     runAttachmentTransferLifecycle,
     type AttachmentTransferLifecycleOptions,
 } from '@mindwtr/core';
-import { createCooperativeYield, stripFileScheme } from './sync-service-utils';
+import {
+    createCooperativeYield,
+    createManagedAttachmentSourcePredicate,
+    stripFileScheme,
+} from './sync-service-utils';
 
 export {
     collectAttachmentsById,
@@ -15,7 +19,7 @@ export {
 
 type BasicRemoteAttachmentSyncOptions = Omit<
     AttachmentTransferLifecycleOptions,
-    'beforeEachAttachment' | 'resolveLocalPath'
+    'beforeEachAttachment' | 'resolveLocalPath' | 'canUploadFrom'
 >;
 
 export async function syncBasicRemoteAttachments(options: BasicRemoteAttachmentSyncOptions): Promise<boolean> {
@@ -24,5 +28,6 @@ export async function syncBasicRemoteAttachments(options: BasicRemoteAttachmentS
         ...options,
         beforeEachAttachment: maybeYield,
         resolveLocalPath: stripFileScheme,
+        canUploadFrom: await createManagedAttachmentSourcePredicate(),
     });
 }

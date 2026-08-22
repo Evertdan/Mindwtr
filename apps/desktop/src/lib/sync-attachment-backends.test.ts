@@ -88,7 +88,7 @@ const createCandidateAttachmentData = (): AppData => ({
                     id: 'attachment-1',
                     kind: 'file',
                     title: 'candidate-proof.txt',
-                    uri: '/data/candidate-proof.txt',
+                    uri: '/app-data/mindwtr/attachments/candidate-proof.txt',
                     cloudKey: 'attachments/attachment-1.txt',
                     localStatus: 'available',
                     createdAt: '2026-08-03T00:00:00.000Z',
@@ -205,7 +205,7 @@ describe('desktop sync attachment backends', () => {
                             id: 'attachment-1',
                             kind: 'file',
                             title: 'mindwtr-upload-test.txt',
-                            uri: 'C:\\Temp\\mindwtr-upload-test.txt',
+                            uri: 'C:\\app-data\\mindwtr\\attachments\\mindwtr-upload-test.txt',
                             localStatus: 'available',
                             createdAt: '2026-06-27T00:00:00.000Z',
                             updatedAt: '2026-06-27T00:00:00.000Z',
@@ -228,9 +228,13 @@ describe('desktop sync attachment backends', () => {
             resolveWebdavPassword: vi.fn(),
         };
 
-        fsMocks.exists.mockImplementation(async (path: string) => path === 'C:/Temp/mindwtr-upload-test.txt');
+        // Windows profile root, so the upload-containment predicate sees the drive-letter
+        // form of the managed data dir.
+        pathMocks.dataDir.mockResolvedValue('C:\\app-data');
+        const relativePath = 'mindwtr\\attachments\\mindwtr-upload-test.txt';
+        fsMocks.exists.mockImplementation(async (path: string) => path === relativePath);
         fsMocks.readFile.mockImplementation(async (path: string) => {
-            if (path !== 'C:/Temp/mindwtr-upload-test.txt') {
+            if (path !== relativePath) {
                 throw new Error('unexpected path ' + path);
             }
             return bytes;
@@ -246,8 +250,10 @@ describe('desktop sync attachment backends', () => {
         ).resolves.toBe(true);
 
         const attachment = appData.tasks[0].attachments?.[0];
-        expect(fsMocks.exists).toHaveBeenCalledWith('C:/Temp/mindwtr-upload-test.txt');
-        expect(fsMocks.readFile).toHaveBeenCalledWith('C:/Temp/mindwtr-upload-test.txt');
+        // Inside the profile root, so the read is scoped to the data dir; the drive-letter
+        // form still has to be recognised as such for that to happen at all.
+        expect(fsMocks.exists).toHaveBeenCalledWith(relativePath, { baseDir: fsMocks.BaseDirectory.Data });
+        expect(fsMocks.readFile).toHaveBeenCalledWith(relativePath, { baseDir: fsMocks.BaseDirectory.Data });
         expect(fetcher).toHaveBeenCalledWith(
             'http://cloud.local/v1/attachments/attachment-1.txt',
             expect.objectContaining({ method: 'PUT' }),
@@ -375,8 +381,13 @@ describe('desktop sync attachment backends', () => {
         );
         expect(appData.tasks[0].attachments?.[0]?.cloudKey).toBe('attachments/attachment-1.txt');
         expect(mutated).toBe(true);
-        // The sync folder is only ever touched off the main thread (#1037).
-        expect(fsMocks.exists).not.toHaveBeenCalled();
+        // The sync folder is only ever touched off the main thread (#1037). The fs
+        // plugin is still how the app reads its OWN data dir, so the assertion names
+        // the sync folder rather than banning the plugin outright.
+        expect(fsMocks.exists).not.toHaveBeenCalledWith(
+            expect.stringContaining('/candidate-sync'),
+            expect.anything(),
+        );
         expect(fsMocks.mkdir).not.toHaveBeenCalled();
     });
 
@@ -390,13 +401,18 @@ describe('desktop sync attachment backends', () => {
             resolveWebdavPassword: vi.fn(),
         };
         syncFsMocks.exists.mockResolvedValue(false);
+        fsMocks.exists.mockResolvedValue(false);
 
         await syncFileAttachments(appData, '/candidate-sync', deps);
 
         expect(appData.tasks[0].attachments?.[0]?.cloudKey).toBe('attachments/attachment-1.txt');
         expect(fsMocks.writeFile).not.toHaveBeenCalled();
-        // The sync folder is only ever stat'd off the main thread (#1037).
-        expect(fsMocks.exists).not.toHaveBeenCalled();
+        // The sync folder is only ever stat'd off the main thread (#1037); reads of the
+        // app's own data dir legitimately go through the fs plugin.
+        expect(fsMocks.exists).not.toHaveBeenCalledWith(
+            expect.stringContaining('/candidate-sync'),
+            expect.anything(),
+        );
         expect(fsMocks.mkdir).not.toHaveBeenCalled();
     });
 
@@ -480,7 +496,7 @@ describe('desktop sync attachment backends', () => {
                         id: `attachment-${index}`,
                         kind: 'file',
                         title: `file-${index}.txt`,
-                        uri: `/data/file-${index}.txt`,
+                        uri: `/app-data/mindwtr/attachments/file-${index}.txt`,
                         createdAt: '2026-06-27T00:00:00.000Z',
                         updatedAt: '2026-06-27T00:00:00.000Z',
                     },
@@ -551,6 +567,37 @@ describe('desktop sync attachment backends', () => {
             expect.objectContaining({ method: 'PUT' }),
         );
         expect(result?.tasks[0].attachments?.[0]?.cloudKey).toBe('attachments/attachment-1.txt');
+    });
+
+    it('never reads or uploads an attachment whose uri points outside the profile (SEC-07)', async () => {
+        // A hostile sync document can put any absolute path in `uri` — it survives the
+        // merge sanitizer, which only rejects traversal segments.
+        const fetcher = vi.fn(async (_url: string, _init?: RequestInit) => new Response(null, { status: 200 }));
+        const appData = createCandidateAttachmentData();
+        appData.tasks[0].attachments![0].uri = '/home/alice/.ssh/id_rsa';
+        appData.tasks[0].attachments![0].cloudKey = undefined;
+        const deps: AttachmentBackendDeps = {
+            getTauriFetch: async () => fetcher as unknown as typeof fetch,
+            isTauriRuntimeEnv: () => true,
+            logSyncInfo: vi.fn(),
+            logSyncWarning: vi.fn(),
+            resolveWebdavPassword: vi.fn(async () => 'secret'),
+        };
+        fsMocks.exists.mockResolvedValue(true);
+        fsMocks.readFile.mockResolvedValue(new Uint8Array([1, 2, 3]));
+        coreMocks.webdavFileExists.mockResolvedValue(true);
+
+        await syncWebdavAttachments(
+            appData,
+            { url: 'https://dav.example/mindwtr', username: 'alice' },
+            'https://dav.example/mindwtr',
+            deps,
+        );
+
+        expect(fsMocks.readFile).not.toHaveBeenCalled();
+        const putCalls = fetcher.mock.calls.filter(([, init]) => (init as RequestInit)?.method === 'PUT');
+        expect(putCalls).toHaveLength(0);
+        expect(appData.tasks[0].attachments?.[0]?.cloudKey).toBeUndefined();
     });
 
     describe('check-on-touch content change detection (#1057)', () => {

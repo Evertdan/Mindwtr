@@ -9,6 +9,7 @@ import {
   buildCloudKey,
   collectAttachments,
   DEFAULT_CONTENT_TYPE,
+  canUploadAttachmentFrom,
   DROPBOX_ATTACHMENT_MAX_DOWNLOADS_PER_SYNC,
   DROPBOX_ATTACHMENT_MAX_UPLOADS_PER_SYNC,
   extractExtension,
@@ -101,7 +102,8 @@ export const syncDropboxAttachments = async (
       didMutate = true;
     }
 
-    if (!attachment.cloudKey && hasLocalPath && existsLocally && !isHttp) {
+    // SEC-07: same containment the shared lifecycle applies via `canUploadFrom`.
+    if (!attachment.cloudKey && hasLocalPath && existsLocally && !isHttp && canUploadAttachmentFrom(uri)) {
       if (!options.activationProbe && uploadCount >= DROPBOX_ATTACHMENT_MAX_UPLOADS_PER_SYNC) {
         if (!uploadLimitLogged) {
           uploadLimitLogged = true;
