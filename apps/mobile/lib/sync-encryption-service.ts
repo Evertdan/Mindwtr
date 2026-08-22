@@ -42,6 +42,7 @@ import { createFileSyncEncryptionRemotePort } from './storage-file-encryption';
 import { getMobileWebDavRequestOptions } from './webdav-request-options';
 import { mobileSyncCryptoPrimitives } from './sync-crypto-native';
 import {
+    flushSyncEncryptionLocalState,
     getMobileSyncEncryptionStatus,
     syncEncryptionKeyCache,
     syncEncryptionLocalState,
@@ -224,6 +225,9 @@ export const enableSyncEncryption = async (
         options.onProgress,
         mobileSyncCryptoPrimitives,
     );
+    // The port's write is fire-and-forget by shape; the transition is not done until the state
+    // that survives a restart has actually landed.
+    await flushSyncEncryptionLocalState();
 });
 
 export const disableSyncEncryption = async (
@@ -238,6 +242,9 @@ export const disableSyncEncryption = async (
         options.onProgress,
         mobileSyncCryptoPrimitives,
     );
+    // The port's write is fire-and-forget by shape; the transition is not done until the state
+    // that survives a restart has actually landed.
+    await flushSyncEncryptionLocalState();
 });
 
 export const changeSyncEncryptionPassphrase = async (
@@ -256,6 +263,9 @@ export const changeSyncEncryptionPassphrase = async (
         options.onProgress,
         mobileSyncCryptoPrimitives,
     );
+    // The port's write is fire-and-forget by shape; the transition is not done until the state
+    // that survives a restart has actually landed.
+    await flushSyncEncryptionLocalState();
 });
 
 export const provideSyncEncryptionPassphrase = async (
@@ -263,7 +273,7 @@ export const provideSyncEncryptionPassphrase = async (
 ): Promise<'ok' | 'wrong-passphrase'> => runSerializedSyncDocumentOperation(async () => {
     await loadSyncEncryptionLocalState();
     const port = await requireTransitionPort(null);
-    return runProvideSyncEncryptionPassphraseOverRemote(
+    const outcome = await runProvideSyncEncryptionPassphraseOverRemote(
         passphrase,
         SYNC_FILE_NAME,
         port,
@@ -271,6 +281,8 @@ export const provideSyncEncryptionPassphrase = async (
         syncEncryptionLocalState,
         mobileSyncCryptoPrimitives,
     );
+    await flushSyncEncryptionLocalState();
+    return outcome;
 });
 
 /** "Not now". Re-affirms the persisted no-key state; automatic and background sync stay
@@ -278,6 +290,7 @@ export const provideSyncEncryptionPassphrase = async (
 export const declineSyncEncryptionPassphrase = async (): Promise<void> => {
     await loadSyncEncryptionLocalState();
     reaffirmRemoteEncryptionNoKey(syncEncryptionLocalState);
+    await flushSyncEncryptionLocalState();
 };
 
 export const __syncEncryptionServiceTestUtils = { buildTransitionEntries, createDropboxRemotePort, createWebdavRemotePort };

@@ -158,6 +158,7 @@ import {
   syncEncryptionKeyCache,
   syncEncryptionLocalState,
 } from './sync-encryption-state';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { runSerializedSyncDocumentOperation } from '@mindwtr/core';
 import {
   disableSyncEncryption,
@@ -551,6 +552,36 @@ describe('File Sync transitions through core orchestration', () => {
 });
 
 describe('local-state persistence and the remote-plaintext state', () => {
+  /** A store whose write actually takes a tick — the real AsyncStorage shape, and the one a
+   *  fire-and-forget `void persist` silently outruns. */
+  const deferNextStoreWrite = () => {
+    vi.mocked(AsyncStorage.setItem).mockImplementationOnce(async (key: string, value: string) => {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      asyncStorage.set(key, value);
+    });
+  };
+
+  it('B4: an awaited transition does not return before its persisted state has landed', async () => {
+    asyncStorage.set(SYNC_BACKEND_KEY, 'file');
+    asyncStorage.set(SYNC_PATH_KEY, SYNC_URI);
+    fs.files.set(SYNC_URI, new TextEncoder().encode(JSON.stringify(appData('before'), null, 2)));
+    deferNextStoreWrite();
+
+    await enableSyncEncryption(PASSPHRASE);
+
+    expect(JSON.parse(asyncStorage.get(SYNC_ENCRYPTION_STATE_KEY)!)).toMatchObject({ state: 'enabled' });
+  }, 30_000);
+
+  it('B4: flush awaits a write queued directly through the port', async () => {
+    deferNextStoreWrite();
+    syncEncryptionLocalState.write({ state: 'enabled', discoveredSalt: 'aabb', discoveredParams: FAST_PARAMS });
+    expect(asyncStorage.get(SYNC_ENCRYPTION_STATE_KEY)).toBeUndefined();
+
+    await flushSyncEncryptionLocalState();
+
+    expect(JSON.parse(asyncStorage.get(SYNC_ENCRYPTION_STATE_KEY)!)).toMatchObject({ state: 'enabled' });
+  });
+
   it('File Sync: a keyed device treats a peer-disabled folder as terminal, not as an empty folder', async () => {
     // The inverse of `discoverEncryptedSyncFolder`: a peer ran the disable transition, so the
     // `.enc` artifact is gone and the plaintext original is back.
