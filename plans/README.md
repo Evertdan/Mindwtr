@@ -66,22 +66,22 @@ Selection non-interactive: every HIGH-confidence actionable finding became a pla
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 019 | cloud-server-integrity | P1 | S | — | TODO |
-| 020 | core-store-write-integrity | P1 | M | — | TODO |
-| 021 | delete-vs-live-revision | P1 | M | — | TODO |
-| 022 | sync-orchestrator-rejections | P1 | S | — | TODO |
-| 023 | fts-search-quoting | P1 | S | — | TODO |
-| 024 | attachment-integrity | P1 | L | — | TODO |
-| 025 | android-component-security | P1 | M | — | TODO |
-| 026 | network-policy | P2 | M | — | TODO |
-| 027 | mcp-hardening-2 | P1 | M | — | TODO |
-| 028 | desktop-native-hardening-2 | P1 | M | — | TODO |
-| 029 | core-input-hardening | P2 | M | — | TODO |
-| 030 | batch-update-perf | P1 | S | — | TODO |
-| 031 | mobile-test-integrity | P2 | M | 024 (soft) | TODO |
-| 032 | dx-batch-2 | P2 | M | DX-01 lands first & alone | TODO |
-| 033 | docs-batch-2 | P2 | M | — | TODO |
-| 034 | csv-recurrence | P2 | M | — | TODO |
+| 019 | cloud-server-integrity | P1 | S | — | DONE |
+| 020 | core-store-write-integrity | P1 | M | — | DONE |
+| 021 | delete-vs-live-revision | P1 | M | — | BLOCKED (ADR 0007 records the outside-window rule as deliberate; fixtures pinned; superseding ADR = maintainer decision) |
+| 022 | sync-orchestrator-rejections | P1 | S | — | DONE |
+| 023 | fts-search-quoting | P1 | S | — | DONE |
+| 024 | attachment-integrity | P1 | L | — | DONE (SEC-07 partial on mobile: migration pre-pass provenance is an open design decision) |
+| 025 | android-component-security | P1 | M | — | DONE (SEC-03 permission half declined: exported receiver is documented public API; rate limit shipped) |
+| 026 | network-policy | P2 | M | — | DONE (+ in-window fix: cloud attachment downloads decrypt before validating) |
+| 027 | mcp-hardening-2 | P1 | M | — | DONE (npm release owed for the fixes to reach users) |
+| 028 | desktop-native-hardening-2 | P1 | M | — | DONE |
+| 029 | core-input-hardening | P2 | M | — | DONE (BUG-12: real win needs an incremental hash API in uuid.ts — follow-up) |
+| 030 | batch-update-perf | P1 | S | — | DONE (50k-task batch move ~11s → ~0.6s) |
+| 031 | mobile-test-integrity | P2 | M | 024 (soft) | DONE |
+| 032 | dx-batch-2 | P2 | M | DX-01 lands first & alone | DONE |
+| 033 | docs-batch-2 | P2 | M | — | DONE |
+| 034 | csv-recurrence | P2 | M | — | DONE |
 
 Dependency notes: 031 after 024 (shared vi.mock idiom for un-stubbing); 032's DX-01 (lockfile) lands as an isolated commit before other work touches node_modules; 024 items 1→5→8→9 are ordered internally.
 
