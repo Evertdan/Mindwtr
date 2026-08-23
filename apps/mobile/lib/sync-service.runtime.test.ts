@@ -773,6 +773,10 @@ describe('mobile sync-service runtime', () => {
           kind: 'file',
           title: 'Old file',
           uri: 'file://document/old-file.txt',
+          // The remote-visible cleanup change is the cloudKey clearing after a
+          // successful remote delete; the record itself stays as a tombstone
+          // the union merge cannot resurrect (#1064).
+          cloudKey: 'attachments/old-file.txt',
           createdAt: '2026-04-01T00:00:00.000Z',
           updatedAt: '2026-04-01T00:00:00.000Z',
           deletedAt: '2026-04-01T00:00:00.000Z',
@@ -792,7 +796,11 @@ describe('mobile sync-service runtime', () => {
 
     expect(result).toEqual({ success: true, stats: emptyStats });
     const lastSaved = storageMocks.saveData.mock.calls.at(-1)?.[0] as AppData | undefined;
-    expect(lastSaved?.tasks[0]?.attachments).toEqual([]);
+    const savedAttachment = lastSaved?.tasks[0]?.attachments?.[0];
+    expect(savedAttachment?.id).toBe('attachment-1');
+    expect(savedAttachment?.deletedAt).toBe('2026-04-01T00:00:00.000Z');
+    expect(savedAttachment?.cloudKey).toBeUndefined();
+    expect(savedAttachment?.localStatus).toBe('missing');
     expect(asyncStorageMocks.setItem.mock.calls.some(([key]) => key === '@mindwtr_fast_sync_state_v1')).toBe(false);
   });
 
