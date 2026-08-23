@@ -14,11 +14,13 @@ export const isEncryptionCapableBackend = (backend: SyncBackend, cloudProvider: 
     backend === 'file' || backend === 'webdav' || (backend === 'cloud' && cloudProvider === 'dropbox')
 );
 
-// The current passphrase is verified before anything is rewrapped, so a rotation
-// failure is a mistyped passphrase far more often than a broken folder. Disable is
-// the opposite: it cannot self-heal a folder an interrupted rotation left on two
-// salts, and the only way out is to finish the rotation first.
-const classifyFailure = (error: unknown, terminal: SyncEncryptionErrorKind): SyncEncryptionErrorKind => {
+// A mistyped current passphrase is caught by the explicit verify below and
+// carries its own sentinel — by the time the rotation itself fails, the
+// passphrase has already been proven, so blaming it is a lie the reporter of
+// #1056 nearly chased. Rotation failures fall through to the generic message.
+// Disable stays special: it cannot self-heal a folder an interrupted rotation
+// left on two salts, and the only way out is to finish the rotation first.
+export const classifyFailure = (error: unknown, terminal: SyncEncryptionErrorKind): SyncEncryptionErrorKind => {
     const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
     if (message.includes('SYNC_ENCRYPTION_WRONG_PASSPHRASE')) return 'wrong-passphrase';
     return isSyncEncryptionFailure(error) ? terminal : 'generic';
@@ -95,7 +97,7 @@ export function useSyncEncryptionSettings(
 
     const changePassphrase = useCallback((current: string, next: string) => run(
         (onProgress) => SyncService.changeSyncEncryptionPassphrase(current, next, onProgress),
-        'wrong-passphrase',
+        'generic',
     ), [run]);
 
     const unlock = useCallback(async (passphrase: string): Promise<boolean> => {

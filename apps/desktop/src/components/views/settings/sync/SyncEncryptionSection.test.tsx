@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { SyncBackend } from '@mindwtr/core';
+import { SyncCryptoAuthError, SyncEncryptionTerminalError, type SyncBackend } from '@mindwtr/core';
 
 import { getEnglishSettingsLabels } from '../labels';
 import { SyncEncryptionSection } from './SyncEncryptionSection';
-import { isEncryptionCapableBackend } from './useSyncEncryptionSettings';
+import { classifyFailure, isEncryptionCapableBackend } from './useSyncEncryptionSettings';
 import type { SyncEncryptionController } from './types';
 
 const t = getEnglishSettingsLabels();
@@ -222,5 +222,21 @@ describe('SyncEncryptionSection', () => {
         expect(screen.getByLabelText(t.syncEncryptionPassphrase)).toHaveAttribute('type', 'password');
         fireEvent.click(screen.getAllByRole('button', { name: t.syncEncryptionShowPassphrase })[0]);
         expect(screen.getByLabelText(t.syncEncryptionPassphrase)).toHaveAttribute('type', 'text');
+    });
+});
+
+describe('classifyFailure', () => {
+    // Only the explicit verify sentinel may blame the passphrase: by the time a
+    // rotation fails, the current passphrase has already been proven (#1056).
+    it('blames the passphrase only on the verify sentinel, not on rotation failures', () => {
+        expect(classifyFailure(new Error('SYNC_ENCRYPTION_WRONG_PASSPHRASE'), 'generic')).toBe('wrong-passphrase');
+        expect(
+            classifyFailure(new SyncEncryptionTerminalError(new SyncCryptoAuthError()), 'generic'),
+        ).toBe('generic');
+        expect(classifyFailure(new Error('disk full'), 'generic')).toBe('generic');
+        // Disable keeps its terminal mapping: the remedy really is rotation-first.
+        expect(
+            classifyFailure(new SyncEncryptionTerminalError(new SyncCryptoAuthError()), 'rotation-first'),
+        ).toBe('rotation-first');
     });
 });
