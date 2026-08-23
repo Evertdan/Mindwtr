@@ -6,6 +6,7 @@ Changes collected after `v1.2.1` and before the next version tag.
 
 ## Full Change List
 
+- iOS: capture from the Lock Screen — a new "Add Task" Lock Screen widget opens quick capture directly, and on iOS 18 an "Add Task" control can replace one of the two Lock Screen bottom buttons or live in Control Center. (#1066)
 - Removing an attachment now deletes its local and synced file copies on the next sync cycle instead of leaving them until a once-a-day cleanup pass. (#1064)
 - Removing an attachment no longer causes recurring "Sync conflict resolved" notices: the removal is now recorded in a form every synced device agrees on, instead of a deletion the next merge kept resurrecting. (#1064)
 - Calendar push on iOS and macOS: a task due on a single day without a time now lands as a one-day all-day event instead of spanning into the next day — visible in Google Calendar and any other account synced through the system calendar. (#1065)

@@ -10,22 +10,35 @@ const sourcePath = path.join(
 );
 const source = fs.readFileSync(sourcePath, 'utf8');
 
+// The widget extension declares AppIntents too (the iOS 18 capture control),
+// so its sources carry the same iOS 26 supportedModes archive hazard.
+const widgetsDir = path.join(repoRoot, 'apps/mobile/widgets-ios');
+const widgetSources = fs
+  .readdirSync(widgetsDir)
+  .filter((name) => name.endsWith('.swift'))
+  .map((name) => ({
+    label: `widgets-ios/${name}`,
+    text: fs.readFileSync(path.join(widgetsDir, name), 'utf8'),
+  }));
+
 const supportedModesMatches = source.match(/static\s+var\s+supportedModes\s*:\s*IntentModes/g) || [];
 if (supportedModesMatches.length === 0) {
   console.error('Expected at least one AppIntent supportedModes declaration.');
   process.exit(1);
 }
 
-const guardedSupportedModesMatches = source.match(
-  /#if compiler\(>=6\.0\)\s*\n\s*@available\(iOS 26\.0, \*\)\s*\n\s*static\s+var\s+supportedModes\s*:\s*IntentModes\s*\{/g
-) || [];
-
-if (guardedSupportedModesMatches.length !== supportedModesMatches.length) {
-  console.error(
-    `Every AppIntent supportedModes declaration must be guarded; found ${guardedSupportedModesMatches.length} guarded of ${supportedModesMatches.length}.`
-  );
-  console.error('IntentModes is iOS 26-only and the release archive targets older iOS versions.');
-  process.exit(1);
+for (const { label, text } of [{ label: 'ios-app-intents/MindwtrSiriCaptureIntents.swift', text: source }, ...widgetSources]) {
+  const declared = text.match(/static\s+var\s+supportedModes\s*:\s*IntentModes/g) || [];
+  const guarded = text.match(
+    /#if compiler\(>=6\.0\)\s*\n\s*@available\(iOS 26\.0, \*\)\s*\n\s*static\s+var\s+supportedModes\s*:\s*IntentModes\s*\{/g
+  ) || [];
+  if (guarded.length !== declared.length) {
+    console.error(
+      `Every AppIntent supportedModes declaration in ${label} must be guarded; found ${guarded.length} guarded of ${declared.length}.`
+    );
+    console.error('IntentModes is iOS 26-only and the release archive targets older iOS versions.');
+    process.exit(1);
+  }
 }
 
 const appShortcutPhrases = source.match(/phrases:\s*\[[\s\S]*?\]/g) || [];
