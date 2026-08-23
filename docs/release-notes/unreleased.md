@@ -6,6 +6,7 @@ Changes collected after `v1.2.1` and before the next version tag.
 
 ## Full Change List
 
+- Mobile: tapping "More options" while processing the inbox now scrolls down to the options it reveals, the same way answering a processing question already follows the next step down.
 - Desktop: a startup abort from the fail-closed credential recovery now writes its reason to mindwtr.log first — previously the app could exit with no window and no trace of why. (#1064)
 - iOS: capture from the Lock Screen — a new "Add Task" Lock Screen widget opens quick capture directly, and on iOS 18 an "Add Task" control can replace one of the two Lock Screen bottom buttons or live in Control Center. (#1066)
 - Removing an attachment now deletes its local and synced file copies on the next sync cycle instead of leaving them until a once-a-day cleanup pass. (#1064)

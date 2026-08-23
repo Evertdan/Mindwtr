@@ -348,6 +348,15 @@ export function useInboxProcessingController({
     if (choice) scrollProcessingToRevealedStep();
   }, [scrollProcessingToRevealedStep]);
 
+  // "More options" reveals below the fold exactly like answering a question
+  // does, so expanding follows the reveal down too; collapsing stays put.
+  const toggleAdvancedOptions = useCallback(() => {
+    setShowAdvancedOptions((previous) => {
+      if (!previous) scrollProcessingToRevealedStep();
+      return !previous;
+    });
+  }, [scrollProcessingToRevealedStep]);
+
   const formatScheduledDateValue = useCallback((date: Date, forceDateOnly: boolean = false): string => {
     const dateOnlyValue = safeFormatDate(date, 'yyyy-MM-dd');
     return defaultScheduleTime && !forceDateOnly ? `${dateOnlyValue}T${defaultScheduleTime}` : dateOnlyValue;
@@ -1221,6 +1230,7 @@ export function useInboxProcessingController({
     setShowReviewDatePicker,
     setShowStartDatePicker,
     setShowAdvancedOptions,
+    toggleAdvancedOptions,
     showDelegateDatePicker,
     showAreaField,
     showAssignedToField,

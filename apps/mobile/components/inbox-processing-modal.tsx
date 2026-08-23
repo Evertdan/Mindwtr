@@ -120,7 +120,7 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
     setShowDueDatePicker,
     setShowReviewDatePicker,
     setShowStartDatePicker,
-    setShowAdvancedOptions,
+    toggleAdvancedOptions,
     setTwoMinuteChoice,
     showDelegateDatePicker,
     showAreaField,
@@ -413,7 +413,7 @@ export function InboxProcessingModal({ visible, onClose }: InboxProcessingModalP
                   <TouchableOpacity
                     accessibilityRole="button"
                     accessibilityState={{ expanded: showAdvancedOptions }}
-                    onPress={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                    onPress={toggleAdvancedOptions}
                     style={[styles.advancedOptionsButton, { borderColor: tc.border, backgroundColor: tc.cardBg }]}
                   >
                     <Text style={[styles.advancedOptionsText, { color: tc.text }]}>
