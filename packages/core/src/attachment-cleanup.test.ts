@@ -4,11 +4,10 @@ import {
     findDeletedAttachmentsForFileCleanup,
     findLiveAttachmentResourceReferences,
     findOrphanedAttachments,
+    hasFreshAttachmentCleanupWork,
     isAttachmentCloudResourceReferenced,
     isAttachmentLocalResourceReferenced,
     PENDING_REMOTE_ATTACHMENT_DELETE_MAX_ATTEMPTS,
-    removeAttachmentsByIdFromData,
-    removeOrphanedAttachmentsFromData,
     runAttachmentCleanupLifecycle,
 } from './attachment-cleanup';
 import type { AppData } from './types';
@@ -394,8 +393,62 @@ describe('findLiveAttachmentResourceReferences', () => {
     });
 });
 
-describe('removeOrphanedAttachmentsFromData', () => {
-    it('removes orphaned attachments from tasks and projects', () => {
+describe('hasFreshAttachmentCleanupWork', () => {
+    const now = '2026-07-14T12:00:00.000Z';
+    const fileTombstone = (overrides: Record<string, unknown> = {}) => ({
+        id: 'a1',
+        kind: 'file' as const,
+        title: 'file',
+        uri: '/managed/file.pdf',
+        createdAt: now,
+        updatedAt: now,
+        deletedAt: now,
+        ...overrides,
+    });
+    const withTaskAttachment = (attachment: Record<string, unknown>, taskOverrides: Record<string, unknown> = {}): AppData => {
+        const data = buildData();
+        data.tasks.push({
+            id: 't1',
+            title: 'Task',
+            status: 'next',
+            contexts: [],
+            createdAt: now,
+            updatedAt: now,
+            attachments: [attachment],
+            ...taskOverrides,
+        } as AppData['tasks'][number]);
+        return data;
+    };
+
+    it('fires for an unprocessed file tombstone and goes quiet once stamped and cleared', () => {
+        expect(hasFreshAttachmentCleanupWork(withTaskAttachment(fileTombstone({ cloudKey: 'attachments/file.pdf' })))).toBe(true);
+        expect(hasFreshAttachmentCleanupWork(
+            withTaskAttachment(fileTombstone({ localStatus: 'missing', cloudKey: undefined })),
+        )).toBe(false);
+    });
+
+    it('fires for a stamped tombstone whose cloud key is not covered by a pending delete', () => {
+        const uncovered = withTaskAttachment(fileTombstone({ localStatus: 'missing', cloudKey: 'attachments/file.pdf' }));
+        expect(hasFreshAttachmentCleanupWork(uncovered)).toBe(true);
+
+        const covered = withTaskAttachment(fileTombstone({ localStatus: 'missing', cloudKey: 'attachments/file.pdf' }));
+        covered.settings.attachments = {
+            pendingRemoteDeletes: [{ cloudKey: 'attachments/file.pdf', attempts: 1 }],
+        };
+        expect(hasFreshAttachmentCleanupWork(covered)).toBe(false);
+    });
+
+    it('fires for records on purged parents and ignores live attachments', () => {
+        expect(hasFreshAttachmentCleanupWork(withTaskAttachment(
+            fileTombstone({ deletedAt: undefined }),
+            { status: 'done', deletedAt: now, purgedAt: now },
+        ))).toBe(true);
+        expect(hasFreshAttachmentCleanupWork(withTaskAttachment(fileTombstone({ deletedAt: undefined })))).toBe(false);
+    });
+});
+
+describe('legacy record removal coverage', () => {
+    it('removal now reaches only purged-parent records through applyAttachmentCleanupResult', () => {
         const data: AppData = {
             tasks: [
                 {
@@ -445,70 +498,60 @@ describe('removeOrphanedAttachmentsFromData', () => {
             settings: {},
         };
 
-        const cleaned = removeOrphanedAttachmentsFromData(data);
+        const cleaned = applyAttachmentCleanupResult(data, {
+            lastCleanupAt: new Date().toISOString(),
+            removableAttachmentIds: ['a1'],
+            processedFileTombstoneIds: ['a2'],
+        });
+        // The purged-parent record goes; the live-parent tombstone stays (a peer
+        // would resurrect it through the union merge) and is stamped instead.
         expect(cleaned.tasks[0].attachments).toHaveLength(0);
-        expect(cleaned.projects[0].attachments).toHaveLength(0);
+        expect(cleaned.projects[0].attachments?.map((attachment) => attachment.id)).toEqual(['a2']);
+        expect(cleaned.projects[0].attachments?.[0]?.localStatus).toBe('missing');
     });
-});
 
-describe('removeAttachmentsByIdFromData', () => {
-    it('removes only requested attachments', () => {
-        const data: AppData = {
-            tasks: [
+    it('clears cloud keys only on deleted records and bumps their updatedAt', () => {
+        const stamp = '2026-07-14T12:00:00.000Z';
+        const data = buildData();
+        data.tasks.push({
+            id: 't1',
+            title: 'Task',
+            status: 'next',
+            contexts: [],
+            createdAt: stamp,
+            updatedAt: stamp,
+            attachments: [
                 {
-                    id: 't1',
-                    title: 'Task',
-                    status: 'inbox',
-                    contexts: [],
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                    attachments: [
-                        {
-                            id: 'keep-task',
-                            kind: 'file',
-                            title: 'keep-task',
-                            uri: '/tmp/keep-task',
-                            createdAt: new Date().toISOString(),
-                            updatedAt: new Date().toISOString(),
-                        },
-                        {
-                            id: 'drop-task',
-                            kind: 'file',
-                            title: 'drop-task',
-                            uri: '/tmp/drop-task',
-                            createdAt: new Date().toISOString(),
-                            updatedAt: new Date().toISOString(),
-                        },
-                    ],
+                    id: 'tombstone',
+                    kind: 'file',
+                    title: 'tombstone',
+                    uri: '',
+                    cloudKey: 'attachments/shared.pdf',
+                    createdAt: stamp,
+                    updatedAt: stamp,
+                    deletedAt: stamp,
+                },
+                {
+                    id: 'live-twin',
+                    kind: 'file',
+                    title: 'live-twin',
+                    uri: '/managed/shared.pdf',
+                    cloudKey: 'attachments/shared.pdf',
+                    createdAt: stamp,
+                    updatedAt: stamp,
                 },
             ],
-            projects: [
-                {
-                    id: 'p1',
-                    title: 'Project',
-                    status: 'active',
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                    attachments: [
-                        {
-                            id: 'drop-project',
-                            kind: 'file',
-                            title: 'drop-project',
-                            uri: '/tmp/drop-project',
-                            createdAt: new Date().toISOString(),
-                            updatedAt: new Date().toISOString(),
-                        },
-                    ],
-                },
-            ],
-            sections: [],
-            areas: [],
-            settings: {},
-        };
+        });
 
-        const cleaned = removeAttachmentsByIdFromData(data, ['drop-task', 'drop-project']);
-        expect(cleaned.tasks[0].attachments?.map((attachment) => attachment.id)).toEqual(['keep-task']);
-        expect(cleaned.projects[0].attachments ?? []).toHaveLength(0);
+        const cleaned = applyAttachmentCleanupResult(data, {
+            lastCleanupAt: '2026-07-15T00:00:00.000Z',
+            clearedCloudKeys: ['attachments/shared.pdf'],
+        });
+        const [tombstone, liveTwin] = cleaned.tasks[0].attachments ?? [];
+        expect(tombstone?.cloudKey).toBeUndefined();
+        expect(tombstone?.updatedAt).toBe('2026-07-15T00:00:00.000Z');
+        expect(liveTwin?.cloudKey).toBe('attachments/shared.pdf');
+        expect(liveTwin?.updatedAt).toBe(stamp);
     });
 });
 
@@ -540,6 +583,7 @@ describe('applyAttachmentCleanupResult', () => {
         const cleaned = applyAttachmentCleanupResult(data, {
             lastCleanupAt: '2026-01-02T00:00:00.000Z',
             orphanedAttachments: orphaned,
+            removableAttachmentIds: orphaned.map((attachment) => attachment.id),
             pendingRemoteDeletes: [{ cloudKey: 'attachments/missing.txt', attempts: 1 }],
         });
 
@@ -618,6 +662,7 @@ describe('applyAttachmentCleanupResult', () => {
             lastCleanupAt: '2026-01-02T00:00:00.000Z',
             orphanedAttachments: findOrphanedAttachments(data),
             processedOrphanedIds: ['processed'],
+            removableAttachmentIds: ['processed'],
             reachedBatchLimit: true,
         });
 
@@ -628,6 +673,106 @@ describe('applyAttachmentCleanupResult', () => {
 
 describe('runAttachmentCleanupLifecycle', () => {
     const now = '2026-07-14T12:00:00.000Z';
+
+    it('keeps a soft-deleted record as a tombstone and goes quiet once processed (#1064)', async () => {
+        // Removing the record never stuck: the merge unions attachments by id,
+        // so a peer's copy resurrected it next cycle and the conflict + cleanup
+        // pass repeated forever. The record must survive as a tombstone with
+        // processed-markers instead.
+        const data = buildData();
+        data.tasks.push({
+            id: 'live-task',
+            title: 'Live',
+            status: 'next',
+            contexts: [],
+            createdAt: now,
+            updatedAt: now,
+            attachments: [{
+                id: 'removed',
+                kind: 'file',
+                title: 'removed',
+                uri: '/managed/removed.pdf',
+                cloudKey: 'attachments/removed.pdf',
+                createdAt: now,
+                updatedAt: now,
+                deletedAt: now,
+            }],
+        });
+        const deleteLocalAttachment = vi.fn(async () => undefined);
+        const deleteRemoteAttachment = vi.fn(async () => undefined);
+
+        expect(hasFreshAttachmentCleanupWork(data)).toBe(true);
+        const first = await runAttachmentCleanupLifecycle({
+            appData: data,
+            now: () => now,
+            deleteLocalAttachment,
+            deleteRemoteAttachment,
+        });
+
+        expect(deleteLocalAttachment).toHaveBeenCalledTimes(1);
+        expect(deleteRemoteAttachment).toHaveBeenCalledTimes(1);
+        const record = first.appData.tasks[0].attachments?.[0];
+        expect(record?.id).toBe('removed');
+        expect(record?.deletedAt).toBe(now);
+        expect(record?.localStatus).toBe('missing');
+        expect(record?.cloudKey).toBeUndefined();
+        expect(record?.updatedAt).toBe(now);
+        expect(first.shouldInvalidateFastSyncState).toBe(true);
+        expect(hasFreshAttachmentCleanupWork(first.appData)).toBe(false);
+
+        deleteLocalAttachment.mockClear();
+        deleteRemoteAttachment.mockClear();
+        const second = await runAttachmentCleanupLifecycle({
+            appData: first.appData,
+            now: () => now,
+            deleteLocalAttachment,
+            deleteRemoteAttachment,
+        });
+        expect(deleteLocalAttachment).not.toHaveBeenCalled();
+        expect(deleteRemoteAttachment).not.toHaveBeenCalled();
+        expect(second.shouldInvalidateFastSyncState).toBe(false);
+        expect(second.appData.tasks[0].attachments?.[0]?.id).toBe('removed');
+    });
+
+    it('keeps the cloud key and stays covered by the pending delete when the remote delete fails', async () => {
+        const data = buildData();
+        data.tasks.push({
+            id: 'live-task',
+            title: 'Live',
+            status: 'next',
+            contexts: [],
+            createdAt: now,
+            updatedAt: now,
+            attachments: [{
+                id: 'removed',
+                kind: 'file',
+                title: 'removed',
+                uri: '/managed/removed.pdf',
+                cloudKey: 'attachments/removed.pdf',
+                createdAt: now,
+                updatedAt: now,
+                deletedAt: now,
+            }],
+        });
+
+        const result = await runAttachmentCleanupLifecycle({
+            appData: data,
+            now: () => now,
+            deleteLocalAttachment: vi.fn(async () => undefined),
+            deleteRemoteAttachment: vi.fn(async () => {
+                throw new Error('offline');
+            }),
+        });
+
+        const record = result.appData.tasks[0].attachments?.[0];
+        expect(record?.cloudKey).toBe('attachments/removed.pdf');
+        expect(result.appData.settings.attachments?.pendingRemoteDeletes).toEqual([
+            expect.objectContaining({ cloudKey: 'attachments/removed.pdf', attempts: 1 }),
+        ]);
+        // The pending entry owns the retry cadence; the tombstone must not
+        // re-trigger an immediate pass on every sync cycle.
+        expect(hasFreshAttachmentCleanupWork(result.appData)).toBe(false);
+    });
 
     it('removes orphaned metadata without deleting resources still referenced by a live task', async () => {
         const data = buildData();

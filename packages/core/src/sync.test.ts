@@ -195,6 +195,52 @@ describe('Sync Logic', () => {
             expect((merged.tasks[0].attachments || []).map(a => a.id).sort()).toEqual(['att-incoming', 'att-local']);
         });
 
+        it('a cleanup-cleared attachment tombstone converges instead of resurrecting (#1064)', () => {
+            // Cleanup used to strip the tombstoned record from the local doc;
+            // the union merge re-imported the peer's copy every cycle, renewing
+            // an attachments conflict forever. Cleanup now keeps the tombstone
+            // and clears its cloudKey with a fresh updatedAt — that version
+            // must win the merge and the follow-up merge must be a no-op.
+            const clearedTombstone: Attachment = {
+                id: 'att-1',
+                kind: 'file',
+                title: 'doc.txt',
+                uri: '',
+                localStatus: 'missing',
+                createdAt: '2023-01-01T00:00:00.000Z',
+                updatedAt: '2023-01-03T00:00:00.000Z',
+                deletedAt: '2023-01-02T00:00:00.000Z',
+            };
+            const remoteTombstone: Attachment = {
+                id: 'att-1',
+                kind: 'file',
+                title: 'doc.txt',
+                uri: '',
+                cloudKey: 'attachments/att-1.txt',
+                createdAt: '2023-01-01T00:00:00.000Z',
+                updatedAt: '2023-01-02T00:00:00.000Z',
+                deletedAt: '2023-01-02T00:00:00.000Z',
+            };
+            const localTask: Task = {
+                ...createMockTask('1', '2023-01-02'),
+                attachments: [clearedTombstone],
+            };
+            const remoteTask: Task = {
+                ...createMockTask('1', '2023-01-02'),
+                attachments: [remoteTombstone],
+            };
+
+            const first = mergeAppDataWithStats(mockAppData([localTask]), mockAppData([remoteTask]));
+            const attachment = first.data.tasks[0].attachments?.find(a => a.id === 'att-1');
+            expect(attachment?.deletedAt).toBe('2023-01-02T00:00:00.000Z');
+            expect(attachment?.cloudKey).toBeUndefined();
+            expect(attachment?.localStatus).toBe('missing');
+
+            const second = mergeAppDataWithStats(first.data, sanitizeAppDataForRemote(first.data));
+            expect(second.stats.tasks.conflicts).toBe(0);
+            expect(second.data.tasks[0].attachments?.find(a => a.id === 'att-1')?.cloudKey).toBeUndefined();
+        });
+
         it('uses winner attachment uri when incoming wins and has a usable uri', () => {
             const localAttachment: Attachment = {
                 id: 'att-1',

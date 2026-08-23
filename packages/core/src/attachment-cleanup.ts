@@ -39,16 +39,52 @@ export function findOrphanedAttachments(appData: AppData): Attachment[] {
     return Array.from(allAttachments.values()).filter((attachment) => !activeReferenceIds.has(attachment.id));
 }
 
+/** Attachment ids whose parent task/project is purged. These records never
+ *  reach a peer (purged tombstones are compacted for the remote payload), so
+ *  removing them from the doc is the one removal sync cannot resurrect. */
+function findPurgedParentAttachmentIds(appData: AppData): Set<string> {
+    const ids = new Set<string>();
+    for (const task of appData.tasks) {
+        if (!task.purgedAt) continue;
+        for (const attachment of task.attachments || []) ids.add(attachment.id);
+    }
+    for (const project of appData.projects) {
+        if (!project.purgedAt) continue;
+        for (const attachment of project.attachments || []) ids.add(attachment.id);
+    }
+    return ids;
+}
+
 /**
- * Whether cleanup has work it should not wait the daily interval for. Orphaned
- * records (which include every soft-deleted attachment) are removed by the
- * cleanup pass itself, so their presence always means unprocessed work and
- * this goes quiet once a pass has run (#1064). Failed remote deletes move to
+ * Whether cleanup has work it should not wait the daily interval for (#1064).
+ *
+ * Soft-deleted records STAY in the doc as tombstones — removing them never
+ * stuck, because the merge unions attachments by id and the peer's copy
+ * resurrected the record next cycle, renewing an attachments conflict forever.
+ * "Processed" is therefore marked on the record instead: `localStatus`
+ * becomes 'missing' once this device has dealt with its local file (the field
+ * never syncs), and `cloudKey` is cleared once the remote copy is gone (that
+ * change syncs, so peers do not re-delete). Failed remote deletes move to
  * pendingRemoteDeletes, which deliberately waits for the interval so retries
  * don't burn the attempt budget in minutes.
  */
 export function hasFreshAttachmentCleanupWork(appData: AppData): boolean {
-    return findOrphanedAttachments(appData).length > 0;
+    const pendingCloudKeys = new Set(
+        normalizePendingRemoteDeletes(appData.settings.attachments?.pendingRemoteDeletes)
+            .map((entry) => entry.cloudKey),
+    );
+    const hasWork = (attachments: readonly Attachment[] | undefined, parentPurged: boolean): boolean => {
+        if (!attachments?.length) return false;
+        if (parentPurged) return true;
+        return attachments.some((attachment) => {
+            if (!attachment.deletedAt) return false;
+            if (attachment.kind === 'file' && attachment.localStatus !== 'missing') return true;
+            const cloudKey = sanitizeAttachmentCloudKeyForSyncMerge(attachment.cloudKey);
+            return Boolean(cloudKey && !pendingCloudKeys.has(cloudKey));
+        });
+    };
+    return appData.tasks.some((task) => hasWork(task.attachments, Boolean(task.purgedAt)))
+        || appData.projects.some((project) => hasWork(project.attachments, Boolean(project.purgedAt)));
 }
 
 export function findDeletedAttachmentsForFileCleanup(appData: AppData): Attachment[] {
@@ -168,40 +204,6 @@ export function isAttachmentCloudResourceReferenced(
     return Boolean(attachment.cloudKey && references.cloudKeys.has(attachment.cloudKey));
 }
 
-export function removeOrphanedAttachmentsFromData(appData: AppData): AppData {
-    const orphanedIds = new Set(findOrphanedAttachments(appData).map((attachment) => attachment.id));
-
-    if (orphanedIds.size === 0) return appData;
-
-    return {
-        ...appData,
-        tasks: appData.tasks.map((task) => ({
-            ...task,
-            attachments: task.attachments?.filter((attachment) => !orphanedIds.has(attachment.id)),
-        })),
-        projects: appData.projects.map((project) => ({
-            ...project,
-            attachments: project.attachments?.filter((attachment) => !orphanedIds.has(attachment.id)),
-        })),
-    };
-}
-
-export function removeAttachmentsByIdFromData(appData: AppData, attachmentIds: Iterable<string>): AppData {
-    const ids = new Set(attachmentIds);
-    if (ids.size === 0) return appData;
-
-    return {
-        ...appData,
-        tasks: appData.tasks.map((task) => ({
-            ...task,
-            attachments: task.attachments?.filter((attachment) => !ids.has(attachment.id)),
-        })),
-        projects: appData.projects.map((project) => ({
-            ...project,
-            attachments: project.attachments?.filter((attachment) => !ids.has(attachment.id)),
-        })),
-    };
-}
 
 export type AttachmentCleanupApplyResult = {
     lastCleanupAt: string;
@@ -209,6 +211,16 @@ export type AttachmentCleanupApplyResult = {
     orphanedAttachments?: readonly Attachment[];
     processedOrphanedIds?: Iterable<string>;
     reachedBatchLimit?: boolean;
+    /** Purged-parent record ids to drop from the doc — the only removal the
+     *  merge cannot resurrect (#1064). */
+    removableAttachmentIds?: Iterable<string>;
+    /** File tombstones whose local file this device has dealt with; stamped
+     *  `localStatus: 'missing'` (device-local, never syncs). */
+    processedFileTombstoneIds?: Iterable<string>;
+    /** Cloud keys whose remote copy is confirmed gone (deleted, 404, or still
+     *  referenced by a live record); cleared from tombstones with a fresh
+     *  `updatedAt` so the clear wins the per-attachment merge and syncs. */
+    clearedCloudKeys?: Iterable<string>;
 };
 
 const parseTimestampMs = (value: unknown): number | null => {
@@ -244,11 +256,36 @@ export function prunePendingRemoteAttachmentDeletes(
 }
 
 export function applyAttachmentCleanupResult(appData: AppData, result: AttachmentCleanupApplyResult): AppData {
-    const hasOrphaned = (result.orphanedAttachments?.length ?? 0) > 0;
-    const cleaned = hasOrphaned
-        ? result.reachedBatchLimit
-            ? removeAttachmentsByIdFromData(appData, result.processedOrphanedIds ?? [])
-            : removeOrphanedAttachmentsFromData(appData)
+    const removableIds = new Set(result.removableAttachmentIds ?? []);
+    const processedFileTombstoneIds = new Set(result.processedFileTombstoneIds ?? []);
+    const clearedCloudKeys = new Set(result.clearedCloudKeys ?? []);
+    const markProcessed = (attachment: Attachment): Attachment => {
+        let next = attachment;
+        if (processedFileTombstoneIds.has(attachment.id) && attachment.localStatus !== 'missing') {
+            next = { ...next, localStatus: 'missing' };
+        }
+        const cloudKey = sanitizeAttachmentCloudKeyForSyncMerge(next.cloudKey);
+        if (next.deletedAt && cloudKey && clearedCloudKeys.has(cloudKey)) {
+            next = { ...next, cloudKey: undefined, updatedAt: result.lastCleanupAt };
+        }
+        return next;
+    };
+    const cleaned = removableIds.size > 0 || processedFileTombstoneIds.size > 0 || clearedCloudKeys.size > 0
+        ? {
+            ...appData,
+            tasks: appData.tasks.map((task) => ({
+                ...task,
+                attachments: task.attachments
+                    ?.filter((attachment) => !removableIds.has(attachment.id))
+                    .map(markProcessed),
+            })),
+            projects: appData.projects.map((project) => ({
+                ...project,
+                attachments: project.attachments
+                    ?.filter((attachment) => !removableIds.has(attachment.id))
+                    .map(markProcessed),
+            })),
+        }
         : appData;
     const pendingRemoteDeletes = prunePendingRemoteAttachmentDeletes(
         result.pendingRemoteDeletes,
@@ -306,7 +343,10 @@ export async function runAttachmentCleanupLifecycle(
         : Number.POSITIVE_INFINITY;
     const reachedBatchLimit = cleanupTargets.size > maxAttachmentTargets;
     const orphanedIds = new Set(orphanedAttachments.map((attachment) => attachment.id));
+    const purgedParentAttachmentIds = findPurgedParentAttachmentIds(options.appData);
     const processedOrphanedIds = new Set<string>();
+    const processedFileTombstoneIds = new Set<string>();
+    const clearedCloudKeys = new Set<string>();
     let processedCount = 0;
 
     for (const attachment of cleanupTargets.values()) {
@@ -316,11 +356,22 @@ export async function runAttachmentCleanupLifecycle(
             processedOrphanedIds.add(attachment.id);
         }
         await options.beforeEachAttachment?.();
-        if (!isAttachmentLocalResourceReferenced(attachment, liveResourceReferences)) {
+        const alreadyStampedTombstone = Boolean(attachment.deletedAt) && attachment.localStatus === 'missing';
+        if (!alreadyStampedTombstone && !isAttachmentLocalResourceReferenced(attachment, liveResourceReferences)) {
             await options.deleteLocalAttachment(attachment);
         }
+        // Attempted counts as processed: the pre-#1064 flow dropped the record
+        // outright here, so a failed local delete was never retried either —
+        // the marker keeps that bar while letting the tombstone survive.
+        if (attachment.kind === 'file' && !purgedParentAttachmentIds.has(attachment.id)) {
+            processedFileTombstoneIds.add(attachment.id);
+        }
         const cloudKey = sanitizeAttachmentCloudKeyForSyncMerge(attachment.cloudKey);
-        if (!cloudKey || isAttachmentCloudResourceReferenced({ cloudKey }, liveResourceReferences)) {
+        if (!cloudKey) continue;
+        if (isAttachmentCloudResourceReferenced({ cloudKey }, liveResourceReferences)) {
+            // A live record shares this remote file; the tombstone must not
+            // keep pointing at it or it would re-trigger cleanup forever.
+            clearedCloudKeys.add(cloudKey);
             continue;
         }
         remoteCleanupTargets.set(cloudKey, {
@@ -352,6 +403,7 @@ export async function runAttachmentCleanupLifecycle(
         await options.beforeEachRemoteDelete?.();
         try {
             await deleteRemoteAttachment(target);
+            clearedCloudKeys.add(target.cloudKey);
         } catch (error) {
             // Freshness guards deliberately throw this sentinel. It must abort
             // the whole cycle rather than being converted into a retryable
@@ -359,6 +411,7 @@ export async function runAttachmentCleanupLifecycle(
             if (isLocalSyncAbortError(error)) throw error;
             if (getErrorStatus(error) === 404 || options.isRemoteMissingError?.(error)) {
                 options.onRemoteAttachmentMissing?.(target);
+                clearedCloudKeys.add(target.cloudKey);
                 continue;
             }
             options.onRemoteDeleteError?.(target, error);
@@ -378,12 +431,17 @@ export async function runAttachmentCleanupLifecycle(
         });
     }
 
+    const removableAttachmentIds = Array.from(processedOrphanedIds)
+        .filter((id) => purgedParentAttachmentIds.has(id));
     const appData = applyAttachmentCleanupResult(options.appData, {
         lastCleanupAt,
         orphanedAttachments,
         pendingRemoteDeletes: Array.from(nextPendingRemoteDeletesByCloudKey.values()),
         processedOrphanedIds,
         reachedBatchLimit,
+        removableAttachmentIds,
+        processedFileTombstoneIds,
+        clearedCloudKeys,
     });
 
     return {
@@ -391,9 +449,8 @@ export async function runAttachmentCleanupLifecycle(
         orphanedAttachments,
         processedOrphanedIds,
         reachedBatchLimit,
-        shouldInvalidateFastSyncState: (
-            orphanedAttachments.length > 0
-            && (!reachedBatchLimit || processedOrphanedIds.size > 0)
-        ),
+        // Only remote-visible changes need the fast unchanged-check invalidated:
+        // record removals and cloudKey clears travel; localStatus stamps never do.
+        shouldInvalidateFastSyncState: removableAttachmentIds.length > 0 || clearedCloudKeys.size > 0,
     };
 }
