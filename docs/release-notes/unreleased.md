@@ -6,6 +6,7 @@ Changes collected after `v1.2.1` and before the next version tag.
 
 ## Full Change List
 
+- Desktop: a startup abort from the fail-closed credential recovery now writes its reason to mindwtr.log first — previously the app could exit with no window and no trace of why. (#1064)
 - iOS: capture from the Lock Screen — a new "Add Task" Lock Screen widget opens quick capture directly, and on iOS 18 an "Add Task" control can replace one of the two Lock Screen bottom buttons or live in Control Center. (#1066)
 - Removing an attachment now deletes its local and synced file copies on the next sync cycle instead of leaving them until a once-a-day cleanup pass. (#1064)
 - Removing an attachment no longer causes recurring "Sync conflict resolved" notices: the removal is now recorded in a form every synced device agrees on, instead of a deletion the next merge kept resurrecting. (#1064)

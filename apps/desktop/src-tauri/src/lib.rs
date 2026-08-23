@@ -1284,9 +1284,25 @@ pub fn run() {
                     log::error!(
                         "Dropbox credential recovery required fail-closed containment: {warning}"
                     );
+                    append_native_log_line(
+                        &app.handle(),
+                        &format!(
+                            "Dropbox credential recovery required fail-closed containment: {warning}"
+                        ),
+                    );
                 }
                 Err(error) => {
+                    // The log plugin that carries log::error! is only registered at
+                    // the END of setup, and a Windows GUI process shows no stderr —
+                    // without this line the app dies with no window and no trace,
+                    // which is exactly how a fail-closed exit must not look (#1064).
                     log::error!("Dropbox credential recovery could not be contained: {error}");
+                    append_native_log_line(
+                        &app.handle(),
+                        &format!(
+                            "Startup aborted: Dropbox credential recovery could not be contained: {error}"
+                        ),
+                    );
                     return Err(std::io::Error::new(std::io::ErrorKind::Other, error).into());
                 }
             }
