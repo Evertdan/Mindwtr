@@ -481,6 +481,22 @@ describe('useRootLayoutExternalCapture', () => {
     });
   });
 
+  it('leaves the capture-quick widget link to Expo Router (#1066)', () => {
+    act(() => {
+      create(
+        <TestHarness
+          incomingUrl="mindwtr:///capture-quick?mode=text"
+          router={router}
+          showToast={showToast}
+        />
+      );
+    });
+
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.push).not.toHaveBeenCalled();
+    expect(showToast).not.toHaveBeenCalled();
+  });
+
   it('routes App Actions feature links through the feature inventory map', () => {
     act(() => {
       create(
