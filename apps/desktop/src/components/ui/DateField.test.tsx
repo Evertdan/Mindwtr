@@ -138,8 +138,8 @@ describe('DateField', () => {
         await waitFor(() => expect(input.value).toBe('04/19/2026'));
     });
 
-    it('parses year-less and 2-digit-year entry (#1050)', () => {
-        vi.useFakeTimers();
+    it('completes year-less and 2-digit-year entry only when leaving the field (#1050)', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
         vi.setSystemTime(new Date(2026, 7, 22));
         try {
             const onDateChange = vi.fn();
@@ -156,20 +156,29 @@ describe('DateField', () => {
                 />
             );
 
-            const input = screen.getByLabelText('Due');
+            const input = screen.getByLabelText('Due') as HTMLInputElement;
+            // Never mid-typing: completing "1/1" on the keystroke rewrote the
+            // text under the user and made "1/1/27" impossible to type.
             fireEvent.change(input, { target: { value: '1/1' } });
-            expect(onDateChange).toHaveBeenLastCalledWith('2027-01-01');
+            expect(onDateChange).not.toHaveBeenCalled();
+            expect(input.className).not.toContain('border-warning');
+            fireEvent.blur(input);
+            await waitFor(() => expect(onDateChange).toHaveBeenLastCalledWith('2027-01-01'));
 
             // Still ahead this year, so no rollover.
+            onDateChange.mockClear();
             fireEvent.change(input, { target: { value: '12/25' } });
-            expect(onDateChange).toHaveBeenLastCalledWith('2026-12-25');
+            fireEvent.blur(input);
+            await waitFor(() => expect(onDateChange).toHaveBeenLastCalledWith('2026-12-25'));
 
-            fireEvent.change(input, { target: { value: '4/20' } });
-            expect(onDateChange).toHaveBeenLastCalledWith('2027-04-20');
-
+            onDateChange.mockClear();
             fireEvent.change(input, { target: { value: '1/1/27' } });
-            expect(onDateChange).toHaveBeenLastCalledWith('2027-01-01');
+            expect(onDateChange).not.toHaveBeenCalled();
+            fireEvent.blur(input);
+            await waitFor(() => expect(onDateChange).toHaveBeenLastCalledWith('2027-01-01'));
 
+            // A complete date still applies while typing, no blur needed.
+            onDateChange.mockClear();
             fireEvent.change(input, { target: { value: '04/20/2026' } });
             expect(onDateChange).toHaveBeenLastCalledWith('2026-04-20');
         } finally {
@@ -177,8 +186,8 @@ describe('DateField', () => {
         }
     });
 
-    it('reads year-less entry day-first under a d/m/y format, and still rejects 31/2', () => {
-        vi.useFakeTimers();
+    it('reads year-less entry day-first under a d/m/y format, and still rejects 31/2', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
         vi.setSystemTime(new Date(2026, 7, 22));
         try {
             const onDateChange = vi.fn();
@@ -197,12 +206,18 @@ describe('DateField', () => {
 
             const input = screen.getByLabelText('Due') as HTMLInputElement;
             fireEvent.change(input, { target: { value: '20/4' } });
-            expect(onDateChange).toHaveBeenLastCalledWith('2027-04-20');
+            expect(onDateChange).not.toHaveBeenCalled();
+            fireEvent.blur(input);
+            await waitFor(() => expect(onDateChange).toHaveBeenLastCalledWith('2027-04-20'));
 
             onDateChange.mockClear();
             fireEvent.change(input, { target: { value: '31/2' } });
             expect(onDateChange).not.toHaveBeenCalled();
             expect(input.className).toContain('border-warning');
+            // An unparseable draft still reverts to the saved value on leave.
+            fireEvent.blur(input);
+            await waitFor(() => expect(input.value).toBe('19/04/2026'));
+            expect(onDateChange).not.toHaveBeenCalled();
         } finally {
             vi.useRealTimers();
         }

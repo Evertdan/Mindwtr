@@ -132,7 +132,18 @@ function formatDateInputDisplay(value: string, order: DateInputOrder, calendarSy
     return `${year}-${month}-${day}`;
 }
 
-function parseDateInputDisplay(value: string, order: DateInputOrder, calendarSystem: string): string | null {
+/**
+ * `lenient` additionally accepts year-less ("1/1") and 2-digit-year ("1/1/27")
+ * entry. Those forms only resolve when the user leaves the field: completing
+ * them on every keystroke committed a date mid-typing, which rewrote the text
+ * under the user and made "1/1/27" impossible to type (#1050).
+ */
+function parseDateInputDisplay(
+    value: string,
+    order: DateInputOrder,
+    calendarSystem: string,
+    lenient = false,
+): string | null {
     const trimmed = value.trim();
     if (!trimmed) return '';
 
@@ -156,7 +167,7 @@ function parseDateInputDisplay(value: string, order: DateInputOrder, calendarSys
 
     const parts = trimmed.match(/\d{1,4}/g);
     if (!parts) return null;
-    if (parts.length === 2) {
+    if (parts.length === 2 && lenient) {
         // ymd has no year to lead with here, so its two-part form reads month/day.
         return order === 'dmy'
             ? resolveYearlessDate(parts[1], parts[0])
@@ -178,7 +189,7 @@ function parseDateInputDisplay(value: string, order: DateInputOrder, calendarSys
     }
 
     // A 2-digit year is read as the 2000s: "1/1/27" is 2027 (#1050).
-    if (year.length === 2) year = String(2000 + Number(year));
+    if (year.length === 2 && lenient) year = String(2000 + Number(year));
     if (year.length !== 4) return null;
     const normalized = normalizeDateInputValue(
         `${year.padStart(4, '0')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
@@ -297,6 +308,19 @@ export function DateField({
         setDraftDateValue(formatDateInputDisplay(dateValue, dateInputOrder, calendarSystem));
     }, [calendarSystem, dateInputOrder, dateValue]);
 
+    /** Leaving the field completes lenient-only forms ("1/1", "1/1/27"); an
+     *  unparseable draft still reverts to the saved value. */
+    const commitOrResetFieldState = useCallback(() => {
+        const parsed = parseDateInputDisplay(draftDateValue, dateInputOrder, calendarSystem, true);
+        if (parsed && parsed !== dateValue) {
+            setIsCalendarOpen(false);
+            setAnnounceDraftInvalid(false);
+            onDateChange(parsed);
+            return;
+        }
+        resetFieldState();
+    }, [calendarSystem, dateInputOrder, dateValue, draftDateValue, onDateChange, resetFieldState]);
+
     useEffect(() => {
         setDraftDateValue(formatDateInputDisplay(dateValue, dateInputOrder, calendarSystem));
     }, [calendarSystem, dateInputOrder, dateValue]);
@@ -314,7 +338,7 @@ export function DateField({
         const handlePointerDown = (event: MouseEvent | PointerEvent | TouchEvent) => {
             const target = event.target;
             if (target instanceof Node && rootRef.current?.contains(target)) return;
-            resetFieldState();
+            commitOrResetFieldState();
         };
         const handleKeyDown = (event: globalThis.KeyboardEvent) => {
             if (event.key === 'Escape') {
@@ -337,7 +361,7 @@ export function DateField({
             window.removeEventListener('resize', handleViewportChange);
             window.removeEventListener('scroll', handleViewportChange, true);
         };
-    }, [isCalendarOpen, resetFieldState, updateCalendarPosition]);
+    }, [isCalendarOpen, commitOrResetFieldState, updateCalendarPosition]);
 
     const handleDateInputChange = (value: string) => {
         setDraftDateValue(value);
@@ -353,7 +377,7 @@ export function DateField({
     // Unparseable text never commits (blur reverts to the saved value), but
     // without a signal it looked accepted while typed (#1050).
     const isDraftInvalid = draftDateValue.trim() !== ''
-        && parseDateInputDisplay(draftDateValue, dateInputOrder, calendarSystem) === null;
+        && parseDateInputDisplay(draftDateValue, dateInputOrder, calendarSystem, true) === null;
     // The border turns while typing, but `aria-invalid` only after the field is
     // left: a half-typed date is invalid on nearly every keystroke, and flipping
     // the attribute each time makes a screen reader call the field invalid before
@@ -384,7 +408,7 @@ export function DateField({
                 runAfterPointerRelease(() => {
                     const activeElement = document.activeElement;
                     if (activeElement instanceof Node && rootRef.current?.contains(activeElement)) return;
-                    resetFieldState();
+                    commitOrResetFieldState();
                 });
             }}
         >
