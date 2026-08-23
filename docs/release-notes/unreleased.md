@@ -8,6 +8,7 @@ Changes collected after `v1.2.1` and before the next version tag.
 
 - Removing an attachment now deletes its local and synced file copies on the next sync cycle instead of leaving them until a once-a-day cleanup pass. (#1064)
 - Removing an attachment no longer causes recurring "Sync conflict resolved" notices: the removal is now recorded in a form every synced device agrees on, instead of a deletion the next merge kept resurrecting. (#1064)
+- Calendar push on iOS and macOS: a task due on a single day without a time now lands as a one-day all-day event instead of spanning into the next day — visible in Google Calendar and any other account synced through the system calendar. (#1065)
 - Desktop date fields now accept a date without a year — "1/1" means the next January 1st — and a 2-digit year, so "1/1/27" reads as 2027. (#1050)
 - Mobile reminder rescheduling no longer rewrites its stored alarms or queries the system alarm list after every edit, and very large libraries stop re-serializing the whole library for a backup they already know is too big to keep. (#766)
 - Large libraries: editing, completing, or adding a task now redraws lists noticeably faster. Sorting a list and rebuilding the counts behind it were re-reading the same dates thousands of times per keystroke-sized change; both now read each date once. (#766)

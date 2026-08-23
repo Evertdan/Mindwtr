@@ -115,6 +115,15 @@ describe('desktop calendar push sync', () => {
             endDate: '2026-01-11',
             allDay: true,
         }));
+        // EventKit counts every day the [start, end] range touches, so the
+        // instant end must stay inside the same local day (#1065) while the
+        // exclusive date-only endDate above keeps the Linux ICS path correct.
+        const details = createEvent.mock.calls[0][0];
+        const endInstant = new Date(details.end);
+        expect(endInstant.getFullYear()).toBe(2026);
+        expect(endInstant.getMonth()).toBe(0);
+        expect(endInstant.getDate()).toBe(10);
+        expect(new Date(details.start).getDate()).toBe(10);
         expect(upsertSyncEntry).toHaveBeenCalledWith(expect.objectContaining({
             taskId: 'task-1',
             calendarEventId: 'event-new',

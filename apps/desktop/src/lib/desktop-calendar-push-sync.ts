@@ -234,6 +234,12 @@ function buildAllDayBoundary(date: Date, dayOffset = 0): Date {
     return boundary;
 }
 
+function buildAllDayEndOfDay(date: Date): Date {
+    const boundary = new Date(date);
+    boundary.setHours(23, 59, 59, 0);
+    return boundary;
+}
+
 function formatLocalDateOnly(date: Date): string {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
@@ -299,7 +305,12 @@ function buildEventDetails(task: Task, target: CalendarPushTarget): SystemCalend
         calendarId: target.id,
         title,
         start: allDayStart.toISOString(),
-        end: allDayEnd.toISOString(),
+        // The two representations serve different consumers: macOS EventKit
+        // reads the instants and counts every day the range touches, so its end
+        // must land inside the same day or the event spans two days (#1065);
+        // Linux builds ICS from the date-only strings, whose DTEND is exclusive
+        // by spec and must stay the next day.
+        end: buildAllDayEndOfDay(startDate).toISOString(),
         startDate: formatLocalDateOnly(allDayStart),
         endDate: formatLocalDateOnly(allDayEnd),
         allDay: true,

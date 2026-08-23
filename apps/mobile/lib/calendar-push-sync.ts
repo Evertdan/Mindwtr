@@ -576,7 +576,13 @@ function buildEventDetails(task: Task) {
     }
 
     const startDateOnly = buildAllDayBoundary(startDate);
-    const endDate = buildAllDayBoundary(startDate, 1);
+    // Android's CalendarContract wants an EXCLUSIVE end at the next UTC
+    // midnight; EventKit counts every day the range touches, so on iOS that
+    // same end reads as a second day and Google Calendar (synced through the
+    // iOS account) shows a two-day event (#1065). iOS ends inside the day.
+    const endDate = Platform.OS === 'android'
+        ? buildAllDayBoundary(startDate, 1)
+        : buildAllDayEndOfDay(startDate);
     return {
         title,
         startDate: startDateOnly,
@@ -596,6 +602,12 @@ function buildAllDayBoundary(date: Date, dayOffset = 0): Date {
     const boundary = new Date(date);
     boundary.setHours(0, 0, 0, 0);
     boundary.setDate(boundary.getDate() + dayOffset);
+    return boundary;
+}
+
+function buildAllDayEndOfDay(date: Date): Date {
+    const boundary = new Date(date);
+    boundary.setHours(23, 59, 59, 0);
     return boundary;
 }
 

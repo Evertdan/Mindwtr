@@ -672,7 +672,7 @@ describe('deleteMindwtrCalendar', () => {
 });
 
 describe('buildEventDetails — date-only calendar events stay on the intended day', () => {
-    it('exports a YYYY-MM-DD due date as an all-day event with an exclusive next-day end', async () => {
+    it('exports a YYYY-MM-DD due date as an all-day event ending inside the same day on iOS', async () => {
         setupEnabled();
         // Use a fixed date-only string — no time, no timezone suffix.
         // new Date('2026-04-20') parses as UTC midnight and shifts to Apr 19
@@ -694,10 +694,13 @@ describe('buildEventDetails — date-only calendar events stay on the intended d
         expect(eventData.startDate.getDate()).toBe(20);
         expect(eventData.startDate.getHours()).toBe(0);
 
+        // EventKit counts every day the range touches: a next-midnight end made
+        // the event span two days in Calendar and in Google accounts synced
+        // through iOS (#1065). The end must stay inside the same local day.
         expect(eventData.endDate.getFullYear()).toBe(2026);
         expect(eventData.endDate.getMonth()).toBe(3);
-        expect(eventData.endDate.getDate()).toBe(21);
-        expect(eventData.endDate.getHours()).toBe(0);
+        expect(eventData.endDate.getDate()).toBe(20);
+        expect(eventData.endDate.getHours()).toBe(23);
     });
 
     it('uses UTC midnight boundaries for Android date-only scheduled starts', async () => {
