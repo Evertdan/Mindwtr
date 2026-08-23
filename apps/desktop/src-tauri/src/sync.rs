@@ -2546,14 +2546,16 @@ where
             Ok(backend) if backend.trim() == "off" => {
                 Ok(DropboxStartupRecoveryOutcome::SyncDisabled { warning })
             }
-            Ok(_) => Err(
-                "Dropbox credential recovery is uncertain and sync could not be durably disabled"
-                    .to_string(),
-            ),
-            Err(_) => Err(
-                "Dropbox credential recovery is uncertain and the disabled sync state could not be verified"
-                    .to_string(),
-            ),
+            // The abort reason is the only diagnostic a user ever sees (a
+            // Windows GUI process shows no stderr), so the underlying errors
+            // must ride along — swallowing them cost a full report round-trip
+            // in #1064's portable-mode "won't start".
+            Ok(backend) => Err(format!(
+                "Dropbox credential recovery is uncertain and sync could not be durably disabled (backend: {backend}; recovery: {warning})"
+            )),
+            Err(read_error) => Err(format!(
+                "Dropbox credential recovery is uncertain and the disabled sync state could not be verified (state read: {read_error}; recovery: {warning})"
+            )),
         },
     }
 }
@@ -7311,16 +7313,20 @@ mod tests {
             .expect("verified off is safe containment"),
             DropboxStartupRecoveryOutcome::SyncDisabled { .. }
         ));
-        assert!(classify_dropbox_startup_recovery_with(
+        let not_disabled = classify_dropbox_startup_recovery_with(
             Err("recovery warning".to_string()),
             || Ok("cloud".to_string()),
         )
-        .is_err());
-        assert!(classify_dropbox_startup_recovery_with(
+        .expect_err("non-off backend must fail closed");
+        assert!(not_disabled.contains("recovery warning"));
+        assert!(not_disabled.contains("cloud"));
+        let unverified = classify_dropbox_startup_recovery_with(
             Err("recovery warning".to_string()),
             || Err("backend unreadable".to_string()),
         )
-        .is_err());
+        .expect_err("unreadable state must fail closed");
+        assert!(unverified.contains("backend unreadable"));
+        assert!(unverified.contains("recovery warning"));
     }
 
     #[test]
