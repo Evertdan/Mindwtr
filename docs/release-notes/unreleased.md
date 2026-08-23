@@ -6,6 +6,7 @@ Changes collected after `v1.2.1` and before the next version tag.
 
 ## Full Change List
 
+- Desktop: hand-editing `config.toml` or `secrets.toml` no longer stops the app from starting. The integrity check that guards against half-written config transactions treated any outside edit as corruption; an edited file that still reads cleanly is now accepted as the new state, and one that doesn't parse is reported with the file's name. (#1064)
 - Mobile: tapping "More options" while processing the inbox now scrolls down to the options it reveals, the same way answering a processing question already follows the next step down.
 - Desktop: a startup abort from the fail-closed credential recovery now writes its reason to mindwtr.log first — previously the app could exit with no window and no trace of why. (#1064)
 - iOS: capture from the Lock Screen — a new "Add Task" Lock Screen widget opens quick capture directly, and on iOS 18 an "Add Task" control can replace one of the two Lock Screen bottom buttons or live in Control Center. (#1066)

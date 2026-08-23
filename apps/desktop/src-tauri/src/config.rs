@@ -1033,7 +1033,30 @@ fn recover_config_publication_unlocked(
         &state.config_fingerprint,
         &state.secrets_fingerprint,
     )? {
-        return Err("Config files do not match their committed generation".to_string());
+        // No transaction is pending, so this mismatch is an out-of-band edit —
+        // the pending/rollback branch above owns every torn transactional
+        // write. Hand-editing config.toml/secrets.toml is a legitimate
+        // (portable-mode) workflow that predates generation tracking; refusing
+        // forever bricked the app at startup with no remedy (#1064). Adopt the
+        // edit as the new committed generation as long as both files still
+        // parse strictly; the per-service credential bindings keep guarding
+        // endpoint/credential pairing on their own fingerprints regardless.
+        read_config_toml_optional_strict(config_path).map_err(|error| {
+            format!(
+                "Config file {} was modified outside the app and no longer reads: {error}",
+                config_path.display()
+            )
+        })?;
+        read_config_toml_optional_strict(secrets_path).map_err(|error| {
+            format!(
+                "Secrets file {} was modified outside the app and no longer reads: {error}",
+                secrets_path.display()
+            )
+        })?;
+        state.config_generation += 1;
+        state.config_fingerprint = fingerprint_optional_file(config_path)?;
+        state.secrets_fingerprint = fingerprint_optional_file(secrets_path)?;
+        write_config_credential_state_file(&state_path, &state)?;
     }
     cleanup_config_rollback_files(config_path, secrets_path);
     Ok(Some(state))
@@ -3383,6 +3406,35 @@ mod tests {
         assert!(snapshot["cloud"]["token"].is_null());
         assert_eq!(snapshot["cloud"]["tokenAuthority"], "opaque");
         assert_eq!(snapshot["cloudProvider"], "dropbox");
+    }
+
+    #[test]
+    fn out_of_band_config_edit_is_adopted_instead_of_bricking_startup() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.toml");
+        let secrets_path = dir.path().join("secrets.toml");
+        write_config_files(&config_path, &secrets_path, &AppConfigToml::default())
+            .expect("seed config");
+        read_config_files_verified(&config_path, &secrets_path).expect("read committed config");
+
+        // A hand-edit (#1064: the reporter changed a calendar path in
+        // secrets.toml) shifts the pair fingerprint without breaking the TOML;
+        // a default seed writes no secrets file, so the edit here creates one.
+        let mut secrets = fs::read_to_string(&secrets_path).unwrap_or_default();
+        secrets.push_str("\n# hand-edited outside the app\n");
+        fs::write(&secrets_path, secrets).expect("hand-edit secrets");
+
+        read_config_files_verified(&config_path, &secrets_path)
+            .expect("adopt the out-of-band edit");
+        // Adoption re-committed the generation, so the next read is clean too.
+        read_config_files_verified(&config_path, &secrets_path)
+            .expect("second read after adoption");
+
+        // An edit that no longer parses still fails closed, naming the file.
+        fs::write(&secrets_path, "not = [valid").expect("corrupt secrets");
+        let error = read_config_files_verified(&config_path, &secrets_path)
+            .expect_err("unparseable secrets must fail");
+        assert!(error.contains("secrets.toml"), "error should name the file: {error}");
     }
 
     #[test]
