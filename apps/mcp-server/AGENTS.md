@@ -1,5 +1,5 @@
 <!-- bmad:context -->
-<!-- Verified 2026-08-23 against bd6be89fa. Managed by bmad-project-context; edits inside this block are replaced on refresh. Keep anything you want preserved outside the markers. -->
+<!-- Verified 2026-08-24 against 62b1ceef9. Managed by bmad-project-context; edits inside this block are replaced on refresh. Keep anything you want preserved outside the markers. -->
 
 ## apps/mcp-server
 

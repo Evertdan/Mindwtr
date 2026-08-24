@@ -1,5 +1,5 @@
 <!-- bmad:context -->
-<!-- Verified 2026-08-23 against bd6be89fa. Managed by bmad-project-context; edits inside this block are replaced on refresh. Keep anything you want preserved outside the markers. -->
+<!-- Verified 2026-08-24 against 62b1ceef9. Managed by bmad-project-context; edits inside this block are replaced on refresh. Keep anything you want preserved outside the markers. -->
 
 ## Mindwtr
 
@@ -30,6 +30,7 @@ GTD-style task manager (desktop, mobile, cloud sync, MCP server). Monorepo, Bun 
 
 ## Known pitfalls
 
-- Never run a repo-wide automated translation pass without diffing for corrupted non-comment code — a 2026-08-23 "translate to Spanish" campaign (commits `237730a44`, `37f1e6907`, `e086fc87b`) mistranslated live code: the global `Date` identifier, TS `Exclude`/`Extract`, HTTP header name literals, and JS keywords inside dense one-liners (`return`→`devolver`, `.test(`→`.prueba(`). Fixed in `d8009dce1`..`bd6be89fa`.
+- Never run a repo-wide automated translation pass without diffing for corrupted non-comment code — a 2026-08-23 "translate to Spanish" campaign (commits `237730a44`, `37f1e6907`, `e086fc87b`) mistranslated live code and content across every workspace and every i18n locale file, including `en.ts` (the canonical English source — ~468 keys got Spanish text; non-Spanish locales had stray Spanish words too). Fixed in `d8009dce1`..`62b1ceef9`.
+- A date/calendar test failing with Spanish month names (e.g. "abril de 2026") on this kind of machine isn't translation corruption — some tests build their expected label with `Intl.DateTimeFormat(undefined, ...)`, which reads the host OS locale instead of the app's own locale. Confirmed in `calendar-scheduling.test.ts`, `PromptModal.test.tsx`, `CalendarView.test.tsx`; not fixed, left as pre-existing test fragility.
 
 <!-- /bmad:context -->
