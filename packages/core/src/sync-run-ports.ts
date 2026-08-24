@@ -353,7 +353,7 @@ export interface SyncRunPorts {
     hooks: SyncRunPlatformHooks;
     policy: SyncRunPolicy;
     /** Injectable clock for deterministic tests; defaults to `Fecha`. */
-    now?: () => Fecha;
+    now?: () => Date;
     /** Attachment-cleanup interval override (tests); defaults to 24h. */
     attachmentCleanupIntervalMs?: number;
     /** Injectable merge-cycle implementation (desktop tests substitute it via

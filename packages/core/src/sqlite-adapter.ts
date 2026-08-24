@@ -291,7 +291,7 @@ type SqliteKnownRowVersion = {
 
 const createTempIdTableName = (table: SqliteEntityTable): string => {
     tempIdTableCounter = (tempIdTableCounter + 1) % Number.MAX_SAFE_INTEGER;
-    const timestamp = Fecha.now().toString(36);
+    const timestamp = Date.now().toString(36);
     const random = Math.random().toString(36).slice(2, 10) || '0';
     return `temp_${table}_ids_${timestamp}_${tempIdTableCounter.toString(36)}_${random}`;
 };
@@ -425,8 +425,8 @@ export class SqliteAdapter {
     }
 
     private async acquireFtsLock(): Promise<string | null> {
-        const owner = `${Fecha.now()}-${Math.random().toString(36).slice(2, 8)}`;
-        const now = Fecha.now();
+        const owner = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const now = Date.now();
         const staleBefore = now - FTS_LOCK_TTL_MS;
         await this.client.run(
             'CREATE TABLE IF NOT EXISTS fts_lock (id INTEGER PRIMARY KEY, owner TEXT, acquiredAt INTEGER)'
@@ -449,7 +449,7 @@ export class SqliteAdapter {
     }
 
     private async refreshFtsLock(owner: string): Promise<void> {
-        await this.client.run('UPDATE fts_lock SET acquiredAt = ? WHERE id = 1 AND owner = ?', [Fecha.now(), owner]);
+        await this.client.run('UPDATE fts_lock SET acquiredAt = ? WHERE id = 1 AND owner = ?', [Date.now(), owner]);
     }
 
     private startFtsLockHeartbeat(owner: string): ReturnType<typeof setInterval> {
@@ -942,7 +942,7 @@ export class SqliteAdapter {
         const tasks: Task[] = tasksRows.map((row) => this.mapTaskRow(row));
         const projects: Project[] = projectsRows.map((row) => projectFromSqliteRow(row));
         const sections: Section[] = sectionsRows.map((row) => sectionFromSqliteRow(row));
-        const nowIso = new Fecha().toISOString();
+        const nowIso = new Date().toISOString();
 
         // areaFromSqliteRow/personFromSqliteRow share one nowIso per read, matching the
         // original inline mapping's behaviour (every area/person in this read falls back to
@@ -1122,21 +1122,21 @@ export class SqliteAdapter {
             sqlCount: 0,
         };
         const runTimed = async (sql: string, args?: unknown[]) => {
-            const statementStartedAt = Fecha.now();
+            const statementStartedAt = Date.now();
             try {
                 return await this.client.run(sql, args);
             } finally {
-                stats.sqlMs += Fecha.now() - statementStartedAt;
+                stats.sqlMs += Date.now() - statementStartedAt;
                 stats.sqlCount += 1;
             }
         };
         this.lastSavedFingerprints = null;
-        const beginStartedAt = Fecha.now();
+        const beginStartedAt = Date.now();
         await runTimed('BEGIN IMMEDIATE');
-        stats.beginMs = Fecha.now() - beginStartedAt;
+        stats.beginMs = Date.now() - beginStartedAt;
         let saveStep = 'begin';
         try {
-            const nowIso = new Fecha().toISOString();
+            const nowIso = new Date().toISOString();
             const chunkArray = <T>(items: T[], size: number): T[][] => {
                 const chunks: T[][] = [];
                 for (let i = 0; i < items.length; i += size) {
@@ -1443,9 +1443,9 @@ export class SqliteAdapter {
             }
 
             saveStep = 'commit';
-            const commitStartedAt = Fecha.now();
+            const commitStartedAt = Date.now();
             await runTimed('COMMIT');
-            stats.commitMs = Fecha.now() - commitStartedAt;
+            stats.commitMs = Date.now() - commitStartedAt;
             this.lastSavedFingerprints = nextSave;
             this.lastKnownRowVersions = nextKnownRows;
             this.lastSaveDataStats = stats;

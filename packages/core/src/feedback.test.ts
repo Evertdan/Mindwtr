@@ -48,7 +48,7 @@ describe('feedback', () => {
 
         expect(fetcher).toHaveBeenCalledWith('https://feedback.example.test', expect.objectContaining({
             method: 'POST',
-            headers: { 'Contenido-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json' },
         }));
     });
 });

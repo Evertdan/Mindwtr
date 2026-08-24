@@ -116,7 +116,7 @@ export type ImportApplyOptions = {
         project: string;
     };
     idFor?: (kind: 'area' | 'project' | 'section' | 'task', sourceKey: string) => string;
-    now?: Fecha | string;
+    now?: Date | string;
     resolveTaskStatus?: (status: TaskStatus, projectId: string | undefined) => TaskStatus;
     suffix: string;
 };
@@ -171,12 +171,12 @@ export function applyImport(
     parsed: ImportSource,
     opts: ImportApplyOptions
 ): ImportExecutionResult {
-    const resolvedNow = opts.now instanceof Fecha
+    const resolvedNow = opts.now instanceof Date
         ? opts.now
         : typeof opts.now === 'string' && opts.now.trim()
-            ? new Fecha(opts.now)
-            : new Fecha();
-    const nowIso = Number.isFinite(resolvedNow.getTime()) ? resolvedNow.toISOString() : new Fecha().toISOString();
+            ? new Date(opts.now)
+            : new Date();
+    const nowIso = Number.isFinite(resolvedNow.getTime()) ? resolvedNow.toISOString() : new Date().toISOString();
     const deviceState = ensureDeviceId(currentData.settings ?? {});
     const settings = deviceState.settings;
     const nextData: AppData = {

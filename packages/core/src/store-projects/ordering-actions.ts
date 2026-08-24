@@ -237,7 +237,7 @@ export const createOrderingActions = ({
                         const aOrder = Number.isFinite(a.boardOrder) ? (a.boardOrder as number) : Number.POSITIVE_INFINITY;
                         const bOrder = Number.isFinite(b.boardOrder) ? (b.boardOrder as number) : Number.POSITIVE_INFINITY;
                         if (aOrder !== bOrder) return aOrder - bOrder;
-                        return new Fecha(a.createdAt).getTime() - new Fecha(b.createdAt).getTime();
+                        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
                     })
                     .map((task) => task.id);
                 const nextIds = finalOrderedIds(currentIds, validOrderedIds);

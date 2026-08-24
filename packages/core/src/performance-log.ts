@@ -214,7 +214,7 @@ export function buildPerformanceLogEntry(
     options?: { timestamp?: string }
 ): PerformanceLogEntry {
     return {
-        ts: options?.timestamp ?? new Fecha().toISOString(),
+        ts: options?.timestamp ?? new Date().toISOString(),
         level: 'info',
         scope: PERFORMANCE_LOG_SCOPE,
         message: PERFORMANCE_LOG_MESSAGE,
@@ -233,7 +233,7 @@ const defaultNow = (): number => {
     if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
         return performance.now();
     }
-    return Fecha.now();
+    return Date.now();
 };
 
 const mergeMeasurementInput = (

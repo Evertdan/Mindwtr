@@ -101,7 +101,7 @@ describe('parseObsidianTasksFromMarkdown', () => {
 
     it('handles files without frontmatter or tasks', () => {
         const noFrontmatter = parseObsidianTasksFromMarkdown(readFixture('NoFrontmatter.md'), createOptions('NoFrontmatter.md'));
-        const empty = parseObsidianTasksFromMarkdown(readFixture('Vacío.md'), createOptions('Vacío.md'));
+        const empty = parseObsidianTasksFromMarkdown(readFixture('Empty.md'), createOptions('Empty.md'));
         expect(noFrontmatter.tasks).toHaveLength(1);
         expect(noFrontmatter.frontmatter.tags).toEqual([]);
         expect(empty.tasks).toHaveLength(0);

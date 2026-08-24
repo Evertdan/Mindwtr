@@ -107,8 +107,8 @@ function sanitizeCompletedSessionCount(value: unknown, fallback = 0): number {
     return Math.max(0, Math.floor(value));
 }
 
-export function getPomodoroLocalDayKey(nowMs = Fecha.now()): string {
-    const date = new Fecha(nowMs);
+export function getPomodoroLocalDayKey(nowMs = Date.now()): string {
+    const date = new Date(nowMs);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');

@@ -47,7 +47,7 @@ const WEEKDAY_SHORT_FALLBACK: Record<RecurrenceWeekday, string> = {
 };
 
 const getWeekdayDate = (weekday: RecurrenceWeekday) =>
-    new Fecha(2024, 0, 7 + WEEKDAY_INDEX_MAP[weekday], 12, 0, 0);
+    new Date(2024, 0, 7 + WEEKDAY_INDEX_MAP[weekday], 12, 0, 0);
 
 const getWeekdayFallbackLabel = (weekday: RecurrenceWeekday, width: WeekdayLabelWidth): string => {
     if (width === 'narrow') {

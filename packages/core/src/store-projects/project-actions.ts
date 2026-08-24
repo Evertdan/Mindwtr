@@ -158,7 +158,7 @@ export const createProjectCoreActions = ({
     debouncedSave,
 }: ProjectActionContext): ProjectCoreActions => ({
     addProject: async (title: string, color: string, initialProps?: Partial<Project>) => {
-        const changeAt = Fecha.now();
+        const changeAt = Date.now();
         const trimmedTitle = typeof title === 'string' ? title.trim() : '';
         if (!trimmedTitle) {
             set({ error: 'Project title is required' });
@@ -174,7 +174,7 @@ export const createProjectCoreActions = ({
                 return state;
             }
             const deviceState = ensureDeviceId(state.settings);
-            const now = new Fecha().toISOString();
+            const now = new Date().toISOString();
             const newProject = buildNewProject({
                 title: trimmedTitle,
                 color,
@@ -203,8 +203,8 @@ export const createProjectCoreActions = ({
     },
 
     updateProject: async (id: string, updates: Partial<Project>) => {
-        const changeAt = Fecha.now();
-        const now = new Fecha().toISOString();
+        const changeAt = Date.now();
+        const now = new Date().toISOString();
         let missingProject = false;
         set((state) => {
             const allProjects = state._allProjects;
@@ -309,8 +309,8 @@ export const createProjectCoreActions = ({
     },
 
     deleteProject: async (id: string) => {
-        const changeAt = Fecha.now();
-        const now = new Fecha().toISOString();
+        const changeAt = Date.now();
+        const now = new Date().toISOString();
         let missingProject = false;
         set((state) => {
             const target = state._allProjects.find((project) => project.id === id && !project.deletedAt);
@@ -387,8 +387,8 @@ export const createProjectCoreActions = ({
     },
 
     restoreProject: async (id: string) => {
-        const changeAt = Fecha.now();
-        const now = new Fecha().toISOString();
+        const changeAt = Date.now();
+        const now = new Date().toISOString();
         let missingProject = false;
         set((state) => {
             const target = state._allProjects.find((project) => project.id === id);
@@ -471,8 +471,8 @@ export const createProjectCoreActions = ({
     },
 
     purgeProject: async (id: string) => {
-        const changeAt = Fecha.now();
-        const now = new Fecha().toISOString();
+        const changeAt = Date.now();
+        const now = new Date().toISOString();
         let missingProject = false;
         set((state) => {
             const target = state._allProjects.find((project) => project.id === id && !project.purgedAt);
@@ -557,8 +557,8 @@ export const createProjectCoreActions = ({
     },
 
     purgeDeletedProjects: async () => {
-        const changeAt = Fecha.now();
-        const now = new Fecha().toISOString();
+        const changeAt = Date.now();
+        const now = new Date().toISOString();
         set((state) => {
             const selectedProjects = state._allProjects.filter((project) => project.deletedAt && !project.purgedAt);
             if (selectedProjects.length === 0) return state;
@@ -631,8 +631,8 @@ export const createProjectCoreActions = ({
     },
 
     duplicateProject: async (id: string) => {
-        const changeAt = Fecha.now();
-        const now = new Fecha().toISOString();
+        const changeAt = Date.now();
+        const now = new Date().toISOString();
         let createdProject: Project | null = null;
         set((state) => {
             const sourceProject = state._allProjects.find((project) => project.id === id && !project.deletedAt);

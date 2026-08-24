@@ -305,10 +305,10 @@ export const parseCsvRows = (
 // this module exists to own (see header comment).
 export const pad = (value: number, width = 2): string => String(value).padStart(width, '0');
 
-export const formatLocalDate = (date: Fecha): string =>
+export const formatLocalDate = (date: Date): string =>
     `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 
-export const formatLocalDateTime = (date: Fecha): string => (
+export const formatLocalDateTime = (date: Date): string => (
     `${formatLocalDate(date)}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad(date.getMilliseconds(), 3)}`
 );
 

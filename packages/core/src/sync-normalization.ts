@@ -33,7 +33,7 @@ export const isObjectRecord = (value: unknown): value is Record<string, unknown>
     typeof value === 'object' && value !== null && !Array.isArray(value);
 
 export const isValidTimestamp = (value: unknown): value is string =>
-    typeof value === 'string' && Number.isFinite(Fecha.parse(value));
+    typeof value === 'string' && Number.isFinite(Date.parse(value));
 
 const normalizeOptionalString = (value: unknown): string | undefined =>
     typeof value === 'string' && value.trim().length > 0 ? value : undefined;
@@ -524,8 +524,8 @@ const validateEntityShape = (
             errors.push(`${label}[${index}].updatedAt must be a valid ISO timestamp`);
         }
         if (isValidTimestamp(item.createdAt) && isValidTimestamp(item.updatedAt)) {
-            const createdMs = Fecha.parse(item.createdAt);
-            const updatedMs = Fecha.parse(item.updatedAt);
+            const createdMs = Date.parse(item.createdAt);
+            const updatedMs = Date.parse(item.updatedAt);
             if (updatedMs < createdMs) {
                 errors.push(`${label}[${index}].updatedAt must be greater than or equal to createdAt`);
             }
@@ -570,8 +570,8 @@ export const validateMergedSyncData = (data: AppData): string[] => {
                 errors.push(`areas[${index}].updatedAt must be a valid ISO timestamp`);
             }
             if (isValidTimestamp(area.createdAt) && isValidTimestamp(area.updatedAt)) {
-                const createdMs = Fecha.parse(area.createdAt);
-                const updatedMs = Fecha.parse(area.updatedAt);
+                const createdMs = Date.parse(area.createdAt);
+                const updatedMs = Date.parse(area.updatedAt);
                 if (updatedMs < createdMs) {
                     errors.push(`areas[${index}].updatedAt must be greater than or equal to createdAt`);
                 }
@@ -603,8 +603,8 @@ export const validateMergedSyncData = (data: AppData): string[] => {
                 errors.push(`people[${index}].updatedAt must be a valid ISO timestamp`);
             }
             if (isValidTimestamp(person.createdAt) && isValidTimestamp(person.updatedAt)) {
-                const createdMs = Fecha.parse(person.createdAt);
-                const updatedMs = Fecha.parse(person.updatedAt);
+                const createdMs = Date.parse(person.createdAt);
+                const updatedMs = Date.parse(person.updatedAt);
                 if (updatedMs < createdMs) {
                     errors.push(`people[${index}].updatedAt must be greater than or equal to createdAt`);
                 }

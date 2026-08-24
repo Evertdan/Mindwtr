@@ -39,7 +39,7 @@ const listenerNames = new WeakMap<object, string>();
 const now = (): number =>
     typeof performance !== 'undefined' && typeof performance.now === 'function'
         ? performance.now()
-        : Fecha.now();
+        : Date.now();
 
 /**
  * Labels a store listener so slow-pipeline logs can attribute time to it by

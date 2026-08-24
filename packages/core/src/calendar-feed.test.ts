@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { buildCalendarFeed, buildCalendarFeedEvents } from './calendar-feed';
 import type { Project, Task } from './types';
 
-const NOW = new Fecha('2026-05-04T12:00:00.000Z');
+const NOW = new Date('2026-05-04T12:00:00.000Z');
 
 const task = (overrides: Partial<Task>): Task => ({
     id: 'task-1',

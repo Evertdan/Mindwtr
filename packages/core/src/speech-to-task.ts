@@ -30,7 +30,7 @@ export type SpeechToTaskCaptureConfig = {
     mode?: AudioCaptureMode;
     fieldStrategy?: AudioFieldStrategy;
     language?: string;
-    now?: Fecha;
+    now?: Date;
     timeZone?: string;
     retryModel?: string;
 };
@@ -170,7 +170,7 @@ async function requestRemoteGemini(
         {
             method: 'POST',
             headers: {
-                'Contenido-Type': 'application/json',
+                'Content-Type': 'application/json',
                 'x-goog-api-key': config.apiKey,
             },
             body: JSON.stringify({
@@ -234,7 +234,7 @@ function buildOpenAIParsePrompt(config: RemoteSpeechToTaskCaptureConfig): string
     return buildSpeechToTaskPrompt({
         fieldStrategy: config.fieldStrategy ?? 'smart',
         language: normalizeSpeechLanguage(config.language),
-        now: config.now ?? new Fecha(),
+        now: config.now ?? new Date(),
         timeZone: config.timeZone,
     });
 }
@@ -253,7 +253,7 @@ async function parseRemoteOpenAIResponses(
         {
             method: 'POST',
             headers: {
-                'Contenido-Type': 'application/json',
+                'Content-Type': 'application/json',
                 Authorization: `Bearer ${config.apiKey}`,
             },
             body: JSON.stringify({
@@ -289,7 +289,7 @@ async function parseRemoteOpenAIChat(
         {
             method: 'POST',
             headers: {
-                'Contenido-Type': 'application/json',
+                'Content-Type': 'application/json',
                 Authorization: `Bearer ${config.apiKey}`,
             },
             body: JSON.stringify({
@@ -396,12 +396,12 @@ export function parseSpeechToTaskResult(text: unknown): SpeechToTaskResult {
 export function buildSpeechToTaskPrompt({
     fieldStrategy = 'smart',
     language = 'auto',
-    now = new Fecha(),
+    now = new Date(),
     timeZone,
 }: {
     fieldStrategy?: AudioFieldStrategy;
     language?: string;
-    now?: Fecha;
+    now?: Date;
     timeZone?: string;
 }): string {
     return `

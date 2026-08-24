@@ -17,8 +17,8 @@ const buildCsv = (headers: string[], rows: string[][], delimiter = ','): string 
 
 const FULL_HEADERS = [
     'Title', 'Description', 'Status', 'Project', 'Section', 'Area', 'Contexts', 'Tags',
-    'Assigned To', 'Priority', 'Energy', 'Start Fecha', 'Due Fecha', 'Review Fecha',
-    'Completed En', 'Checklist', 'Location', 'Order', 'ID', 'Created En',
+    'Assigned To', 'Priority', 'Energy', 'Start Date', 'Due Date', 'Review Date',
+    'Completed At', 'Checklist', 'Location', 'Order', 'ID', 'Created At',
 ];
 
 describe('mindwtr csv import', () => {
@@ -122,7 +122,7 @@ describe('mindwtr csv import', () => {
 
     it('keeps a date-only value date-only while a datetime keeps its time', () => {
         const csv = buildCsv(
-            ['Title', 'Start Fecha', 'Due Fecha'],
+            ['Title', 'Start Date', 'Due Date'],
             [['Mixed dates', '2026-10-01', '2026-10-02T09:15:00']]
         );
 
@@ -134,7 +134,7 @@ describe('mindwtr csv import', () => {
     });
 
     it('rejects an impossible date-only value instead of rolling it into another month', () => {
-        const csv = buildCsv(['Title', 'Due Fecha'], [['Impossible date', '2026-02-31']]);
+        const csv = buildCsv(['Title', 'Due Date'], [['Impossible date', '2026-02-31']]);
 
         const result = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: csv });
 
@@ -144,7 +144,7 @@ describe('mindwtr csv import', () => {
 
     it('rejects local datetimes with impossible calendar or clock components', () => {
         const csv = buildCsv(
-            ['Title', 'Start Fecha', 'Due Fecha'],
+            ['Title', 'Start Date', 'Due Date'],
             [['Impossible datetimes', '2026-13-01T09:30:00', '2026-02-28T24:00:00']]
         );
 
@@ -155,7 +155,7 @@ describe('mindwtr csv import', () => {
     });
 
     it('rejects an entity timestamp that would roll into another calendar date', () => {
-        const csv = buildCsv(['Title', 'Created En'], [['Impossible timestamp', '2026-02-31T09:30:00']]);
+        const csv = buildCsv(['Title', 'Created At'], [['Impossible timestamp', '2026-02-31T09:30:00']]);
 
         const result = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: csv });
 
@@ -179,9 +179,9 @@ describe('mindwtr csv import', () => {
         expect(tasks.find((task) => task.title === 'No project')).toMatchObject({ status: 'inbox', projectSourceKey: undefined });
     });
 
-    it('defaults empty Status to done when Completed En is set', () => {
+    it('defaults empty Status to done when Completed At is set', () => {
         const csv = buildCsv(
-            ['Title', 'Status', 'Completed En'],
+            ['Title', 'Status', 'Completed At'],
             [['Finished already', '', '2026-08-05T10:00:00Z']]
         );
 
@@ -647,8 +647,8 @@ describe('mindwtr csv import', () => {
         expect(second.data.tasks[0]?.id).toBe(first.data.tasks[0]?.id);
     });
 
-    it('normalizes a date-only Created En to a full UTC instant (C2)', () => {
-        const csv = buildCsv(['Title', 'Created En'], [['Old task', '2026-08-01']]);
+    it('normalizes a date-only Created At to a full UTC instant (C2)', () => {
+        const csv = buildCsv(['Title', 'Created At'], [['Old task', '2026-08-01']]);
 
         const result = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: csv });
 
@@ -658,7 +658,7 @@ describe('mindwtr csv import', () => {
 
     it('accepts SQL-shaped timestamps: long fractional seconds and a space before the offset (#1011)', () => {
         const csv = buildCsv(
-            ['Title', 'Due Fecha', 'Completed En', 'Status'],
+            ['Title', 'Due Date', 'Completed At', 'Status'],
             [['SQL task', '2026-02-21 22:44:00.6390000 +00:00', '2026-02-21 22:44:00.6390000 +00:00', 'done']],
         );
 
@@ -672,7 +672,7 @@ describe('mindwtr csv import', () => {
 
     it('treats literal NULL cells as empty (#1011)', () => {
         const csv = buildCsv(
-            ['Title', 'Project', 'Contexts', 'Tags', 'Due Fecha'],
+            ['Title', 'Project', 'Contexts', 'Tags', 'Due Date'],
             [['Real task', 'NULL', 'null', 'NULL', 'NULL'], ['NULL', 'Ops', '', '', '']],
         );
 
@@ -1133,7 +1133,7 @@ describe('mindwtr csv import', () => {
     });
 
     it('imports a file with no Recurrence column unchanged', () => {
-        const csv = buildCsv(['Title', 'Due Fecha'], [['No column', '2026-09-01']]);
+        const csv = buildCsv(['Title', 'Due Date'], [['No column', '2026-09-01']]);
 
         const result = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: csv });
 
@@ -1142,7 +1142,7 @@ describe('mindwtr csv import', () => {
     });
 
     it('warns when a date cell cannot be parsed', () => {
-        const csv = buildCsv(['Title', 'Due Fecha'], [['Bad date', '09/05/2026']]);
+        const csv = buildCsv(['Title', 'Due Date'], [['Bad date', '09/05/2026']]);
 
         const result = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: csv });
 

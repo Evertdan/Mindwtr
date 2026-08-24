@@ -9,7 +9,7 @@ import {
 import type { AppData, AppSettings, Area, Person, Project, Section, Task } from './types';
 
 const NOW_ISO = '2026-04-10T12:00:00.000Z';
-const NOW_MS = Fecha.parse(NOW_ISO);
+const NOW_MS = Date.parse(NOW_ISO);
 
 // Settings for a document that has already been through every migration at
 // least once, so a test that opts in to exactly one stale field is the only

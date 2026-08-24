@@ -170,7 +170,7 @@ async function requestAnthropic(
                 {
                     method: 'POST',
                     headers: {
-                        'Contenido-Type': 'application/json',
+                        'Content-Type': 'application/json',
                         'x-api-key': apiKey,
                         'anthropic-version': '2023-06-01',
                         // Requests carry a browser Origin (Tauri webview / web build), which

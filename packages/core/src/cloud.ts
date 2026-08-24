@@ -189,7 +189,7 @@ export async function cloudRequestJson<T>(
     const fetcher = options.fetcher ?? fetch;
     const headers = buildHeaders(options);
     if (body !== undefined) {
-        headers['Contenido-Type'] = headers['Contenido-Type'] || 'application/json';
+        headers['Content-Type'] = headers['Content-Type'] || 'application/json';
     }
     const res = await fetchWithTimeout(
         url,
@@ -281,7 +281,7 @@ export async function cloudPutJson(
     assertCloudUrl(url, options);
     const fetcher = options.fetcher ?? fetch;
     const headers = buildHeaders(options);
-    headers['Contenido-Type'] = headers['Contenido-Type'] || 'application/json';
+    headers['Content-Type'] = headers['Content-Type'] || 'application/json';
 
     const res = await fetchWithTimeout(
         url,
@@ -318,15 +318,15 @@ export async function cloudPutFile(
     assertCloudUrl(url, options);
     const fetcher = options.fetcher ?? fetch;
     const headers = buildHeaders(options);
-    headers['Contenido-Type'] = contentType || 'application/octet-stream';
+    headers['Content-Type'] = contentType || 'application/octet-stream';
 
     let body: BodyInit = data instanceof Uint8Array ? new Uint8Array(data) : data;
     if (options.onProgress) {
         const bytes = await toUint8Array(data);
         const stream = createProgressStream(bytes, options.onProgress);
         body = stream ?? bytes;
-        if (!headers['Contenido-Length']) {
-            headers['Contenido-Length'] = String(bytes.length);
+        if (!headers['Content-Length']) {
+            headers['Content-Length'] = String(bytes.length);
         }
     }
 

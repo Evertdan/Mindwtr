@@ -130,7 +130,7 @@ export const createSettingsActions = ({
         markCoreStartupPhase('core.fetch_data.start');
         // Consumed at entry so a fetch already in flight keeps its own answer.
         const isDocumentReplacement = consumeDocumentReplacementMark();
-        const fetchInvokedAt = Fecha.now();
+        const fetchInvokedAt = Date.now();
         const isResultStillRelevant = options?.isResultStillRelevant ?? (() => true);
         const finishIrrelevantFetch = () => {
             markCoreStartupPhase('core.fetch_data.skipped_irrelevant');
@@ -142,11 +142,11 @@ export const createSettingsActions = ({
         let storageReadMs = 0;
         let setStateMs = 0;
         if (hasPendingSaveWork()) {
-            const flushStartedAt = Fecha.now();
+            const flushStartedAt = Date.now();
             await measureCoreStartupPhase('core.fetch_data.flush_pending_save', async () => {
                 await flushPendingSave();
             });
-            flushMs = Fecha.now() - flushStartedAt;
+            flushMs = Date.now() - flushStartedAt;
         } else {
             markCoreStartupPhase('core.fetch_data.flush_pending_save.skipped', { reason: 'no_pending_work' });
         }
@@ -179,7 +179,7 @@ export const createSettingsActions = ({
             // document sync just wrote); it skips the storage read but runs the exact
             // same load pipeline, and the lastDataChangeAt guard below still discards
             // it if local edits landed in the meantime.
-            const storageReadStartedAt = Fecha.now();
+            const storageReadStartedAt = Date.now();
             const sourceStorage = options?.preloadedData ? undefined : getStorage();
             const data = options?.preloadedData
                 ?? await measureCoreStartupPhase('core.fetch_data.storage_get_data', async () =>
@@ -189,11 +189,11 @@ export const createSettingsActions = ({
                 finishIrrelevantFetch();
                 return;
             }
-            storageReadMs = options?.preloadedData ? 0 : Fecha.now() - storageReadStartedAt;
-            const postProcessStartedAt = Fecha.now();
+            storageReadMs = options?.preloadedData ? 0 : Date.now() - storageReadStartedAt;
+            const postProcessStartedAt = Date.now();
             markCoreStartupPhase('core.fetch_data.post_process:start');
-            const nowIso = new Fecha().toISOString();
-            const nowMs = Fecha.now();
+            const nowIso = new Date().toISOString();
+            const nowMs = Date.now();
             const rawTasks = Array.isArray(data.tasks) ? data.tasks : [];
             const rawProjects = Array.isArray(data.projects) ? data.projects : [];
             const rawSettings = data.settings && typeof data.settings === 'object' ? data.settings : {};
@@ -232,7 +232,7 @@ export const createSettingsActions = ({
             const allPeople = migratedData.people ?? [];
             const nextSettings = migratedData.settings;
 
-            const postProcessMs = Fecha.now() - postProcessStartedAt;
+            const postProcessMs = Date.now() - postProcessStartedAt;
             markCoreStartupPhase('core.fetch_data.post_process:end', { durationMs: postProcessMs });
             let skippedDueToConcurrentLocalChange = false;
             let setProducerMs = 0;
@@ -242,23 +242,23 @@ export const createSettingsActions = ({
             let visibleTasksReused = false;
             let stateUpdateSkipped = false;
             let resultAccepted = false;
-            const setStateStartedAt = Fecha.now();
+            const setStateStartedAt = Date.now();
             const notifyProfilingEnabled = nextSettings?.diagnostics?.loggingEnabled === true;
             let notifyProfile: NotifyProfile | null = null;
             if (notifyProfilingEnabled) beginNotifyProfile();
             try {
                 await measureCoreStartupPhase('core.fetch_data.zustand_set_state', async () => {
                     set((state) => {
-                        const producerStartedAt = Fecha.now();
+                        const producerStartedAt = Date.now();
                         if (!isResultStillRelevant()) {
                             stateUpdateSkipped = true;
-                            setProducerMs = Fecha.now() - producerStartedAt;
+                            setProducerMs = Date.now() - producerStartedAt;
                             return state;
                         }
                         resultAccepted = true;
                         if (state.lastDataChangeAt > fetchStartedAt) {
                             skippedDueToConcurrentLocalChange = true;
-                            setProducerMs = Fecha.now() - producerStartedAt;
+                            setProducerMs = Date.now() - producerStartedAt;
                             return options?.silent || !state.isLoading ? state : { isLoading: false };
                         }
                         const nextTasks = reconcileEntityCollection(state._allTasks, state._tasksById, allTasks);
@@ -300,7 +300,7 @@ export const createSettingsActions = ({
                             && nextLastDataChangeAt === state.lastDataChangeAt
                         ) {
                             stateUpdateSkipped = true;
-                            setProducerMs = Fecha.now() - producerStartedAt;
+                            setProducerMs = Date.now() - producerStartedAt;
                             return state;
                         }
                         if (applied.length > 0) {
@@ -368,7 +368,7 @@ export const createSettingsActions = ({
                             });
                             markCoreStartupPhase('core.fetch_data.debounced_save_enqueued');
                         }
-                        setProducerMs = Fecha.now() - producerStartedAt;
+                        setProducerMs = Date.now() - producerStartedAt;
                         return {
                             settings: settingsForState,
                             _allTasks: nextTasks.items,
@@ -384,12 +384,12 @@ export const createSettingsActions = ({
             } finally {
                 if (notifyProfilingEnabled) notifyProfile = endNotifyProfile();
             }
-            setStateMs = Fecha.now() - setStateStartedAt;
+            setStateMs = Date.now() - setStateStartedAt;
             if (!resultAccepted) {
                 finishIrrelevantFetch();
                 return;
             }
-            const totalFetchMs = Fecha.now() - fetchInvokedAt;
+            const totalFetchMs = Date.now() - fetchInvokedAt;
             // Runtime diagnostic for shared beta logs: break the load pipeline down so a
             // slow refresh can be attributed to save-flush, storage read, or JS processing.
             if (totalFetchMs >= SLOW_FETCH_LOG_THRESHOLD_MS) {
@@ -497,7 +497,7 @@ export const createSettingsActions = ({
         const archiveDaysUpdate = updates.gtd?.autoArchiveDays !== undefined;
         set((state) => {
             const deviceState = ensureDeviceId(state.settings);
-            const nowIso = new Fecha().toISOString();
+            const nowIso = new Date().toISOString();
             const nextSettings = mergeSettingsUpdates(deviceState.settings, updates);
             const nextSyncUpdatedAt = { ...(deviceState.settings.syncPreferencesUpdatedAt ?? {}) };
             let syncUpdated = false;
@@ -566,7 +566,7 @@ export const createSettingsActions = ({
             if (archiveDaysUpdate) {
                 const autoArchiveResult = runAutoArchive(state._allTasks, newSettings, {
                     nowIso,
-                    nowMs: Fecha.now(),
+                    nowMs: Date.now(),
                     deviceId: deviceState.deviceId,
                 });
 
@@ -652,6 +652,6 @@ export const createSettingsActions = ({
     },
 
     setHighlightTask: (id: string | null) => {
-        set({ highlightTaskId: id, highlightTaskAt: id ? Fecha.now() : null });
+        set({ highlightTaskId: id, highlightTaskAt: id ? Date.now() : null });
     },
 });

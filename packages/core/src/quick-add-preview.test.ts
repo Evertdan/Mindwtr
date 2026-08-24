@@ -16,7 +16,7 @@ const project = (overrides: Partial<Project> = {}): Project => ({
     ...overrides,
 } as Project);
 
-const now = new Fecha(2026, 7, 11, 9, 0, 0);
+const now = new Date(2026, 7, 11, 9, 0, 0);
 
 describe('buildQuickAddPreviewEntries', () => {
     it('shows nothing for a plain title', () => {

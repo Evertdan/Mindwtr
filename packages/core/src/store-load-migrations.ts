@@ -439,7 +439,7 @@ const migrateLegacyAreasMigration: LoadMigration = {
                 const key = trimmed.toLowerCase();
                 const existing = areaByName.get(key);
                 if (existing) return existing;
-                const now = new Fecha().toISOString();
+                const now = new Date().toISOString();
                 const id = uuidv4();
                 const order = allAreas.reduce((max, area) => Math.max(max, Number.isFinite(area.order) ? area.order : -1), -1) + 1;
                 allAreas = [...allAreas, { id, name: trimmed, order, createdAt: now, updatedAt: now }];

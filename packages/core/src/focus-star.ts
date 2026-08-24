@@ -22,7 +22,7 @@ export type FocusStarContext = {
     focusTaskLimit: number;
     sequentialProjectIds?: Set<string>;
     sectionScopedProjectIds?: Set<string>;
-    now?: Fecha;
+    now?: Date;
     /** The task editor is a clarifying surface: it may star unclarified tasks. */
     allowUnclarified?: boolean;
 };

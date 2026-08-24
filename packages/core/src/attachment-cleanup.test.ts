@@ -28,17 +28,17 @@ describe('findOrphanedAttachments', () => {
             title: 'Task',
             status: 'inbox',
             contexts: [],
-            createdAt: new Fecha().toISOString(),
-            updatedAt: new Fecha().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
             attachments: [
                 {
                     id: 'a1',
                     kind: 'file',
                     title: 'file',
                     uri: '/tmp/file',
-                    createdAt: new Fecha().toISOString(),
-                    updatedAt: new Fecha().toISOString(),
-                    deletedAt: new Fecha().toISOString(),
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    deletedAt: new Date().toISOString(),
                 },
             ],
         });
@@ -54,17 +54,17 @@ describe('findOrphanedAttachments', () => {
             title: 'Task',
             status: 'done',
             contexts: [],
-            createdAt: new Fecha().toISOString(),
-            updatedAt: new Fecha().toISOString(),
-            deletedAt: new Fecha().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: new Date().toISOString(),
             attachments: [
                 {
                     id: 'a1',
                     kind: 'file',
                     title: 'file',
                     uri: '/tmp/file',
-                    createdAt: new Fecha().toISOString(),
-                    updatedAt: new Fecha().toISOString(),
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
                 },
             ],
         });
@@ -80,18 +80,18 @@ describe('findOrphanedAttachments', () => {
             title: 'Task',
             status: 'done',
             contexts: [],
-            createdAt: new Fecha().toISOString(),
-            updatedAt: new Fecha().toISOString(),
-            deletedAt: new Fecha().toISOString(),
-            purgedAt: new Fecha().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: new Date().toISOString(),
+            purgedAt: new Date().toISOString(),
             attachments: [
                 {
                     id: 'a1',
                     kind: 'file',
                     title: 'file',
                     uri: '/tmp/file',
-                    createdAt: new Fecha().toISOString(),
-                    updatedAt: new Fecha().toISOString(),
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
                 },
             ],
         });
@@ -109,22 +109,22 @@ describe('findOrphanedAttachments', () => {
             color: '#2563eb',
             order: 0,
             tagIds: [],
-            createdAt: new Fecha().toISOString(),
-            updatedAt: new Fecha().toISOString(),
-            deletedAt: new Fecha().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: new Date().toISOString(),
             attachments: [{
                 id: 'a1',
                 kind: 'file',
                 title: 'file',
                 uri: '/tmp/project-file',
-                createdAt: new Fecha().toISOString(),
-                updatedAt: new Fecha().toISOString(),
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
             }],
         });
 
         expect(findOrphanedAttachments(data)).toHaveLength(0);
 
-        data.projects[0].purgedAt = new Fecha().toISOString();
+        data.projects[0].purgedAt = new Date().toISOString();
         expect(findOrphanedAttachments(data).map((attachment) => attachment.id)).toEqual(['a1']);
     });
 
@@ -135,16 +135,16 @@ describe('findOrphanedAttachments', () => {
             title: 'Task',
             status: 'inbox',
             contexts: [],
-            createdAt: new Fecha().toISOString(),
-            updatedAt: new Fecha().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
             attachments: [
                 {
                     id: 'a1',
                     kind: 'file',
                     title: 'file',
                     uri: '/tmp/file',
-                    createdAt: new Fecha().toISOString(),
-                    updatedAt: new Fecha().toISOString(),
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
                 },
             ],
         });
@@ -162,8 +162,8 @@ describe('findDeletedAttachmentsForFileCleanup', () => {
             title: 'Task',
             status: 'inbox',
             contexts: [],
-            createdAt: new Fecha().toISOString(),
-            updatedAt: new Fecha().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
             attachments: [
                 {
                     id: 'a1',
@@ -171,9 +171,9 @@ describe('findDeletedAttachmentsForFileCleanup', () => {
                     title: 'audio',
                     uri: '',
                     cloudKey: 'attachments/a1.m4a',
-                    createdAt: new Fecha().toISOString(),
-                    updatedAt: new Fecha().toISOString(),
-                    deletedAt: new Fecha().toISOString(),
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    deletedAt: new Date().toISOString(),
                 },
             ],
         });
@@ -181,17 +181,17 @@ describe('findDeletedAttachmentsForFileCleanup', () => {
             id: 'p1',
             title: 'Project',
             status: 'active',
-            createdAt: new Fecha().toISOString(),
-            updatedAt: new Fecha().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
             attachments: [
                 {
                     id: 'a2',
                     kind: 'file',
                     title: 'doc',
                     uri: '/tmp/doc',
-                    createdAt: new Fecha().toISOString(),
-                    updatedAt: new Fecha().toISOString(),
-                    deletedAt: new Fecha().toISOString(),
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    deletedAt: new Date().toISOString(),
                 },
             ],
         });
@@ -207,18 +207,18 @@ describe('findDeletedAttachmentsForFileCleanup', () => {
             title: 'Task',
             status: 'done',
             contexts: [],
-            createdAt: new Fecha().toISOString(),
-            updatedAt: new Fecha().toISOString(),
-            deletedAt: new Fecha().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: new Date().toISOString(),
             attachments: [
                 {
                     id: 'a1',
                     kind: 'file',
                     title: 'file',
                     uri: '/tmp/file',
-                    createdAt: new Fecha().toISOString(),
-                    updatedAt: new Fecha().toISOString(),
-                    deletedAt: new Fecha().toISOString(),
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    deletedAt: new Date().toISOString(),
                 },
             ],
         });
@@ -456,18 +456,18 @@ describe('legacy record removal coverage', () => {
                     title: 'Task',
                     status: 'done',
                     contexts: [],
-                    createdAt: new Fecha().toISOString(),
-                    updatedAt: new Fecha().toISOString(),
-                    deletedAt: new Fecha().toISOString(),
-                    purgedAt: new Fecha().toISOString(),
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    deletedAt: new Date().toISOString(),
+                    purgedAt: new Date().toISOString(),
                     attachments: [
                         {
                             id: 'a1',
                             kind: 'file',
                             title: 'file',
                             uri: '/tmp/file',
-                            createdAt: new Fecha().toISOString(),
-                            updatedAt: new Fecha().toISOString(),
+                            createdAt: new Date().toISOString(),
+                            updatedAt: new Date().toISOString(),
                         },
                     ],
                 },
@@ -477,18 +477,18 @@ describe('legacy record removal coverage', () => {
                     id: 'p1',
                     title: 'Project',
                     status: 'active',
-                    createdAt: new Fecha().toISOString(),
-                    updatedAt: new Fecha().toISOString(),
-                    deletedAt: new Fecha().toISOString(),
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    deletedAt: new Date().toISOString(),
                     attachments: [
                         {
                             id: 'a2',
                             kind: 'file',
                             title: 'file2',
                             uri: '/tmp/file2',
-                            createdAt: new Fecha().toISOString(),
-                            updatedAt: new Fecha().toISOString(),
-                            deletedAt: new Fecha().toISOString(),
+                            createdAt: new Date().toISOString(),
+                            updatedAt: new Date().toISOString(),
+                            deletedAt: new Date().toISOString(),
                         },
                     ],
                 },
@@ -499,7 +499,7 @@ describe('legacy record removal coverage', () => {
         };
 
         const cleaned = applyAttachmentCleanupResult(data, {
-            lastCleanupAt: new Fecha().toISOString(),
+            lastCleanupAt: new Date().toISOString(),
             removableAttachmentIds: ['a1'],
             processedFileTombstoneIds: ['a2'],
         });

@@ -116,7 +116,7 @@ export function buildQuickAddPreviewEntries(
         entries.push({
             id: 'due',
             kind: 'due',
-            label: tFallback(t, 'taskEdit.dueDateLabel', 'Due Fecha'),
+            label: tFallback(t, 'taskEdit.dueDateLabel', 'Due Date'),
             value: formatPreviewDate(dueValue),
             tone: 'default',
         });
@@ -126,7 +126,7 @@ export function buildQuickAddPreviewEntries(
         entries.push({
             id: 'start',
             kind: 'start',
-            label: tFallback(t, 'taskEdit.startDateLabel', 'Start Fecha'),
+            label: tFallback(t, 'taskEdit.startDateLabel', 'Start Date'),
             value: formatPreviewDate(startValue),
             tone: 'default',
         });
@@ -135,7 +135,7 @@ export function buildQuickAddPreviewEntries(
         entries.push({
             id: 'review',
             kind: 'review',
-            label: tFallback(t, 'taskEdit.reviewDateLabel', 'Review Fecha'),
+            label: tFallback(t, 'taskEdit.reviewDateLabel', 'Review Date'),
             value: formatPreviewDate(props.reviewAt),
             tone: 'default',
         });

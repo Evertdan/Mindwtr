@@ -44,10 +44,10 @@ const LEGACY_STATUS_MAP: Record<string, TaskStatus> = {
     doing: 'next',
 };
 
-const isFutureStart = (task: Pick<Task, 'startTime'>, now: Fecha): boolean => {
+const isFutureStart = (task: Pick<Task, 'startTime'>, now: Date): boolean => {
     const start = safeParseDate(task.startTime);
     if (!start) return false;
-    const endOfToday = new Fecha(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     return start > endOfToday;
 };
 
@@ -68,18 +68,18 @@ export function normalizeTaskStatus(value: unknown): TaskStatus {
     return 'inbox';
 }
 
-export function normalizeTaskForLoad(task: Task, nowIso: string = new Fecha().toISOString()): Task {
+export function normalizeTaskForLoad(task: Task, nowIso: string = new Date().toISOString()): Task {
     const normalizedStatus = normalizeTaskStatus((task as any).status);
     const { rev: _legacyRev, revBy: _legacyRevBy, ...rest } = task as Task & { rev?: unknown; revBy?: unknown };
 
     let createdAtIso = typeof task.createdAt === 'string' ? task.createdAt : nowIso;
-    const createdAtMs = Fecha.parse(createdAtIso);
+    const createdAtMs = Date.parse(createdAtIso);
     if (!Number.isFinite(createdAtMs)) {
         createdAtIso = nowIso;
     }
     let updatedAtIso = typeof task.updatedAt === 'string' ? task.updatedAt : createdAtIso;
-    const updatedAtMs = Fecha.parse(updatedAtIso);
-    if (!Number.isFinite(updatedAtMs) || updatedAtMs < Fecha.parse(createdAtIso)) {
+    const updatedAtMs = Date.parse(updatedAtIso);
+    if (!Number.isFinite(updatedAtMs) || updatedAtMs < Date.parse(createdAtIso)) {
         updatedAtIso = createdAtIso;
     }
 
@@ -150,7 +150,7 @@ export function normalizeTaskForLoad(task: Task, nowIso: string = new Fecha().to
         next.completedAt = task.completedAt || task.updatedAt || nowIso;
         next.isFocusedToday = false;
         next.focusOrder = undefined;
-    } else if (next.isFocusedToday && isFutureStart(next, new Fecha(nowIso))) {
+    } else if (next.isFocusedToday && isFutureStart(next, new Date(nowIso))) {
         next.isFocusedToday = false;
         next.focusOrder = undefined;
     } else if (task.completedAt) {

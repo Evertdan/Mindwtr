@@ -11,12 +11,12 @@ import {
 import type { AppTheme, TaskStatus } from './types';
 
 const TASK_STATUSES: TaskStatus[] = ['inbox', 'next', 'waiting', 'someday', 'reference', 'done', 'archived'];
-const CONCRETE_THEMES = SETTINGS_THEME_VALUES.filter((theme): theme is Excluir<AppTheme, 'system'> => theme !== 'system');
+const CONCRETE_THEMES = SETTINGS_THEME_VALUES.filter((theme): theme is Exclude<AppTheme, 'system'> => theme !== 'system');
 
 // The one place the intended light/dark split is stated independently of the
 // registry — without it the tests below would only prove the registry agrees
 // with itself. A theme missing here has no expected scheme, so the loop fails.
-const EXPECTED_SCHEMES: Record<Excluir<AppTheme, 'system'>, ThemeColorScheme> = {
+const EXPECTED_SCHEMES: Record<Exclude<AppTheme, 'system'>, ThemeColorScheme> = {
     'light': 'light',
     'dark': 'dark',
     'eink': 'light',

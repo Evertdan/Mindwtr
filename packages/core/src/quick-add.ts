@@ -113,7 +113,7 @@ export interface ProjectNextActionParseContext {
     sectionId?: string | null;
     projects?: Project[];
     areas?: Area[];
-    now?: Fecha;
+    now?: Date;
     parseOptions?: QuickAddParseOptions;
 }
 
@@ -131,7 +131,7 @@ export function parseProjectNextActionInput(
     input: string,
     context: ProjectNextActionParseContext,
 ): { title: string; props: Partial<Task>; invalidDateCommands?: string[] } {
-    const { projectId, sectionId, projects, areas, now = new Fecha(), parseOptions } = context;
+    const { projectId, sectionId, projects, areas, now = new Date(), parseOptions } = context;
     const parsed = parseQuickAdd(input, projects, now, areas, parseOptions);
     const props: Partial<Task> = { ...parsed.props };
     let title = parsed.title;
@@ -352,14 +352,14 @@ type DateCommandParseOptions = {
 };
 
 type ParsedNaturalDate = {
-    date: Fecha;
+    date: Date;
     hasExplicitTime: boolean;
 };
 
-function buildDefaultDate(now: Fecha, defaultTimeMode: DateDefaultTimeMode): Fecha {
+function buildDefaultDate(now: Date, defaultTimeMode: DateDefaultTimeMode): Date {
     const fallbackHour = defaultTimeMode === 'startOfDay' ? 0 : now.getHours();
     const fallbackMinute = defaultTimeMode === 'startOfDay' ? 0 : now.getMinutes();
-    return set(new Fecha(now), { hours: fallbackHour, minutes: fallbackMinute, seconds: 0, milliseconds: 0 });
+    return set(new Date(now), { hours: fallbackHour, minutes: fallbackMinute, seconds: 0, milliseconds: 0 });
 }
 
 function parseDefaultScheduleTime(value?: string | null): { hours: number; minutes: number } | null {
@@ -391,7 +391,7 @@ function hasNaturalTimeHint(text: string): boolean {
 
 function resolveChronoDate(
     result: chrono.ParsedResult,
-    now: Fecha,
+    now: Date,
     defaultTimeMode: DateDefaultTimeMode,
 ): ParsedNaturalDate | null {
     let parsed = result.start.date();
@@ -426,7 +426,7 @@ function orderedChronoInstances(text: string): chrono.Chrono[] {
 
 // A result only counts if it spans the whole input — used for both the
 // locale attempt and the English fallback so the acceptance rule lives once.
-function parseWholeTextResult(chronoInstance: chrono.Chrono, text: string, now: Fecha): chrono.ParsedResult | null {
+function parseWholeTextResult(chronoInstance: chrono.Chrono, text: string, now: Date): chrono.ParsedResult | null {
     const results = chronoInstance.parse(text, { instant: now }, { forwardDate: true });
     const result = results[0];
     if (!result) return null;
@@ -435,7 +435,7 @@ function parseWholeTextResult(chronoInstance: chrono.Chrono, text: string, now: 
     return result;
 }
 
-function parseNaturalDate(raw: string, now: Fecha, defaultTimeMode: DateDefaultTimeMode = 'now'): ParsedNaturalDate | null {
+function parseNaturalDate(raw: string, now: Date, defaultTimeMode: DateDefaultTimeMode = 'now'): ParsedNaturalDate | null {
     const text = raw.trim();
     if (!text) return { date: buildDefaultDate(now, defaultTimeMode), hasExplicitTime: defaultTimeMode === 'now' };
 
@@ -457,7 +457,7 @@ function formatDueDateValue(parsed: ParsedNaturalDate): string {
 function findTrailingDateInResults(
     results: chrono.ParsedResult[],
     trimmed: string,
-    now: Fecha,
+    now: Date,
     language: Language,
 ): QuickAddDetectedDate | undefined {
     for (let index = results.length - 1; index >= 0; index -= 1) {
@@ -486,7 +486,7 @@ function findTrailingDateInResults(
     return undefined;
 }
 
-function detectTrailingDate(title: string, now: Fecha): QuickAddDetectedDate | undefined {
+function detectTrailingDate(title: string, now: Date): QuickAddDetectedDate | undefined {
     const trimmed = title.trim();
     if (!trimmed) return undefined;
 
@@ -689,7 +689,7 @@ function matchQuickAddQuotedName(working: string, marker: '+' | '!' | '%'): { ra
 function parseDateCommand(
     command: 'start' | 'due' | 'review',
     working: string,
-    now: Fecha,
+    now: Date,
     options: DateCommandParseOptions = {},
 ): { value?: string; working: string; invalidCommand?: string } {
     const match = working.match(new RegExp(`${QUICK_ADD_COMMAND_START}\\/${command}:([\\s\\S]+?)${QUICK_ADD_COMMAND_BOUNDARY}`, 'i'));
@@ -719,7 +719,7 @@ function parseDateCommand(
 
 function parseDateCommandsFromWorking(
     working: string,
-    now: Fecha,
+    now: Date,
     options: DateCommandParseOptions = {},
 ): {
     working: string;
@@ -754,7 +754,7 @@ function parseDateCommandsFromWorking(
     };
 }
 
-function buildQuickAddLinkAttachment(input: string, now: Fecha): Attachment | null {
+function buildQuickAddLinkAttachment(input: string, now: Date): Attachment | null {
     const normalized = normalizeLinkAttachmentInput(input);
     if (!normalized.uri.trim()) return null;
     const createdAt = now.toISOString();
@@ -770,7 +770,7 @@ function buildQuickAddLinkAttachment(input: string, now: Fecha): Attachment | nu
 
 function parseLinkCommandsFromWorking(
     working: string,
-    now: Fecha,
+    now: Date,
 ): { attachments?: Attachment[]; working: string } {
     const attachments: Attachment[] = [];
     const linkCommandRe = new RegExp(`${QUICK_ADD_COMMAND_START}\\/link:([\\s\\S]*?)${QUICK_ADD_COMMAND_BOUNDARY}`, 'i');
@@ -797,7 +797,7 @@ function parseLinkCommandsFromWorking(
 
 export function parseQuickAddDateCommands(
     input: string,
-    now: Fecha = new Fecha(),
+    now: Date = new Date(),
     options: Pick<QuickAddParseOptions, 'preserveText' | 'defaultScheduleTime'> = {},
 ): QuickAddDateCommandsResult {
     const protectedInput = protectEscapes(input.trim());
@@ -825,7 +825,7 @@ export function parseQuickAddDateCommands(
 export function parseQuickAdd(
     input: string,
     projects?: Project[],
-    now: Fecha = new Fecha(),
+    now: Date = new Date(),
     areas?: Area[],
     options: QuickAddParseOptions = {},
 ): QuickAddResult {

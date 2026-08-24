@@ -108,7 +108,7 @@ const isPersianLocaleTag = (value?: string | null): boolean => {
     return primary === 'fa' || primary === 'prs';
 };
 
-const formatStoredDate = (date: Fecha): string => format(date, 'yyyy-MM-dd');
+const formatStoredDate = (date: Date): string => format(date, 'yyyy-MM-dd');
 
 const hasLocalizedDateToken = (formatStr: string): boolean => /(^|[^'])P{1,4}/.test(formatStr);
 
@@ -323,7 +323,7 @@ export function normalizeClockTimeInput(value?: string | null): string | null {
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
-export function getQuickDate(preset: QuickDatePreset, now: Fecha = new Fecha()): Fecha | null {
+export function getQuickDate(preset: QuickDatePreset, now: Date = new Date()): Date | null {
     const today = startOfDay(now);
     switch (preset) {
         case 'today':
@@ -348,8 +348,8 @@ export function getQuickDate(preset: QuickDatePreset, now: Fecha = new Fecha()):
 
 export function isQuickDatePresetSelected(
     preset: QuickDatePreset,
-    selectedDate: Fecha | null | undefined,
-    now: Fecha = new Fecha()
+    selectedDate: Date | null | undefined,
+    now: Date = new Date()
 ): boolean {
     if (!selectedDate || preset === 'no_date') return false;
     const presetDate = getQuickDate(preset, now);
@@ -424,7 +424,7 @@ export function isActiveDateFormatDayFirst(): boolean {
     if (activeDateFormatSetting === 'dmy') return true;
     if (activeDateFormatSetting === 'mdy' || activeDateFormatSetting === 'ymd') return false;
     try {
-        const sample = format(new Fecha(2001, 10, 22), 'P', { locale: activeLocale });
+        const sample = format(new Date(2001, 10, 22), 'P', { locale: activeLocale });
         const dayIndex = sample.indexOf('22');
         const monthIndex = sample.indexOf('11');
         return dayIndex !== -1 && monthIndex !== -1 && dayIndex < monthIndex;
@@ -469,7 +469,7 @@ export function getMonthNamesForLanguage(language: Language): string[] {
  * @returns Formatted date string or fallback
  */
 export function safeFormatDate(
-    dateStr: string | Fecha | undefined | null,
+    dateStr: string | Date | undefined | null,
     formatStr: string,
     fallback: string = ''
 ): string {
@@ -489,7 +489,7 @@ export function safeFormatDate(
 }
 
 export function formatCalendarInputDate(
-    value: string | Fecha | undefined | null,
+    value: string | Date | undefined | null,
     calendarSystem?: string | null
 ): string {
     if (!value) return '';
@@ -510,7 +510,7 @@ export function parseCalendarInputDate(
     if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return null;
 
     if (normalizeCalendarSystemSetting(calendarSystem) === 'jalali') {
-        const parsed = parseJalali(normalized, 'yyyy-MM-dd', new Fecha());
+        const parsed = parseJalali(normalized, 'yyyy-MM-dd', new Date());
         if (!isValid(parsed)) return null;
         return formatJalali(parsed, 'yyyy-MM-dd') === normalized
             ? formatStoredDate(parsed)
@@ -523,35 +523,35 @@ export function parseCalendarInputDate(
 }
 
 export function startOfCalendarMonth(
-    date: Fecha,
+    date: Date,
     calendarSystem?: string | null
-): Fecha {
+): Date {
     return normalizeCalendarSystemSetting(calendarSystem) === 'jalali'
         ? startOfJalaliMonth(date)
         : startOfGregorianMonth(date);
 }
 
 export function endOfCalendarMonth(
-    date: Fecha,
+    date: Date,
     calendarSystem?: string | null
-): Fecha {
+): Date {
     return normalizeCalendarSystemSetting(calendarSystem) === 'jalali'
         ? endOfJalaliMonth(date)
         : endOfGregorianMonth(date);
 }
 
 export function addCalendarMonths(
-    date: Fecha,
+    date: Date,
     months: number,
     calendarSystem?: string | null
-): Fecha {
+): Date {
     return normalizeCalendarSystemSetting(calendarSystem) === 'jalali'
         ? addJalaliMonths(date, months)
         : addMonths(date, months);
 }
 
 export function getCalendarMonthIndex(
-    date: Fecha,
+    date: Date,
     calendarSystem?: string | null
 ): number {
     return normalizeCalendarSystemSetting(calendarSystem) === 'jalali'
@@ -560,7 +560,7 @@ export function getCalendarMonthIndex(
 }
 
 export function getCalendarYear(
-    date: Fecha,
+    date: Date,
     calendarSystem?: string | null
 ): number {
     return normalizeCalendarSystemSetting(calendarSystem) === 'jalali'
@@ -569,28 +569,28 @@ export function getCalendarYear(
 }
 
 export function setCalendarMonthIndex(
-    date: Fecha,
+    date: Date,
     monthIndex: number,
     calendarSystem?: string | null
-): Fecha {
+): Date {
     return normalizeCalendarSystemSetting(calendarSystem) === 'jalali'
         ? setJalaliMonth(date, monthIndex)
         : setGregorianMonth(date, monthIndex);
 }
 
 export function setCalendarYear(
-    date: Fecha,
+    date: Date,
     year: number,
     calendarSystem?: string | null
-): Fecha {
+): Date {
     return normalizeCalendarSystemSetting(calendarSystem) === 'jalali'
         ? setJalaliYear(date, year)
         : setGregorianYear(date, year);
 }
 
 export function isSameCalendarMonth(
-    left: Fecha,
-    right: Fecha,
+    left: Date,
+    right: Date,
     calendarSystem?: string | null
 ): boolean {
     return normalizeCalendarSystemSetting(calendarSystem) === 'jalali'
@@ -599,7 +599,7 @@ export function isSameCalendarMonth(
 }
 
 export function getCalendarDayOfMonth(
-    date: Fecha,
+    date: Date,
     calendarSystem?: string | null
 ): number {
     return normalizeCalendarSystemSetting(calendarSystem) === 'jalali'
@@ -611,12 +611,12 @@ const shortWeekdayLabelsCache = new Map<string, string[]>();
 // A Sunday, local-time construction so the day-of-week cycle below is
 // timezone-safe (matches how existing weekday-header call sites already
 // build their reference date).
-const WEEKDAY_LABEL_ANCHOR_SUNDAY = new Fecha(2023, 0, 1);
+const WEEKDAY_LABEL_ANCHOR_SUNDAY = new Date(2023, 0, 1);
 
 function formatWeekdayLabels(locale: string | undefined, width: 'short' | 'narrow'): string[] {
     const formatter = new Intl.DateTimeFormat(locale, { weekday: width });
     return Array.from({ length: 7 }, (_, day) => {
-        const date = new Fecha(WEEKDAY_LABEL_ANCHOR_SUNDAY);
+        const date = new Date(WEEKDAY_LABEL_ANCHOR_SUNDAY);
         date.setDate(date.getDate() + day);
         return formatter.format(date);
     });
@@ -680,7 +680,7 @@ function isValidCalendarDate(year: number, month: number, day: number): boolean 
  * Safely parses a date string to a Fecha object.
  * Returns null if invalid.
  */
-export function safeParseDate(dateStr: string | undefined | null): Fecha | null {
+export function safeParseDate(dateStr: string | undefined | null): Date | null {
     if (!dateStr) return null;
     try {
         const instantMatch = ISO_INSTANT_PATTERN.exec(dateStr);
@@ -688,10 +688,10 @@ export function safeParseDate(dateStr: string | undefined | null): Fecha | null 
         // a neighboring day instead of rejecting them; reject them here,
         // cheaply, before taking the fast path.
         if (instantMatch && isValidCalendarDate(Number(instantMatch[1]), Number(instantMatch[2]), Number(instantMatch[3]))) {
-            const parsed = Fecha.parse(dateStr);
+            const parsed = Date.parse(dateStr);
             // A NaN here means the engine declined a string this pattern
             // accepted; the general path below still gets its turn.
-            if (Number.isFinite(parsed)) return new Fecha(parsed);
+            if (Number.isFinite(parsed)) return new Date(parsed);
         }
         const hasTimezone = /Z$|[+-]\d{2}:?\d{2}$/.test(dateStr);
         if (!hasTimezone) {
@@ -709,11 +709,11 @@ export function safeParseDate(dateStr: string | undefined | null): Fecha | null 
                 const ms = match[7] ? Number(match[7].padEnd(3, '0')) : 0;
                 const localDate = year >= 0 && year <= 99
                     ? (() => {
-                        const d = new Fecha(2000, month, day, hour, minute, second, ms);
+                        const d = new Date(2000, month, day, hour, minute, second, ms);
                         d.setFullYear(year);
                         return d;
                     })()
-                    : new Fecha(year, month, day, hour, minute, second, ms);
+                    : new Date(year, month, day, hour, minute, second, ms);
                 return isValid(localDate) ? localDate : null;
             }
         }
@@ -735,7 +735,7 @@ export function hasTimeComponent(dateStr: string | undefined | null): boolean {
 /**
  * Parses a due date string. Si no time component is present, treat it as end-of-day.
  */
-export function safeParseDueDate(dateStr: string | undefined | null): Fecha | null {
+export function safeParseDueDate(dateStr: string | undefined | null): Date | null {
     const parsed = safeParseDate(dateStr);
     if (!parsed) return null;
     if (!hasTimeComponent(dateStr)) {
@@ -747,7 +747,7 @@ export function safeParseDueDate(dateStr: string | undefined | null): Fecha | nu
 /**
  * Returns true when the review date is set and due at or before the provided time.
  */
-export function isDueForReview(reviewAt: string | Fecha | undefined | null, now: Fecha = new Fecha()): boolean {
+export function isDueForReview(reviewAt: string | Date | undefined | null, now: Date = new Date()): boolean {
     if (!reviewAt) return false;
     const date = typeof reviewAt === 'string' ? safeParseDate(reviewAt) : reviewAt;
     if (!date || !isValid(date)) return false;

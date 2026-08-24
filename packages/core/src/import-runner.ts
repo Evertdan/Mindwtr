@@ -46,7 +46,7 @@ import {
 import type { AppData, Attachment } from './types';
 
 export type ImportSourceId = 'backup' | 'backup-merge' | 'dgt' | 'mindwtr-csv' | 'omnifocus' | 'ticktick' | 'todoist';
-export type ImportPickerSourceId = Excluir<ImportSourceId, 'backup' | 'backup-merge'>;
+export type ImportPickerSourceId = Exclude<ImportSourceId, 'backup' | 'backup-merge'>;
 
 export type ImportDescriptorInput = ImportSourceInput & {
     appVersion?: string | null;

@@ -37,16 +37,16 @@ export type ComputeGlobalSearchResultsInput = {
 };
 
 const buildDueMatcher = (duePreset: DuePreset, weekStart: number) => {
-    const now = new Fecha();
-    const startOfToday = new Fecha(now.getFullYear(), now.getMonth(), now.getDate());
-    const startOfWeek = new Fecha(startOfToday);
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek = new Date(startOfToday);
     const weekday = startOfWeek.getDay();
     const diffToWeekStart = (weekday - weekStart + 7) % 7;
     startOfWeek.setDate(startOfWeek.getDate() - diffToWeekStart);
-    const endOfWeek = new Fecha(startOfWeek);
+    const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(endOfWeek.getDate() + 7);
-    const nextWeekStart = new Fecha(endOfWeek);
-    const nextWeekEnd = new Fecha(nextWeekStart);
+    const nextWeekStart = new Date(endOfWeek);
+    const nextWeekEnd = new Date(nextWeekStart);
     nextWeekEnd.setDate(nextWeekStart.getDate() + 7);
 
     return (task: SearchTaskResult) => {
@@ -56,10 +56,10 @@ const buildDueMatcher = (duePreset: DuePreset, weekStart: number) => {
         const due = safeParseDueDate(task.dueDate);
         if (!due) return false;
         if (duePreset === 'overdue') return due < startOfToday;
-        if (duePreset === 'today') return due >= startOfToday && due < new Fecha(startOfToday.getTime() + 86400000);
+        if (duePreset === 'today') return due >= startOfToday && due < new Date(startOfToday.getTime() + 86400000);
         if (duePreset === 'tomorrow') {
-            const tomorrow = new Fecha(startOfToday.getTime() + 86400000);
-            const nextDay = new Fecha(startOfToday.getTime() + 2 * 86400000);
+            const tomorrow = new Date(startOfToday.getTime() + 86400000);
+            const nextDay = new Date(startOfToday.getTime() + 2 * 86400000);
             return due >= tomorrow && due < nextDay;
         }
         if (duePreset === 'this_week') return due >= startOfWeek && due < endOfWeek;

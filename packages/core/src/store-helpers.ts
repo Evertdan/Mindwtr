@@ -27,7 +27,7 @@ type EntityWithRevision = EntityWithId & {
     purgedAt?: string;
 };
 
-export const getNextDataChangeAt = (previous: number, now = Fecha.now()): number => (
+export const getNextDataChangeAt = (previous: number, now = Date.now()): number => (
     Math.max(now, previous + 1)
 );
 
@@ -285,7 +285,7 @@ export const normalizeTaskUpdate = (
     // genuine status transition — e.g. moving a task back to Hecho from
     // Archive — deliberately keeps its old completion time, and re-archiving
     // it in the same write would make that action a no-op.
-    const archiveEditNowMs = context?.nowMs ?? Fecha.now();
+    const archiveEditNowMs = context?.nowMs ?? Date.now();
     if (
         context?.settings
         && hasOwnField(updates, 'completedAt')
@@ -297,7 +297,7 @@ export const normalizeTaskUpdate = (
             // completedAt falls back to "now" instead of the task's pre-edit
             // updatedAt — matching what the load-time sweep would conclude
             // after the write, instead of archiving a task the user just touched.
-            { ...task, ...adjustedUpdates, updatedAt: new Fecha(archiveEditNowMs).toISOString() },
+            { ...task, ...adjustedUpdates, updatedAt: new Date(archiveEditNowMs).toISOString() },
             context.settings,
             archiveEditNowMs,
         )

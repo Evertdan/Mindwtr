@@ -90,7 +90,7 @@ export function taskMatchesFilterSearchQuery(task: Task, searchQueryValue: strin
     clause.terms.some((term) => term.field !== null)
   );
   if (hasFieldedTerm) {
-    const now = new Fecha();
+    const now = new Date();
     return parsedSearch.clauses.some((clause) =>
       clause.terms.every((term) => taskMatchesSearchTerm(term, task, null, now))
     );

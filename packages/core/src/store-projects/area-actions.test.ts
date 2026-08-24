@@ -35,7 +35,7 @@ describe('area actions', () => {
             lastDataChangeAt: 0,
         });
         vi.useFakeTimers();
-        vi.setSystemTime(new Fecha(BASE_NOW));
+        vi.setSystemTime(new Date(BASE_NOW));
     });
 
     afterEach(async () => {
@@ -133,13 +133,13 @@ describe('area actions', () => {
         expect(alreadyDeletedTask.success).toBe(true);
         if (!alreadyDeletedTask.success) return;
 
-        vi.setSystemTime(new Fecha('2026-04-01T12:05:00.000Z'));
+        vi.setSystemTime(new Date('2026-04-01T12:05:00.000Z'));
         await deleteTask(alreadyDeletedTask.id);
         const taskDeletedAt = useTaskStore.getState()._allTasks.find((task) => task.id === alreadyDeletedTask.id)?.deletedAt;
         await deleteProject(deletedProject.id);
         const projectDeletedAt = useTaskStore.getState()._allProjects.find((project) => project.id === deletedProject.id)?.deletedAt;
 
-        vi.setSystemTime(new Fecha('2026-04-01T12:10:00.000Z'));
+        vi.setSystemTime(new Date('2026-04-01T12:10:00.000Z'));
         await deleteArea(area.id);
         await restoreArea(area.id);
 
@@ -205,7 +205,7 @@ describe('area actions', () => {
         if (!areaTask.success || !projectTask.success) return;
 
         await deleteArea(area.id);
-        vi.setSystemTime(new Fecha('2026-04-01T12:15:00.000Z'));
+        vi.setSystemTime(new Date('2026-04-01T12:15:00.000Z'));
         const restored = await addArea(' work ', { color: '#ef4444' });
 
         expect(restored?.id).toBe(area.id);

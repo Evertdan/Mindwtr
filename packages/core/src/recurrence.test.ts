@@ -1448,8 +1448,8 @@ describe('recurrence', () => {
         expect(projected?.startTime).toBe('2026-07-22T09:00');
         expect(projected?.dueDate).toBe('2026-07-24T17:00');
 
-        const originalSpacingMs = new Fecha(task.dueDate as string).getTime() - new Fecha(task.startTime as string).getTime();
-        const projectedSpacingMs = new Fecha(projected?.dueDate as string).getTime() - new Fecha(projected?.startTime as string).getTime();
+        const originalSpacingMs = new Date(task.dueDate as string).getTime() - new Date(task.startTime as string).getTime();
+        const projectedSpacingMs = new Date(projected?.dueDate as string).getTime() - new Date(projected?.startTime as string).getTime();
         expect(projectedSpacingMs).toBe(originalSpacingMs);
     });
 
@@ -1499,12 +1499,12 @@ describe('recurrence', () => {
 
                     if (timing === 'future') {
                         if (task.dueDate) {
-                            expect(new Fecha(projected?.dueDate as string).getTime())
-                                .toBeGreaterThan(new Fecha(task.dueDate).getTime());
+                            expect(new Date(projected?.dueDate as string).getTime())
+                                .toBeGreaterThan(new Date(task.dueDate).getTime());
                         }
                         if (task.startTime) {
-                            expect(new Fecha(projected?.startTime as string).getTime())
-                                .toBeGreaterThan(new Fecha(task.startTime).getTime());
+                            expect(new Date(projected?.startTime as string).getTime())
+                                .toBeGreaterThan(new Date(task.startTime).getTime());
                         }
                     }
                 }
@@ -1647,7 +1647,7 @@ describe('expandCalendarRecurringTasksInRange', () => {
             '2026-08-10', '2026-08-17', '2026-08-24', '2026-08-31', '2026-09-07', '2026-09-14',
         ]);
         for (const occurrence of projected) {
-            expect(new Fecha(`${occurrence.dueDate}T00:00:00`).getDay()).toBe(1); // Monday
+            expect(new Date(`${occurrence.dueDate}T00:00:00`).getDay()).toBe(1); // Monday
         }
     });
 
@@ -1666,7 +1666,7 @@ describe('expandCalendarRecurringTasksInRange', () => {
             '2026-08-05', '2026-08-10', '2026-08-12', '2026-08-17', '2026-08-19',
         ]);
         for (const occurrence of projected) {
-            const weekday = new Fecha(`${occurrence.dueDate}T00:00:00`).getDay();
+            const weekday = new Date(`${occurrence.dueDate}T00:00:00`).getDay();
             expect([1, 3]).toContain(weekday); // Monday or Wednesday only
         }
     });
@@ -1686,7 +1686,7 @@ describe('expandCalendarRecurringTasksInRange', () => {
             '2026-08-03', '2026-08-05', '2026-08-07', '2026-08-09',
         ]);
         for (let i = 1; i < projected.length; i += 1) {
-            const gapMs = new Fecha(projected[i]!.dueDate as string).getTime() - new Fecha(projected[i - 1]!.dueDate as string).getTime();
+            const gapMs = new Date(projected[i]!.dueDate as string).getTime() - new Date(projected[i - 1]!.dueDate as string).getTime();
             expect(gapMs).toBe(2 * 24 * 60 * 60 * 1000);
         }
     });
@@ -1706,10 +1706,10 @@ describe('expandCalendarRecurringTasksInRange', () => {
             '2026-08-17', '2026-08-31', '2026-09-14',
         ]);
         for (const occurrence of projected) {
-            expect(new Fecha(`${occurrence.dueDate}T00:00:00`).getDay()).toBe(1); // stays on Monday
+            expect(new Date(`${occurrence.dueDate}T00:00:00`).getDay()).toBe(1); // stays on Monday
         }
         for (let i = 1; i < projected.length; i += 1) {
-            const gapMs = new Fecha(projected[i]!.dueDate as string).getTime() - new Fecha(projected[i - 1]!.dueDate as string).getTime();
+            const gapMs = new Date(projected[i]!.dueDate as string).getTime() - new Date(projected[i - 1]!.dueDate as string).getTime();
             expect(gapMs).toBe(14 * 24 * 60 * 60 * 1000);
         }
     });
@@ -2160,12 +2160,12 @@ describe('createNextRecurringTask late completion coherence', () => {
         ...overrides,
     });
 
-    const at = (iso: string): number => (safeParseDate(iso) as Fecha).getTime();
+    const at = (iso: string): number => (safeParseDate(iso) as Date).getTime();
     const calendarDayDiff = (fromIso: string, toIso: string): number => {
-        const from = safeParseDate(fromIso) as Fecha;
-        const to = safeParseDate(toIso) as Fecha;
-        const dayNumber = (date: Fecha) => (
-            Fecha.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000
+        const from = safeParseDate(fromIso) as Date;
+        const to = safeParseDate(toIso) as Date;
+        const dayNumber = (date: Date) => (
+            Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000
         );
         return dayNumber(to) - dayNumber(from);
     };

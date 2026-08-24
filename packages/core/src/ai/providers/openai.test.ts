@@ -15,7 +15,7 @@ const mockOpenAiSuccess = () =>
                 },
             ],
         }),
-        { status: 200, headers: { 'Contenido-Type': 'application/json' } },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
     );
 
 const originalFetch = globalThis.fetch;
@@ -85,7 +85,7 @@ describe('openai provider auth behavior', () => {
                         message: 'invalid token',
                     },
                 }),
-                { status: 401, headers: { 'Contenido-Type': 'application/json' } },
+                { status: 401, headers: { 'Content-Type': 'application/json' } },
             ));
         globalThis.fetch = fetchMock as unknown as typeof fetch;
 
@@ -240,7 +240,7 @@ describe('openai provider auth behavior', () => {
                         },
                     ],
                 }),
-                { status: 200, headers: { 'Contenido-Type': 'application/json' } },
+                { status: 200, headers: { 'Content-Type': 'application/json' } },
             ));
         globalThis.fetch = fetchMock as unknown as typeof fetch;
 
@@ -276,7 +276,7 @@ describe('openai provider auth behavior', () => {
                         },
                     ],
                 }),
-                { status: 200, headers: { 'Contenido-Type': 'application/json' } },
+                { status: 200, headers: { 'Content-Type': 'application/json' } },
             ));
         globalThis.fetch = fetchMock as unknown as typeof fetch;
 
@@ -296,7 +296,7 @@ describe('openai provider auth behavior', () => {
 const mockContent = (content: unknown) =>
     new Response(
         JSON.stringify({ choices: [{ message: { content: JSON.stringify(content) } }] }),
-        { status: 200, headers: { 'Contenido-Type': 'application/json' } },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
     );
 
 const readBody = (fetchMock: ReturnType<typeof vi.fn>) => {
@@ -341,7 +341,7 @@ describe('openai structured outputs', () => {
         const requiresSchema = () =>
             new Response(
                 JSON.stringify({ error: { message: "'response_format.type' must be 'json_schema'" } }),
-                { status: 400, headers: { 'Contenido-Type': 'application/json' } },
+                { status: 400, headers: { 'Content-Type': 'application/json' } },
             );
         let call = 0;
         const fetchMock = vi.fn(async () => {
@@ -375,7 +375,7 @@ describe('openai structured outputs', () => {
         const requiresSchema = () =>
             new Response(
                 JSON.stringify({ error: "'response_format.type' must be 'json_schema' or 'text'" }),
-                { status: 400, headers: { 'Contenido-Type': 'application/json' } },
+                { status: 400, headers: { 'Content-Type': 'application/json' } },
             );
         let call = 0;
         const fetchMock = vi.fn(async () => {
@@ -471,7 +471,7 @@ describe('openai structured outputs', () => {
         const unsupported = () =>
             new Response(
                 JSON.stringify({ error: { message: "This model does not support the 'response_format' parameter with json_schema.", type: 'invalid_request_error', code: 'unsupported_parameter' } }),
-                { status: 400, headers: { 'Contenido-Type': 'application/json' } },
+                { status: 400, headers: { 'Content-Type': 'application/json' } },
             );
         let call = 0;
         const fetchMock = vi.fn(async () => {
@@ -495,7 +495,7 @@ describe('openai structured outputs', () => {
         const fetchMock = vi.fn(async () =>
             new Response(
                 JSON.stringify({ error: { message: 'Invalid value for max_tokens.', type: 'invalid_request_error' } }),
-                { status: 400, headers: { 'Contenido-Type': 'application/json' } },
+                { status: 400, headers: { 'Content-Type': 'application/json' } },
             ));
         globalThis.fetch = fetchMock as unknown as typeof fetch;
 
@@ -508,7 +508,7 @@ describe('openai structured outputs', () => {
 describe('openai error body parsing', () => {
     it('recovers a non-JSON error body (body read once as text, not consumed by json())', async () => {
         const fetchMock = vi.fn(async () =>
-            new Response('gateway exploded', { status: 502, headers: { 'Contenido-Type': 'text/plain' } }));
+            new Response('gateway exploded', { status: 502, headers: { 'Content-Type': 'text/plain' } }));
         globalThis.fetch = fetchMock as unknown as typeof fetch;
 
         const provider = createOpenAIProvider({ provider: 'openai', apiKey: 'test-key', model: 'gpt-5.4-mini' });

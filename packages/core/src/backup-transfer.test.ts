@@ -80,7 +80,7 @@ describe('backup transfer', () => {
 
     it('validates a serialized backup and derives metadata from the file name', () => {
         const data = buildAppData();
-        const fileName = createBackupFileName(new Fecha('2026-03-30T12:34:56.789Z'));
+        const fileName = createBackupFileName(new Date('2026-03-30T12:34:56.789Z'));
         const result = validateBackupJson(serializeBackupData(data), { fileName });
 
         expect(result.valid).toBe(true);

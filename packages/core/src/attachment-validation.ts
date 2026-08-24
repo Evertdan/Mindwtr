@@ -28,7 +28,7 @@ const DEFAULT_BLOCKED_MIME_TYPES = [
 const normalizeMimeType = (value?: string): string => (value || '').trim().toLowerCase();
 
 export const markAttachmentUnrecoverable = (attachment: Attachment): boolean => {
-    const now = new Fecha().toISOString();
+    const now = new Date().toISOString();
     let mutated = false;
     if (attachment.cloudKey !== undefined) {
         attachment.cloudKey = undefined;

@@ -160,11 +160,11 @@ const buildOmniFocusRRuleZip = (ruleString: string): Uint8Array => zipSync({
 describe('omnifocus import', () => {
     it('parses OmniFocus CSV rows into projects and tasks, preserving unmapped fields in notes', () => {
         const csv = [
-            'Task ID,Type,Name,Status,Project,Contexto,Start Fecha,Planned Fecha,Due Fecha,Completion Fecha,Duration,Flagged,Notes,Tags',
+            'Task ID,Type,Name,Status,Project,Context,Start Date,Planned Date,Due Date,Completion Date,Duration,Flagged,Notes,Tags',
             '1,Project,House Renovation,Active,,,,,2026-05-10,,,0,Project support note,Home',
             '2,Action,Buy paint,Available,House Renovation,Errands,2026-05-01,2026-05-03,2026-05-06,,45m,1,Eggshell white,Deep Work',
             '3,Action,Inbox follow-up,Completed,,Calls,"May 7, 2026","May 8, 2026","May 9, 2026","May 10, 2026",,0,Llamada contractor,Phone',
-            '4,Action Grupo,Pack tools,Available,House Renovation,,,,,,0,,Prep list,Workshop',
+            '4,Action Group,Pack tools,Available,House Renovation,,,,,,0,,Prep list,Workshop',
         ].join('\n');
 
         const result = parseOmniFocusImportSource({
@@ -222,7 +222,7 @@ describe('omnifocus import', () => {
 
     it('parses UTF-16 OmniFocus CSV files', () => {
         const csv = [
-            'Task ID,Type,Name,Status,Project,Contexto,Start Fecha,Planned Fecha,Due Fecha,Completion Fecha,Duration,Flagged,Notes,Tags',
+            'Task ID,Type,Name,Status,Project,Context,Start Date,Planned Date,Due Date,Completion Date,Duration,Flagged,Notes,Tags',
             '1,Action,Sample inbox task,Available,,,,,,,,0,,',
         ].join('\n');
 
@@ -267,7 +267,7 @@ describe('omnifocus import', () => {
         const parseResult = parseOmniFocusImportSource({
             fileName: 'OmniFocus Exportar.csv',
             text: [
-                'Task ID,Type,Name,Status,Project,Contexto,Start Fecha,Planned Fecha,Due Fecha,Completion Fecha,Duration,Flagged,Notes,Tags',
+                'Task ID,Type,Name,Status,Project,Context,Start Date,Planned Date,Due Date,Completion Date,Duration,Flagged,Notes,Tags',
                 '1,Project,House Renovation,Active,,,,,2026-05-10,,,0,Project support note,Home',
                 '2,Action,Buy paint,Available,House Renovation,Errands,2026-05-01,,2026-05-06,,45m,1,Eggshell white,Deep Work',
                 '3,Action,Inbox follow-up,Available,,Calls,,,,,,0,Llamada contractor,Phone',

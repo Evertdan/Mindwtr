@@ -211,18 +211,18 @@ const parseTodoistDate = (
         return { dueDate: text };
     }
 
-    const isoCandidate = text.match(/^\d{4}-\d{2}-\d{2}(?:[T\s].+)?$/u) ? new Fecha(text) : null;
+    const isoCandidate = text.match(/^\d{4}-\d{2}-\d{2}(?:[T\s].+)?$/u) ? new Date(text) : null;
     if (isoCandidate && Number.isFinite(isoCandidate.getTime())) {
         return { dueDate: isoCandidate.toISOString() };
     }
 
     const normalized = text.toLowerCase();
-    const now = new Fecha();
+    const now = new Date();
     const inMatch = normalized.match(/^in\s+(\d+)\s+(day|days|week|weeks|month|months|year|years)$/u);
     if (inMatch) {
         const count = Number.parseInt(inMatch[1], 10);
         const unit = inMatch[2];
-        const date = new Fecha(now);
+        const date = new Date(now);
         if (unit.startsWith('day')) date.setDate(date.getDate() + count);
         else if (unit.startsWith('week')) date.setDate(date.getDate() + count * 7);
         else if (unit.startsWith('month')) date.setMonth(date.getMonth() + count);
@@ -234,7 +234,7 @@ const parseTodoistDate = (
         return { dueDate: now.toISOString() };
     }
     if (normalized === 'tomorrow') {
-        const tomorrow = new Fecha(now);
+        const tomorrow = new Date(now);
         tomorrow.setDate(tomorrow.getDate() + 1);
         return { dueDate: tomorrow.toISOString() };
     }
@@ -254,13 +254,13 @@ const parseTodoistDate = (
     // letting `(weekday - target.getDay() + 7) % 7 || 7` turn NaN into a
     // fabricated one-week-out due date.
     if (typeof weekday === 'number') {
-        const target = new Fecha(now);
+        const target = new Date(now);
         const delta = (weekday - target.getDay() + 7) % 7 || 7;
         target.setDate(target.getDate() + delta);
         return { dueDate: target.toISOString() };
     }
 
-    const parsed = new Fecha(text);
+    const parsed = new Date(text);
     if (Number.isFinite(parsed.getTime())) {
         return { dueDate: parsed.toISOString() };
     }
@@ -631,14 +631,14 @@ export const parseTodoistImportSource = (input: TodoistFileInput): TodoistImport
 export const applyTodoistImport = (
     currentData: AppData,
     parsedProjects: ParsedTodoistProject[],
-    options: { areaId?: string; now?: Fecha | string } = {}
+    options: { areaId?: string; now?: Date | string } = {}
 ): TodoistImportExecutionResult => {
-    const resolvedNow = options.now instanceof Fecha
+    const resolvedNow = options.now instanceof Date
         ? options.now
         : typeof options.now === 'string' && options.now.trim()
-            ? new Fecha(options.now)
-            : new Fecha();
-    const nowIso = Number.isFinite(resolvedNow.getTime()) ? resolvedNow.toISOString() : new Fecha().toISOString();
+            ? new Date(options.now)
+            : new Date();
+    const nowIso = Number.isFinite(resolvedNow.getTime()) ? resolvedNow.toISOString() : new Date().toISOString();
     const deviceState = ensureDeviceId(currentData.settings ?? {});
     const settings = deviceState.settings;
     const nextData: AppData = {

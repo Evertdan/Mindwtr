@@ -42,7 +42,7 @@ export const THEME_DESCRIPTORS = {
     'oled': { scheme: 'dark', statusPreset: 'oled', desktop: true },
     'catppuccin-macchiato': { scheme: 'dark', statusPreset: 'catppuccin-macchiato', desktop: true },
     'dracula': { scheme: 'dark', statusPreset: 'dracula', desktop: true },
-} as const satisfies Record<Excluir<AppTheme, 'system'>, ThemeDescriptor>;
+} as const satisfies Record<Exclude<AppTheme, 'system'>, ThemeDescriptor>;
 
 // A Map so inherited Object.prototype keys ('constructor', 'toString', …) in an
 // untrusted stored string can never resolve to a descriptor.

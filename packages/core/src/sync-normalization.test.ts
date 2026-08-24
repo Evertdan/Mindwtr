@@ -679,7 +679,7 @@ describe('sync normalization', () => {
     });
 
     it('clamps adversarial future timestamps during merge comparison', () => {
-        const nowSpy = vi.spyOn(Fecha, 'now').mockReturnValue(new Fecha(NOW).getTime());
+        const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(new Date(NOW).getTime());
         try {
             const local = mockAppData([
                 createMockTask('task-1', '2099-01-01T00:00:00.000Z'),
@@ -699,7 +699,7 @@ describe('sync normalization', () => {
 
     it('does not report clock skew at the warning boundary', () => {
         const localUpdatedAt = '2026-01-01T00:00:00.000Z';
-        const incomingUpdatedAt = new Fecha(Fecha.parse(localUpdatedAt) + CLOCK_SKEW_THRESHOLD_MS).toISOString();
+        const incomingUpdatedAt = new Date(Date.parse(localUpdatedAt) + CLOCK_SKEW_THRESHOLD_MS).toISOString();
         const result = mergeAppDataWithStats(
             mockAppData([{ ...createMockTask('task-1', localUpdatedAt), title: 'Local title' }]),
             mockAppData([{ ...createMockTask('task-1', incomingUpdatedAt), title: 'Entrante title' }]),

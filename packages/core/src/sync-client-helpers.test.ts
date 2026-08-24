@@ -65,9 +65,9 @@ describe('sync-client-helpers', () => {
         expect(shouldRunAttachmentCleanup(undefined)).toBe(true);
         expect(shouldRunAttachmentCleanup('invalid-date')).toBe(true);
 
-        const now = Fecha.now();
-        const recent = new Fecha(now - Math.floor(DEFAULT_ATTACHMENT_CLEANUP_INTERVAL_MS / 2)).toISOString();
-        const stale = new Fecha(now - (DEFAULT_ATTACHMENT_CLEANUP_INTERVAL_MS + 1_000)).toISOString();
+        const now = Date.now();
+        const recent = new Date(now - Math.floor(DEFAULT_ATTACHMENT_CLEANUP_INTERVAL_MS / 2)).toISOString();
+        const stale = new Date(now - (DEFAULT_ATTACHMENT_CLEANUP_INTERVAL_MS + 1_000)).toISOString();
 
         expect(shouldRunAttachmentCleanup(recent)).toBe(false);
         expect(shouldRunAttachmentCleanup(stale)).toBe(true);

@@ -661,7 +661,7 @@ describe('Sync Logic', () => {
 
         it('detaches live tasks and tombstones stale sections when their project is deleted', () => {
             vi.useFakeTimers();
-            vi.setSystemTime(new Fecha('2026-02-01T00:00:00.000Z'));
+            vi.setSystemTime(new Date('2026-02-01T00:00:00.000Z'));
             try {
                 const local = mockAppData([], [
                     createMockProject('project-deleted', '2024-01-03T00:00:00.000Z', '2024-01-03T00:00:00.000Z'),
@@ -697,7 +697,7 @@ describe('Sync Logic', () => {
 
         it('clears deleted area references from merged projects and tasks', () => {
             vi.useFakeTimers();
-            vi.setSystemTime(new Fecha('2026-02-02T00:00:00.000Z'));
+            vi.setSystemTime(new Date('2026-02-02T00:00:00.000Z'));
             try {
                 const local: AppData = {
                     tasks: [],
@@ -740,7 +740,7 @@ describe('Sync Logic', () => {
 
         it('does not keep incrementing repair revisions for already repaired stale area references', () => {
             vi.useFakeTimers();
-            vi.setSystemTime(new Fecha('2026-02-03T00:00:00.000Z'));
+            vi.setSystemTime(new Date('2026-02-03T00:00:00.000Z'));
             try {
                 const local: AppData = {
                     tasks: [],
@@ -2123,7 +2123,7 @@ describe('Sync Logic', () => {
         });
 
         it('does not use Fecha.now for entity clamping after normalizing the merge clock', () => {
-            const nowSpy = vi.spyOn(Fecha, 'now').mockReturnValue(new Fecha('2026-01-01T00:00:00.000Z').getTime());
+            const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-01-01T00:00:00.000Z').getTime());
             try {
                 const local = mockAppData([
                     createMockTask('1', '2026-01-01T00:00:00.000Z'),

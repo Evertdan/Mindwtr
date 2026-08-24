@@ -8,11 +8,11 @@ const RELATIVE_START_OFFSET_MAX_AMOUNT = 0;
 
 const pad2 = (value: number): string => String(value).padStart(2, '0');
 
-const formatLocalDate = (date: Fecha): string => (
+const formatLocalDate = (date: Date): string => (
     `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
 );
 
-const formatLocalDateTime = (date: Fecha): string => (
+const formatLocalDateTime = (date: Date): string => (
     `${formatLocalDate(date)}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`
 );
 
@@ -33,8 +33,8 @@ export const normalizeRelativeStartOffset = (value: unknown): RelativeStartOffse
     return { amount: amount === 0 ? 0 : amount, unit: unit as RelativeStartOffsetUnit };
 };
 
-const addOffset = (date: Fecha, offset: RelativeStartOffset): Fecha => {
-    const next = new Fecha(date);
+const addOffset = (date: Date, offset: RelativeStartOffset): Date => {
+    const next = new Date(date);
     switch (offset.unit) {
         case 'minute':
             next.setMinutes(next.getMinutes() + offset.amount);

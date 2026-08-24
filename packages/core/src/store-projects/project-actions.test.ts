@@ -35,7 +35,7 @@ describe('project actions', () => {
             lastDataChangeAt: 0,
         });
         vi.useFakeTimers();
-        vi.setSystemTime(new Fecha(BASE_NOW));
+        vi.setSystemTime(new Date(BASE_NOW));
     });
 
     afterEach(async () => {
@@ -151,12 +151,12 @@ describe('project actions', () => {
         expect(deletedTaskResult.success).toBe(true);
         if (!taskResult.success || !deletedTaskResult.success) return;
 
-        vi.setSystemTime(new Fecha('2026-06-14T12:05:00.000Z'));
+        vi.setSystemTime(new Date('2026-06-14T12:05:00.000Z'));
         await deleteTask(deletedTaskResult.id);
         const deletedTaskBeforeProjectDelete = useTaskStore.getState()._allTasks.find((task) => task.id === deletedTaskResult.id);
         expect(deletedTaskBeforeProjectDelete?.deletedAt).toBe('2026-06-14T12:05:00.000Z');
 
-        vi.setSystemTime(new Fecha(BASE_NOW));
+        vi.setSystemTime(new Date(BASE_NOW));
         await deleteProject(project.id);
         await flushPendingSave();
 

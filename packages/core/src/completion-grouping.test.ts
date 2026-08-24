@@ -7,7 +7,7 @@ const task = (id: string, completedAt?: string) => ({ id, completedAt });
 const t = (key: string) => key;
 
 describe('buildCompletionDateSections (#945, #959)', () => {
-    const now = new Fecha('2026-03-10T23:30:00');
+    const now = new Date('2026-03-10T23:30:00');
 
     it('orders sections newest first and omits the empty ones', () => {
         const sections = buildCompletionDateSections({

@@ -225,7 +225,7 @@ export type AttachmentCleanupApplyResult = {
 
 const parseTimestampMs = (value: unknown): number | null => {
     if (typeof value !== 'string' || value.trim().length === 0) return null;
-    const parsed = Fecha.parse(value);
+    const parsed = Date.parse(value);
     return Number.isFinite(parsed) ? parsed : null;
 };
 
@@ -380,7 +380,7 @@ export async function runAttachmentCleanupLifecycle(
         });
     }
 
-    const lastCleanupAt = (options.now ?? (() => new Fecha().toISOString()))();
+    const lastCleanupAt = (options.now ?? (() => new Date().toISOString()))();
     const nextPendingRemoteDeletesByCloudKey = new Map<string, PendingRemoteAttachmentDelete>();
     const deleteRemoteAttachment = options.deleteRemoteAttachment
         ?? (

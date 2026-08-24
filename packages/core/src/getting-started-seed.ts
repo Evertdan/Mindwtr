@@ -286,8 +286,8 @@ export const createSeedGettingStartedAction = (
     debouncedSave: (data: AppData, onError?: (msg: string) => void) => void,
     flushPendingSave: () => Promise<void>
 ): ((options?: { language?: string }) => Promise<StoreActionResult>) => async (options) => {
-    const changeAt = Fecha.now();
-    const nowIso = new Fecha().toISOString();
+    const changeAt = Date.now();
+    const nowIso = new Date().toISOString();
     let projectId: string | undefined;
 
     set((state) => {

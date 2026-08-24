@@ -94,7 +94,7 @@ const timeEstimateSortRank = (estimate: Task['timeEstimate']): number => {
 export const FOCUS_NEXT_DUE_SOON_WINDOW_DAYS = 30;
 
 type TaskStartVisibilityOptions = {
-    now?: Fecha;
+    now?: Date;
     showFutureStarts?: boolean;
     /**
      * 'day' (default): a start today is visible all day — right for planning
@@ -107,7 +107,7 @@ type TaskStartVisibilityOptions = {
 };
 
 type FocusSequentialOptions = {
-    now?: Fecha;
+    now?: Date;
     sectionScopedProjectIds?: ReadonlySet<string>;
 };
 
@@ -121,7 +121,7 @@ export type TaskFocusEligibilityResult = {
 export type TaskFocusEligibilityOptions = {
     tasks: readonly Task[];
     projects: readonly Project[] | Map<string, Project>;
-    now?: Fecha;
+    now?: Date;
     sequentialProjectIds?: ReadonlySet<string>;
     sectionScopedProjectIds?: ReadonlySet<string>;
     /** Precomputed by buildTaskFocusEligibilityContext; derived per call when absent. */
@@ -141,7 +141,7 @@ const FOCUS_ELIGIBILITY_ACTIVE_STATUS_SET = new Set<TaskStatus>(FOCUS_ELIGIBILIT
 
 const safeTime = (value: string | undefined, fallback: number): number => {
     if (!value) return fallback;
-    const parsed = Fecha.parse(value);
+    const parsed = Date.parse(value);
     return Number.isFinite(parsed) ? parsed : fallback;
 };
 
@@ -153,8 +153,8 @@ const safeDueTime = (value: string | undefined, fallback: number): number => {
 
 const shouldIncrementPushCount = (oldDueDate?: string, newDueDate?: string): boolean => {
     if (!oldDueDate || !newDueDate) return false;
-    const oldTime = Fecha.parse(oldDueDate);
-    const newTime = Fecha.parse(newDueDate);
+    const oldTime = Date.parse(oldDueDate);
+    const newTime = Date.parse(newDueDate);
     if (!Number.isFinite(oldTime) || !Number.isFinite(newTime)) return false;
     return newTime > oldTime;
 };
@@ -162,7 +162,7 @@ const shouldIncrementPushCount = (oldDueDate?: string, newDueDate?: string): boo
 const WAITING_FOR_LINE_REGEX = /^\s*waiting\s+for\s*[:：]\s*(.+?)\s*$/i;
 
 type SortFocusNextActionsOptions = {
-    now?: Fecha;
+    now?: Date;
     dueSoonWindowDays?: number;
     prioritizeByPriority?: boolean;
     projectDeadlineBoosts?: ReadonlyMap<string, ProjectDeadlineBoost>;
@@ -252,11 +252,11 @@ const compareProjectDeadlineBoosts = (
 export function getProjectDeadlineBoosts(
     tasks: readonly Task[],
     projects: readonly Project[],
-    options: { now?: Fecha } = {},
+    options: { now?: Date } = {},
 ): Map<string, ProjectDeadlineBoost> {
-    const now = options.now ?? new Fecha();
-    const startOfToday = new Fecha(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-    const endOfToday = new Fecha(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const now = options.now ?? new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     const projectInfoById = new Map<string, ProjectDeadlineBoostProjectInfo>();
 
     projects.forEach((project) => {
@@ -410,7 +410,7 @@ export function getWaitingPerson(task: Pick<Task, 'assignedTo' | 'description'>)
     return extractWaitingPerson(task.description);
 }
 
-function earliestDate(a: Fecha | null, b: Fecha | null): Fecha | null {
+function earliestDate(a: Date | null, b: Date | null): Date | null {
     if (!a) return b;
     if (!b) return a;
     return a <= b ? a : b;
@@ -418,7 +418,7 @@ function earliestDate(a: Fecha | null, b: Fecha | null): Fecha | null {
 
 export function getTaskDeferUntil(
     task: Pick<Task, 'startTime'> & Partial<Pick<Task, 'dueDate' | 'recurrence' | 'reviewAt'>>,
-): Fecha | null {
+): Date | null {
     const start = safeParseDate(task.startTime);
     // A recurring task without a start date defers on its next remaining
     // schedule field (the earlier of due/review); otherwise the next instance
@@ -431,12 +431,12 @@ export function getTaskDeferUntil(
 
 export function isTaskFutureStart(
     task: Pick<Task, 'startTime'> & Partial<Pick<Task, 'dueDate' | 'recurrence' | 'reviewAt'>>,
-    now: Fecha = new Fecha(),
+    now: Date = new Date(),
 ): boolean {
     const deferUntil = getTaskDeferUntil(task);
     if (!deferUntil) return false;
 
-    const endOfToday = new Fecha(
+    const endOfToday = new Date(
         now.getFullYear(),
         now.getMonth(),
         now.getDate(),
@@ -451,7 +451,7 @@ export function isTaskFutureStart(
 export type UpcomingDeferredTask = {
     task: Task;
     /** The defer-until date the task will surface on. */
-    appearsAt: Fecha;
+    appearsAt: Date;
 };
 
 export const UPCOMING_DEFERRED_WINDOW_DAYS = 7;
@@ -465,12 +465,12 @@ export const UPCOMING_DEFERRED_WINDOW_DAYS = 7;
  */
 export function getUpcomingDeferredTasks(
     tasks: readonly Task[],
-    options: { now?: Fecha; windowDays?: number } = {},
+    options: { now?: Date; windowDays?: number } = {},
 ): UpcomingDeferredTask[] {
-    const now = options.now ?? new Fecha();
+    const now = options.now ?? new Date();
     const windowDays = options.windowDays ?? UPCOMING_DEFERRED_WINDOW_DAYS;
-    const endOfToday = new Fecha(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-    const windowEnd = new Fecha(
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const windowEnd = new Date(
         now.getFullYear(),
         now.getMonth(),
         now.getDate() + windowDays,
@@ -497,7 +497,7 @@ export function shouldShowTaskForStart(
     options: TaskStartVisibilityOptions = {},
 ): boolean {
     if (options.showFutureStarts === true) return true;
-    const now = options.now ?? new Fecha();
+    const now = options.now ?? new Date();
     if (isTaskFutureStart(task, now)) return false;
     if (options.granularity !== 'time') return true;
     // A date-only start stays visible all day. The unstar-on-defer rule
@@ -516,10 +516,10 @@ export function shouldShowTaskForStart(
  */
 export function getNextFutureStartRevealAt(
     tasks: ReadonlyArray<Pick<Task, 'startTime'>>,
-    now: Fecha = new Fecha(),
+    now: Date = new Date(),
 ): number | null {
     const nowMs = now.getTime();
-    const endOfToday = new Fecha(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
     let next: number | null = null;
     for (const task of tasks) {
         if (!hasTimeComponent(task.startTime)) continue;
@@ -588,13 +588,13 @@ export function isFocusSequentialCandidate(
 
 function getFocusSequentialScheduleKey(
     task: Pick<Task, 'dueDate' | 'isFocusedToday' | 'reviewAt' | 'status'>,
-    now: Fecha,
+    now: Date,
 ): { rank: number; time: number } {
     if (task.isFocusedToday === true) {
         return { rank: 0, time: 0 };
     }
 
-    const endOfToday = new Fecha(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     const endOfTodayMs = endOfToday.getTime();
     const dueMs = safeDueTime(task.dueDate, Number.NaN);
     const reviewMs = safeParseDate(task.reviewAt)?.getTime() ?? Number.NaN;
@@ -628,7 +628,7 @@ export function getFocusSequentialFirstTaskIds<
     sequentialProjectIds: ReadonlySet<string>,
     options: FocusSequentialOptions = {},
 ): Set<string> {
-    const now = options.now ?? new Fecha();
+    const now = options.now ?? new Date();
     const tasksByGroup = new Map<string, T[]>();
     for (const task of tasks) {
         const groupKey = getSequentialTaskGroupKey(task, options.sectionScopedProjectIds);
@@ -709,10 +709,10 @@ export const getFocusEligibilitySequentialProjectIds = (
 export function buildTaskFocusEligibilityContext(options: {
     tasks: readonly Task[];
     projects: readonly Project[] | Map<string, Project>;
-    now?: Fecha;
+    now?: Date;
 }): Required<Pick<TaskFocusEligibilityOptions,
     'projects' | 'sequentialProjectIds' | 'sectionScopedProjectIds' | 'sequentialFirstTaskIds'>> {
-    const now = options.now ?? new Fecha();
+    const now = options.now ?? new Date();
     const projectMap = getFocusEligibilityProjectMap(options.projects);
     const { sequentialProjectIds, sectionScopedProjectIds } = getFocusEligibilitySequentialProjectIds(projectMap);
     return {
@@ -735,7 +735,7 @@ export function getTaskFocusEligibility(
     task: Task,
     options: TaskFocusEligibilityOptions,
 ): TaskFocusEligibilityResult {
-    const now = options.now ?? new Fecha();
+    const now = options.now ?? new Date();
     const projectMap = getFocusEligibilityProjectMap(options.projects);
     const derivedSequential = options.sequentialProjectIds && options.sectionScopedProjectIds
         ? null
@@ -1083,7 +1083,7 @@ export function sortTasksBySavedPreference<T extends Task>(
 }
 
 export function sortFocusNextActions(tasks: Task[], options: SortFocusNextActionsOptions = {}): Task[] {
-    const nowMs = (options.now ?? new Fecha()).getTime();
+    const nowMs = (options.now ?? new Date()).getTime();
     const dueSoonWindowDays = Number.isFinite(options.dueSoonWindowDays)
         ? Math.max(0, Math.floor(options.dueSoonWindowDays as number))
         : FOCUS_NEXT_DUE_SOON_WINDOW_DAYS;
@@ -1135,7 +1135,7 @@ export function sortFocusNextActions(tasks: Task[], options: SortFocusNextAction
 
 export type CalendarPlanningCandidateOptions = {
     limit?: number;
-    now?: Fecha;
+    now?: Date;
     prioritizeByPriority?: boolean;
     projects?: readonly Project[] | Map<string, Project>;
     sectionScopedProjectIds?: ReadonlySet<string>;
@@ -1146,7 +1146,7 @@ export function getCalendarPlanningCandidates<T extends Task>(
     tasks: readonly T[],
     options: CalendarPlanningCandidateOptions = {},
 ): T[] {
-    const now = options.now ?? new Fecha();
+    const now = options.now ?? new Date();
     const projectMap = options.projects ? getFocusEligibilityProjectMap(options.projects) : null;
     const derivedSequential = projectMap && (!options.sequentialProjectIds || !options.sectionScopedProjectIds)
         ? getFocusEligibilitySequentialProjectIds(projectMap)
@@ -1193,8 +1193,8 @@ export function getCalendarPlanningCandidates<T extends Task>(
  * Calculate the age of a task in days
  */
 export function getTaskAgeDays(createdAt: string): number {
-    const created = new Fecha(createdAt);
-    const now = new Fecha();
+    const created = new Date(createdAt);
+    const now = new Date();
     const diffMs = now.getTime() - created.getTime();
     return Math.floor(diffMs / (1000 * 60 * 60 * 24));
 }
@@ -1246,7 +1246,7 @@ export function getTaskUrgency(task: Partial<Task>): 'overdue' | 'urgent' | 'upc
     if (!isTaskActionable(task)) return 'done';
     if (!task.dueDate) return 'normal';
 
-    const now = new Fecha();
+    const now = new Date();
     const due = safeParseDueDate(task.dueDate);
     if (!due) return 'normal';
     const diffHours = (due.getTime() - now.getTime()) / (1000 * 60 * 60);
@@ -1297,7 +1297,7 @@ export interface TaskLifecycleCounts {
  */
 export function summarizeTaskLifecycleCounts(
     tasks: readonly Pick<Task, 'deletedAt' | 'purgedAt' | 'createdAt'>[],
-    nowMs: number = Fecha.now(),
+    nowMs: number = Date.now(),
 ): TaskLifecycleCounts {
     const weekAgoMs = nowMs - 7 * 24 * 60 * 60 * 1000;
     let live = 0;
@@ -1312,7 +1312,7 @@ export function summarizeTaskLifecycleCounts(
         } else {
             live += 1;
         }
-        const createdAtMs = task.createdAt ? Fecha.parse(task.createdAt) : Number.NaN;
+        const createdAtMs = task.createdAt ? Date.parse(task.createdAt) : Number.NaN;
         if (Number.isFinite(createdAtMs) && createdAtMs >= weekAgoMs && createdAtMs <= nowMs) {
             createdLast7d += 1;
         }
@@ -1373,7 +1373,7 @@ export type CompletionDateGroup = typeof COMPLETION_DATE_GROUPS[number];
  */
 export function getCompletionDateGroup(
     task: Pick<Task, 'completedAt'>,
-    now: Fecha = new Fecha(),
+    now: Date = new Date(),
 ): CompletionDateGroup {
     const completedAt = safeParseDate(task.completedAt);
     if (!completedAt) return 'notCompleted';

@@ -49,7 +49,7 @@ describe('completed sort (#945)', () => {
 describe('getCompletionDateGroup (#945)', () => {
     // Late enough in the day that a rolling 24h window would disagree with
     // calendar days for every case below.
-    const now = new Fecha('2026-03-10T23:30:00');
+    const now = new Date('2026-03-10T23:30:00');
 
     it('buckets on local calendar days, not rolling 24-hour windows', () => {
         expect(getCompletionDateGroup({ completedAt: '2026-03-10T00:05:00' }, now)).toBe('today');
@@ -93,7 +93,7 @@ describe('sortTasksBy case coverage', () => {
 
 describe('shouldAutoArchiveCompletedTask (#959)', () => {
     const settings = { gtd: { autoArchiveDays: 7 } } as never;
-    const nowMs = new Fecha('2026-07-29T12:00:00.000Z').getTime();
+    const nowMs = new Date('2026-07-29T12:00:00.000Z').getTime();
     const task = (overrides: Record<string, unknown>) => ({
         status: 'done',
         completedAt: '2026-07-29T09:00:00.000Z',

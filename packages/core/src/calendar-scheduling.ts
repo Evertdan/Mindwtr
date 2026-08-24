@@ -65,11 +65,11 @@ type CalendarEventTaskDraftOptions = {
 type CalendarQuickAddTaskDraftOptions = {
     areas?: Area[];
     durationMinutes: number;
-    now?: Fecha;
+    now?: Date;
     /** The capture surface's parse bag; without it `@John Smith` splits at the space. */
     parseOptions?: QuickAddParseOptions;
     projects?: Project[];
-    start: Fecha;
+    start: Date;
 };
 
 type CalendarSchedulingOptions = {
@@ -80,20 +80,20 @@ type CalendarSchedulingOptions = {
 };
 
 type FindFreeSlotOptions = CalendarSchedulingOptions & {
-    day: Fecha;
+    day: Date;
     durationMinutes: number;
     events: readonly SchedulingEvent[];
     excludeTaskId?: string;
-    now?: Fecha;
+    now?: Date;
     tasks: readonly SchedulingTask[];
 };
 
 type IsSlotFreeOptions = CalendarSchedulingOptions & {
-    day: Fecha;
+    day: Date;
     durationMinutes: number;
     events: readonly SchedulingEvent[];
     excludeTaskId?: string;
-    startTime: Fecha;
+    startTime: Date;
     tasks: readonly SchedulingTask[];
 };
 
@@ -212,7 +212,7 @@ export function buildCalendarQuickAddTaskDraft(
     const parsed = parseQuickAdd(
         input,
         options.projects,
-        options.now ?? new Fecha(),
+        options.now ?? new Date(),
         options.areas,
         options.parseOptions,
     );
@@ -262,7 +262,7 @@ function cleanEventTaskText(value: string | undefined): string {
     return (value ?? '').trim();
 }
 
-function allDayEventDateValue(event: ExternalCalendarEvent, start: Fecha): string {
+function allDayEventDateValue(event: ExternalCalendarEvent, start: Date): string {
     const datePrefix = /^(\d{4}-\d{2}-\d{2})/.exec(event.start)?.[1];
     return datePrefix ?? safeFormatDate(start, 'yyyy-MM-dd', start.toISOString().slice(0, 10));
 }
@@ -318,23 +318,23 @@ export function normalizeCalendarDurationMinutes(minutes: number): number {
         ?? timeEstimateToMinutes(estimate);
 }
 
-export function addCalendarMinutes(date: Fecha, minutes: number): Fecha {
-    return new Fecha(date.getTime() + minutes * 60_000);
+export function addCalendarMinutes(date: Date, minutes: number): Date {
+    return new Date(date.getTime() + minutes * 60_000);
 }
 
-export function formatCalendarTimeInputValue(date: Fecha): string {
+export function formatCalendarTimeInputValue(date: Date): string {
     return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
 export function parseCalendarTimeOnDate(
-    date: Fecha,
+    date: Date,
     value: string,
     // Accepted for API symmetry with formatTimeEstimateLabel/formatCalendarDurationLabel
     // above (a real caller needs this once a UI feeds it non-English am/pm text); not yet
     // consumed — every current caller feeds ASCII HH:MM / English am-pm text regardless of
     // locale, so there's nothing to route through timeFormat/locale here today.
     _options?: { timeFormat?: string; locale?: string },
-): Fecha | null {
+): Date | null {
     const trimmed = value.trim();
     const twelveHourMatch = /^(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?$/i.exec(trimmed);
     if (twelveHourMatch) {
@@ -346,7 +346,7 @@ export function parseCalendarTimeOnDate(
         const hours = period === 'p'
             ? (hour12 === 12 ? 12 : hour12 + 12)
             : (hour12 === 12 ? 0 : hour12);
-        const next = new Fecha(date);
+        const next = new Date(date);
         next.setHours(hours, minutes, 0, 0);
         return next;
     }
@@ -357,7 +357,7 @@ export function parseCalendarTimeOnDate(
     const minutes = Number(match[2]);
     if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null;
     if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
-    const next = new Fecha(date);
+    const next = new Date(date);
     next.setHours(hours, minutes, 0, 0);
     return next;
 }
@@ -374,21 +374,21 @@ export function formatCalendarDurationLabel(minutes: number, options?: CalendarL
     return formatI18nTemplate(t('units.hoursShort'), { hours: hoursValue });
 }
 
-const ceilToMinutes = (date: Fecha, stepMinutes: number): Fecha => {
+const ceilToMinutes = (date: Date, stepMinutes: number): Date => {
     const stepMs = stepMinutes * 60 * 1000;
-    return new Fecha(Math.ceil(date.getTime() / stepMs) * stepMs);
+    return new Date(Math.ceil(date.getTime() / stepMs) * stepMs);
 };
 
-const isSameLocalDay = (left: Fecha, right: Fecha): boolean => (
+const isSameLocalDay = (left: Date, right: Date): boolean => (
     left.getFullYear() === right.getFullYear()
     && left.getMonth() === right.getMonth()
     && left.getDate() === right.getDate()
 );
 
-const getDayBounds = (day: Fecha, options?: CalendarSchedulingOptions): { dayEnd: Fecha; dayStart: Fecha; snapMinutes: number } => {
-    const dayStart = new Fecha(day);
+const getDayBounds = (day: Date, options?: CalendarSchedulingOptions): { dayEnd: Date; dayStart: Date; snapMinutes: number } => {
+    const dayStart = new Date(day);
     dayStart.setHours(options?.dayStartHour ?? DEFAULT_CALENDAR_DAY_START_HOUR, 0, 0, 0);
-    const dayEnd = new Fecha(day);
+    const dayEnd = new Date(day);
     dayEnd.setHours(options?.dayEndHour ?? DEFAULT_CALENDAR_DAY_END_HOUR, 0, 0, 0);
     return {
         dayEnd,
@@ -404,7 +404,7 @@ const taskBlocksScheduling = (task: SchedulingTask, excludeTaskId?: string): boo
 };
 
 const collectBusyIntervals = (
-    day: Fecha,
+    day: Date,
     events: readonly SchedulingEvent[],
     tasks: readonly SchedulingTask[],
     options?: CalendarSchedulingOptions & { excludeTaskId?: string },
@@ -443,12 +443,12 @@ const collectBusyIntervals = (
     return merged;
 };
 
-export function findFreeSlotForDay(options: FindFreeSlotOptions): Fecha | null {
+export function findFreeSlotForDay(options: FindFreeSlotOptions): Date | null {
     const { dayEnd, dayStart, snapMinutes } = getDayBounds(options.day, options);
-    const now = options.now ?? new Fecha();
+    const now = options.now ?? new Date();
     const isToday = isSameLocalDay(options.day, now);
     const earliest = ceilToMinutes(
-        new Fecha(Math.max(dayStart.getTime(), isToday ? now.getTime() : dayStart.getTime())),
+        new Date(Math.max(dayStart.getTime(), isToday ? now.getTime() : dayStart.getTime())),
         snapMinutes,
     );
     const intervals = collectBusyIntervals(options.day, options.events, options.tasks, options);
@@ -456,13 +456,13 @@ export function findFreeSlotForDay(options: FindFreeSlotOptions): Fecha | null {
     let cursor = Math.max(earliest.getTime(), dayStart.getTime());
 
     for (const interval of intervals) {
-        if (cursor + durationMs <= interval.start) return new Fecha(cursor);
+        if (cursor + durationMs <= interval.start) return new Date(cursor);
         if (cursor < interval.end) {
-            cursor = ceilToMinutes(new Fecha(interval.end), snapMinutes).getTime();
+            cursor = ceilToMinutes(new Date(interval.end), snapMinutes).getTime();
         }
     }
 
-    if (cursor + durationMs <= dayEnd.getTime()) return new Fecha(cursor);
+    if (cursor + durationMs <= dayEnd.getTime()) return new Date(cursor);
     return null;
 }
 

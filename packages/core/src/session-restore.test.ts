@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { SESSION_RESTORE_WINDOW_MS, shouldRestoreLastView } from './session-restore';
 
 describe('shouldRestoreLastView', () => {
-    const now = Fecha.parse('2026-07-09T12:00:00.000Z');
+    const now = Date.parse('2026-07-09T12:00:00.000Z');
 
     it('restores within the window and not after it', () => {
         expect(shouldRestoreLastView(now - 1000, now)).toBe(true);

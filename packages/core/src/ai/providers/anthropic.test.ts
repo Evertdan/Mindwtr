@@ -14,13 +14,13 @@ const mockAnthropicSuccess = () =>
                 },
             ],
         }),
-        { status: 200, headers: { 'Contenido-Type': 'application/json' } },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
     );
 
 const mockAnthropicError = (status: number, error?: { type?: string; message?: string }) =>
     new Response(
         JSON.stringify(error ? { type: 'error', error } : {}),
-        { status, headers: { 'Contenido-Type': 'application/json' } },
+        { status, headers: { 'Content-Type': 'application/json' } },
     );
 
 const originalFetch = globalThis.fetch;
@@ -103,7 +103,7 @@ describe('anthropic provider error behavior', () => {
                     error: { type: 'invalid_request_error', message: 'bad input' },
                     request_id: 'req_body_123',
                 }),
-                { status: 400, headers: { 'Contenido-Type': 'application/json' } },
+                { status: 400, headers: { 'Content-Type': 'application/json' } },
             ));
         globalThis.fetch = fetchMock as unknown as typeof fetch;
 
@@ -122,7 +122,7 @@ describe('anthropic provider error behavior', () => {
         const fetchMock = vi.fn(async () =>
             new Response(
                 JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message: 'bad input' } }),
-                { status: 400, headers: { 'Contenido-Type': 'application/json', 'request-id': 'req_header_456' } },
+                { status: 400, headers: { 'Content-Type': 'application/json', 'request-id': 'req_header_456' } },
             ));
         globalThis.fetch = fetchMock as unknown as typeof fetch;
 
@@ -172,7 +172,7 @@ describe('anthropic provider error behavior', () => {
 
     it('falls back to the raw body when no structured error is present', async () => {
         const fetchMock = vi.fn(async () =>
-            new Response('gateway exploded', { status: 502, headers: { 'Contenido-Type': 'text/plain' } }));
+            new Response('gateway exploded', { status: 502, headers: { 'Content-Type': 'text/plain' } }));
         globalThis.fetch = fetchMock as unknown as typeof fetch;
 
         const provider = createAnthropicProvider({

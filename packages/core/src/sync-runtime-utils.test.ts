@@ -56,7 +56,7 @@ describe('sync-runtime-utils', () => {
 
     it('tracks, prunes, and clears download backoff entries', () => {
         const backoff = createWebdavDownloadBackoff({ missingBackoffMs: 1_000, errorBackoffMs: 2_000 });
-        const nowSpy = vi.spyOn(Fecha, 'now').mockReturnValue(1_000);
+        const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1_000);
 
         backoff.setFromError('a', { status: 404 });
         expect(backoff.getBlockedUntil('a')).toBe(2_000);

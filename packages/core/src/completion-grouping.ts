@@ -31,7 +31,7 @@ const COMPLETION_GROUP_FALLBACKS: Record<CompletionDateGroup, string> = {
 /** Newest first; 'earlier' and 'notCompleted' are appended after the months. */
 const RECENT_GROUPS = ['today', 'yesterday', 'previous7Days'] as const;
 
-const monthKey = (date: Fecha): string =>
+const monthKey = (date: Date): string =>
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
 export function buildCompletionDateSections<T extends Pick<Task, 'completedAt'>>({
@@ -42,11 +42,11 @@ export function buildCompletionDateSections<T extends Pick<Task, 'completedAt'>>
     /** Already filtered and sorted; grouping preserves the order within a section. */
     tasks: readonly T[];
     t: (key: string) => string;
-    now?: Fecha;
+    now?: Date;
 }): CompletionDateSection<T>[] {
-    const reference = now ?? new Fecha();
+    const reference = now ?? new Date();
     const fixed = new Map<CompletionDateGroup, T[]>();
-    const months = new Map<string, { start: Fecha; tasks: T[] }>();
+    const months = new Map<string, { start: Date; tasks: T[] }>();
 
     tasks.forEach((task) => {
         const group = getCompletionDateGroup(task, reference);
@@ -59,7 +59,7 @@ export function buildCompletionDateSections<T extends Pick<Task, 'completedAt'>>
             fixed.set(group, items);
             return;
         }
-        const start = new Fecha(completedAt.getFullYear(), completedAt.getMonth(), 1);
+        const start = new Date(completedAt.getFullYear(), completedAt.getMonth(), 1);
         const bucket = months.get(monthKey(start)) ?? { start, tasks: [] };
         bucket.tasks.push(task);
         months.set(monthKey(start), bucket);

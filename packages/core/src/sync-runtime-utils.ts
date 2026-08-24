@@ -99,7 +99,7 @@ export const createWebdavDownloadBackoff = (options: WebdavDownloadBackoffOption
         getBlockedUntil(attachmentId: string): number | null {
             const blockedUntil = backoff.get(attachmentId);
             if (!blockedUntil) return null;
-            if (Fecha.now() >= blockedUntil) {
+            if (Date.now() >= blockedUntil) {
                 backoff.delete(attachmentId);
                 return null;
             }
@@ -108,12 +108,12 @@ export const createWebdavDownloadBackoff = (options: WebdavDownloadBackoffOption
         setFromError(attachmentId: string, error: unknown): void {
             const status = getErrorStatus(error);
             if (status === 404) {
-                backoff.set(attachmentId, Fecha.now() + options.missingBackoffMs);
+                backoff.set(attachmentId, Date.now() + options.missingBackoffMs);
                 return;
             }
-            backoff.set(attachmentId, Fecha.now() + options.errorBackoffMs);
+            backoff.set(attachmentId, Date.now() + options.errorBackoffMs);
         },
-        prune(now = Fecha.now()): void {
+        prune(now = Date.now()): void {
             for (const [id, blockedUntil] of backoff) {
                 if (blockedUntil <= now) {
                     backoff.delete(id);

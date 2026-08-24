@@ -19,7 +19,7 @@ describe('quick-add', () => {
     });
 
     it('parses status, due, note, tags, contexts', () => {
-        const now = new Fecha('2025-01-01T10:00:00Z');
+        const now = new Date('2025-01-01T10:00:00Z');
         const result = parseQuickAdd('Llamada mom @phone #family /next /due:tomorrow 5pm /note:ask about trip', undefined, now);
 
         expect(result.title).toBe('Llamada mom');
@@ -27,7 +27,7 @@ describe('quick-add', () => {
         expect(result.props.contexts).toEqual(['@phone']);
         expect(result.props.tags).toEqual(['#family']);
         expect(result.props.description).toBe('ask about trip');
-        const expectedLocal = new Fecha(2025, 0, 2, 17, 0, 0, 0).toISOString();
+        const expectedLocal = new Date(2025, 0, 2, 17, 0, 0, 0).toISOString();
         expect(result.props.dueDate).toBe(expectedLocal);
     });
 
@@ -65,7 +65,7 @@ describe('quick-add', () => {
     });
 
     it('parses URL notes into the description field', () => {
-        const now = new Fecha('2026-03-30T10:00:00Z');
+        const now = new Date('2026-03-30T10:00:00Z');
         const result = parseQuickAdd('Verificar website /note:https://example.com', undefined, now);
 
         expect(result.title).toBe('Verificar website');
@@ -73,7 +73,7 @@ describe('quick-add', () => {
     });
 
     it('keeps parsing later commands after a URL note', () => {
-        const now = new Fecha('2026-03-30T10:00:00Z');
+        const now = new Date('2026-03-30T10:00:00Z');
         const result = parseQuickAdd('Verificar website /note:https://example.com /next', undefined, now);
 
         expect(result.title).toBe('Verificar website');
@@ -82,7 +82,7 @@ describe('quick-add', () => {
     });
 
     it('parses a link command into a link attachment without consuming later commands', () => {
-        const now = new Fecha('2026-03-30T10:00:00Z');
+        const now = new Date('2026-03-30T10:00:00Z');
         const result = parseQuickAdd(
             'Read source /link:https://example.com/docs#section /next @desk',
             undefined,
@@ -106,7 +106,7 @@ describe('quick-add', () => {
     });
 
     it('keeps URI-style link commands as lightweight link attachments', () => {
-        const now = new Fecha('2026-03-30T10:00:00Z');
+        const now = new Date('2026-03-30T10:00:00Z');
         const result = parseQuickAdd(
             'Email Alex /link:mailto:alex@example.com /note:Ask for the update',
             undefined,
@@ -124,7 +124,7 @@ describe('quick-add', () => {
     });
 
     it('supports labeled link commands', () => {
-        const now = new Fecha('2026-03-30T10:00:00Z');
+        const now = new Date('2026-03-30T10:00:00Z');
         const result = parseQuickAdd('Review plan /link:Sprint Plan | https://example.com/doc', undefined, now);
 
         expect(result.title).toBe('Review plan');
@@ -136,7 +136,7 @@ describe('quick-add', () => {
     });
 
     it('keeps due commands date-only when no time is explicit', () => {
-        const now = new Fecha('2025-01-01T10:00:00Z');
+        const now = new Date('2025-01-01T10:00:00Z');
         const result = parseQuickAdd(
             'Review proposal /start:tomorrow /review:friday /due:next week',
             undefined,
@@ -150,7 +150,7 @@ describe('quick-add', () => {
     });
 
     it('uses default schedule time for start and review commands without explicit time', () => {
-        const now = new Fecha('2025-01-01T10:00:00Z');
+        const now = new Date('2025-01-01T10:00:00Z');
         const result = parseQuickAdd(
             'Review proposal /start:tomorrow /review:friday /due:next week',
             undefined,
@@ -164,14 +164,14 @@ describe('quick-add', () => {
         });
 
         expect(result.title).toBe('Review proposal');
-        expect(result.props.startTime).toBe(new Fecha(2025, 0, 2, 9, 30, 0, 0).toISOString());
-        expect(result.props.reviewAt).toBe(new Fecha(2025, 0, 3, 9, 30, 0, 0).toISOString());
+        expect(result.props.startTime).toBe(new Date(2025, 0, 2, 9, 30, 0, 0).toISOString());
+        expect(result.props.reviewAt).toBe(new Date(2025, 0, 3, 9, 30, 0, 0).toISOString());
         expect(result.props.dueDate).toBe('2025-01-08');
-        expect(relativeResult.props.startTime).toBe(new Fecha(2025, 0, 2, 9, 30, 0, 0).toISOString());
+        expect(relativeResult.props.startTime).toBe(new Date(2025, 0, 2, 9, 30, 0, 0).toISOString());
     });
 
     it('keeps explicit quick-add times ahead of the default schedule time', () => {
-        const now = new Fecha('2025-01-01T10:00:00Z');
+        const now = new Date('2025-01-01T10:00:00Z');
         const result = parseQuickAdd(
             'Review proposal /start:tomorrow 2:15pm /review:friday 11am',
             undefined,
@@ -180,19 +180,19 @@ describe('quick-add', () => {
             { defaultScheduleTime: '09:30' },
         );
 
-        expect(result.props.startTime).toBe(new Fecha(2025, 0, 2, 14, 15, 0, 0).toISOString());
-        expect(result.props.reviewAt).toBe(new Fecha(2025, 0, 3, 11, 0, 0, 0).toISOString());
+        expect(result.props.startTime).toBe(new Date(2025, 0, 2, 14, 15, 0, 0).toISOString());
+        expect(result.props.reviewAt).toBe(new Date(2025, 0, 3, 11, 0, 0, 0).toISOString());
     });
 
     it('parses abbreviated weekday commands like /start:mon', () => {
-        const now = new Fecha('2026-02-27T09:40:00Z');
+        const now = new Date('2026-02-27T09:40:00Z');
         const result = parseQuickAdd('Task /start:mon', undefined, now);
         expect(result.props.startTime).toBe('2026-03-02');
         expect(result.invalidDateCommands).toBeUndefined();
     });
 
     it('exposes date incoherence from parsed quick-add dates without changing the dates', () => {
-        const now = new Fecha('2026-04-20T09:40:00Z');
+        const now = new Date('2026-04-20T09:40:00Z');
         const result = parseQuickAdd('Task /due:tomorrow /start:friday', undefined, now);
 
         expect(result.props.dueDate).toBe('2026-04-21');
@@ -205,7 +205,7 @@ describe('quick-add', () => {
     });
 
     it('reports invalid date commands instead of silently dropping them', () => {
-        const now = new Fecha('2025-01-01T10:00:00Z');
+        const now = new Date('2025-01-01T10:00:00Z');
         const result = parseQuickAdd('Task /start:monx /due:tomorrow', undefined, now);
         expect(result.invalidDateCommands).toEqual(['/start:monx']);
         expect(result.props.startTime).toBeUndefined();
@@ -213,7 +213,7 @@ describe('quick-add', () => {
     });
 
     it('parses date commands without stripping unrelated quick-add tokens', () => {
-        const now = new Fecha('2026-04-13T10:00:00Z');
+        const now = new Date('2026-04-13T10:00:00Z');
         const result = parseQuickAddDateCommands(
             'Review talk @school #urgent /start:tomorrow /due:friday 2pm /review:next monday',
             now
@@ -221,12 +221,12 @@ describe('quick-add', () => {
 
         expect(result.title).toBe('Review talk @school #urgent');
         expect(result.props.startTime).toBe('2026-04-14');
-        expect(result.props.dueDate).toBe(new Fecha(2026, 3, 17, 14, 0, 0, 0).toISOString());
+        expect(result.props.dueDate).toBe(new Date(2026, 3, 17, 14, 0, 0, 0).toISOString());
         expect(result.props.reviewAt).toBe('2026-04-20');
     });
 
     it('keeps invalid date commands in the title-only parser output', () => {
-        const now = new Fecha('2026-04-13T10:00:00Z');
+        const now = new Date('2026-04-13T10:00:00Z');
         const result = parseQuickAddDateCommands('Task /due:2026-04-31', now);
 
         expect(result.title).toBe('Task /due:2026-04-31');
@@ -235,29 +235,29 @@ describe('quick-add', () => {
     });
 
     it('parses relative due dates with numbers without treating numbers as time tokens', () => {
-        const now = new Fecha('2026-03-01T10:30:00Z');
+        const now = new Date('2026-03-01T10:30:00Z');
         const result = parseQuickAdd('Task /due:in 3 days', undefined, now);
         expect(result.invalidDateCommands).toBeUndefined();
         expect(result.props.dueDate).toBe('2026-03-04');
     });
 
     it('parses ISO due dates as date-only without corrupting the date token', () => {
-        const now = new Fecha('2026-03-01T10:30:00Z');
+        const now = new Date('2026-03-01T10:30:00Z');
         const result = parseQuickAdd('Task /due:2026-03-15', undefined, now);
         expect(result.invalidDateCommands).toBeUndefined();
         expect(result.props.dueDate).toBe('2026-03-15');
     });
 
     it('parses richer chrono expressions in explicit date commands', () => {
-        const now = new Fecha('2026-04-06T10:00:00Z');
+        const now = new Date('2026-04-06T10:00:00Z');
         const result = parseQuickAdd('Llamada dentist /due:next friday at 3pm', undefined, now);
 
         expect(result.invalidDateCommands).toBeUndefined();
-        expect(result.props.dueDate).toBe(new Fecha(2026, 3, 17, 15, 0, 0, 0).toISOString());
+        expect(result.props.dueDate).toBe(new Date(2026, 3, 17, 15, 0, 0, 0).toISOString());
     });
 
     it('keeps explicit calendar due dates date-only without a time', () => {
-        const now = new Fecha('2026-02-01T10:00:00Z');
+        const now = new Date('2026-02-01T10:00:00Z');
         const result = parseQuickAdd('Submit report /due:march 15', undefined, now);
 
         expect(result.invalidDateCommands).toBeUndefined();
@@ -265,7 +265,7 @@ describe('quick-add', () => {
     });
 
     it('detects a trailing natural-language due date without auto-applying it in core', () => {
-        const now = new Fecha('2026-04-06T10:00:00Z');
+        const now = new Date('2026-04-06T10:00:00Z');
         const result = parseQuickAdd('Llamada mom tomorrow at 3pm @phone /next', undefined, now);
 
         expect(result.title).toBe('Llamada mom tomorrow at 3pm');
@@ -273,14 +273,14 @@ describe('quick-add', () => {
         expect(result.props.contexts).toEqual(['@phone']);
         expect(result.props.dueDate).toBeUndefined();
         expect(result.detectedDate).toEqual({
-            date: new Fecha(2026, 3, 7, 15, 0, 0, 0).toISOString(),
+            date: new Date(2026, 3, 7, 15, 0, 0, 0).toISOString(),
             matchedText: 'tomorrow at 3pm',
             titleWithoutDate: 'Llamada mom',
         });
     });
 
     it('does not auto-detect dates from the middle of the title', () => {
-        const now = new Fecha('2026-04-06T10:00:00Z');
+        const now = new Date('2026-04-06T10:00:00Z');
         const result = parseQuickAdd('Llamada March about the report', undefined, now);
 
         expect(result.title).toBe('Llamada March about the report');
@@ -288,7 +288,7 @@ describe('quick-add', () => {
     });
 
     it('does not auto-detect pure time-only suffixes', () => {
-        const now = new Fecha('2026-04-06T10:00:00Z');
+        const now = new Date('2026-04-06T10:00:00Z');
         const result = parseQuickAdd('Task at 3', undefined, now);
 
         expect(result.title).toBe('Task at 3');
@@ -296,7 +296,7 @@ describe('quick-add', () => {
     });
 
     it('does not auto-detect when the entire title is just a date phrase', () => {
-        const now = new Fecha('2026-04-06T10:00:00Z');
+        const now = new Date('2026-04-06T10:00:00Z');
         const result = parseQuickAdd('tomorrow', undefined, now);
 
         expect(result.title).toBe('tomorrow');
@@ -304,7 +304,7 @@ describe('quick-add', () => {
     });
 
     it('does not auto-detect bare month names at the end of the title', () => {
-        const now = new Fecha('2026-04-06T10:00:00Z');
+        const now = new Date('2026-04-06T10:00:00Z');
         const result = parseQuickAdd('Llamada March', undefined, now);
 
         expect(result.title).toBe('Llamada March');
@@ -312,7 +312,7 @@ describe('quick-add', () => {
     });
 
     it('strips unicode dashes before an auto-detected trailing date', () => {
-        const now = new Fecha('2026-04-16T10:00:00Z');
+        const now = new Date('2026-04-16T10:00:00Z');
         const result = parseQuickAdd('Tax deadline — April 15', undefined, now);
 
         expect(result.detectedDate).toEqual({
@@ -323,7 +323,7 @@ describe('quick-add', () => {
     });
 
     it('skips trailing NLP detection when an explicit due command is present', () => {
-        const now = new Fecha('2026-04-06T10:00:00Z');
+        const now = new Date('2026-04-06T10:00:00Z');
         const result = parseQuickAdd('Llamada mom tomorrow /due:friday', undefined, now);
 
         expect(result.props.dueDate).toBe('2026-04-10');
@@ -344,28 +344,28 @@ describe('quick-add', () => {
 
         it('parses day-first under the dmy setting', () => {
             configureDateFormatting({ dateFormat: 'dmy' });
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             const result = parseQuickAdd('Pay rent /due:10/8', undefined, now);
             expect(result.props.dueDate).toContain('2026-08-10');
         });
 
         it('parses month-first under the mdy setting', () => {
             configureDateFormatting({ dateFormat: 'mdy' });
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             const result = parseQuickAdd('Pay rent /due:10/8', undefined, now);
             expect(result.props.dueDate).toContain('2026-10-08');
         });
 
         it('applies day-first to trailing title dates too', () => {
             configureDateFormatting({ dateFormat: 'dmy' });
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             const result = parseQuickAdd('Pay rent 10/8', undefined, now);
             expect(result.detectedDate?.date ?? result.props.dueDate).toContain('2026-08-10');
         });
 
         it('keeps unambiguous dot dates day-first in both modes', () => {
             configureDateFormatting({ dateFormat: 'mdy' });
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             const result = parseQuickAdd('Pay rent /due:10.08.', undefined, now);
             expect(result.props.dueDate).toContain('2026-08-10');
         });
@@ -382,7 +382,7 @@ describe('quick-add', () => {
 
         it('detects a French bare date phrase', () => {
             configureDateFormatting({ language: 'fr' });
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             const result = parseQuickAdd('Appeler le dentiste vendredi prochain', undefined, now);
             expect(result.detectedDate?.matchedText).toBe('vendredi prochain');
             expect(result.detectedDate?.titleWithoutDate).toBe('Appeler le dentiste');
@@ -390,7 +390,7 @@ describe('quick-add', () => {
 
         it('detects a German bare date phrase', () => {
             configureDateFormatting({ language: 'de' });
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             const result = parseQuickAdd('Zahnarzt anrufen nächsten Freitag', undefined, now);
             expect(result.detectedDate?.date).toBeTruthy();
             expect(result.detectedDate?.titleWithoutDate).toBe('Zahnarzt anrufen');
@@ -398,7 +398,7 @@ describe('quick-add', () => {
 
         it('detects a Spanish bare date phrase', () => {
             configureDateFormatting({ language: 'es' });
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             const result = parseQuickAdd('Llamar al dentista el próximo viernes', undefined, now);
             expect(result.detectedDate?.matchedText).toBe('próximo viernes');
             expect(result.detectedDate?.titleWithoutDate).toBe('Llamar al dentista');
@@ -408,7 +408,7 @@ describe('quick-add', () => {
         // introduce a date out of the match, so the cleaned title used to keep a
         // dangling "el"/"le"/"no dia"/"il".
         it('drops the date-introducing words the Romance parsers exclude', () => {
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             const cases: Array<{ language: 'es' | 'fr' | 'pt' | 'it'; input: string; title: string }> = [
                 { language: 'es', input: 'Revisar informe el lunes', title: 'Revisar informe' },
                 { language: 'es', input: 'Enviar informe para el 5 de septiembre', title: 'Enviar informe' },
@@ -430,7 +430,7 @@ describe('quick-add', () => {
         });
 
         it('keeps title words that only look like date-introducing words', () => {
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             const cases: Array<{ language: 'es' | 'fr' | 'pt' | 'it'; input: string; title: string }> = [
                 { language: 'es', input: 'Comprar leche del super mañana', title: 'Comprar leche del super' },
                 { language: 'es', input: 'Preparar la charla para el equipo mañana', title: 'Preparar la charla para el equipo' },
@@ -446,14 +446,14 @@ describe('quick-add', () => {
 
         it('resolves a Simplified Chinese /due: command', () => {
             configureDateFormatting({ language: 'zh' });
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             const result = parseQuickAddDateCommands('Buy groceries /due:明天', now);
             expect(result.props.dueDate).toBe('2026-08-05');
         });
 
         it('falls back to the English parser for an English phrase under a French UI', () => {
             configureDateFormatting({ language: 'fr' });
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             const result = parseQuickAdd('Llamada dentist tomorrow', undefined, now);
             expect(result.detectedDate?.matchedText).toBe('tomorrow');
             expect(result.detectedDate?.titleWithoutDate).toBe('Llamada dentist');
@@ -461,7 +461,7 @@ describe('quick-add', () => {
 
         it('does not auto-detect a bare month name under French', () => {
             configureDateFormatting({ language: 'fr' });
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             const result = parseQuickAdd('Réunion budget mai', undefined, now);
             expect(result.title).toBe('Réunion budget mai');
             expect(result.detectedDate).toBeUndefined();
@@ -471,7 +471,7 @@ describe('quick-add', () => {
         // name, so this exercises the localized bare-month skip itself.
         it('skips a bare Italian month name the locale parser matches', () => {
             configureDateFormatting({ language: 'it' });
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             const result = parseQuickAdd('Rivedere budget maggio', undefined, now);
             expect(result.title).toBe('Rivedere budget maggio');
             expect(result.detectedDate).toBeUndefined();
@@ -482,7 +482,7 @@ describe('quick-add', () => {
         // chrono.ru matches the inflected form, so the skip must cover it too.
         it('skips inflected Russian bare month names', () => {
             configureDateFormatting({ language: 'ru' });
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             for (const title of ['Отчет января', 'Отчет мар.', 'Отчет январь']) {
                 const result = parseQuickAdd(title, undefined, now);
                 expect(result.detectedDate).toBeUndefined();
@@ -492,7 +492,7 @@ describe('quick-add', () => {
 
         it('keeps unsupported-locale UI languages English-only', () => {
             configureDateFormatting({ language: 'pl' });
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             const english = parseQuickAdd('Llamada dentist tomorrow', undefined, now);
             expect(english.detectedDate?.matchedText).toBe('tomorrow');
             expect(english.detectedDate?.titleWithoutDate).toBe('Llamada dentist');
@@ -504,21 +504,21 @@ describe('quick-add', () => {
 
         it('resolves a French /due: command with a locale date word', () => {
             configureDateFormatting({ language: 'fr' });
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             const result = parseQuickAddDateCommands('Payer le loyer /due:demain', now);
             expect(result.props.dueDate).toBe('2026-08-05');
         });
 
         it('keeps the dot-date parser on the locale chrono instance', () => {
             configureDateFormatting({ language: 'fr' });
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             const result = parseQuickAddDateCommands('Payer le loyer /due:26.08.2026', now);
             expect(result.props.dueDate).toBe('2026-08-26');
         });
 
         it('naturalLanguageDates: false still suppresses bare detection under French', () => {
             configureDateFormatting({ language: 'fr' });
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             const result = parseQuickAdd(
                 'Appeler le dentiste vendredi prochain',
                 undefined,
@@ -542,14 +542,14 @@ describe('quick-add', () => {
 
         it('reads a day-first locale month-first under the mdy setting', () => {
             configureDateFormatting({ language: 'de', dateFormat: 'mdy' });
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             expect(parseQuickAdd('Miete zahlen /due:10/8', undefined, now).props.dueDate).toContain('2026-10-08');
             expect(parseQuickAdd('Miete zahlen 10/8', undefined, now).detectedDate?.date).toContain('2026-10-08');
         });
 
         it('keeps a day-first locale day-first under the dmy setting', () => {
             configureDateFormatting({ language: 'fr', dateFormat: 'dmy' });
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             expect(parseQuickAdd('Payer le loyer /due:10/8', undefined, now).props.dueDate).toContain('2026-08-10');
             expect(parseQuickAdd('Payer le loyer 10/8', undefined, now).detectedDate?.date).toContain('2026-08-10');
         });
@@ -557,7 +557,7 @@ describe('quick-add', () => {
         // The English instances resolve these, but the title cleanup still
         // belongs to the active language.
         it('still drops the date-introducing word ahead of a numeric date', () => {
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             const cases: Array<{ language: 'es' | 'fr' | 'pt' | 'it'; input: string; title: string }> = [
                 { language: 'es', input: 'Llamar al dentista el 10/8', title: 'Llamar al dentista' },
                 { language: 'fr', input: 'Payer le loyer le 10/8', title: 'Payer le loyer' },
@@ -573,13 +573,13 @@ describe('quick-add', () => {
 
         it('reads a month-first locale day-first under the dmy setting', () => {
             configureDateFormatting({ language: 'it', dateFormat: 'dmy' });
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             expect(parseQuickAdd('Pagare affitto /due:10/8', undefined, now).props.dueDate).toContain('2026-08-10');
             expect(parseQuickAdd('Pagare affitto 10/8', undefined, now).detectedDate?.date).toContain('2026-08-10');
         });
 
         it('still parses word-based locale phrases under either setting', () => {
-            const now = new Fecha('2026-08-04T10:00:00');
+            const now = new Date('2026-08-04T10:00:00');
             for (const dateFormat of ['mdy', 'dmy'] as const) {
                 configureDateFormatting({ language: 'de', dateFormat });
                 const bare = parseQuickAdd('Zahnarzt anrufen nächsten Freitag', undefined, now);
@@ -592,7 +592,7 @@ describe('quick-add', () => {
     });
 
     describe('naturalLanguageDates toggle', () => {
-        const now = new Fecha('2026-07-16T10:00:00Z');
+        const now = new Date('2026-07-16T10:00:00Z');
 
         it('toggle on, preserveText off: bare phrase is detected (default behavior unchanged)', () => {
             const result = parseQuickAdd('Register for the race next week', undefined, now);
@@ -686,7 +686,7 @@ describe('quick-add', () => {
     });
 
     it('matches project by title when provided', () => {
-        const now = new Fecha('2025-01-01T10:00:00Z');
+        const now = new Date('2025-01-01T10:00:00Z');
         const projects = [
             {
                 id: 'p1',
@@ -706,7 +706,7 @@ describe('quick-add', () => {
     });
 
     it('does not match archived projects by title', () => {
-        const now = new Fecha('2025-01-01T10:00:00Z');
+        const now = new Date('2025-01-01T10:00:00Z');
         const projects = [{
             id: 'p1',
             title: 'OldProject',
@@ -725,7 +725,7 @@ describe('quick-add', () => {
     });
 
     it('captures project title when project is missing', () => {
-        const now = new Fecha('2025-01-01T10:00:00Z');
+        const now = new Date('2025-01-01T10:00:00Z');
         const projects = [
             {
                 id: 'p1',
@@ -745,7 +745,7 @@ describe('quick-add', () => {
     });
 
     it('captures multi-word project titles', () => {
-        const now = new Fecha('2025-01-01T10:00:00Z');
+        const now = new Date('2025-01-01T10:00:00Z');
         const projects = [
             {
                 id: 'p1',
@@ -765,7 +765,7 @@ describe('quick-add', () => {
     });
 
     it('matches area by name when provided', () => {
-        const now = new Fecha('2025-01-01T10:00:00Z');
+        const now = new Date('2025-01-01T10:00:00Z');
         const areas = [
             { id: 'a1', name: 'Work', color: '#111111', order: 0, createdAt: now.toISOString(), updatedAt: now.toISOString() },
             { id: 'a2', name: 'Personal', color: '#222222', order: 1, createdAt: now.toISOString(), updatedAt: now.toISOString() },
@@ -781,7 +781,7 @@ describe('quick-add', () => {
     });
 
     it('matches an existing multi-word project and keeps trailing words in the title', () => {
-        const now = new Fecha('2026-07-03T10:00:00Z');
+        const now = new Date('2026-07-03T10:00:00Z');
         const projects = [
             { id: 'p1', title: 'My Project', status: 'active', color: '#000000', tagIds: [], order: 0, createdAt: now.toISOString(), updatedAt: now.toISOString() },
             { id: 'p2', title: 'My Project Extended', status: 'active', color: '#000000', tagIds: [], order: 1, createdAt: now.toISOString(), updatedAt: now.toISOString() },
@@ -802,7 +802,7 @@ describe('quick-add', () => {
     });
 
     it('matches an existing multi-word area and keeps trailing words in the title', () => {
-        const now = new Fecha('2026-07-03T10:00:00Z');
+        const now = new Date('2026-07-03T10:00:00Z');
         const areas = [
             { id: 'a1', name: 'Work', color: '#111111', order: 0, createdAt: now.toISOString(), updatedAt: now.toISOString() },
             { id: 'a2', name: 'Home Stuff', color: '#222222', order: 1, createdAt: now.toISOString(), updatedAt: now.toISOString() },
@@ -818,7 +818,7 @@ describe('quick-add', () => {
     });
 
     it('leaves an unmatched area token in the text instead of swallowing it', () => {
-        const now = new Fecha('2026-07-03T10:00:00Z');
+        const now = new Date('2026-07-03T10:00:00Z');
         const areas = [
             { id: 'a1', name: 'Work', color: '#111111', order: 0, createdAt: now.toISOString(), updatedAt: now.toISOString() },
         ];
@@ -829,7 +829,7 @@ describe('quick-add', () => {
     });
 
     it('supports quoted project and area names for explicit delimiting', () => {
-        const now = new Fecha('2026-07-03T10:00:00Z');
+        const now = new Date('2026-07-03T10:00:00Z');
         const projects = [
             { id: 'p1', title: 'My Project', status: 'active', color: '#000000', tagIds: [], order: 0, createdAt: now.toISOString(), updatedAt: now.toISOString() },
         ];
@@ -851,7 +851,7 @@ describe('quick-add', () => {
     });
 
     it('parses a person token into assignedTo', () => {
-        const now = new Fecha('2026-07-11T10:00:00Z');
+        const now = new Date('2026-07-11T10:00:00Z');
         const result = parseQuickAdd('Ask %Jim for the budget /waiting', undefined, now);
 
         expect(result.title).toBe('Ask for the budget');
@@ -860,7 +860,7 @@ describe('quick-add', () => {
     });
 
     it('matches known multi-word people and keeps trailing words in the title', () => {
-        const now = new Fecha('2026-07-11T10:00:00Z');
+        const now = new Date('2026-07-11T10:00:00Z');
         const result = parseQuickAdd(
             'Seguir up %Jim Smith about budget',
             undefined,
@@ -874,7 +874,7 @@ describe('quick-add', () => {
     });
 
     it('uses the canonical person name casing for known people', () => {
-        const now = new Fecha('2026-07-11T10:00:00Z');
+        const now = new Date('2026-07-11T10:00:00Z');
         const result = parseQuickAdd(
             'Ping %jim smith today',
             undefined,
@@ -887,7 +887,7 @@ describe('quick-add', () => {
     });
 
     it('takes only the first word for unknown person names', () => {
-        const now = new Fecha('2026-07-11T10:00:00Z');
+        const now = new Date('2026-07-11T10:00:00Z');
         const result = parseQuickAdd('Ask %Jim Smith for report', undefined, now);
 
         expect(result.props.assignedTo).toBe('Jim');
@@ -895,7 +895,7 @@ describe('quick-add', () => {
     });
 
     it('parses European dot dates with a trailing dot or a year, day-first', () => {
-        const now = new Fecha('2026-07-22T12:00:00');
+        const now = new Date('2026-07-22T12:00:00');
 
         const trailingDot = parseQuickAdd('Pay rent 26.06.', undefined, now);
         expect(trailingDot.detectedDate?.date).toBe('2027-06-26');
@@ -912,11 +912,11 @@ describe('quick-add', () => {
         expect(explicitCommand.props.dueDate).toBe('2027-06-26');
 
         const withTime = parseQuickAdd('Pay rent 26.06. 18:00', undefined, now);
-        expect(withTime.detectedDate?.date).toBe(new Fecha(2027, 5, 26, 18, 0, 0, 0).toISOString());
+        expect(withTime.detectedDate?.date).toBe(new Date(2027, 5, 26, 18, 0, 0, 0).toISOString());
     });
 
     it('never reads version numbers or bare decimals as dot dates', () => {
-        const now = new Fecha('2026-07-22T12:00:00');
+        const now = new Date('2026-07-22T12:00:00');
 
         const version = parseQuickAdd('Upgrade to python 3.12', undefined, now);
         expect(version.detectedDate).toBeUndefined();
@@ -930,7 +930,7 @@ describe('quick-add', () => {
     });
 
     it('accepts typographic and mixed quote styles around person names (#849 keyboard smart quotes)', () => {
-        const now = new Fecha('2026-07-22T10:00:00Z');
+        const now = new Date('2026-07-22T10:00:00Z');
         const variants = [
             'Task %"Jim Smith" /next',
             'Task %“Jim Smith” /next',
@@ -949,7 +949,7 @@ describe('quick-add', () => {
     });
 
     it('supports quoted person names for explicit delimiting', () => {
-        const now = new Fecha('2026-07-11T10:00:00Z');
+        const now = new Date('2026-07-11T10:00:00Z');
         const result = parseQuickAdd('task %"Jane Doe" more words', undefined, now);
 
         expect(result.props.assignedTo).toBe('Jane Doe');
@@ -957,7 +957,7 @@ describe('quick-add', () => {
     });
 
     it('supports macOS smart quotes around person names (#849)', () => {
-        const now = new Fecha('2026-07-22T10:00:00Z');
+        const now = new Date('2026-07-22T10:00:00Z');
         const result = parseQuickAdd('Task %“Jim Smith” /next', undefined, now);
 
         expect(result.title).toBe('Task');
@@ -966,7 +966,7 @@ describe('quick-add', () => {
     });
 
     it('parses person tokens alongside contexts and tags', () => {
-        const now = new Fecha('2026-07-11T10:00:00Z');
+        const now = new Date('2026-07-11T10:00:00Z');
         const result = parseQuickAdd('Ask %Jim @phone #budget', undefined, now);
 
         expect(result.props.assignedTo).toBe('Jim');
@@ -976,7 +976,7 @@ describe('quick-add', () => {
     });
 
     it('escapes percent signs so they stay in the title', () => {
-        const now = new Fecha('2026-07-11T10:00:00Z');
+        const now = new Date('2026-07-11T10:00:00Z');
         const result = parseQuickAdd('Cut budget by \\%10', undefined, now);
 
         expect(result.props.assignedTo).toBeUndefined();
@@ -990,7 +990,7 @@ describe('quick-add', () => {
     });
 
     it('supports unicode tags and contexts', () => {
-        const now = new Fecha('2025-01-01T10:00:00Z');
+        const now = new Date('2025-01-01T10:00:00Z');
         const result = parseQuickAdd('计划 @工作 #项目 /next', undefined, now);
 
         expect(result.title).toBe('计划');
@@ -1000,7 +1000,7 @@ describe('quick-add', () => {
     });
 
     it('supports emoji-starting tags selected from quick add suggestions', () => {
-        const now = new Fecha('2026-05-19T10:00:00Z');
+        const now = new Date('2026-05-19T10:00:00Z');
         const areas = [
             { id: 'a1', name: 'Perso', color: '#111111', order: 0, createdAt: now.toISOString(), updatedAt: now.toISOString() },
         ];
@@ -1019,7 +1019,7 @@ describe('quick-add', () => {
     });
 
     it('matches the longest existing multi-word tag from quick add tokens', () => {
-        const now = new Fecha('2026-05-19T10:00:00Z');
+        const now = new Date('2026-05-19T10:00:00Z');
         const result = parseQuickAdd(
             'Buy headset #home office',
             undefined,
@@ -1033,7 +1033,7 @@ describe('quick-add', () => {
     });
 
     it('leaves trailing words in the title after a matched multi-word tag', () => {
-        const now = new Fecha('2026-05-19T10:00:00Z');
+        const now = new Date('2026-05-19T10:00:00Z');
         const result = parseQuickAdd(
             'Buy headset #home office supplies',
             undefined,
@@ -1061,7 +1061,7 @@ describe('quick-add', () => {
     });
 
     it('keeps simple single-word tags from consuming following title text', () => {
-        const now = new Fecha('2026-05-19T10:00:00Z');
+        const now = new Date('2026-05-19T10:00:00Z');
         const result = parseQuickAdd('Email #project stakeholders /next', undefined, now);
 
         expect(result.title).toBe('Email stakeholders');
@@ -1070,7 +1070,7 @@ describe('quick-add', () => {
     });
 
     it('preserveText still drops the tokens it applied, whatever the cleanup setting says', () => {
-        const now = new Fecha('2025-01-01T10:00:00Z');
+        const now = new Date('2025-01-01T10:00:00Z');
         const input = 'Llamada mom @phone #family /due:tomorrow';
         const result = parseQuickAdd(input, undefined, now, undefined, { preserveText: true });
 
@@ -1088,7 +1088,7 @@ describe('quick-add', () => {
         // (same stance as shortcut captures, which resolve relative dates at
         // capture time). Consumers that must never infer dates pass
         // naturalLanguageDates: false.
-        const now = new Fecha('2025-01-01T10:00:00Z');
+        const now = new Date('2025-01-01T10:00:00Z');
         const input = 'Read https://en.wikipedia.org/wiki/Foo_(bar) tomorrow';
         const result = parseQuickAdd(input, undefined, now, undefined, { preserveText: true });
 
@@ -1099,7 +1099,7 @@ describe('quick-add', () => {
     });
 
     describe('applied tokens leave the title whatever quickAddAutoClean says', () => {
-        const now = new Fecha('2025-01-01T10:00:00Z');
+        const now = new Date('2025-01-01T10:00:00Z');
 
         it('drops /next with cleanup off and on alike', () => {
             for (const preserveText of [true, false]) {
@@ -1166,7 +1166,7 @@ describe('quick-add', () => {
     });
 
     it('parseQuickAddDateCommands preserves the title when requested (#742)', () => {
-        const now = new Fecha('2025-01-01T10:00:00Z');
+        const now = new Date('2025-01-01T10:00:00Z');
         const stripped = parseQuickAddDateCommands('Submit report /due:tomorrow', now);
         expect(stripped.title).toBe('Submit report');
         expect(stripped.props.dueDate).toBeTruthy();
@@ -1178,7 +1178,7 @@ describe('quick-add', () => {
     });
 
     describe('parseProjectNextActionInput (#859)', () => {
-        const now = new Fecha('2025-01-01T10:00:00Z');
+        const now = new Date('2025-01-01T10:00:00Z');
         const projects = [
             {
                 id: 'p1',
@@ -1334,7 +1334,7 @@ describe('quick-add', () => {
         // and only showed up as `%Jim Smith` capturing as `%Jim`.
         it('resolves a multi-word known person, which a bag missing knownPeople cannot', () => {
             const source = { tasks: [], people: [person('Jim Smith')] };
-            const now = new Fecha('2026-07-11T10:00:00Z');
+            const now = new Date('2026-07-11T10:00:00Z');
             const input = 'Seguir up %Jim Smith about budget';
 
             const withPeople = parseQuickAdd(input, undefined, now, undefined, buildQuickAddParseOptions({}, source));

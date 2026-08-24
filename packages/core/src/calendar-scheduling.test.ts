@@ -124,7 +124,7 @@ describe('calendar scheduling helpers', () => {
     });
 
     it('formats and parses calendar time inputs on a given day', () => {
-        const base = new Fecha(2026, 3, 26, 8, 5);
+        const base = new Date(2026, 3, 26, 8, 5);
         expect(formatCalendarTimeInputValue(base)).toBe('08:05');
         expect(addCalendarMinutes(base, 35).getHours()).toBe(8);
         expect(addCalendarMinutes(base, 35).getMinutes()).toBe(40);
@@ -152,12 +152,12 @@ describe('calendar scheduling helpers', () => {
     });
 
     it('builds a quick-add draft while keeping the selected calendar slot authoritative', () => {
-        const selectedStart = new Fecha('2026-04-26T14:00:00.000Z');
+        const selectedStart = new Date('2026-04-26T14:00:00.000Z');
         const draft = buildCalendarQuickAddTaskDraft(
             'Draft launch plan +Launch @computer #deep /note:Outline next steps /start:tomorrow /next',
             {
                 durationMinutes: 30,
-                now: new Fecha('2026-04-25T10:00:00.000Z'),
+                now: new Date('2026-04-25T10:00:00.000Z'),
                 projects: [project({ id: 'project-launch' })],
                 start: selectedStart,
             }
@@ -183,7 +183,7 @@ describe('calendar scheduling helpers', () => {
     // title, and `%"Jim Smith"` never matched the known person.
     it('resolves multi-word contexts and people exactly like quick add', () => {
         const input = 'Sync notes @John Smith %"Jim Smith"';
-        const now = new Fecha('2026-04-25T10:00:00.000Z');
+        const now = new Date('2026-04-25T10:00:00.000Z');
         const parseOptions = buildQuickAddParseOptions(
             {},
             {
@@ -196,7 +196,7 @@ describe('calendar scheduling helpers', () => {
             durationMinutes: 30,
             now,
             parseOptions,
-            start: new Fecha('2026-04-26T14:00:00.000Z'),
+            start: new Date('2026-04-26T14:00:00.000Z'),
         });
         const quickAdd = parseQuickAdd(input, undefined, now, undefined, parseOptions);
 
@@ -213,7 +213,7 @@ describe('calendar scheduling helpers', () => {
             areas: [area({ id: 'area-work' })],
             durationMinutes: 60,
             projects: [],
-            start: new Fecha('2026-04-26T14:00:00.000Z'),
+            start: new Date('2026-04-26T14:00:00.000Z'),
         });
 
         expect(draft.title).toBe('Plan campaign');
@@ -226,7 +226,7 @@ describe('calendar scheduling helpers', () => {
         const draft = buildCalendarQuickAddTaskDraft('Plan archive +Launch', {
             durationMinutes: 30,
             projects: [project({ id: 'project-archived', status: 'archived' })],
-            start: new Fecha('2026-04-26T14:00:00.000Z'),
+            start: new Date('2026-04-26T14:00:00.000Z'),
         });
 
         expect(draft.projectTitle).toBe('Launch');
@@ -236,8 +236,8 @@ describe('calendar scheduling helpers', () => {
     it('flags a quick-add due date that would be before the selected calendar slot', () => {
         const draft = buildCalendarQuickAddTaskDraft('Review launch /due:2026-04-25', {
             durationMinutes: 30,
-            now: new Fecha('2026-04-24T10:00:00.000Z'),
-            start: new Fecha('2026-04-26T14:00:00.000Z'),
+            now: new Date('2026-04-24T10:00:00.000Z'),
+            start: new Date('2026-04-26T14:00:00.000Z'),
         });
 
         expect(draft.dateCoherenceIssues).toEqual([
@@ -257,7 +257,7 @@ describe('calendar scheduling helpers', () => {
 
     it('finds the first open slot around external events and scheduled tasks', () => {
         const slot = findFreeSlotForDay({
-            day: new Fecha(2026, 3, 26),
+            day: new Date(2026, 3, 26),
             durationMinutes: 30,
             events: [
                 event({
@@ -265,7 +265,7 @@ describe('calendar scheduling helpers', () => {
                     end: '2026-04-26T09:00:00',
                 }),
             ],
-            now: new Fecha(2026, 3, 25, 12, 0),
+            now: new Date(2026, 3, 25, 12, 0),
             tasks: [
                 task({
                     id: 'task-2',
@@ -281,7 +281,7 @@ describe('calendar scheduling helpers', () => {
 
     it('clamps timed external events that started before the selected day', () => {
         const slot = findFreeSlotForDay({
-            day: new Fecha(2026, 3, 26),
+            day: new Date(2026, 3, 26),
             durationMinutes: 30,
             events: [
                 event({
@@ -289,7 +289,7 @@ describe('calendar scheduling helpers', () => {
                     end: '2026-04-26T08:45:00',
                 }),
             ],
-            now: new Fecha(2026, 3, 25, 12, 0),
+            now: new Date(2026, 3, 25, 12, 0),
             tasks: [],
         });
 
@@ -299,7 +299,7 @@ describe('calendar scheduling helpers', () => {
 
     it('returns null when external events fill the available workday', () => {
         const slot = findFreeSlotForDay({
-            day: new Fecha(2026, 3, 26),
+            day: new Date(2026, 3, 26),
             dayEndHour: 10,
             dayStartHour: 8,
             durationMinutes: 30,
@@ -309,7 +309,7 @@ describe('calendar scheduling helpers', () => {
                     end: '2026-04-26T10:00:00',
                 }),
             ],
-            now: new Fecha(2026, 3, 25, 12, 0),
+            now: new Date(2026, 3, 25, 12, 0),
             tasks: [],
         });
 
@@ -318,7 +318,7 @@ describe('calendar scheduling helpers', () => {
 
     it('ignores all-day external events for free-slot detection', () => {
         const slot = findFreeSlotForDay({
-            day: new Fecha(2026, 3, 26),
+            day: new Date(2026, 3, 26),
             durationMinutes: 30,
             events: [
                 event({
@@ -327,7 +327,7 @@ describe('calendar scheduling helpers', () => {
                     end: '2026-04-27T00:00:00',
                 }),
             ],
-            now: new Fecha(2026, 3, 25, 12, 0),
+            now: new Date(2026, 3, 25, 12, 0),
             tasks: [],
         });
 
@@ -337,10 +337,10 @@ describe('calendar scheduling helpers', () => {
 
     it('ignores date-only task starts for free-slot detection', () => {
         const slot = findFreeSlotForDay({
-            day: new Fecha(2026, 3, 26),
+            day: new Date(2026, 3, 26),
             durationMinutes: 30,
             events: [],
-            now: new Fecha(2026, 3, 25, 12, 0),
+            now: new Date(2026, 3, 25, 12, 0),
             tasks: [
                 task({
                     id: 'task-date-only',
@@ -356,10 +356,10 @@ describe('calendar scheduling helpers', () => {
 
     it('rounds today slots forward to the configured snap interval', () => {
         const slot = findFreeSlotForDay({
-            day: new Fecha(2026, 3, 26),
+            day: new Date(2026, 3, 26),
             durationMinutes: 30,
             events: [],
-            now: new Fecha(2026, 3, 26, 8, 7),
+            now: new Date(2026, 3, 26, 8, 7),
             tasks: [],
         });
 
@@ -369,7 +369,7 @@ describe('calendar scheduling helpers', () => {
 
     it('rounds free slots after busy intervals forward to the configured snap interval', () => {
         const slot = findFreeSlotForDay({
-            day: new Fecha(2026, 3, 26),
+            day: new Date(2026, 3, 26),
             durationMinutes: 30,
             events: [
                 event({
@@ -377,7 +377,7 @@ describe('calendar scheduling helpers', () => {
                     end: '2026-04-26T10:07:00',
                 }),
             ],
-            now: new Fecha(2026, 3, 25, 12, 0),
+            now: new Date(2026, 3, 25, 12, 0),
             snapMinutes: 15,
             tasks: [],
         });
@@ -388,7 +388,7 @@ describe('calendar scheduling helpers', () => {
 
     it('checks candidate slots against blocking intervals', () => {
         const base = {
-            day: new Fecha(2026, 3, 26),
+            day: new Date(2026, 3, 26),
             durationMinutes: 30,
             events: [
                 event({
@@ -401,30 +401,30 @@ describe('calendar scheduling helpers', () => {
 
         expect(isSlotFreeForDay({
             ...base,
-            startTime: new Fecha(2026, 3, 26, 9, 30),
+            startTime: new Date(2026, 3, 26, 9, 30),
         })).toBe(true);
         expect(isSlotFreeForDay({
             ...base,
-            startTime: new Fecha(2026, 3, 26, 10, 30),
+            startTime: new Date(2026, 3, 26, 10, 30),
         })).toBe(false);
     });
 
     it('allows slots outside the visible calendar window when they do not overlap', () => {
         expect(isSlotFreeForDay({
-            day: new Fecha(2026, 3, 26),
+            day: new Date(2026, 3, 26),
             durationMinutes: 30,
             events: [],
-            startTime: new Fecha(2026, 3, 26, 6, 30),
+            startTime: new Date(2026, 3, 26, 6, 30),
             tasks: [],
         })).toBe(true);
     });
 
     it('excludes the task being edited from slot collision checks', () => {
         const base = {
-            day: new Fecha(2026, 3, 26),
+            day: new Date(2026, 3, 26),
             durationMinutes: 30,
             events: [],
-            startTime: new Fecha(2026, 3, 26, 10, 0),
+            startTime: new Date(2026, 3, 26, 10, 0),
             tasks: [
                 task({
                     id: 'task-1',
@@ -440,10 +440,10 @@ describe('calendar scheduling helpers', () => {
 
     it('does not treat date-only task starts as timed collisions', () => {
         expect(isSlotFreeForDay({
-            day: new Fecha(2026, 3, 26),
+            day: new Date(2026, 3, 26),
             durationMinutes: 30,
             events: [],
-            startTime: new Fecha(2026, 3, 26, 8, 0),
+            startTime: new Date(2026, 3, 26, 8, 0),
             tasks: [
                 task({
                     id: 'task-date-only',

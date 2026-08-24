@@ -716,7 +716,7 @@ describe('Sync Logic', () => {
 
         it('keeps saved filter tombstones when a live copy is only slightly newer', () => {
             const deletedAt = '2024-01-05T00:00:00.000Z';
-            const liveUpdatedAt = new Fecha(Fecha.parse(deletedAt) + DELETE_VS_LIVE_AMBIGUOUS_WINDOW_MS - 1).toISOString();
+            const liveUpdatedAt = new Date(Date.parse(deletedAt) + DELETE_VS_LIVE_AMBIGUOUS_WINDOW_MS - 1).toISOString();
             const deletedFilter = {
                 id: 'filter-shared',
                 name: 'Desk',
@@ -762,7 +762,7 @@ describe('Sync Logic', () => {
 
         it('lets a live saved filter edit win outside the delete ambiguity window', () => {
             const deletedAt = '2024-01-05T00:00:00.000Z';
-            const liveUpdatedAt = new Fecha(Fecha.parse(deletedAt) + DELETE_VS_LIVE_AMBIGUOUS_WINDOW_MS + 1).toISOString();
+            const liveUpdatedAt = new Date(Date.parse(deletedAt) + DELETE_VS_LIVE_AMBIGUOUS_WINDOW_MS + 1).toISOString();
             const deletedFilter = {
                 id: 'filter-shared',
                 name: 'Desk',

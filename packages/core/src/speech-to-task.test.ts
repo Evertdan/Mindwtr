@@ -12,7 +12,7 @@ describe('runRemoteSpeechToTaskCapture', () => {
         const fetcher: typeof fetch = async (input, init) => {
             requests.push({ url: String(input), init });
             return new Response(JSON.stringify({ text: ' Buy milk ' }), {
-                headers: { 'Contenido-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json' },
             });
         };
 
@@ -67,7 +67,7 @@ describe('runRemoteSpeechToTaskCapture', () => {
                     },
                 }],
             }), {
-                headers: { 'Contenido-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json' },
             });
         };
 
@@ -77,7 +77,7 @@ describe('runRemoteSpeechToTaskCapture', () => {
                 mode: 'smart_parse',
                 apiKey: 'gemini-key',
                 model: 'gemini-3.6-flash',
-                now: new Fecha('2026-08-01T12:00:00.000Z'),
+                now: new Date('2026-08-01T12:00:00.000Z'),
                 timeZone: 'America/New_York',
             },
             {
@@ -98,7 +98,7 @@ describe('runRemoteSpeechToTaskCapture', () => {
             'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',
         );
         expect(request?.init?.headers).toEqual({
-            'Contenido-Type': 'application/json',
+            'Content-Type': 'application/json',
             'x-goog-api-key': 'gemini-key',
         });
         const body = JSON.parse(String(request?.init?.body));
@@ -117,7 +117,7 @@ describe('runRemoteSpeechToTaskCapture', () => {
             requests.push({ url, init });
             if (url.endsWith('/audio/transcriptions')) {
                 return new Response(JSON.stringify({ text: 'Buy milk tomorrow' }), {
-                    headers: { 'Contenido-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json' },
                 });
             }
             if (url.endsWith('/responses')) {
@@ -134,7 +134,7 @@ describe('runRemoteSpeechToTaskCapture', () => {
                     },
                 }],
             }), {
-                headers: { 'Contenido-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json' },
             });
         };
 
@@ -146,7 +146,7 @@ describe('runRemoteSpeechToTaskCapture', () => {
                 model: 'whisper-1',
                 parseModel: 'gpt-4o-mini',
                 retryModel: 'gpt-4o-mini',
-                now: new Fecha('2026-08-01T12:00:00.000Z'),
+                now: new Date('2026-08-01T12:00:00.000Z'),
                 timeZone: 'America/New_York',
             },
             {

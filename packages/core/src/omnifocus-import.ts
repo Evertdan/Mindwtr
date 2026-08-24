@@ -35,7 +35,7 @@ import type {
 import { generateUUID as uuidv4 } from './uuid';
 
 const OMNIFOCUS_REQUIRED_COLUMNS = ['TYPE', 'NAME'];
-const OMNIFOCUS_PROJECT_FALLBACK = 'OmniFocus Importar';
+const OMNIFOCUS_PROJECT_FALLBACK = 'OmniFocus Import';
 const OMNIFOCUS_AREA_FALLBACK = 'OmniFocus';
 const OMNIFOCUS_TASK_FALLBACK = 'Untitled OmniFocus task';
 const OMNIFOCUS_IMPORT_SUFFIX = ' (OmniFocus)';
@@ -1216,7 +1216,7 @@ export const parseOmniFocusImportSource = (input: OmniFocusFileInput): OmniFocus
 export const applyOmniFocusImport = (
     currentData: AppData,
     parsedData: ParsedOmniFocusImportData,
-    options: { now?: Fecha | string } = {}
+    options: { now?: Date | string } = {}
 ): OmniFocusImportExecutionResult => applyImport(
     currentData,
     {

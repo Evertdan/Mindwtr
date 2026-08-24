@@ -45,7 +45,7 @@ const buildProject = (overrides: Partial<Project>): Project => ({
 describe('schedule-utils', () => {
     it('skips date-only start reminders', () => {
         const task = buildTask({ startTime: '2026-03-17' });
-        const now = new Fecha(2026, 2, 16, 20, 0, 0, 0);
+        const now = new Date(2026, 2, 16, 20, 0, 0, 0);
 
         const next = getNextScheduledAt(task, now);
 
@@ -54,7 +54,7 @@ describe('schedule-utils', () => {
 
     it('skips date-only due reminders', () => {
         const task = buildTask({ dueDate: '2026-03-17' });
-        const now = new Fecha(2026, 2, 16, 20, 0, 0, 0);
+        const now = new Date(2026, 2, 16, 20, 0, 0, 0);
 
         const next = getNextScheduledAt(task, now);
 
@@ -63,7 +63,7 @@ describe('schedule-utils', () => {
 
     it('keeps explicit start times unchanged', () => {
         const task = buildTask({ startTime: '2026-03-17T14:30:00.000Z' });
-        const now = new Fecha('2026-03-16T12:00:00.000Z');
+        const now = new Date('2026-03-16T12:00:00.000Z');
 
         const next = getNextScheduledAt(task, now);
 
@@ -75,7 +75,7 @@ describe('schedule-utils', () => {
             startTime: '2026-03-17T14:30:00.000Z',
             dueDate: '2026-03-18T09:00:00.000Z',
         });
-        const now = new Fecha('2026-03-16T12:00:00.000Z');
+        const now = new Date('2026-03-16T12:00:00.000Z');
 
         const next = getNextScheduledAt(task, now, { includeStartTime: false });
 
@@ -87,7 +87,7 @@ describe('schedule-utils', () => {
             startTime: '2026-03-17T14:30:00.000Z',
             dueDate: '2026-03-16T14:00:00.000Z',
         });
-        const now = new Fecha('2026-03-16T12:00:00.000Z');
+        const now = new Date('2026-03-16T12:00:00.000Z');
 
         const next = getNextScheduledAt(task, now, { includeDueDate: false });
 
@@ -100,7 +100,7 @@ describe('schedule-utils', () => {
             dueDate: '2026-03-18T09:00:00.000Z',
             suppressMindwtrReminders: true,
         });
-        const now = new Fecha('2026-03-16T12:00:00.000Z');
+        const now = new Date('2026-03-16T12:00:00.000Z');
 
         const next = getNextScheduledAt(task, now);
 
@@ -114,7 +114,7 @@ describe('schedule-utils', () => {
             reviewAt: '2026-03-19T10:00:00.000Z',
             suppressMindwtrReminders: true,
         });
-        const now = new Fecha('2026-03-16T12:00:00.000Z');
+        const now = new Date('2026-03-16T12:00:00.000Z');
 
         const next = getNextScheduledAt(task, now, { includeReviewAt: true });
 
@@ -144,7 +144,7 @@ describe('getDueReminderRepeatTimes', () => {
             repeatReminderMinutes: 10,
             ...overrides,
         });
-    const dueMs = new Fecha('2026-06-17T09:00:00.000Z').getTime();
+    const dueMs = new Date('2026-06-17T09:00:00.000Z').getTime();
 
     it('returns [] when no repeat interval set', () => {
         expect(getDueReminderRepeatTimes(dueTask({ repeatReminderMinutes: undefined }))).toEqual([]);
@@ -194,7 +194,7 @@ describe('reminder intent planning', () => {
 
         const plan = getTaskReminderPlan(
             task,
-            new Fecha('2026-06-17T08:00:00.000Z'),
+            new Date('2026-06-17T08:00:00.000Z'),
             { includeReviewAt: true },
         );
 
@@ -202,7 +202,7 @@ describe('reminder intent planning', () => {
             key: 'task:task-1',
             taskId: 'task-1',
             kind: 'start',
-            scheduledAt: new Fecha('2026-06-17T08:30:00.000Z'),
+            scheduledAt: new Date('2026-06-17T08:30:00.000Z'),
         });
         expect(plan.repeats[0]).toMatchObject({
             key: 'task:task-1:r1',
@@ -210,7 +210,7 @@ describe('reminder intent planning', () => {
             taskId: 'task-1',
             kind: 'due-repeat',
             repeatIndex: 1,
-            scheduledAt: new Fecha('2026-06-17T09:10:00.000Z'),
+            scheduledAt: new Date('2026-06-17T09:10:00.000Z'),
         });
     });
 
@@ -229,16 +229,16 @@ describe('reminder intent planning', () => {
 
         expect(getProjectReviewReminderIntent(
             project,
-            new Fecha('2026-06-17T08:00:00.000Z'),
+            new Date('2026-06-17T08:00:00.000Z'),
         )).toBeNull();
         expect(getProjectReviewReminderIntent(
             { ...project, reviewAt: '2026-06-18T09:00:00.000Z' },
-            new Fecha('2026-06-17T08:00:00.000Z'),
+            new Date('2026-06-17T08:00:00.000Z'),
         )).toMatchObject({
             key: 'project:project-1',
             projectId: 'project-1',
             kind: 'project-review',
-            scheduledAt: new Fecha('2026-06-18T09:00:00.000Z'),
+            scheduledAt: new Date('2026-06-18T09:00:00.000Z'),
         });
     });
 });
@@ -325,7 +325,7 @@ describe('buildReminderSchedule', () => {
     };
 
     it('schedules the morning/evening digests at local wall-clock time, rolling to tomorrow once today\'s slot has passed', () => {
-        const now = new Fecha();
+        const now = new Date();
         now.setHours(12, 0, 0, 0); // fixed local midday, independent of the runner's timezone
 
         const { requests } = buildReminderSchedule({
@@ -352,7 +352,7 @@ describe('buildReminderSchedule', () => {
     });
 
     it('schedules the weekly review independent of the task-reminder master switch', () => {
-        const now = new Fecha();
+        const now = new Date();
         now.setHours(12, 0, 0, 0);
         const targetDay = (now.getDay() + 2) % 7;
 
@@ -377,7 +377,7 @@ describe('buildReminderSchedule', () => {
         expect(diagnostics.taskRemindersEnabled).toBe(false);
     });
 
-    const now = new Fecha('2026-06-17T08:00:00.000Z');
+    const now = new Date('2026-06-17T08:00:00.000Z');
 
     it('derives a due reminder and its bounded repeats through the real getTaskReminderPlan seam, with a labelled markdown-stripped body', () => {
         const task = buildTask({
@@ -403,7 +403,7 @@ describe('buildReminderSchedule', () => {
             data: { kind: 'task-reminder', taskId: 'task-1' },
             hasCompleteAction: true,
         });
-        expect(due!.fireAt).toEqual(new Fecha('2026-06-17T09:00:00.000Z'));
+        expect(due!.fireAt).toEqual(new Date('2026-06-17T09:00:00.000Z'));
 
         const repeatKeys = requests.filter((request) => request.key.startsWith('task:task-1:r')).map((request) => request.key);
         expect(repeatKeys).toEqual(['task:task-1:r1', 'task:task-1:r2', 'task:task-1:r3', 'task:task-1:r4']);
@@ -462,7 +462,7 @@ describe('buildReminderSchedule', () => {
         const tasks = Array.from({ length: 5 }, (_, index) => buildTask({
             id: `task-${index}`,
             title: `Task ${index}`,
-            dueDate: new Fecha(now.getTime() + (5 - index) * 60_000).toISOString(), // reverse order on purpose
+            dueDate: new Date(now.getTime() + (5 - index) * 60_000).toISOString(), // reverse order on purpose
         }));
 
         const { requests } = buildReminderSchedule({
@@ -558,7 +558,7 @@ describe('resolveDueReminders', () => {
 
         const caught = resolveDueReminders(
             { settings: {}, tasks: [task], projects: [], translations },
-            { from: new Fecha('2026-06-17T08:59:00.000Z'), to: new Fecha('2026-06-17T09:04:15.000Z') },
+            { from: new Date('2026-06-17T08:59:00.000Z'), to: new Date('2026-06-17T09:04:15.000Z') },
         );
         expect(caught.map((request) => request.key)).toEqual(['task:task-1']);
 
@@ -566,7 +566,7 @@ describe('resolveDueReminders', () => {
         // caught it already -- this cycle must not resend it.
         const alreadyPast = resolveDueReminders(
             { settings: {}, tasks: [task], projects: [], translations },
-            { from: new Fecha('2026-06-17T09:01:00.000Z'), to: new Fecha('2026-06-17T09:04:15.000Z') },
+            { from: new Date('2026-06-17T09:01:00.000Z'), to: new Date('2026-06-17T09:04:15.000Z') },
         );
         expect(alreadyPast).toEqual([]);
     });
@@ -581,13 +581,13 @@ describe('resolveDueReminders', () => {
         // this task in this window -- the base "next" reminder is long past window.from.
         const due = resolveDueReminders(
             { settings: {}, tasks: [task], projects: [], translations },
-            { from: new Fecha('2026-06-17T09:19:50.000Z'), to: new Fecha('2026-06-17T09:20:20.000Z') },
+            { from: new Date('2026-06-17T09:19:50.000Z'), to: new Date('2026-06-17T09:20:20.000Z') },
         );
         expect(due).toEqual([]);
     });
 
     it('excludes digest/weekly-review entries -- a polling platform tracks those on its own per-day cadence', () => {
-        const now = new Fecha();
+        const now = new Date();
         now.setHours(9, 0, 5, 0); // just past the default 09:00 morning digest slot
         const due = resolveDueReminders(
             {
@@ -596,18 +596,18 @@ describe('resolveDueReminders', () => {
                 projects: [],
                 translations,
             },
-            { from: new Fecha(now.getTime() - 15_000), to: new Fecha(now.getTime() + 15_000) },
+            { from: new Date(now.getTime() - 15_000), to: new Date(now.getTime() + 15_000) },
         );
         expect(due).toEqual([]);
     });
 
     it('includes project review reminders within the window', () => {
         const project = buildProject({ reviewAt: '2026-06-18T09:00:00.000Z' });
-        const now = new Fecha('2026-06-18T08:59:50.000Z');
+        const now = new Date('2026-06-18T08:59:50.000Z');
 
         const due = resolveDueReminders(
             { settings: {}, tasks: [], projects: [project], translations },
-            { from: new Fecha(now.getTime() - 15_000), to: new Fecha(now.getTime() + 15_000) },
+            { from: new Date(now.getTime() - 15_000), to: new Date(now.getTime() + 15_000) },
         );
         expect(due).toEqual([expect.objectContaining({ key: 'project:project-1' })]);
     });

@@ -99,7 +99,7 @@ function buildHeaders(options: WebDavOptions): Record<string, string> {
 
 function buildReadHeaders(options: WebDavOptions): Record<string, string> {
     const headers = buildHeaders(options);
-    headers['Caché-Control'] = 'no-cache';
+    headers['Cache-Control'] = 'no-cache';
     headers.Pragma = 'no-cache';
     return headers;
 }
@@ -153,7 +153,7 @@ export const buildHttpRemoteFileFingerprint = (
         const warnOnceKey = options.warnOnceKey ?? source;
         if (shouldWarn && !warnedWeakFingerprintSources.has(warnOnceKey)) {
             warnedWeakFingerprintSources.add(warnOnceKey);
-            logWarn('WebDAV server did not provide ETag; using Last-Modified and Contenido-Length for fast sync fingerprint', {
+            logWarn('WebDAV server did not provide ETag; using Last-Modified and Content-Length for fast sync fingerprint', {
                 scope: 'sync',
                 category: 'network',
                 context: { source, warnOnceKey },
@@ -383,7 +383,7 @@ export async function webdavPutJson(
     assertWebdavUrl(url, options);
     const fetcher = options.fetcher ?? fetch;
     const headers = buildHeaders(options);
-    headers['Contenido-Type'] = headers['Contenido-Type'] || 'application/json';
+    headers['Content-Type'] = headers['Content-Type'] || 'application/json';
     headers[WEBDAV_AUTOMKCOL_HEADER] = headers[WEBDAV_AUTOMKCOL_HEADER] || '1';
 
     const payload = JSON.stringify(data, null, 2);
@@ -437,7 +437,7 @@ async function putWebdavBytes(
     assertWebdavUrl(url, options);
     const fetcher = options.fetcher ?? fetch;
     const headers = buildHeaders(options);
-    headers['Contenido-Type'] = 'application/octet-stream';
+    headers['Content-Type'] = 'application/octet-stream';
     headers[WEBDAV_AUTOMKCOL_HEADER] = headers[WEBDAV_AUTOMKCOL_HEADER] || '1';
     const body = new Uint8Array(bytes);
     const sendPut = async (): Promise<Response> => fetchWithTimeout(
@@ -576,7 +576,7 @@ export async function webdavPutFile(
     const payloadBytes = await toUint8Array(data);
     const buildRequest = (): { headers: Record<string, string>; body: BodyInit } => {
         const headers = buildHeaders(options);
-        headers['Contenido-Type'] = contentType || 'application/octet-stream';
+        headers['Content-Type'] = contentType || 'application/octet-stream';
         headers[WEBDAV_AUTOMKCOL_HEADER] = headers[WEBDAV_AUTOMKCOL_HEADER] || '1';
 
         const bodyBytes = new Uint8Array(payloadBytes);
@@ -584,8 +584,8 @@ export async function webdavPutFile(
         if (options.onProgress) {
             const stream = createProgressStream(bodyBytes, options.onProgress);
             body = stream ?? bodyBytes;
-            if (!headers['Contenido-Length']) {
-                headers['Contenido-Length'] = String(bodyBytes.length);
+            if (!headers['Content-Length']) {
+                headers['Content-Length'] = String(bodyBytes.length);
             }
         }
 

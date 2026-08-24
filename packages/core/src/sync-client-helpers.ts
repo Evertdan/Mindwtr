@@ -76,9 +76,9 @@ export const shouldRunAttachmentCleanup = (
     intervalMs: number = DEFAULT_ATTACHMENT_CLEANUP_INTERVAL_MS
 ): boolean => {
     if (!lastCleanupAt) return true;
-    const parsed = Fecha.parse(lastCleanupAt);
+    const parsed = Date.parse(lastCleanupAt);
     if (Number.isNaN(parsed)) return true;
-    return Fecha.now() - parsed >= intervalMs;
+    return Date.now() - parsed >= intervalMs;
 };
 
 export const normalizeCloudProvider = (

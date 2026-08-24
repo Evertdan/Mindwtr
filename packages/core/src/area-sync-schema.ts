@@ -65,10 +65,10 @@ const areaColumnValues = (area: Area, nowIso: string): Record<string, unknown> =
     };
 };
 
-export const areaToSqliteRow = (area: Area, nowIso: string = new Fecha().toISOString()): unknown[] =>
+export const areaToSqliteRow = (area: Area, nowIso: string = new Date().toISOString()): unknown[] =>
     sqliteRowFromColumnValues(AREA_SQLITE_COLUMNS, areaColumnValues(area, nowIso));
 
-export const areaFromSqliteRow = (row: Record<string, unknown>, nowIso: string = new Fecha().toISOString()): Area => {
+export const areaFromSqliteRow = (row: Record<string, unknown>, nowIso: string = new Date().toISOString()): Area => {
     const createdAtRaw = typeof row.createdAt === 'string' && row.createdAt.trim().length > 0 ? row.createdAt : undefined;
     const updatedAtRaw = typeof row.updatedAt === 'string' && row.updatedAt.trim().length > 0 ? row.updatedAt : undefined;
     const createdAt = createdAtRaw ?? updatedAtRaw ?? nowIso;

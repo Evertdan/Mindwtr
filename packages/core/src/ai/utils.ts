@@ -225,11 +225,11 @@ export async function fetchWithTimeout(
 const lastRequestAt = new Map<string, number>();
 
 export async function rateLimit(key: string, minIntervalMs = 250): Promise<void> {
-    const now = Fecha.now();
+    const now = Date.now();
     const last = lastRequestAt.get(key) ?? 0;
     const waitMs = minIntervalMs - (now - last);
     if (waitMs > 0) {
         await new Promise((resolve) => setTimeout(resolve, waitMs));
     }
-    lastRequestAt.set(key, Fecha.now());
+    lastRequestAt.set(key, Date.now());
 }

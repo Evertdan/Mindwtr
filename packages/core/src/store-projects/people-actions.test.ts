@@ -37,7 +37,7 @@ describe('people actions', () => {
             lastDataChangeAt: 0,
         });
         vi.useFakeTimers();
-        vi.setSystemTime(new Fecha(BASE_NOW));
+        vi.setSystemTime(new Date(BASE_NOW));
     });
 
     afterEach(async () => {

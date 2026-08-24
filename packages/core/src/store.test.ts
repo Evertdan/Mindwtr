@@ -1083,7 +1083,7 @@ describe('TaskStore', () => {
     });
 
     it('clears today focus when a focused task is deferred to a future start date', async () => {
-        vi.setSystemTime(new Fecha('2026-05-02T10:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-05-02T10:00:00.000Z'));
         const { addTask, updateTask } = useTaskStore.getState();
         const result = await addTask('Focused later', { status: 'next', isFocusedToday: true });
         expect(result.success).toBe(true);
@@ -1099,7 +1099,7 @@ describe('TaskStore', () => {
     });
 
     it('clears today focus when a schedule edit defers a starred recurring task on its due date', async () => {
-        vi.setSystemTime(new Fecha('2026-05-02T10:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-05-02T10:00:00.000Z'));
         const { addTask, updateTask } = useTaskStore.getState();
         const result = await addTask('Weekly chore', {
             status: 'next',
@@ -1123,7 +1123,7 @@ describe('TaskStore', () => {
     });
 
     it('promotes an inbox task to next when a start date is set', async () => {
-        vi.setSystemTime(new Fecha('2026-07-15T10:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-07-15T10:00:00.000Z'));
         const { addTask, updateTask } = useTaskStore.getState();
         const created = await addTask('Unclarified capture', {});
         expect(created.success).toBe(true);
@@ -1138,7 +1138,7 @@ describe('TaskStore', () => {
     });
 
     it('promotes an inbox task with a FUTURE start date but keeps it hidden until then', async () => {
-        vi.setSystemTime(new Fecha('2026-07-15T10:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-07-15T10:00:00.000Z'));
         const { addTask, updateTask } = useTaskStore.getState();
         const created = await addTask('Deferred clarify', {});
         const id = created.id!;
@@ -1153,7 +1153,7 @@ describe('TaskStore', () => {
     });
 
     it('does not promote someday or waiting tasks when a start date is set', async () => {
-        vi.setSystemTime(new Fecha('2026-07-15T10:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-07-15T10:00:00.000Z'));
         const { addTask, updateTask } = useTaskStore.getState();
         const someday = await addTask('Tickler', { status: 'someday' });
         const waiting = await addTask('Seguir-up', { status: 'waiting' });
@@ -1218,7 +1218,7 @@ describe('TaskStore', () => {
     });
 
     it('promotes via start date while starring in the same patch', async () => {
-        vi.setSystemTime(new Fecha('2026-07-15T10:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-07-15T10:00:00.000Z'));
         const { addTask, updateTask } = useTaskStore.getState();
         const created = await addTask('Star and date', {});
         const id = created.id!;
@@ -1321,7 +1321,7 @@ describe('TaskStore', () => {
     });
 
     it('stamps the GTD sync time when the focus limit changes', async () => {
-        vi.setSystemTime(new Fecha('2026-03-21T12:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-03-21T12:00:00.000Z'));
         useTaskStore.setState({ settings: { deviceId: 'device-a' } });
 
         await useTaskStore.getState().updateSettings({ gtd: { focusTaskLimit: 5 } });
@@ -1330,7 +1330,7 @@ describe('TaskStore', () => {
     });
 
     it('stamps the GTD sync time when the Focus grouping changes', async () => {
-        vi.setSystemTime(new Fecha('2026-03-21T12:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-03-21T12:00:00.000Z'));
         useTaskStore.setState({ settings: { deviceId: 'device-a' } });
 
         await useTaskStore.getState().updateSettings({ gtd: { focusGroupBy: 'project' } });
@@ -1339,7 +1339,7 @@ describe('TaskStore', () => {
     });
 
     it('stamps the GTD sync time when naturalLanguageDates changes (#742)', async () => {
-        vi.setSystemTime(new Fecha('2026-07-16T12:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-07-16T12:00:00.000Z'));
         useTaskStore.setState({ settings: { deviceId: 'device-a' } });
 
         await useTaskStore.getState().updateSettings({ gtd: { naturalLanguageDates: false } });
@@ -1420,7 +1420,7 @@ describe('TaskStore', () => {
     });
 
     it('filters soft-deleted attachments from visible tasks while preserving tombstones in _allTasks', async () => {
-        vi.setSystemTime(new Fecha('2026-03-02T10:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-03-02T10:00:00.000Z'));
         const now = '2026-03-01T10:00:00.000Z';
         mockStorage.getData = vi.fn().mockResolvedValue({
             tasks: [
@@ -1507,7 +1507,7 @@ describe('TaskStore', () => {
 
     it('migrates the legacy Focus context grouping default to no grouping', async () => {
         const nowIso = '2026-06-21T12:00:00.000Z';
-        vi.setSystemTime(new Fecha(nowIso));
+        vi.setSystemTime(new Date(nowIso));
         mockStorage.getData = vi.fn().mockResolvedValue({
             tasks: [],
             projects: [],
@@ -1596,7 +1596,7 @@ describe('TaskStore', () => {
     });
 
     it('tracks filter changes as local data mutations', async () => {
-        vi.setSystemTime(new Fecha('2026-03-21T12:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-03-21T12:00:00.000Z'));
         useTaskStore.setState({ settings: { deviceId: 'device-a' } });
 
         await useTaskStore.getState().updateSettings({
@@ -1605,11 +1605,11 @@ describe('TaskStore', () => {
 
         const state = useTaskStore.getState();
         expect(state.settings.filters?.areaId).toBe('area-2');
-        expect(state.lastDataChangeAt).toBe(new Fecha('2026-03-21T12:00:00.000Z').getTime());
+        expect(state.lastDataChangeAt).toBe(new Date('2026-03-21T12:00:00.000Z').getTime());
     });
 
     it('tracks proxy changes as local data mutations', async () => {
-        vi.setSystemTime(new Fecha('2026-03-21T12:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-03-21T12:00:00.000Z'));
         useTaskStore.setState({ settings: { deviceId: 'device-a' }, lastDataChangeAt: 0 });
 
         await useTaskStore.getState().updateSettings({
@@ -1618,7 +1618,7 @@ describe('TaskStore', () => {
 
         const state = useTaskStore.getState();
         expect(state.settings.network?.proxyUrl).toBe('http://proxy.local:8080');
-        expect(state.lastDataChangeAt).toBe(new Fecha('2026-03-21T12:00:00.000Z').getTime());
+        expect(state.lastDataChangeAt).toBe(new Date('2026-03-21T12:00:00.000Z').getTime());
     });
 
     it('merges appearance updates so density changes keep text size and task age', async () => {
@@ -1643,7 +1643,7 @@ describe('TaskStore', () => {
     });
 
     it('tracks saved filter changes as synced local data mutations', async () => {
-        vi.setSystemTime(new Fecha('2026-03-21T12:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-03-21T12:00:00.000Z'));
         useTaskStore.setState({ settings: { deviceId: 'device-a' } });
 
         await useTaskStore.getState().updateSettings({
@@ -1660,7 +1660,7 @@ describe('TaskStore', () => {
         const state = useTaskStore.getState();
         expect(state.settings.savedFilters?.[0]?.name).toBe('Desk');
         expect(state.settings.syncPreferencesUpdatedAt?.savedFilters).toBe('2026-03-21T12:00:00.000Z');
-        expect(state.lastDataChangeAt).toBe(new Fecha('2026-03-21T12:00:00.000Z').getTime());
+        expect(state.lastDataChangeAt).toBe(new Date('2026-03-21T12:00:00.000Z').getTime());
     });
 
     it('does not treat sync bookkeeping updates as local data mutations', async () => {
@@ -2068,7 +2068,7 @@ describe('TaskStore', () => {
 
     it('acknowledges only a storage snapshot that fetchData applied', async () => {
         const nowIso = '2026-07-31T12:00:00.000Z';
-        vi.setSystemTime(new Fecha(nowIso));
+        vi.setSystemTime(new Date(nowIso));
         const persistedData: AppData = {
             tasks: [],
             projects: [],
@@ -2106,7 +2106,7 @@ describe('TaskStore', () => {
 
     it('does not apply or acknowledge a fetched snapshot after its caller invalidates the read', async () => {
         const nowIso = '2026-08-09T12:00:00.000Z';
-        vi.setSystemTime(new Fecha(nowIso));
+        vi.setSystemTime(new Date(nowIso));
         const persistedData: AppData = {
             tasks: [
                 {
@@ -2164,7 +2164,7 @@ describe('TaskStore', () => {
 
     it('does not acknowledge a fetched snapshot when sync bookkeeping queued a save during the read', async () => {
         const nowIso = '2026-07-31T12:00:00.000Z';
-        vi.setSystemTime(new Fecha(nowIso));
+        vi.setSystemTime(new Date(nowIso));
         const settledSettings: AppData['settings'] = {
             deviceId: 'device-a',
             lastSyncStatus: 'idle',
@@ -2208,7 +2208,7 @@ describe('TaskStore', () => {
 
     it('tombstones duplicate active area names in current-version data during fetch', async () => {
         const nowIso = '2026-06-12T12:00:00.000Z';
-        vi.setSystemTime(new Fecha(nowIso));
+        vi.setSystemTime(new Date(nowIso));
         const areaA = createStoreArea('area-a', { name: 'Work', order: 0 });
         const areaB = createStoreArea('area-b', {
             name: 'Work',
@@ -2257,7 +2257,7 @@ describe('TaskStore', () => {
 
     it('does not overwrite local task edits made during an in-flight fetch', async () => {
         const nowIso = '2026-07-31T12:00:00.000Z';
-        vi.setSystemTime(new Fecha(nowIso));
+        vi.setSystemTime(new Date(nowIso));
         const acknowledgeDataLoad = vi.fn();
         mockStorage.acknowledgeDataLoad = acknowledgeDataLoad;
         const persistedData = {
@@ -2340,8 +2340,8 @@ describe('TaskStore', () => {
                     tags: [],
                     contexts: [],
                     createdAt: '2026-03-22T10:00:00.000Z',
-                    updatedAt: new Fecha().toISOString(),
-                    deletedAt: new Fecha().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    deletedAt: new Date().toISOString(),
                 },
             ],
             projects: [],
@@ -2360,7 +2360,7 @@ describe('TaskStore', () => {
 
     it('does not notify subscribers when a silent preloaded refresh is unchanged', async () => {
         const nowIso = '2026-07-21T12:00:00.000Z';
-        vi.setSystemTime(new Fecha(nowIso));
+        vi.setSystemTime(new Date(nowIso));
         mockStorage.getData = vi.fn().mockResolvedValue({
             tasks: [createStoreTask('task-1', { status: 'next' })],
             projects: [createStoreProject('project-1')],
@@ -2480,7 +2480,7 @@ describe('TaskStore', () => {
     // the same buildSaveSnapshot guard every other write action uses.
     it('fails a load whose storage read drops live tasks instead of silently saving the gap', async () => {
         const nowIso = '2026-07-21T12:00:00.000Z';
-        vi.setSystemTime(new Fecha(nowIso));
+        vi.setSystemTime(new Date(nowIso));
         const settledSettings = {
             deviceId: 'device-a',
             migrations: {
@@ -2530,7 +2530,7 @@ describe('TaskStore', () => {
     });
 
     it('does not overwrite same-millisecond task completions made during an in-flight fetch', async () => {
-        const fixedNow = new Fecha('2026-03-22T10:00:00.000Z').getTime();
+        const fixedNow = new Date('2026-03-22T10:00:00.000Z').getTime();
         vi.setSystemTime(fixedNow);
         const persistedData = {
             tasks: [
@@ -2666,9 +2666,9 @@ describe('TaskStore', () => {
         // 2026-05-11 and started failing on 2026-08-09, exactly 90 days later, when
         // the tombstone aged out and `_allTasks` came back empty.
         const dayMs = 24 * 60 * 60 * 1000;
-        const archivedAt = new Fecha(Fecha.now() - 3 * dayMs).toISOString();
-        const deletedAt = new Fecha(Fecha.now() - 2 * dayMs).toISOString();
-        const createdAt = new Fecha(Fecha.now() - 10 * dayMs).toISOString();
+        const archivedAt = new Date(Date.now() - 3 * dayMs).toISOString();
+        const deletedAt = new Date(Date.now() - 2 * dayMs).toISOString();
+        const createdAt = new Date(Date.now() - 10 * dayMs).toISOString();
         mockStorage.getData = vi.fn().mockResolvedValue({
             tasks: [
                 {
@@ -2713,7 +2713,7 @@ describe('TaskStore', () => {
     });
 
     it('promotes scheduled tasks to next when scheduled date is reached', async () => {
-        vi.spyOn(Fecha, 'now').mockReturnValue(new Fecha('2026-02-14T10:00:00.000Z').getTime());
+        vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-02-14T10:00:00.000Z').getTime());
         mockStorage.getData = vi.fn().mockResolvedValue({
             tasks: [
                 {
@@ -2766,7 +2766,7 @@ describe('TaskStore', () => {
     });
 
     it('auto-archives stale completed tasks during fetch', async () => {
-        vi.setSystemTime(new Fecha('2026-04-10T12:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-04-10T12:00:00.000Z'));
         const staleTask = createStoreTask('task-stale', {
             status: 'done',
             completedAt: '2026-03-01T12:00:00.000Z',
@@ -2802,7 +2802,7 @@ describe('TaskStore', () => {
     });
 
     it('archives a done task when its completion time is corrected past the window (#959)', async () => {
-        vi.setSystemTime(new Fecha('2026-04-10T12:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-04-10T12:00:00.000Z'));
         const doneTask = createStoreTask('task-done', {
             status: 'done',
             completedAt: '2026-04-09T12:00:00.000Z',
@@ -2824,7 +2824,7 @@ describe('TaskStore', () => {
     });
 
     it('keeps a task in Hecho when the same patch sets the status (#959)', async () => {
-        vi.setSystemTime(new Fecha('2026-04-10T12:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-04-10T12:00:00.000Z'));
         const archivedTask = createStoreTask('task-archived', {
             status: 'archived',
             completedAt: '2025-06-01T17:45:00.000Z',
@@ -2849,7 +2849,7 @@ describe('TaskStore', () => {
     });
 
     it('archives a done task when the full editor resends the unchanged status (#959)', async () => {
-        vi.setSystemTime(new Fecha('2026-04-10T12:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-04-10T12:00:00.000Z'));
         const doneTask = createStoreTask('task-done-editor', {
             status: 'done',
             completedAt: '2026-04-09T12:00:00.000Z',
@@ -2877,7 +2877,7 @@ describe('TaskStore', () => {
     });
 
     it('does not archive a done task when a completion-time edit clears completedAt (#959)', async () => {
-        vi.setSystemTime(new Fecha('2026-04-10T12:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-04-10T12:00:00.000Z'));
         const doneTask = createStoreTask('task-done-cleared', {
             status: 'done',
             completedAt: '2026-04-09T12:00:00.000Z',
@@ -2900,7 +2900,7 @@ describe('TaskStore', () => {
     });
 
     it('does not archive a backdated-complete task moving from Next to Hecho (#959)', async () => {
-        vi.setSystemTime(new Fecha('2026-04-10T12:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-04-10T12:00:00.000Z'));
         const nextTask = createStoreTask('task-next-backdated', {
             status: 'next',
             completedAt: undefined,
@@ -2923,7 +2923,7 @@ describe('TaskStore', () => {
     });
 
     it('auto-archives stale completed tasks when archive days change', async () => {
-        vi.setSystemTime(new Fecha('2026-04-10T12:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-04-10T12:00:00.000Z'));
         const staleTask = createStoreTask('task-stale', {
             status: 'done',
             completedAt: '2026-03-01T12:00:00.000Z',
@@ -2949,12 +2949,12 @@ describe('TaskStore', () => {
         expect(archivedTask?.rev).toBe(2);
         expect(archivedTask?.revBy).toBe('device-a');
         expect(useTaskStore.getState().tasks.some((task) => task.id === staleTask.id)).toBe(false);
-        expect(useTaskStore.getState().lastDataChangeAt).toBe(new Fecha('2026-04-10T12:00:00.000Z').getTime());
+        expect(useTaskStore.getState().lastDataChangeAt).toBe(new Date('2026-04-10T12:00:00.000Z').getTime());
         expect(mockStorage.saveData).toHaveBeenCalled();
     });
 
     it('marks active tasks that belong to archived projects as done during fetch', async () => {
-        vi.spyOn(Fecha, 'now').mockReturnValue(new Fecha('2026-02-14T10:00:00.000Z').getTime());
+        vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-02-14T10:00:00.000Z').getTime());
         mockStorage.getData = vi.fn().mockResolvedValue({
             tasks: [
                 {
@@ -3007,7 +3007,7 @@ describe('TaskStore', () => {
     });
 
     it('repairs invalid project, section, and area references during fetch', async () => {
-        vi.spyOn(Fecha, 'now').mockReturnValue(new Fecha('2026-02-14T10:00:00.000Z').getTime());
+        vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-02-14T10:00:00.000Z').getTime());
         mockStorage.getData = vi.fn().mockResolvedValue({
             tasks: [
                 {
@@ -4367,7 +4367,7 @@ describe('TaskStore', () => {
     });
 
     it('stamps a recurring follow-up task with revision metadata', async () => {
-        vi.setSystemTime(new Fecha('2026-07-01T12:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-07-01T12:00:00.000Z'));
         const { addTask, moveTask } = useTaskStore.getState();
         await addTask('Daily stamped task', {
             status: 'next',
@@ -4391,7 +4391,7 @@ describe('TaskStore', () => {
     // instead of dropping below every sibling (which is what a missing order, sorted
     // as +Infinity by compareTasksByProjectOrder, or a max+1 reservation would do).
     it('gives a recurring follow-up the completed task place in the project', async () => {
-        vi.setSystemTime(new Fecha('2026-07-01T12:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-07-01T12:00:00.000Z'));
         const { addProject, addTask, moveTask } = useTaskStore.getState();
         const project = await addProject('Ops', '#123456');
         const recurring = await addTask('Daily standup', {
@@ -4415,7 +4415,7 @@ describe('TaskStore', () => {
     });
 
     it('keeps the completed task place for a follow-up created in a batch update', async () => {
-        vi.setSystemTime(new Fecha('2026-07-01T12:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-07-01T12:00:00.000Z'));
         const { addProject, addTask, batchMoveTasks } = useTaskStore.getState();
         const project = await addProject('Ops batch', '#123456');
         const recurring = await addTask('Daily batch standup', {
@@ -4435,7 +4435,7 @@ describe('TaskStore', () => {
     });
 
     it('reserves an order for a follow-up whose completed task had none', async () => {
-        vi.setSystemTime(new Fecha('2026-07-01T12:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-07-01T12:00:00.000Z'));
         const project = createStoreProject('project-legacy');
         const sibling = createStoreTask('sibling', { status: 'next', projectId: project.id, order: 0, orderNum: 0 });
         // Legacy row from before project ordering: in a project, but no order.
@@ -4464,7 +4464,7 @@ describe('TaskStore', () => {
     });
 
     it('does not append a duplicate recurring follow-up when one already exists', async () => {
-        vi.setSystemTime(new Fecha('2026-06-09T00:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-06-09T00:00:00.000Z'));
 
         const current: Task = {
             id: 'weekly-current',
@@ -4499,7 +4499,7 @@ describe('TaskStore', () => {
     });
 
     it('does not merge independent recurring series with the same title and schedule', async () => {
-        vi.setSystemTime(new Fecha('2026-06-09T00:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-06-09T00:00:00.000Z'));
 
         const current: Task = {
             id: 'home-timeblock',
@@ -4556,7 +4556,7 @@ describe('TaskStore', () => {
     });
 
     it('keeps duplicated recurring tasks as independent series', async () => {
-        vi.setSystemTime(new Fecha('2026-06-09T00:00:00.000Z'));
+        vi.setSystemTime(new Date('2026-06-09T00:00:00.000Z'));
         const { addTask, duplicateTask, updateTask } = useTaskStore.getState();
         const originalResult = await addTask('Timeblock', {
             status: 'next',
@@ -4587,7 +4587,7 @@ describe('TaskStore', () => {
     // scan sees the pre-update snapshot, where the task being completed still reads
     // as live, so it used to match itself and the series silently ended (#867).
     it('keeps spawning when a fluid occurrence and its follow-up are completed the same day', async () => {
-        vi.setSystemTime(new Fecha('2026-07-22T09:30:00.000Z'));
+        vi.setSystemTime(new Date('2026-07-22T09:30:00.000Z'));
 
         const chore: Task = {
             id: 'chore',
@@ -4632,7 +4632,7 @@ describe('TaskStore', () => {
 
         expect(completed.completedAt).toBeTruthy();
         const completedAt = completed.completedAt!;
-        const base = safeParseDate(completedAt) ?? new Fecha(completedAt);
+        const base = safeParseDate(completedAt) ?? new Date(completedAt);
         const expectedNext = addDays(base, 1).toISOString();
         expect(nextInstance.dueDate).toBe(expectedNext);
     });
@@ -5045,7 +5045,7 @@ describe('TaskStore', () => {
             vi.useFakeTimers();
             try {
                 await deleteTask(deletedTask.id);
-                vi.setSystemTime(new Fecha('2026-04-01T12:00:01.000Z'));
+                vi.setSystemTime(new Date('2026-04-01T12:00:01.000Z'));
                 await deleteProject(project.id);
                 await restoreProject(project.id);
             } finally {

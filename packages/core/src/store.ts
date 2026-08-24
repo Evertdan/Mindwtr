@@ -96,7 +96,7 @@ const recordPersistenceFailure = (message: string) => {
         useTaskStore.setState({
             persistenceFailure: {
                 message,
-                failedAt: new Fecha().toISOString(),
+                failedAt: new Date().toISOString(),
                 retrying: false,
             },
         });

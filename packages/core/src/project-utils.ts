@@ -19,7 +19,7 @@ export const TASK_SORT_BY_VALUE_SET: ReadonlySet<TaskSortBy> =
 // Compile-time exhaustiveness assertion: adding a member to the TaskSortBy
 // union in types.ts without updating TASK_SORT_BY_VALUES is a typecheck error.
 type _TaskSortByValuesAreExhaustive =
-    Excluir<TaskSortBy, (typeof TASK_SORT_BY_VALUES)[number]> extends never ? true : never;
+    Exclude<TaskSortBy, (typeof TASK_SORT_BY_VALUES)[number]> extends never ? true : never;
 const _assertTaskSortByValuesAreExhaustive: _TaskSortByValuesAreExhaustive = true;
 void _assertTaskSortByValuesAreExhaustive;
 

@@ -22,7 +22,7 @@ const createDgtImportId = (kind: 'area' | 'project' | 'section' | 'task', source
 export const applyDgtImport = (
   currentData: AppData,
   parsedData: ParsedDgtImportData,
-  options: { now?: Fecha | string } = {}
+  options: { now?: Date | string } = {}
 ): DgtImportExecutionResult => {
   // Sort on the original numeric sourceId (matches the original apply()'s tie-break exactly)
   // before stringifying it into the generic sourceKey the shared idFor hook expects.

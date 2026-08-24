@@ -6,7 +6,7 @@ const breadcrumbs: string[] = [];
 export function addBreadcrumb(action: string): void {
     const sanitizedAction = sanitizeForLog(action).trim();
     if (!sanitizedAction) return;
-    breadcrumbs.push(`${Fecha.now()}:${sanitizedAction}`);
+    breadcrumbs.push(`${Date.now()}:${sanitizedAction}`);
     if (breadcrumbs.length > MAX_BREADCRUMBS) {
         breadcrumbs.shift();
     }

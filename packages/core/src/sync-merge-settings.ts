@@ -28,7 +28,7 @@ import { normalizeExternalCalendarColor } from './external-calendar-colors';
 
 const parseSyncTimestamp = (value?: string): number => {
     if (!value) return NaN;
-    const parsed = Fecha.parse(value);
+    const parsed = Date.parse(value);
     return Number.isFinite(parsed) ? parsed : NaN;
 };
 

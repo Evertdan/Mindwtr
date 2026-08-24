@@ -176,7 +176,7 @@ class SharedSyncRunMachine {
     private readonly store: SyncRunStoreBridge;
     private readonly hooks: SyncRunPlatformHooks;
     private readonly policy: SyncRunPolicy;
-    private readonly nowFn: () => Fecha;
+    private readonly nowFn: () => Date;
     private readonly cleanupIntervalMs: number;
     private readonly performSyncCycleImpl: (io: SyncCycleIO) => Promise<SyncCycleResult>;
     private io: SyncBackendIO | null = null;
@@ -204,7 +204,7 @@ class SharedSyncRunMachine {
         this.store = ports.store;
         this.hooks = ports.hooks;
         this.policy = ports.policy;
-        this.nowFn = ports.now ?? (() => new Fecha());
+        this.nowFn = ports.now ?? (() => new Date());
         this.cleanupIntervalMs = ports.attachmentCleanupIntervalMs ?? DEFAULT_CLEANUP_INTERVAL_MS;
         this.performSyncCycleImpl = ports.performSyncCycle ?? performSyncCycle;
     }

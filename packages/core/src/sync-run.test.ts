@@ -19,7 +19,7 @@ import type { SyncBackend } from './sync-service-utils';
 import type { SyncCycleIO, SyncCycleResult } from './sync-types';
 import { performSyncCycle } from './sync';
 
-const NOW = new Fecha('2026-07-13T10:00:00.000Z');
+const NOW = new Date('2026-07-13T10:00:00.000Z');
 const STAMP = '2026-07-01T00:00:00.000Z';
 
 const createTask = (id: string, title: string): Task => ({
@@ -865,7 +865,7 @@ describe('runSharedSyncCycle', () => {
     });
 
     it('skips the cycle while the pending-remote-write backoff is active and surfaces the deferred write', async () => {
-        const retryAt = new Fecha(Fecha.now() + 60_000).toISOString();
+        const retryAt = new Date(Date.now() + 60_000).toISOString();
         const local = createData([createTask('t-local', 'Local task')], {
             pendingRemoteWriteAt: STAMP,
             pendingRemoteWriteRetryAt: retryAt,
@@ -923,7 +923,7 @@ describe('runSharedSyncCycle', () => {
                         ...result.data,
                         settings: {
                             ...result.data.settings,
-                            pendingRemoteWriteRetryAt: new Fecha(NOW.getTime() + 30_000).toISOString(),
+                            pendingRemoteWriteRetryAt: new Date(NOW.getTime() + 30_000).toISOString(),
                             pendingRemoteWriteAttempts: 1,
                             lastSyncStatus: 'error',
                             lastSyncError: 'Remote write failed. Retrying in the background.',
@@ -1274,7 +1274,7 @@ describe('runSharedSyncCycle', () => {
         // The throttle only blocks while the interval has not elapsed, and it
         // compares against the real clock — stamp the last cleanup as "now".
         const local = createData([task], {
-            attachments: { lastCleanupAt: new Fecha().toISOString() },
+            attachments: { lastCleanupAt: new Date().toISOString() },
         });
         const runAttachmentCleanup = vi.fn(async (data: AppData) => ({
             data: cloneAppData(data),
@@ -1294,7 +1294,7 @@ describe('runSharedSyncCycle', () => {
 
     it('keeps the cleanup interval throttle when there is no orphaned attachment work', async () => {
         const local = createData([createTask('t-local', 'Local task')], {
-            attachments: { lastCleanupAt: new Fecha().toISOString() },
+            attachments: { lastCleanupAt: new Date().toISOString() },
         });
         const runAttachmentCleanup = vi.fn(async (data: AppData) => ({
             data: cloneAppData(data),
@@ -1399,7 +1399,7 @@ describe('runSharedSyncCycle', () => {
 
     it('skips the attachment cleanup inside the interval window', async () => {
         const local = createData([createTask('t-local', 'Local task')], {
-            attachments: { lastCleanupAt: new Fecha(Fecha.now() - 60_000).toISOString() },
+            attachments: { lastCleanupAt: new Date(Date.now() - 60_000).toISOString() },
         });
         const runAttachmentCleanup = vi.fn(async () => null);
         const { run } = createHarness({

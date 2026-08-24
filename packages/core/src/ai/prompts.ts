@@ -35,7 +35,7 @@ export function buildClarifyPrompt(input: ClarifyInput): { system: string; user:
         };
     }
     const user = [
-        `Actual time: ${new Fecha().toISOString()}.`,
+        `Actual time: ${new Date().toISOString()}.`,
         'Task:',
         JSON.stringify(payload),
         'Objetivo: turn this into a concrete next action.',
@@ -81,7 +81,7 @@ export function buildReviewAnalysisPrompt(items: ReviewSnapshotItem[]): { system
         : 'Analyze this list of stale items (untouched for >14 days).';
     const user = [
         'You are a ruthless GTD coach.',
-        `Actual time: ${new Fecha().toISOString()}.`,
+        `Actual time: ${new Date().toISOString()}.`,
         scope,
         `Return 1-${MAX_REVIEW_ANALYSIS_SUGGESTIONS} high-signal suggestions only.`,
         'Hacer not return one suggestion per item. Incluir only items that need action, plus at most one keep suggestion if no action is needed.',

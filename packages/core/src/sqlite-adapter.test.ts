@@ -118,7 +118,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('round-trips tasks, projects, areas, people, and settings', async () => {
-        const now = new Fecha().toISOString();
+        const now = new Date().toISOString();
         const archivedAt = '2026-05-12T09:00:00.000Z';
         const data: AppData = {
             tasks: [
@@ -385,7 +385,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('updates a single task row through saveTask while preserving unrelated data', async () => {
-        const now = new Fecha().toISOString();
+        const now = new Date().toISOString();
         const data: AppData = {
             tasks: [
                 {
@@ -821,7 +821,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('normalizes legacy string recurrence values when loading tasks', async () => {
-        const now = new Fecha().toISOString();
+        const now = new Date().toISOString();
         await adapter.saveData({
             tasks: [
                 {
@@ -846,7 +846,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('saves and deletes linked area, project, section, and task records without foreign key failures', async () => {
-        const now = new Fecha().toISOString();
+        const now = new Date().toISOString();
         const linkedData: AppData = {
             tasks: [
                 {
@@ -919,7 +919,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('keeps task references consistent when a project row is hard-deleted', async () => {
-        const now = new Fecha().toISOString();
+        const now = new Date().toISOString();
         await adapter.saveData({
             tasks: [
                 {
@@ -1094,7 +1094,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('indexes task locations in full text search', async () => {
-        const now = new Fecha().toISOString();
+        const now = new Date().toISOString();
         await adapter.saveData({
             tasks: [
                 {
@@ -1121,7 +1121,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('indexes assigned people in full text search', async () => {
-        const now = new Fecha().toISOString();
+        const now = new Date().toISOString();
         await adapter.saveData({
             tasks: [
                 {
@@ -1147,7 +1147,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('indexes checklist item titles in full text search', async () => {
-        const now = new Fecha().toISOString();
+        const now = new Date().toISOString();
         await adapter.saveData({
             tasks: [
                 {
@@ -1176,7 +1176,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('finds tasks by context and tag search terms', async () => {
-        const now = new Fecha().toISOString();
+        const now = new Date().toISOString();
         await adapter.saveData({
             tasks: [
                 {
@@ -1227,7 +1227,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('derives stable fallback order when project/section orderNum is null', async () => {
-        const now = new Fecha().toISOString();
+        const now = new Date().toISOString();
         await adapter.saveData({
             tasks: [],
             projects: [
@@ -1288,7 +1288,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('preserves attachments with empty URIs when loading tasks', async () => {
-        const now = new Fecha().toISOString();
+        const now = new Date().toISOString();
         const data: AppData = {
             tasks: [
                 {

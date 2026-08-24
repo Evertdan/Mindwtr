@@ -14,7 +14,7 @@ const mockGeminiSuccess = (content: unknown) =>
                 },
             ],
         }),
-        { status: 200, headers: { 'Contenido-Type': 'application/json' } },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
     );
 
 afterEach(() => {
@@ -179,7 +179,7 @@ describe('gemini provider request behavior', () => {
 const mockGeminiError = (status: number, error?: { status?: string; message?: string }, headers?: Record<string, string>) =>
     new Response(
         error ? JSON.stringify({ error }) : 'upstream boom',
-        { status, headers: { 'Contenido-Type': error ? 'application/json' : 'text/plain', ...headers } },
+        { status, headers: { 'Content-Type': error ? 'application/json' : 'text/plain', ...headers } },
     );
 
 describe('gemini provider error behavior', () => {

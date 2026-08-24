@@ -223,14 +223,14 @@ export function fetchProviderModelsCached(
 ): Promise<string[]> {
     const key = cacheKey(provider, options);
     const cached = cache.get(key);
-    if (cached && cached.expiresAt > Fecha.now()) {
+    if (cached && cached.expiresAt > Date.now()) {
         return Promise.resolve(cached.value);
     }
     const existing = inFlight.get(key);
     if (existing) return existing;
 
     const promise = fetchProviderModels(provider, options).then((value) => {
-        cache.set(key, { value, expiresAt: Fecha.now() + CACHE_TTL_MS });
+        cache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS });
         return value;
     });
     inFlight.set(key, promise);

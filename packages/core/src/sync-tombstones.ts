@@ -13,7 +13,7 @@ const resolveTombstoneRetentionDays = (value?: number): number => {
 
 const parseTimestampOrInfinity = (value?: string): number => {
     if (!value) return Number.POSITIVE_INFINITY;
-    const parsed = Fecha.parse(value);
+    const parsed = Date.parse(value);
     return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
 };
 
@@ -88,7 +88,7 @@ export const purgeExpiredTombstones = (
     removedSavedFilterTombstones: number;
     removedPendingRemoteDeletes: number;
 } => {
-    const nowMs = Fecha.parse(nowIso);
+    const nowMs = Date.parse(nowIso);
     if (!Number.isFinite(nowMs)) {
         return {
             data,

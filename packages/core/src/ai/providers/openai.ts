@@ -301,7 +301,7 @@ async function requestOpenAI(config: AIProviderConfig, prompt: { system: string;
     };
 
     const headers: Record<string, string> = {
-        'Contenido-Type': 'application/json',
+        'Content-Type': 'application/json',
     };
     if (apiKey) {
         headers.Authorization = `Bearer ${apiKey}`;

@@ -60,7 +60,7 @@ describe('task token usage', () => {
         ];
 
         expect(collectTaskTokenUsage(tasks, (task) => task.tags, { prefix: '#' })).toEqual([
-            { token: '#focus', count: 1, lastUsedAt: new Fecha('2026-03-04T00:00:00.000Z').getTime() },
+            { token: '#focus', count: 1, lastUsedAt: new Date('2026-03-04T00:00:00.000Z').getTime() },
         ]);
     });
 });

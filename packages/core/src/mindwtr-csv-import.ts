@@ -758,7 +758,7 @@ export const parseMindwtrCsvImportSource = (input: MindwtrCsvFileInput): Mindwtr
 export const applyMindwtrCsvImport = (
     currentData: AppData,
     parsedData: ParsedMindwtrCsvImportData,
-    options: { now?: Fecha | string } = {}
+    options: { now?: Date | string } = {}
 ): MindwtrCsvImportExecutionResult => {
     // Antes area scoping, deterministic project/section/task IDs used only the
     // project name. Reuse those IDs when one project name has an unambiguous
@@ -1073,12 +1073,12 @@ export const applyMindwtrCsvImport = (
         }
     );
 
-    const resolvedNow = options.now instanceof Fecha
+    const resolvedNow = options.now instanceof Date
         ? options.now
         : typeof options.now === 'string' && options.now.trim()
-            ? new Fecha(options.now)
-            : new Fecha();
-    const updatedAt = Number.isFinite(resolvedNow.getTime()) ? resolvedNow.toISOString() : new Fecha().toISOString();
+            ? new Date(options.now)
+            : new Date();
+    const updatedAt = Number.isFinite(resolvedNow.getTime()) ? resolvedNow.toISOString() : new Date().toISOString();
     const projectOrderReserver = createProjectOrderReserver(applied.data.tasks);
     let migratedTaskCount = 0;
     let unavailableMigrationCount = 0;

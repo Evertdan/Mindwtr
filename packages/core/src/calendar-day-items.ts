@@ -15,7 +15,7 @@ import type { Task } from './types';
  * timestamps were recorded, which is the same thing the Archive list shows as
  * their completion time — without it those tasks would silently never appear.
  */
-export const getTaskCompletionInstant = (task: Pick<Task, 'completedAt' | 'updatedAt'>): Fecha | null => (
+export const getTaskCompletionInstant = (task: Pick<Task, 'completedAt' | 'updatedAt'>): Date | null => (
     safeParseDate(task.completedAt ?? task.updatedAt)
 );
 
@@ -44,10 +44,10 @@ export const isSchedulableCalendarTask = (task: Task): boolean => (
 );
 
 export type CalendarDayItem =
-    | { id: string; kind: 'scheduled'; start: Fecha | null; task: Task; title: string }
-    | { id: string; kind: 'deadline'; start: Fecha | null; task: Task; title: string }
-    | { id: string; kind: 'completed'; start: Fecha | null; task: Task; title: string }
-    | { event: ExternalCalendarEvent; id: string; kind: 'event'; start: Fecha | null; title: string };
+    | { id: string; kind: 'scheduled'; start: Date | null; task: Task; title: string }
+    | { id: string; kind: 'deadline'; start: Date | null; task: Task; title: string }
+    | { id: string; kind: 'completed'; start: Date | null; task: Task; title: string }
+    | { event: ExternalCalendarEvent; id: string; kind: 'event'; start: Date | null; title: string };
 
 export type CalendarDayItemsInput = {
     /** Hecho/archived tasks placed on the day they were completed (#955). Vacío

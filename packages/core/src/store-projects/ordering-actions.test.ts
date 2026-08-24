@@ -18,7 +18,7 @@ describe('reorderProjectTasks', () => {
         };
         setStorageAdapter(storage);
         vi.useFakeTimers();
-        vi.setSystemTime(new Fecha(BASE_NOW));
+        vi.setSystemTime(new Date(BASE_NOW));
     });
 
     afterEach(async () => {
@@ -180,7 +180,7 @@ describe('reorderProjects', () => {
         };
         setStorageAdapter(storage);
         vi.useFakeTimers();
-        vi.setSystemTime(new Fecha(BASE_NOW));
+        vi.setSystemTime(new Date(BASE_NOW));
     });
 
     afterEach(async () => {
@@ -290,7 +290,7 @@ describe('reorderSections', () => {
         };
         setStorageAdapter(storage);
         vi.useFakeTimers();
-        vi.setSystemTime(new Fecha(BASE_NOW));
+        vi.setSystemTime(new Date(BASE_NOW));
     });
 
     afterEach(async () => {
@@ -403,7 +403,7 @@ describe('reorderBoardTasks', () => {
             lastDataChangeAt: 0,
         });
         vi.useFakeTimers();
-        vi.setSystemTime(new Fecha(BASE_NOW));
+        vi.setSystemTime(new Date(BASE_NOW));
     });
 
     afterEach(async () => {

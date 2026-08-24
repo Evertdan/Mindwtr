@@ -249,7 +249,7 @@ const parseTickTickTimestamp = (value: string): string | undefined => {
     return parsed ? parsed.toISOString() : undefined;
 };
 
-const formatDateInTimeZone = (date: Fecha, timeZone: string): string => {
+const formatDateInTimeZone = (date: Date, timeZone: string): string => {
     const trimmedZone = timeZone.trim();
     if (!trimmedZone) return date.toISOString().slice(0, 10);
     try {
@@ -669,7 +669,7 @@ const resolveImportedTaskStatus = (status: TaskStatus, projectId: string | undef
 export const applyTickTickImport = (
     currentData: AppData,
     parsedData: ParsedTickTickImportData,
-    options: { now?: Fecha | string } = {}
+    options: { now?: Date | string } = {}
 ): TickTickImportExecutionResult => {
     const areas = [...parsedData.areas].sort((left, right) => left.order - right.order || left.sourceKey.localeCompare(right.sourceKey));
     const projects = [...parsedData.projects].sort((left, right) => left.order - right.order || left.sourceKey.localeCompare(right.sourceKey));

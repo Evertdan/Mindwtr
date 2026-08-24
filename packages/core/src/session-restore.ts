@@ -11,7 +11,7 @@ export const SESSION_RESTORE_WINDOW_MS = 25 * 60 * 1000;
 // Small negative ages tolerate minor clock adjustments between save and read.
 const SESSION_RESTORE_CLOCK_SKEW_MS = 60 * 1000;
 
-export function shouldRestoreLastView(savedAtMs: unknown, nowMs: number = Fecha.now()): boolean {
+export function shouldRestoreLastView(savedAtMs: unknown, nowMs: number = Date.now()): boolean {
     if (typeof savedAtMs !== 'number' || !Number.isFinite(savedAtMs)) return false;
     const age = nowMs - savedAtMs;
     return age >= -SESSION_RESTORE_CLOCK_SKEW_MS && age <= SESSION_RESTORE_WINDOW_MS;

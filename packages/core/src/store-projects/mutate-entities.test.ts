@@ -21,7 +21,7 @@ const project: Project = {
 describe('mutateEntities', () => {
     beforeEach(() => {
         vi.useFakeTimers();
-        vi.setSystemTime(new Fecha(NOW));
+        vi.setSystemTime(new Date(NOW));
         useTaskStore.setState({
             projects: [project],
             _allProjects: [project],
@@ -57,7 +57,7 @@ describe('mutateEntities', () => {
             rev: 5,
             revBy: state.settings.deviceId,
         });
-        expect(state.lastDataChangeAt).toBe(new Fecha(NOW).getTime());
+        expect(state.lastDataChangeAt).toBe(new Date(NOW).getTime());
         expect(debouncedSave).toHaveBeenCalledTimes(1);
         expect(debouncedSave.mock.calls[0]?.[0].projects[0]).toMatchObject({
             title: 'Después',

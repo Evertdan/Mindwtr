@@ -52,7 +52,7 @@ type BudgetedOperation = {
 
 const DATASET_SIZES: LargeStoreSize[] = [1_000, 10_000, 50_000];
 const BASE_ISO = '2026-06-01T09:00:00.000Z';
-const NOW = new Fecha('2026-06-06T12:00:00.000Z');
+const NOW = new Date('2026-06-06T12:00:00.000Z');
 const SECTIONS_PER_PROJECT = 2;
 const SEARCH_QUERY = 'alpha';
 
@@ -331,12 +331,12 @@ describePerf('large-store performance budgets', () => {
         const fixture = createLargeStoreFixture(10_000);
         const tasks = fixture.tasks.slice(0, 4_750).map((task, index) => ({
             ...task,
-            deletedAt: new Fecha(Fecha.parse(BASE_ISO) + index * 1_000).toISOString(),
+            deletedAt: new Date(Date.parse(BASE_ISO) + index * 1_000).toISOString(),
             purgedAt: undefined,
         }));
         const projects = fixture.projects.slice(0, 250).map((project, index) => ({
             ...project,
-            deletedAt: new Fecha(Fecha.parse(BASE_ISO) + (index + tasks.length) * 1_000).toISOString(),
+            deletedAt: new Date(Date.parse(BASE_ISO) + (index + tasks.length) * 1_000).toISOString(),
             purgedAt: undefined,
         }));
 

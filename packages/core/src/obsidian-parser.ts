@@ -15,7 +15,7 @@ export type ObsidianSourceRef = {
 };
 
 export type ObsidianTaskFormat = 'inline' | 'tasknotes';
-export type ObsidianTaskNotesStatus = Extraer<TaskStatus, 'inbox' | 'next' | 'waiting' | 'someday' | 'done' | 'archived'>;
+export type ObsidianTaskNotesStatus = Extract<TaskStatus, 'inbox' | 'next' | 'waiting' | 'someday' | 'done' | 'archived'>;
 
 export type ObsidianTaskNotesData = {
     rawStatus: string;

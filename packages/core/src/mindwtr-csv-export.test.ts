@@ -110,7 +110,7 @@ describe('serializeMindwtrCsv', () => {
         ]);
         // Fecha-only stays date-only; a datetime keeps its instant (#797).
         expect(parsed.tasks[0].startTime).toBe('2026-09-01');
-        expect(new Fecha(parsed.tasks[0].dueDate!).toISOString()).toBe('2026-09-05T14:30:00.000Z');
+        expect(new Date(parsed.tasks[0].dueDate!).toISOString()).toBe('2026-09-05T14:30:00.000Z');
     });
 
     // D1: the previous version of this test only checked the PARSE output, so it proved the

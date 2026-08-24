@@ -249,7 +249,7 @@ async function requestGemini(config: AIProviderConfig, prompt: { system: string;
                 {
                     method: 'POST',
                     headers: {
-                        'Contenido-Type': 'application/json',
+                        'Content-Type': 'application/json',
                         'x-goog-api-key': apiKey,
                     },
                     body: JSON.stringify(body),
