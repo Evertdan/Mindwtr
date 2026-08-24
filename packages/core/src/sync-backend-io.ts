@@ -50,7 +50,7 @@ export type FileSyncReadResult = {
 };
 
 /**
- * Platform transport for one sync cycle's active backend. Every member here
+ * Platform transport for one sync cycle's active backend. Cada member here
  * is a deliberate platform truth carried over verbatim from the desktop/mobile
  * orchestrators (see `sync-run-ports.ts` for the ones ADR 0014 already
  * codified): desktop forks `isTauriRuntimeEnv()` between `tauriInvoke` and

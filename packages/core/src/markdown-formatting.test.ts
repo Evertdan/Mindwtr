@@ -322,7 +322,7 @@ describe('parseInlineMarkdown', () => {
 describe('getInlineMarkdownPreview', () => {
     it('removes block prefixes while preserving inline markdown tokens', () => {
         expect(getInlineMarkdownPreview('# Heading **draft** [spec](https://example.com)')).toBe('Heading **draft** [spec](https://example.com)');
-        expect(getInlineMarkdownPreview('- [x] ~~Done~~ item')).toBe('~~Done~~ item');
+        expect(getInlineMarkdownPreview('- [x] ~~Hecho~~ item')).toBe('~~Hecho~~ item');
         expect(getInlineMarkdownPreview('> `Quoted` note')).toBe('`Quoted` note');
     });
 

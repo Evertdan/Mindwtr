@@ -26,9 +26,9 @@ describe('Process Inbox session', () => {
     it('builds the session queue from live Inbox tasks and a platform visibility predicate', () => {
         const queue = selectProcessInboxCandidates([
             { id: 'one', status: 'inbox', title: 'One' },
-            { id: 'done', status: 'done', title: 'Done' },
+            { id: 'done', status: 'done', title: 'Hecho' },
             { id: 'deleted', status: 'inbox', deletedAt: '2026-07-15', title: 'Deleted' },
-            { id: 'hidden', status: 'inbox', title: 'Hidden' },
+            { id: 'hidden', status: 'inbox', title: 'Oculto' },
         ], (task) => task.id !== 'hidden');
 
         expect(queue.map(({ id }) => id)).toEqual(['one']);

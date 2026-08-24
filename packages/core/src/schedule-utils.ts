@@ -17,7 +17,7 @@ export type TaskReminderIntent = {
     dedupeKey: string;
     taskId: string;
     kind: TaskReminderIntentKind;
-    scheduledAt: Date;
+    scheduledAt: Fecha;
     repeatIndex?: number;
 };
 
@@ -31,7 +31,7 @@ export type ProjectReviewReminderIntent = {
     dedupeKey: string;
     projectId: string;
     kind: 'project-review';
-    scheduledAt: Date;
+    scheduledAt: Fecha;
 };
 
 export const REPEAT_REMINDER_INTERVAL_OPTIONS = [5, 10, 15, 30, 60] as const;
@@ -48,7 +48,7 @@ export function normalizeRepeatReminderMinutes(value: unknown): number | undefin
     return REPEAT_REMINDER_INTERVAL_SET.has(value) ? value : undefined;
 }
 
-function parseExplicitReminderDate(value: string | undefined | null): Date | null {
+function parseExplicitReminderDate(value: string | undefined | null): Fecha | null {
     if (!hasTimeComponent(value ?? undefined)) {
         return null;
     }
@@ -61,7 +61,7 @@ function isInactiveTask(task: Task): boolean {
 
 function getNextTaskReminderIntent(
     task: Task,
-    now: Date,
+    now: Fecha,
     options: ScheduleOptions,
 ): TaskReminderIntent | null {
     if (isInactiveTask(task)) return null;
@@ -69,7 +69,7 @@ function getNextTaskReminderIntent(
     const includeTaskReminders = task.suppressMindwtrReminders !== true;
     const candidates: TaskReminderIntent[] = [];
     const addCandidate = (
-        kind: Exclude<TaskReminderIntentKind, 'due-repeat'>,
+        kind: Excluir<TaskReminderIntentKind, 'due-repeat'>,
         value: string | undefined,
         enabled: boolean,
     ) => {
@@ -107,7 +107,7 @@ function getNextTaskReminderIntent(
  * Returns the next future scheduled time for a task, based on startTime/dueDate.
  * Used by apps to drive local notification scheduling.
  */
-export function getNextScheduledAt(task: Task, now: Date = new Date(), options: ScheduleOptions = {}): Date | null {
+export function getNextScheduledAt(task: Task, now: Fecha = new Fecha(), options: ScheduleOptions = {}): Fecha | null {
     return getNextTaskReminderIntent(task, now, options)?.scheduledAt ?? null;
 }
 
@@ -122,7 +122,7 @@ export function getNextScheduledAt(task: Task, now: Date = new Date(), options: 
  *
  * Pure: callers filter by `now` for delivery.
  */
-export function getDueReminderRepeatTimes(task: Task, options: ScheduleOptions = {}): Date[] {
+export function getDueReminderRepeatTimes(task: Task, options: ScheduleOptions = {}): Fecha[] {
     if (isInactiveTask(task)) return [];
     if (task.suppressMindwtrReminders === true) return [];
     if (options.includeDueDate === false) return [];
@@ -137,16 +137,16 @@ export function getDueReminderRepeatTimes(task: Task, options: ScheduleOptions =
         REPEAT_REMINDER_MAX_OCCURRENCES,
         Math.floor(REPEAT_REMINDER_MAX_WINDOW_MINUTES / interval),
     );
-    const times: Date[] = [];
+    const times: Fecha[] = [];
     for (let i = 1; i <= count; i += 1) {
-        times.push(new Date(due.getTime() + i * interval * 60_000));
+        times.push(new Fecha(due.getTime() + i * interval * 60_000));
     }
     return times;
 }
 
 export function getTaskReminderPlan(
     task: Task,
-    now: Date = new Date(),
+    now: Fecha = new Fecha(),
     options: ScheduleOptions = {},
 ): TaskReminderPlan {
     const repeats = getDueReminderRepeatTimes(task, options).map(
@@ -167,7 +167,7 @@ export function getTaskReminderPlan(
 
 export function getProjectReviewReminderIntent(
     project: Project,
-    now: Date = new Date(),
+    now: Fecha = new Fecha(),
 ): ProjectReviewReminderIntent | null {
     if (project.deletedAt || project.status === 'archived') return null;
     const scheduledAt = parseExplicitReminderDate(project.reviewAt);
@@ -181,7 +181,7 @@ export function getProjectReviewReminderIntent(
     };
 }
 
-export function getUpcomingSchedules(tasks: Task[], now: Date = new Date(), options: ScheduleOptions = {}) {
+export function getUpcomingSchedules(tasks: Task[], now: Fecha = new Fecha(), options: ScheduleOptions = {}) {
     return tasks
         .map((task) => {
             const scheduledAt = getNextScheduledAt(task, now, options);
@@ -191,7 +191,7 @@ export function getUpcomingSchedules(tasks: Task[], now: Date = new Date(), opti
         .sort((a, b) => (a!.scheduledAt.getTime() - b!.scheduledAt.getTime()));
 }
 
-export function isDueWithinMinutes(task: Task, minutes: number, now: Date = new Date(), options: ScheduleOptions = {}): boolean {
+export function isDueWithinMinutes(task: Task, minutes: number, now: Fecha = new Fecha(), options: ScheduleOptions = {}): boolean {
     const next = getNextScheduledAt(task, now, options);
     if (!next) return false;
     const diffMs = next.getTime() - now.getTime();
@@ -212,7 +212,7 @@ export function parseTimeOfDay(value: string | undefined, fallback: { hour: numb
 // --- Reminder gating (shared by desktop's poll loop and mobile's pre-scheduled alarms) ---
 
 /**
- * The master on/off switch. Every other task-reminder gate below is ANDed with this one.
+ * The master on/off switch. Cada other task-reminder gate below is ANDed with this one.
  */
 export function areTaskRemindersEnabled(settings: NotificationSettings): boolean {
     return settings.notificationsEnabled !== false;
@@ -244,7 +244,7 @@ export function hasActiveMobileNotificationFeature(settings: NotificationSetting
     return areTaskRemindersEnabled(settings) || isWeeklyReviewReminderEnabled(settings);
 }
 
-// --- Digest scheduling (the three defaults + the weekly-review-day clamp, previously
+// --- Resumen scheduling (the three defaults + the weekly-review-day clamp, previously
 // duplicated verbatim on both desktop and mobile) ---
 
 export type DigestTimeSlot = { enabled: boolean; hour: number; minute: number };
@@ -277,8 +277,8 @@ export function getDigestSchedule(settings: NotificationSettings): DigestSchedul
     };
 }
 
-function nextDailyTime(hour: number, minute: number, now: Date): Date {
-    const next = new Date(now);
+function nextDailyTime(hour: number, minute: number, now: Fecha): Fecha {
+    const next = new Fecha(now);
     next.setHours(hour, minute, 0, 0);
     if (next.getTime() <= now.getTime()) {
         next.setDate(next.getDate() + 1);
@@ -286,8 +286,8 @@ function nextDailyTime(hour: number, minute: number, now: Date): Date {
     return next;
 }
 
-function nextWeeklyTime(dayOfWeekSundayFirst: number, hour: number, minute: number, now: Date): Date {
-    const next = new Date(now);
+function nextWeeklyTime(dayOfWeekSundayFirst: number, hour: number, minute: number, now: Fecha): Fecha {
+    const next = new Fecha(now);
     next.setHours(hour, minute, 0, 0);
 
     const current = next.getDay(); // 0 = Sunday
@@ -326,13 +326,13 @@ export function buildReminderNotificationBody(
     return description ? `${reminderLabel}\n${description}` : reminderLabel;
 }
 
-// --- Full reminder schedule derivation (the "derive" half of ADR 0013's derive/effect split) ---
+// --- Completo reminder schedule derivation (the "derive" half of ADR 0013's derive/effect split) ---
 
 export type ReminderScheduleRequest = {
     key: string;
     title: string;
     message: string;
-    fireAt: Date;
+    fireAt: Fecha;
     repeatInterval?: 'daily' | 'weekly';
     hasSnoozeAction?: boolean;
     hasCompleteAction?: boolean;
@@ -364,8 +364,8 @@ export type ReminderScheduleInput = {
     settings: NotificationSettings;
     tasks: Task[];
     projects: Project[];
-    /** Defaults to `new Date()`. Pass explicitly in tests for deterministic output. */
-    now?: Date;
+    /** Defaults to `new Fecha()`. Pass explicitly in tests for deterministic output. */
+    now?: Fecha;
     translations: Record<string, string>;
     /** Platform cap on pending one-shot alarms (e.g. 60 on iOS, 200 on Android). Omit for no cap. */
     maxOneShotReminders?: number;
@@ -375,7 +375,7 @@ export type ReminderScheduleInput = {
      * platform sets this to avoid paying for `buildReminderNotificationBody` (stripMarkdown, etc.)
      * on occurrences it will immediately discard as out-of-window.
      */
-    deliveryWindowTo?: Date;
+    deliveryWindowTo?: Fecha;
 };
 
 export type ReminderSchedule = {
@@ -392,11 +392,11 @@ export type ReminderSchedule = {
  * project reviews. Diagnostics are produced by the same task loop that builds the requests, so
  * they cannot silently drift from what actually gets scheduled.
  *
- * Pure: no `Date.now()`, no store access, no i18n lookup beyond `translations`.
+ * Pure: no `Fecha.now()`, no store access, no i18n lookup beyond `translations`.
  */
 export function buildReminderSchedule(input: ReminderScheduleInput): ReminderSchedule {
     const { settings, tasks, projects, translations } = input;
-    const now = input.now ?? new Date();
+    const now = input.now ?? new Fecha();
     const nowMs = now.getTime();
     const windowToMs = input.deliveryWindowTo?.getTime() ?? Infinity;
     // A windowed (polling) caller discards diagnostics along with everything outside its window
@@ -582,9 +582,9 @@ export function buildReminderSchedule(input: ReminderScheduleInput): ReminderSch
 
 export type ReminderDeliveryWindow = {
     /** Look-back start: reminders due before this instant are treated as already missed. */
-    from: Date;
+    from: Fecha;
     /** Reminders due after this instant haven't arrived yet this cycle. */
-    to: Date;
+    to: Fecha;
 };
 
 /**
@@ -594,7 +594,7 @@ export type ReminderDeliveryWindow = {
  * already used per-task before this existed), then only the task/project one-shot requests due
  * by `window.to` are kept.
  *
- * Digest/weekly-review entries are excluded: a polling platform tracks those on its own per-day
+ * Resumen/weekly-review entries are excluded: a polling platform tracks those on its own per-day
  * cadence (see desktop's `checkDueAndNotify`), not as a one-shot delivery. Due-time repeat
  * occurrences are excluded too — a polling platform resolves which single occurrence fires this
  * cycle itself (see desktop's `resolveDueRepeatToFire`); folding core's whole future repeat chain

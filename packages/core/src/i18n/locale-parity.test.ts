@@ -25,7 +25,7 @@ import { LOCALES, isMixedEnglishChecked, type Locale } from './i18n-locales';
 // The one hand-kept binding left in this file: LOCALES (i18n-locales.ts) describes each
 // locale's mode/translatedKeyFloor/nonLatin, but the concrete translation object still has to come
 // from a real static import — there's no way to turn a string key into an imported binding
-// without one. Every other roster this file used to hand-keep (fullParityLocales,
+// without one. Cada other roster this file used to hand-keep (fullParityLocales,
 // overrideLocales, nonLatinOverrideLocales, overrideLocaleCoverageFloors, shippedLocales) was
 // an independent list of the same locale set and is now derived from LOCALES below.
 const translationsByLocale: Record<Locale, Record<string, string>> = {
@@ -37,7 +37,7 @@ const translationsByLocale: Record<Locale, Record<string, string>> = {
 
 const englishKeyCount = Object.keys(en).length;
 const locales = Object.entries(LOCALES) as Array<[Locale, (typeof LOCALES)[Locale]]>;
-// Full parity is the 'all' commitment, not the load mode: fa and sv load as 'overrides' but
+// Completo parity is the 'all' commitment, not the load mode: fa and sv load as 'overrides' but
 // are maintained at every key (see i18n-locales.ts).
 const fullParityLocales = locales.filter(([, descriptor]) => descriptor.translatedKeyFloor === 'all');
 const countFloorLocales = locales.filter(([, descriptor]) => typeof descriptor.translatedKeyFloor === 'number');

@@ -80,7 +80,7 @@ const slugifyTitle = (title: string): string => {
 };
 
 export type TaskNotesExportFile = {
-    /** Vault-relative path, e.g. "TaskNotes/Call-mom-1a2b3c4d.md". */
+    /** Vault-relative path, e.g. "TaskNotes/Llamada-mom-1a2b3c4d.md". */
     path: string;
     content: string;
 };

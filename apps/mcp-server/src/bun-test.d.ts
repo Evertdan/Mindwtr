@@ -17,7 +17,7 @@ declare module 'bun:test' {
     toHaveBeenCalledWith(...args: unknown[]): void;
   }
 
-  interface Expect {
+  interface Esperar {
     <T extends Matchable | Promise<unknown>>(actual: T): Matchers<T>;
     (actual: () => unknown): Matchers<unknown>;
   }
@@ -32,6 +32,6 @@ declare module 'bun:test' {
   export const beforeAll: (callback: TestCallback) => void;
   export const afterAll: (callback: TestCallback) => void;
   export const afterEach: (callback: TestCallback) => void;
-  export const expect: Expect;
+  export const expect: Esperar;
   export const spyOn: (object: object, method: string) => Spy;
 }

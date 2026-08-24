@@ -12,7 +12,7 @@ describe('runRemoteSpeechToTaskCapture', () => {
         const fetcher: typeof fetch = async (input, init) => {
             requests.push({ url: String(input), init });
             return new Response(JSON.stringify({ text: ' Buy milk ' }), {
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Contenido-Type': 'application/json' },
             });
         };
 
@@ -47,7 +47,7 @@ describe('runRemoteSpeechToTaskCapture', () => {
         expect(body.get('model')).toBe('whisper-1');
         expect(body.get('language')).toBe('en');
         expect(body.get('response_format')).toBe('json');
-        expect((body.get('file') as File).name).toBe('note.wav');
+        expect((body.get('file') as Archivo).name).toBe('note.wav');
     });
 
     it('sends Gemini audio bytes and parses the provider response', async () => {
@@ -67,7 +67,7 @@ describe('runRemoteSpeechToTaskCapture', () => {
                     },
                 }],
             }), {
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Contenido-Type': 'application/json' },
             });
         };
 
@@ -77,7 +77,7 @@ describe('runRemoteSpeechToTaskCapture', () => {
                 mode: 'smart_parse',
                 apiKey: 'gemini-key',
                 model: 'gemini-3.6-flash',
-                now: new Date('2026-08-01T12:00:00.000Z'),
+                now: new Fecha('2026-08-01T12:00:00.000Z'),
                 timeZone: 'America/New_York',
             },
             {
@@ -98,7 +98,7 @@ describe('runRemoteSpeechToTaskCapture', () => {
             'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',
         );
         expect(request?.init?.headers).toEqual({
-            'Content-Type': 'application/json',
+            'Contenido-Type': 'application/json',
             'x-goog-api-key': 'gemini-key',
         });
         const body = JSON.parse(String(request?.init?.body));
@@ -117,7 +117,7 @@ describe('runRemoteSpeechToTaskCapture', () => {
             requests.push({ url, init });
             if (url.endsWith('/audio/transcriptions')) {
                 return new Response(JSON.stringify({ text: 'Buy milk tomorrow' }), {
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Contenido-Type': 'application/json' },
                 });
             }
             if (url.endsWith('/responses')) {
@@ -134,7 +134,7 @@ describe('runRemoteSpeechToTaskCapture', () => {
                     },
                 }],
             }), {
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Contenido-Type': 'application/json' },
             });
         };
 
@@ -146,7 +146,7 @@ describe('runRemoteSpeechToTaskCapture', () => {
                 model: 'whisper-1',
                 parseModel: 'gpt-4o-mini',
                 retryModel: 'gpt-4o-mini',
-                now: new Date('2026-08-01T12:00:00.000Z'),
+                now: new Fecha('2026-08-01T12:00:00.000Z'),
                 timeZone: 'America/New_York',
             },
             {
@@ -185,7 +185,7 @@ describe('runRemoteSpeechToTaskCapture', () => {
 describe('runSpeechToTaskCapture', () => {
     it('uses the direct audio adapter with a transcription prompt in transcribe-only mode', async () => {
         const direct = vi.fn(async (): Promise<SpeechToTaskResult> => ({
-            transcript: 'Call Marc tomorrow.',
+            transcript: 'Llamada Marc tomorrow.',
             language: 'en',
         }));
         const transcribe = vi.fn();
@@ -201,7 +201,7 @@ describe('runSpeechToTaskCapture', () => {
         );
 
         expect(result).toEqual({
-            transcript: 'Call Marc tomorrow.',
+            transcript: 'Llamada Marc tomorrow.',
             language: 'en',
         });
         expect(direct).toHaveBeenCalledWith(expect.stringContaining('Audio language: en'));
@@ -210,18 +210,18 @@ describe('runSpeechToTaskCapture', () => {
     });
 
     it('returns local transcription without invoking remote parsing', async () => {
-        const transcribe = vi.fn(async () => 'Call Marc tomorrow.');
+        const transcribe = vi.fn(async () => 'Llamada Marc tomorrow.');
         const parse = vi.fn();
 
         await expect(runSpeechToTaskCapture(
             { provider: 'whisper', mode: 'smart_parse' },
             { transcribe, parse },
-        )).resolves.toEqual({ transcript: 'Call Marc tomorrow.' });
+        )).resolves.toEqual({ transcript: 'Llamada Marc tomorrow.' });
         expect(parse).not.toHaveBeenCalled();
     });
 
     it('retries smart parsing once and preserves the original transcript when parsing fails', async () => {
-        const transcribe = vi.fn(async () => 'Call Marc tomorrow.');
+        const transcribe = vi.fn(async () => 'Llamada Marc tomorrow.');
         const parse = vi.fn()
             .mockRejectedValueOnce(new Error('primary failed'))
             .mockRejectedValueOnce(new Error('retry failed'));
@@ -232,9 +232,9 @@ describe('runSpeechToTaskCapture', () => {
             { transcribe, parse, onParseFallback },
         );
 
-        expect(result).toEqual({ transcript: 'Call Marc tomorrow.' });
-        expect(parse).toHaveBeenNthCalledWith(1, 'Call Marc tomorrow.', undefined);
-        expect(parse).toHaveBeenNthCalledWith(2, 'Call Marc tomorrow.', 'gpt-4o-mini');
+        expect(result).toEqual({ transcript: 'Llamada Marc tomorrow.' });
+        expect(parse).toHaveBeenNthCalledWith(1, 'Llamada Marc tomorrow.', undefined);
+        expect(parse).toHaveBeenNthCalledWith(2, 'Llamada Marc tomorrow.', 'gpt-4o-mini');
         expect(onParseFallback).toHaveBeenCalledWith(expect.objectContaining({
             message: 'retry failed',
         }));
@@ -244,17 +244,17 @@ describe('runSpeechToTaskCapture', () => {
         const result = await runSpeechToTaskCapture(
             { provider: 'openai', mode: 'smart_parse' },
             {
-                transcribe: async () => 'Call Marc tomorrow.',
+                transcribe: async () => 'Llamada Marc tomorrow.',
                 parse: async () => ({
                     transcript: '',
-                    title: 'Call Marc',
+                    title: 'Llamada Marc',
                 }),
             },
         );
 
         expect(result).toEqual({
-            transcript: 'Call Marc tomorrow.',
-            title: 'Call Marc',
+            transcript: 'Llamada Marc tomorrow.',
+            title: 'Llamada Marc',
         });
     });
 });

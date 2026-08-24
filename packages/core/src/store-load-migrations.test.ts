@@ -9,7 +9,7 @@ import {
 import type { AppData, AppSettings, Area, Person, Project, Section, Task } from './types';
 
 const NOW_ISO = '2026-04-10T12:00:00.000Z';
-const NOW_MS = Date.parse(NOW_ISO);
+const NOW_MS = Fecha.parse(NOW_ISO);
 
 // Settings for a document that has already been through every migration at
 // least once, so a test that opts in to exactly one stale field is the only
@@ -161,7 +161,7 @@ describe('runLoadMigrations', () => {
 
     // `settledSettings` carries `lastAutoArchiveAt: NOW_ISO`, i.e. a pass that just
     // ran. The old twice-daily throttle skipped this load entirely, so a stale task
-    // sat in Done across restarts with nothing to explain why (#959).
+    // sat in Hecho across restarts with nothing to explain why (#959).
     it('auto-archive-stale-tasks: archives a stale completed task on a load right after the last pass', () => {
         const data = settledData({
             tasks: [{

@@ -144,7 +144,7 @@ export function normalizeAttachmentInput(input: string): NormalizedAttachmentInp
     }
 
     if (isLikelyFilePath(trimmed)) {
-        // A pointer, not a copy: "Add link" (and "Link to file…") promise the
+        // A pointer, not a copy: "Agregar link" (and "Link to file…") promise the
         // original file is only referenced. `kind: 'file'` would hand the path
         // to attachment sync, which uploads the bytes and later re-homes the
         // attachment onto its own copy (#1001).

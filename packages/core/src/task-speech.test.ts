@@ -15,8 +15,8 @@ describe('buildTaskUpdatesFromSpeechResult', () => {
                 projectId: undefined,
             },
             {
-                transcript: 'Call the electrician tomorrow at 3pm',
-                title: 'Call electrician',
+                transcript: 'Llamada the electrician tomorrow at 3pm',
+                title: 'Llamada electrician',
                 description: 'Ask about the hallway light.',
                 dueDate: '2026-04-08T15:00:00.000Z',
                 tags: ['urgent'],
@@ -35,7 +35,7 @@ describe('buildTaskUpdatesFromSpeechResult', () => {
 
         expect(plan).toEqual({
             updates: {
-                title: 'Call electrician',
+                title: 'Llamada electrician',
                 description: 'Ask about the hallway light.',
                 dueDate: '2026-04-08T15:00:00.000Z',
                 tags: ['#home', '#urgent'],
@@ -126,7 +126,7 @@ describe('buildTaskUpdatesFromSpeechResult', () => {
                     lang: '',
                     emotion: '',
                     event: '',
-                    text: 'How I want to play basketball tomorrow. Money.',
+                    text: 'Cómo I want to play basketball tomorrow. Money.',
                     timestamps: [0.64, 1.2],
                     durations: [0.24, 0.32],
                     tokens: ['H', 'ow'],
@@ -145,7 +145,7 @@ describe('buildTaskUpdatesFromSpeechResult', () => {
 
         expect(plan).toEqual({
             updates: {
-                title: 'How I want to play basketball tomorrow. Money.',
+                title: 'Cómo I want to play basketball tomorrow. Money.',
             },
             suggestedProjectTitle: undefined,
         });

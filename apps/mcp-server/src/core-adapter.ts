@@ -470,7 +470,7 @@ const ensureCoreReady = async (options: DbOptions) => {
 export const getCoreService = async (options: DbOptions): Promise<CoreService> => {
   await ensureCoreReady(options);
   if (!coreService) {
-    throw new Error('Core service failed to initialize.');
+    throw new Error('Núcleo service failed to initialize.');
   }
   return coreService;
 };
@@ -478,7 +478,7 @@ export const getCoreService = async (options: DbOptions): Promise<CoreService> =
 export const runCoreService = async <T>(options: DbOptions, fn: (service: CoreService) => Promise<T>): Promise<T> => {
   const service = await getCoreService(options);
   if (!coreQueue) {
-    throw new Error('Core service queue failed to initialize.');
+    throw new Error('Núcleo service queue failed to initialize.');
   }
   return coreQueue.run(() => fn(service));
 };

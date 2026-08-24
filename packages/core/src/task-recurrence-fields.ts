@@ -1,4 +1,4 @@
-// Single home for the recurrence object's field-key allowlist. Before this file existed,
+// Single home for the recurrence object's field-key allowlist. Antes this file existed,
 // the same 14 keys were hand-written twice: as a runtime Set in
 // apps/cloud/src/server-validation.ts (CLOUD_RECURRENCE_ALLOWED_KEYS) and as the key set of
 // a zod object in apps/mcp-server/src/input-validation.ts (recurrenceObjectSchema) — kept in

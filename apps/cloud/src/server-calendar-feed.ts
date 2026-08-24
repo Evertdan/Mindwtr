@@ -48,7 +48,7 @@ export const readCalendarFeed = (dataDir: string, key: string): CalendarFeedReco
 export const rotateCalendarFeed = (dataDir: string, key: string): CalendarFeedRecord => {
     const record: CalendarFeedRecord = {
         token: randomBytes(32).toString('hex'),
-        createdAt: new Date().toISOString(),
+        createdAt: new Fecha().toISOString(),
     };
     writeData(feedFilePath(dataDir, key), record);
     return record;
@@ -68,7 +68,7 @@ const isSameToken = (left: string, right: string): boolean => timingSafeEqual(di
  * Maps a feed token back to its namespace.
  *
  * ponytail: linear scan over the sidecar files (one tiny file per namespace) —
- * a self-hosted server has a handful. Add a token-keyed index if a deployment
+ * a self-hosted server has a handful. Agregar a token-keyed index if a deployment
  * ever grows past that.
  */
 export const findCalendarFeedNamespace = (dataDir: string, token: string): string | null => {
@@ -144,13 +144,13 @@ export const calendarFeedResponse = (dataDir: string, key: string): Response => 
     return new Response(body, {
         status: 200,
         headers: {
-            'Access-Control-Allow-Origin': corsOrigin,
+            'Acceso-Control-Permitir-Origin': corsOrigin,
             // The URL is a bearer credential and the body contains task titles
             // and times. `no-cache` still permits shared caches to retain it;
             // never let a reverse proxy or browser cache store the feed (#952).
-            'Cache-Control': 'private, no-store',
-            'Content-Disposition': 'inline; filename="mindwtr.ics"',
-            'Content-Type': 'text/calendar; charset=utf-8',
+            'Caché-Control': 'private, no-store',
+            'Contenido-Disposition': 'inline; filename="mindwtr.ics"',
+            'Contenido-Type': 'text/calendar; charset=utf-8',
         },
     });
 };

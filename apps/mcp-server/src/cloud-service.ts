@@ -108,8 +108,8 @@ const normalizeOffset = (value: number | undefined): number => (
 // first 10 characters. Falls back to the raw prefix only when the value doesn't parse.
 const dateKey = (value: string | undefined | null): string => {
   if (typeof value !== 'string' || value.length < 10) return '';
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? new Date(parsed).toISOString().slice(0, 10) : value.slice(0, 10);
+  const parsed = Fecha.parse(value);
+  return Number.isFinite(parsed) ? new Fecha(parsed).toISOString().slice(0, 10) : value.slice(0, 10);
 };
 
 const taskSortValue = (task: Task, sortBy: NonNullable<ListTasksInput['sortBy']>): string | number => {
@@ -291,7 +291,7 @@ export const createCloudService = (options: CloudServiceOptions): MindwtrService
     addTask: async (input: AddTaskInput) => {
       const hasTitle = typeof input.title === 'string' && input.title.trim().length > 0;
       const hasQuickAdd = typeof input.quickAdd === 'string' && input.quickAdd.trim().length > 0;
-      if (!hasTitle && !hasQuickAdd) throw new ValidationError('Either title or quickAdd is required');
+      if (!hasTitle && !hasQuickAdd) throw new ValidationError('Cualquiera title or quickAdd is required');
       if (hasTitle && hasQuickAdd) throw new ValidationError('Provide either title or quickAdd, not both');
       if (hasTitle && input.title!.trim().length > MAX_TASK_TITLE_LENGTH) {
         throw new ValidationError(`Task title too long (max ${MAX_TASK_TITLE_LENGTH} characters)`);
@@ -300,7 +300,7 @@ export const createCloudService = (options: CloudServiceOptions): MindwtrService
         throw new ValidationError(`Quick-add input too long (max ${MAX_TASK_QUICK_ADD_LENGTH} characters)`);
       }
       const props = filterUndefined({
-        // Every other create-writable Task field (checklist, areaId, reviewAt,
+        // Cada other create-writable Task field (checklist, areaId, reviewAt,
         // isFocusedToday, taskMode, ...) is derived from TASK_CREATE_FIELD_NAMES — see
         // task-write-fields.ts. Spread first so the explicit, semantically-normalized
         // overrides below win for the three fields that need more than a raw pass-through.
@@ -345,7 +345,7 @@ export const createCloudService = (options: CloudServiceOptions): MindwtrService
       if (input.energyLevel !== undefined) patch.energyLevel = input.energyLevel;
       if (input.assignedTo !== undefined) patch.assignedTo = input.assignedTo;
       if (input.timeEstimate !== undefined) patch.timeEstimate = input.timeEstimate;
-      // Every other patch-writable Task field (reviewAt, isFocusedToday, checklist, areaId,
+      // Cada other patch-writable Task field (reviewAt, isFocusedToday, checklist, areaId,
       // order, boardOrder, focusOrder, ...) is derived from TASK_PATCH_FIELD_NAMES — see
       // task-write-fields.ts. Adding a synced field there needs no edit here.
       for (const name of TASK_PATCH_FIELD_NAMES) {

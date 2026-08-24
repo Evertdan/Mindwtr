@@ -18,11 +18,11 @@ import {
 } from './user-prompts';
 
 const dayMs = 24 * 60 * 60 * 1000;
-const baseMs = new Date('2026-06-01T12:00:00.000Z').getTime();
+const baseMs = new Fecha('2026-06-01T12:00:00.000Z').getTime();
 
 const buildEligibleState = (): UserPromptState => {
     let state: UserPromptState = {
-        firstSeenAt: new Date(baseMs - 30 * dayMs).toISOString(),
+        firstSeenAt: new Fecha(baseMs - 30 * dayMs).toISOString(),
     };
     for (let index = 0; index < 7; index += 1) {
         state = recordPromptActivity(state, baseMs - index * dayMs);
@@ -32,7 +32,7 @@ const buildEligibleState = (): UserPromptState => {
 
 const buildDonationEligibleState = (): UserPromptState => {
     let state: UserPromptState = {
-        firstSeenAt: new Date(baseMs - 45 * dayMs).toISOString(),
+        firstSeenAt: new Fecha(baseMs - 45 * dayMs).toISOString(),
     };
     for (let index = 0; index < 21; index += 1) {
         state = recordPromptActivity(state, baseMs - index * dayMs);
@@ -42,12 +42,12 @@ const buildDonationEligibleState = (): UserPromptState => {
 
 const buildDonationRepeatEligibleState = (): UserPromptState => {
     let state: UserPromptState = {
-        firstSeenAt: new Date(baseMs - 240 * dayMs).toISOString(),
+        firstSeenAt: new Fecha(baseMs - 240 * dayMs).toISOString(),
         firstSeenDayKey: getPromptLocalDayKey(baseMs - 240 * dayMs),
-        lastInterruptivePromptAt: new Date(baseMs - 183 * dayMs).toISOString(),
+        lastInterruptivePromptAt: new Fecha(baseMs - 183 * dayMs).toISOString(),
         donation: {
             askedEver: true,
-            lastShownAt: new Date(baseMs - 183 * dayMs).toISOString(),
+            lastShownAt: new Fecha(baseMs - 183 * dayMs).toISOString(),
         },
     };
     for (let index = 0; index < 21; index += 1) {
@@ -58,7 +58,7 @@ const buildDonationRepeatEligibleState = (): UserPromptState => {
 
 const buildUpdateEligibleState = (): UserPromptState => {
     let state: UserPromptState = {
-        firstSeenAt: new Date(baseMs - 10 * dayMs).toISOString(),
+        firstSeenAt: new Fecha(baseMs - 10 * dayMs).toISOString(),
     };
     state = recordPromptActivity(state, baseMs - dayMs);
     state = recordPromptActivity(state, baseMs - 2 * dayMs);
@@ -71,7 +71,7 @@ describe('user prompt state', () => {
         const second = recordPromptActivity(first, baseMs + 60 * 60 * 1000);
         const third = recordPromptActivity(second, baseMs + dayMs);
 
-        expect(first.firstSeenAt).toBe(new Date(baseMs).toISOString());
+        expect(first.firstSeenAt).toBe(new Fecha(baseMs).toISOString());
         expect(first.firstSeenDayKey).toBe(getPromptLocalDayKey(baseMs));
         expect(second.firstSeenAt).toBe(first.firstSeenAt);
         expect(second.firstSeenDayKey).toBe(first.firstSeenDayKey);
@@ -82,7 +82,7 @@ describe('user prompt state', () => {
     });
 
     it('derives a stable first seen day for existing prompt state', () => {
-        const firstSeenAt = new Date(baseMs - 14 * dayMs).toISOString();
+        const firstSeenAt = new Fecha(baseMs - 14 * dayMs).toISOString();
         const state = recordPromptActivity({ firstSeenAt }, baseMs);
 
         expect(state.firstSeenAt).toBe(firstSeenAt);
@@ -110,7 +110,7 @@ describe('user prompt state', () => {
 
     it('ignores invalid and future active day keys for store review eligibility', () => {
         const state: UserPromptState = {
-            firstSeenAt: new Date(baseMs - 30 * dayMs).toISOString(),
+            firstSeenAt: new Fecha(baseMs - 30 * dayMs).toISOString(),
             firstSeenDayKey: getPromptLocalDayKey(baseMs - 30 * dayMs),
             activeDayKeys: [
                 ...Array.from({ length: 6 }, (_, index) => getPromptLocalDayKey(baseMs - index * dayMs)),
@@ -154,7 +154,7 @@ describe('user prompt state', () => {
 
         const otherPrompt: UserPromptState = {
             ...buildEligibleState(),
-            lastInterruptivePromptAt: new Date(baseMs - 2 * dayMs).toISOString(),
+            lastInterruptivePromptAt: new Fecha(baseMs - 2 * dayMs).toISOString(),
         };
         expect(shouldAttemptStoreReviewPrompt({
             nowMs: baseMs,
@@ -206,7 +206,7 @@ describe('user prompt state', () => {
 
         const otherPrompt: UserPromptState = {
             ...buildDonationEligibleState(),
-            lastInterruptivePromptAt: new Date(baseMs - 2 * dayMs).toISOString(),
+            lastInterruptivePromptAt: new Fecha(baseMs - 2 * dayMs).toISOString(),
         };
         expect(shouldShowDonationPrompt({
             nowMs: baseMs,
@@ -226,10 +226,10 @@ describe('user prompt state', () => {
     it('blocks repeat donation prompt before half a year or without renewed active usage', () => {
         const tooRecent: UserPromptState = {
             ...buildDonationRepeatEligibleState(),
-            lastInterruptivePromptAt: new Date(baseMs - 182 * dayMs).toISOString(),
+            lastInterruptivePromptAt: new Fecha(baseMs - 182 * dayMs).toISOString(),
             donation: {
                 askedEver: true,
-                lastShownAt: new Date(baseMs - 182 * dayMs).toISOString(),
+                lastShownAt: new Fecha(baseMs - 182 * dayMs).toISOString(),
             },
         };
         expect(shouldShowDonationPrompt({
@@ -239,12 +239,12 @@ describe('user prompt state', () => {
         })).toBe(false);
 
         let inactive: UserPromptState = {
-            firstSeenAt: new Date(baseMs - 240 * dayMs).toISOString(),
+            firstSeenAt: new Fecha(baseMs - 240 * dayMs).toISOString(),
             firstSeenDayKey: getPromptLocalDayKey(baseMs - 240 * dayMs),
-            lastInterruptivePromptAt: new Date(baseMs - 183 * dayMs).toISOString(),
+            lastInterruptivePromptAt: new Fecha(baseMs - 183 * dayMs).toISOString(),
             donation: {
                 askedEver: true,
-                lastShownAt: new Date(baseMs - 183 * dayMs).toISOString(),
+                lastShownAt: new Fecha(baseMs - 183 * dayMs).toISOString(),
             },
         };
         for (let index = 0; index < 20; index += 1) {
@@ -288,13 +288,13 @@ describe('user prompt state', () => {
     it('records donation prompt display metadata when shown', () => {
         const state = recordDonationPromptShown(buildDonationEligibleState(), baseMs);
         expect(state.donation?.askedEver).toBe(true);
-        expect(state.donation?.lastShownAt).toBe(new Date(baseMs).toISOString());
-        expect(state.lastInterruptivePromptAt).toBe(new Date(baseMs).toISOString());
+        expect(state.donation?.lastShownAt).toBe(new Fecha(baseMs).toISOString());
+        expect(state.lastInterruptivePromptAt).toBe(new Fecha(baseMs).toISOString());
     });
 
     it('records donation support action click metadata', () => {
         const state = recordDonationPromptSupportClicked(buildDonationEligibleState(), baseMs);
-        expect(state.donation?.lastActionAt).toBe(new Date(baseMs).toISOString());
+        expect(state.donation?.lastActionAt).toBe(new Fecha(baseMs).toISOString());
     });
 
     it('compares prompt versions with optional v prefixes', () => {
@@ -330,7 +330,7 @@ describe('user prompt state', () => {
             updateReminderAllowed: true,
             currentVersion: '0.9.8',
             latestVersion: '0.10.0',
-            latestReleasedAt: new Date(baseMs - dayMs).toISOString(),
+            latestReleasedAt: new Fecha(baseMs - dayMs).toISOString(),
         })).toBe(true);
     });
 
@@ -342,7 +342,7 @@ describe('user prompt state', () => {
             updateReminderAllowed: true,
             currentVersion: '0.9.8',
             latestVersion: '0.9.9',
-            latestReleasedAt: new Date(baseMs - 3 * dayMs).toISOString(),
+            latestReleasedAt: new Fecha(baseMs - 3 * dayMs).toISOString(),
         })).toBe(false);
 
         const dismissed = recordUpdateReminderDismissed(state, '0.10.0');
@@ -352,7 +352,7 @@ describe('user prompt state', () => {
             updateReminderAllowed: true,
             currentVersion: '0.9.8',
             latestVersion: '0.10.0',
-            latestReleasedAt: new Date(baseMs - dayMs).toISOString(),
+            latestReleasedAt: new Fecha(baseMs - dayMs).toISOString(),
         })).toBe(false);
 
         const shown = recordUpdateReminderShown(state, baseMs - 2 * dayMs);
@@ -362,7 +362,7 @@ describe('user prompt state', () => {
             updateReminderAllowed: true,
             currentVersion: '0.9.8',
             latestVersion: '0.10.0',
-            latestReleasedAt: new Date(baseMs - dayMs).toISOString(),
+            latestReleasedAt: new Fecha(baseMs - dayMs).toISOString(),
         })).toBe(false);
     });
 });

@@ -77,7 +77,7 @@ type FieldSpec<K extends TaskDraftField> = {
 
 const trimmedDiffers = (draftValue: string, taskValue: string) => draftValue.trim() !== taskValue.trim();
 
-// Convert stored ISO or datetime-local strings into datetime-local input values.
+// Convertir stored ISO or datetime-local strings into datetime-local input values.
 export function toTaskDraftDateTimeLocalValue(dateStr: string | undefined): string {
     if (!dateStr) return '';
     const parsed = safeParseDate(dateStr);
@@ -136,7 +136,7 @@ const TASK_DRAFT_FIELDS: { [K in TaskDraftField]: FieldSpec<K> } = {
     },
     status: {
         fromTask: (task) => task.status,
-        // Moving a draft to Inbox drops its star; leaving Done drops its
+        // Moving a draft to Inbox drops its star; leaving Hecho drops its
         // completion timestamp. The reverse star→Next transition belongs to
         // focusedToday below, so direction is explicit at the write seam.
         onSet: (draft) => {

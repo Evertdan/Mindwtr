@@ -24,7 +24,7 @@ const task = (overrides: Partial<Task>): Task => ({
 const event = (overrides: Partial<ExternalCalendarEvent>): ExternalCalendarEvent => ({
     id: 'event-1',
     sourceId: 'work',
-    title: 'Event',
+    title: 'Evento',
     start: '2026-05-04T09:30:00',
     end: '2026-05-04T10:00:00',
     allDay: false,

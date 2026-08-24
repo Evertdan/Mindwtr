@@ -45,7 +45,7 @@ const cloneConfiguration = (
 const createTransactionHarness = (
     initial: PersistedSyncConfiguration,
     failureStep?: FailureStep,
-    rollbackFailureStep?: Exclude<FailureStep, 'backend'>,
+    rollbackFailureStep?: Excluir<FailureStep, 'backend'>,
 ) => {
     const state = cloneConfiguration(initial);
     let primaryFailureInjected = false;
@@ -984,7 +984,7 @@ describe('commit protocol goldens (desktop reference semantics)', () => {
     const goldenHarness = (
         initial: PersistedSyncConfiguration,
         failureStep?: FailureStep,
-        rollbackFailureStep?: Exclude<FailureStep, 'backend'>,
+        rollbackFailureStep?: Excluir<FailureStep, 'backend'>,
     ) => {
         const harness = createTransactionHarness(initial, failureStep, rollbackFailureStep);
         harness.dependencies.recoverDropboxCredentialsBeforeConfiguration = async () => {

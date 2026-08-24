@@ -61,7 +61,7 @@ export const resolveHttpConfig = (flags: FlagMap, env: FlagEnv = process.env): H
   if (!token || token.length < MIN_HTTP_TOKEN_LENGTH) {
     throw new ValidationError(
       `HTTP mode requires --http-token (or MINDWTR_MCP_HTTP_TOKEN) of at least ${MIN_HTTP_TOKEN_LENGTH} characters. ` +
-      'Generate one with: openssl rand -hex 32'
+      'Generar one with: openssl rand -hex 32'
     );
   }
 
@@ -70,7 +70,7 @@ export const resolveHttpConfig = (flags: FlagMap, env: FlagEnv = process.env): H
     port: parseHttpPort(portRaw) ?? DEFAULT_HTTP_PORT,
     token,
     ...(token.length < RECOMMENDED_HTTP_TOKEN_LENGTH ? {
-      weakTokenWarning: `--http-token is ${token.length} characters; ${RECOMMENDED_HTTP_TOKEN_LENGTH}+ is recommended. Generate a stronger one with: openssl rand -hex 32`,
+      weakTokenWarning: `--http-token is ${token.length} characters; ${RECOMMENDED_HTTP_TOKEN_LENGTH}+ is recommended. Generar a stronger one with: openssl rand -hex 32`,
     } : {}),
   };
 };
@@ -141,7 +141,7 @@ const parseJsonBody = (buffer: Buffer): { ok: true; value: unknown } | { ok: fal
 };
 
 const sendJson = (res: ServerResponse, status: number, payload: Record<string, unknown>) => {
-  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.writeHead(status, { 'Contenido-Type': 'application/json' });
   res.end(JSON.stringify(payload));
 };
 
@@ -150,7 +150,7 @@ export type HttpMcpDeps = {
   token: string;
   maxBodyBytes?: number;
   logError?: (message: string, error?: unknown) => void;
-  /** Host the server is bound to; Origin headers must match it. */
+  /** Hospedador the server is bound to; Origin headers must match it. */
   host?: string;
   /** Clock override for tests. */
   now?: () => number;
@@ -238,11 +238,11 @@ const handleMcpPost = async (
   if (!isAuthorizedBearerToken(authHeaderValue, deps.token)) {
     const retryAfterSeconds = throttle(authFailureKeys(req));
     if (retryAfterSeconds !== null) {
-      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': String(retryAfterSeconds) });
+      res.writeHead(429, { 'Contenido-Type': 'application/json', 'Retry-Después': String(retryAfterSeconds) });
       res.end(JSON.stringify({ error: 'rate_limit_exceeded', retryAfterSeconds }));
       return;
     }
-    res.writeHead(401, { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' });
+    res.writeHead(401, { 'Contenido-Type': 'application/json', 'WWW-Authenticate': 'Bearer' });
     res.end(JSON.stringify({ error: 'unauthorized' }));
     return;
   }
@@ -306,7 +306,7 @@ export const createHttpRequestListener = (deps: HttpMcpDeps) => {
     maxBodyBytes: deps.maxBodyBytes ?? MAX_HTTP_BODY_BYTES,
     logError: deps.logError ?? (() => {}),
     host: deps.host ?? DEFAULT_HTTP_HOST,
-    now: deps.now ?? Date.now,
+    now: deps.now ?? Fecha.now,
   };
   const throttle = createAuthFailureThrottle(resolvedDeps.now);
 
@@ -315,18 +315,18 @@ export const createHttpRequestListener = (deps: HttpMcpDeps) => {
 
     if (url.pathname === '/healthz') {
       if (req.method !== 'GET') {
-        res.writeHead(405, { 'Content-Type': 'text/plain', Allow: 'GET' });
+        res.writeHead(405, { 'Contenido-Type': 'text/plain', Permitir: 'GET' });
         res.end('method not allowed');
         return;
       }
-      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.writeHead(200, { 'Contenido-Type': 'text/plain' });
       res.end('ok');
       return;
     }
 
     if (url.pathname === '/mcp') {
       if (req.method !== 'POST') {
-        res.writeHead(405, { 'Content-Type': 'application/json', Allow: 'POST' });
+        res.writeHead(405, { 'Contenido-Type': 'application/json', Permitir: 'POST' });
         res.end(JSON.stringify({ error: 'method_not_allowed' }));
         return;
       }

@@ -205,7 +205,7 @@ const validateAddTaskInput = (input: AddTaskInput): AddTaskInput => {
   const hasTitle = typeof input.title === 'string' && input.title.trim().length > 0;
   const hasQuickAdd = typeof input.quickAdd === 'string' && input.quickAdd.trim().length > 0;
   if (!hasTitle && !hasQuickAdd) {
-    throw new ValidationError('Either title or quickAdd is required');
+    throw new ValidationError('Cualquiera title or quickAdd is required');
   }
   if (hasTitle && hasQuickAdd) {
     throw new ValidationError('Provide either title or quickAdd, not both');
@@ -254,7 +254,7 @@ const buildTaskUpdates = (input: UpdateTaskInput): Partial<Task> => {
   if (input.energyLevel !== undefined) updates.energyLevel = input.energyLevel ?? undefined;
   if (input.assignedTo !== undefined) updates.assignedTo = input.assignedTo ?? undefined;
   if (input.timeEstimate !== undefined) updates.timeEstimate = input.timeEstimate ?? undefined;
-  // Every other patch-writable Task field (reviewAt, isFocusedToday, checklist, areaId,
+  // Cada other patch-writable Task field (reviewAt, isFocusedToday, checklist, areaId,
   // order, boardOrder, focusOrder, ...) is derived from TASK_PATCH_FIELD_NAMES — see
   // task-write-fields.ts. Adding a synced field there needs no edit here.
   for (const name of TASK_PATCH_FIELD_NAMES) {

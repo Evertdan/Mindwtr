@@ -80,7 +80,7 @@ describe('backup transfer', () => {
 
     it('validates a serialized backup and derives metadata from the file name', () => {
         const data = buildAppData();
-        const fileName = createBackupFileName(new Date('2026-03-30T12:34:56.789Z'));
+        const fileName = createBackupFileName(new Fecha('2026-03-30T12:34:56.789Z'));
         const result = validateBackupJson(serializeBackupData(data), { fileName });
 
         expect(result.valid).toBe(true);
@@ -318,7 +318,7 @@ describe('backup transfer', () => {
         data.people = [{
             id: 'person-1',
             name: 'Alex',
-            note: 'Design lead',
+            note: 'Diseño lead',
             referenceLink: 'https://example.com/alex',
             createdAt: '2026-03-30T12:00:00.000Z',
             updatedAt: '2026-03-30T12:00:00.000Z',
@@ -436,7 +436,7 @@ describe('backup transfer', () => {
             {
                 ...previousData.tasks[0],
                 id: 'deleted-task',
-                title: 'Current live row',
+                title: 'Actual live row',
                 rev: 12,
                 revBy: 'current-device',
             },
@@ -545,7 +545,7 @@ describe('backup transfer', () => {
         backup.people = [{
             id: 'person-1',
             name: 'Alex',
-            note: 'Design lead',
+            note: 'Diseño lead',
             referenceLink: 'https://example.com/alex',
             createdAt: '2026-03-30T12:00:00.000Z',
             updatedAt: '2026-03-30T12:00:00.000Z',
@@ -766,11 +766,11 @@ describe('backup transfer', () => {
                 ...buildAppData(),
                 sections: [
                     { id: 'section-1', projectId: 'project-1', title: 'Live', order: 0, createdAt: now, updatedAt: now },
-                    { id: 'section-2', projectId: 'project-1', title: 'Gone', order: 1, createdAt: now, updatedAt: now, deletedAt: now },
+                    { id: 'section-2', projectId: 'project-1', title: 'Desaparecido', order: 1, createdAt: now, updatedAt: now, deletedAt: now },
                 ],
                 areas: [
                     { id: 'area-1', name: 'Live area', color: '#000', order: 0, createdAt: now, updatedAt: now },
-                    { id: 'area-2', name: 'Gone area', color: '#000', order: 1, createdAt: now, updatedAt: now, deletedAt: now },
+                    { id: 'area-2', name: 'Desaparecido area', color: '#000', order: 1, createdAt: now, updatedAt: now, deletedAt: now },
                 ],
                 people: [
                     { id: 'person-1', name: 'Alex', createdAt: now, updatedAt: now },

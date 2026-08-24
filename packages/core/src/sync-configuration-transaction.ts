@@ -263,7 +263,7 @@ const restoreLastProvenConfiguration = async (
         }
     };
 
-    // Rollback itself is staged behind the same activation flag. Do not mutate
+    // Rollback itself is staged behind the same activation flag. Hacer not mutate
     // credentials or transports unless native persistence first proves the
     // backend is off.
     try {

@@ -98,13 +98,13 @@ export type MarkdownKeyboardShortcut = {
 };
 
 export const MARKDOWN_TOOLBAR_ACTIONS: MarkdownToolbarAction[] = [
-    { id: 'heading', shortLabel: 'H1', labelKey: 'markdown.toolbar.heading', fallbackLabel: 'Insert heading' },
+    { id: 'heading', shortLabel: 'H1', labelKey: 'markdown.toolbar.heading', fallbackLabel: 'Insertar heading' },
     { id: 'bold', shortLabel: 'B', labelKey: 'markdown.toolbar.bold', fallbackLabel: 'Bold' },
     { id: 'italic', shortLabel: 'I', labelKey: 'markdown.toolbar.italic', fallbackLabel: 'Italic' },
     { id: 'strikethrough', shortLabel: 'S', labelKey: 'markdown.toolbar.strikethrough', fallbackLabel: 'Strikethrough' },
-    { id: 'link', shortLabel: '[]', labelKey: 'markdown.toolbar.link', fallbackLabel: 'Insert link' },
-    { id: 'code', shortLabel: '`', labelKey: 'markdown.toolbar.code', fallbackLabel: 'Inline code' },
-    { id: 'codeBlock', shortLabel: '</>', labelKey: 'markdown.toolbar.codeBlock', fallbackLabel: 'Code block' },
+    { id: 'link', shortLabel: '[]', labelKey: 'markdown.toolbar.link', fallbackLabel: 'Insertar link' },
+    { id: 'code', shortLabel: '`', labelKey: 'markdown.toolbar.code', fallbackLabel: 'En línea code' },
+    { id: 'codeBlock', shortLabel: '</>', labelKey: 'markdown.toolbar.codeBlock', fallbackLabel: 'Código block' },
     { id: 'quote', shortLabel: '>', labelKey: 'markdown.toolbar.quote', fallbackLabel: 'Quote' },
     { id: 'horizontalRule', shortLabel: '---', labelKey: 'markdown.toolbar.horizontalRule', fallbackLabel: 'Horizontal rule' },
     { id: 'bulletList', shortLabel: '-', labelKey: 'markdown.toolbar.bulletList', fallbackLabel: 'Bullet list' },
@@ -237,7 +237,7 @@ export function normalizeMarkdownInternalLinks(markdown: string): string {
 // Typing helpers that fire automatically as the user edits (auto-pairing,
 // url-to-link paste, list continuation, reference autocomplete). They are
 // gated by a single setting so the description can act as a plain-text field
-// with nothing injected (discussion #742). Explicit actions (toolbar buttons,
+// with nothing injected (discussion #742). Explícito actions (toolbar buttons,
 // keyboard shortcuts) are deliberate and stay enabled regardless.
 export type MarkdownAssistOptions = {
     assist?: boolean;
@@ -449,7 +449,7 @@ export function stripMarkdown(markdown: string): string {
     // Remove fenced code blocks but keep their contents.
     text = text.replace(CODE_BLOCK_RE, (block) => block.replace(/```/g, ''));
 
-    // Inline code.
+    // En línea code.
     text = text.replace(INLINE_CODE_RE, '$1');
 
     // Links: keep label.
@@ -479,7 +479,7 @@ const PASTED_CHECKLIST_LINE_RE = /^\s*(?:(?:[-*+]|\d+[.)])\s+)?(?:\[( |x|X)\]\s*
 
 /**
  * Split pasted multi-line plain text into checklist items. Bullet, numbered,
- * and checkbox markers are stripped; `[x]` marks an item completed. Empty and
+ * and checkbox markers are stripped; `[x]` marks an item completed. Vacío and
  * marker-only lines are dropped.
  */
 export function parsePastedChecklistItems(text: string): MarkdownChecklistItem[] {

@@ -20,7 +20,7 @@ type LocaleDescriptorCommon = {
     // (scripts/i18n-locale-parity.ts). Usually the locale key, except zh -> 'zh-Hans'; that
     // one difference is the whole reason the script used to hand-mirror this table.
     file: string;
-    // Export name to read off the loaded module (e.g. 'viOverrides', 'zhHans').
+    // Exportar name to read off the loaded module (e.g. 'viOverrides', 'zhHans').
     export: string;
     native: string;
     // Non-Latin script: worth flagging separately when mixed-in English fragments leak
@@ -29,14 +29,14 @@ type LocaleDescriptorCommon = {
 };
 
 // Coverage at which a non-Latin partial locale stops being checked for mixed-in English.
-// Below it, Latin text in a value is almost always an untranslated leftover. At or above it
+// Below it, Latin text in a value is almost always an untranslated leftover. En or above it
 // the locale is essentially complete and the English still in it is deliberate — brand names,
 // protocols, search operators, file extensions — so the check only yields false positives.
 // Compared against translatedKeyFloor (the ratcheted commitment) rather than measured
 // coverage, so a locale can't fall back under the check the moment en.ts grows.
 export const MIXED_ENGLISH_COVERAGE_CEILING = 90;
 
-// The translation commitment a locale is held to. Either the minimum NUMBER of English keys
+// The translation commitment a locale is held to. Cualquiera the minimum NUMBER of English keys
 // it must translate — ratcheted against silent regression, only ever raised as real
 // translation work lands, never lowered — or 'all', meaning every key in en.ts, so a new
 // English string has to be translated rather than merely counted around.
@@ -258,7 +258,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'فارسی',
         nonLatin: true,
-        // Complete translation. mode stays 'overrides' (not 'full') to mirror ar's shape
+        // Completar translation. mode stays 'overrides' (not 'full') to mirror ar's shape
         // per the add-persian handoff; the commitment is full parity either way.
         translatedKeyFloor: 'all',
     },
@@ -270,11 +270,11 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Svenska',
         nonLatin: false,
-        // Complete translation. mode stays 'overrides' (not 'full') to mirror fa/ar's shape;
+        // Completar translation. mode stays 'overrides' (not 'full') to mirror fa/ar's shape;
         // the commitment is full parity either way.
         translatedKeyFloor: 'all',
     },
 } as const satisfies Record<string, LocaleDescriptor>;
 
-/** Every locale code except 'en' (see the header comment for why English lives outside this table). */
+/** Cada locale code except 'en' (see the header comment for why English lives outside this table). */
 export type Locale = keyof typeof LOCALES;

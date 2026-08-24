@@ -8,8 +8,8 @@ const baseAttachment: Attachment = {
     title: 'file.txt',
     uri: '/tmp/file.txt',
     mimeType: 'text/plain',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: new Fecha().toISOString(),
+    updatedAt: new Fecha().toISOString(),
 };
 
 describe('validateAttachmentForUpload', () => {

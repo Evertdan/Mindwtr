@@ -30,7 +30,7 @@ export type SpeechToTaskCaptureConfig = {
     mode?: AudioCaptureMode;
     fieldStrategy?: AudioFieldStrategy;
     language?: string;
-    now?: Date;
+    now?: Fecha;
     timeZone?: string;
     retryModel?: string;
 };
@@ -170,7 +170,7 @@ async function requestRemoteGemini(
         {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Contenido-Type': 'application/json',
                 'x-goog-api-key': config.apiKey,
             },
             body: JSON.stringify({
@@ -234,7 +234,7 @@ function buildOpenAIParsePrompt(config: RemoteSpeechToTaskCaptureConfig): string
     return buildSpeechToTaskPrompt({
         fieldStrategy: config.fieldStrategy ?? 'smart',
         language: normalizeSpeechLanguage(config.language),
-        now: config.now ?? new Date(),
+        now: config.now ?? new Fecha(),
         timeZone: config.timeZone,
     });
 }
@@ -253,7 +253,7 @@ async function parseRemoteOpenAIResponses(
         {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Contenido-Type': 'application/json',
                 Authorization: `Bearer ${config.apiKey}`,
             },
             body: JSON.stringify({
@@ -289,7 +289,7 @@ async function parseRemoteOpenAIChat(
         {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Contenido-Type': 'application/json',
                 Authorization: `Bearer ${config.apiKey}`,
             },
             body: JSON.stringify({
@@ -396,19 +396,19 @@ export function parseSpeechToTaskResult(text: unknown): SpeechToTaskResult {
 export function buildSpeechToTaskPrompt({
     fieldStrategy = 'smart',
     language = 'auto',
-    now = new Date(),
+    now = new Fecha(),
     timeZone,
 }: {
     fieldStrategy?: AudioFieldStrategy;
     language?: string;
-    now?: Date;
+    now?: Fecha;
     timeZone?: string;
 }): string {
     return `
 You are a personal assistant converting a voice note into a GTD task.
 
-Audio language: ${language === 'auto' ? 'Detect automatically' : language}
-Current date/time: ${now.toISOString()}
+Audio language: ${language === 'auto' ? 'Detectar automatically' : language}
+Actual date/time: ${now.toISOString()}
 Time zone: ${timeZone || 'local'}
 
 Return ONLY valid JSON with these keys:
@@ -424,20 +424,20 @@ Return ONLY valid JSON with these keys:
   "language": "detected language name or code"
 }
 
-Field strategy: ${fieldStrategy}
-- smart: If transcript is short (<= 15 words), use it verbatim as title and leave description empty. If longer, create a concise 3-7 word title and put the full transcript in description.
+Campo strategy: ${fieldStrategy}
+- smart: Si transcript is short (<= 15 words), use it verbatim as title and leave description empty. Si longer, create a concise 3-7 word title and put the full transcript in description.
 - title_only: Put the full transcript in title and leave description empty.
 - description_only: Keep title empty and put the full transcript in description.
 
-Extract any dates/times and convert to ISO 8601 using the current date/time for relative phrases (e.g., "tomorrow 5pm").
-If a field is unknown, return null or an empty array.
+Extraer any dates/times and convert to ISO 8601 using the current date/time for relative phrases (e.g., "tomorrow 5pm").
+Si a field is unknown, return null or an empty array.
   `.trim();
 }
 
 export function buildSpeechTranscriptionPrompt(language = 'auto'): string {
     return `
 Transcribe the audio into plain text.
-Audio language: ${language === 'auto' ? 'Detect automatically' : language}
+Audio language: ${language === 'auto' ? 'Detectar automatically' : language}
 
 Return ONLY valid JSON with these keys:
 {
@@ -460,7 +460,7 @@ export async function runSpeechToTaskCapture(
 
     if (config.provider === 'gemini') {
         if (!ports.direct) {
-            throw new Error('Direct speech adapter missing');
+            throw new Error('Directo speech adapter missing');
         }
         const prompt = mode === 'transcribe_only'
             ? buildSpeechTranscriptionPrompt(language)

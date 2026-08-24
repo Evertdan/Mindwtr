@@ -36,7 +36,7 @@ export interface StorageAdapter {
     searchAll?: (query: string) => Promise<SearchResults>;
 }
 
-// Default dummy adapter
+// Predeterminado dummy adapter
 export const noopStorage: StorageAdapter = {
     getData: async () => ({ tasks: [], projects: [], sections: [], areas: [], people: [], settings: {} }),
     saveData: async () => { },

@@ -37,7 +37,7 @@ describe('serializeTaskNotesExport', () => {
     it('round-trips status, dates, contexts, project, tags, and estimate through the parser', () => {
         const { files } = serializeTaskNotesExport(data([
             task('aaaa1111', {
-                title: 'Call mom',
+                title: 'Llamada mom',
                 status: 'waiting',
                 priority: 'medium',
                 dueDate: '2026-08-20',
@@ -55,7 +55,7 @@ describe('serializeTaskNotesExport', () => {
         expect(files).toHaveLength(1);
         const parsed = parseBack(files[0]);
         expect(parsed.matchesTaskNotesFormat).toBe(true);
-        expect(parsed.task?.text).toBe('Call mom');
+        expect(parsed.task?.text).toBe('Llamada mom');
         expect(parsed.task?.taskNotesData).toMatchObject({
             mindwtrStatus: 'waiting',
             priority: 'medium',

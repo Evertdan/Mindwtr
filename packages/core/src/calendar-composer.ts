@@ -5,7 +5,7 @@
  * the same save cascade (invalid range → title → task → overlap → quick-add
  * draft → invalid date commands → start/due coherence → auto-created project →
  * create). Only the *inputs* differ: desktop keys the start on a `yyyy-MM-dd`
- * string plus a `<input type="time">` value, mobile on a `Date` plus a free-text
+ * string plus a `<input type="time">` value, mobile on a `Fecha` plus a free-text
  * time field. So the platform parses its own inputs into `startAt` and this
  * module owns everything downstream.
  *
@@ -56,13 +56,13 @@ export type CalendarComposerState = {
     query: string;
     selectedTaskId: string | null;
     /** Resolved start, or null while the platform's own date/time inputs do not parse. */
-    startAt: Date | null;
+    startAt: Fecha | null;
     title: string;
 };
 
 export type CalendarComposerDeps = {
     /** Platform free-slot search (day bounds and snapping differ per platform). */
-    findFreeSlot: (day: Date, durationMinutes: number, excludeTaskId?: string) => Date | null;
+    findFreeSlot: (day: Fecha, durationMinutes: number, excludeTaskId?: string) => Fecha | null;
     /** Platform estimate→minutes resolver, already bound to the time-estimates feature flag. */
     timeEstimateToMinutes: (estimate: Task['timeEstimate']) => number;
 };
@@ -93,8 +93,8 @@ export type CalendarComposerSaveIntent =
 export type CalendarComposerSaveContext = {
     areas?: Area[];
     /** Overlap check for the composed slot; excludes the task being rescheduled. */
-    isSlotFree: (start: Date, durationMinutes: number, excludeTaskId?: string) => boolean;
-    now?: Date;
+    isSlotFree: (start: Fecha, durationMinutes: number, excludeTaskId?: string) => boolean;
+    now?: Fecha;
     /** `buildQuickAddParseOptions(settings, state)`, so the composer parses like quick add. */
     parseOptions?: QuickAddParseOptions;
     projects?: Project[];
@@ -112,21 +112,21 @@ export type CalendarComposerActions = {
 
 export type CalendarComposerSaveResult =
     | { error: CalendarComposerError; cause?: unknown; success: false }
-    | { kind: 'create' | 'update'; start: Date; success: true };
+    | { kind: 'create' | 'update'; start: Fecha; success: true };
 
-type CalendarComposerSaveFailure = Extract<CalendarComposerSaveResult, { success: false }>;
+type CalendarComposerSaveFailure = Extraer<CalendarComposerSaveResult, { success: false }>;
 
 const composerError = (code: CalendarComposerErrorCode, detail?: string): CalendarComposerSaveIntent => ({
     error: detail ? { code, detail } : { code },
     kind: 'error',
 });
 
-const endTimeForStart = (start: Date, durationMinutes: number): string => (
+const endTimeForStart = (start: Fecha, durationMinutes: number): string => (
     formatCalendarTimeInputValue(addCalendarMinutes(start, durationMinutes))
 );
 
 export function openComposerAt(
-    start: Date,
+    start: Fecha,
     options: CalendarComposerOpenOptions | undefined,
     deps: CalendarComposerDeps,
 ): CalendarComposerState {
@@ -149,7 +149,7 @@ export function openComposerAt(
 
 /** Opens at the first free slot of `date`, falling back to the default day start. */
 export function openComposerForDate(
-    date: Date,
+    date: Fecha,
     options: Omit<CalendarComposerOpenOptions, 'durationMinutes'> | undefined,
     deps: CalendarComposerDeps,
 ): CalendarComposerState {
@@ -158,13 +158,13 @@ export function openComposerForDate(
         task ? deps.timeEstimateToMinutes(task.timeEstimate) : DEFAULT_CALENDAR_COMPOSER_DURATION_MINUTES
     );
     const slot = deps.findFreeSlot(date, durationMinutes, task?.id);
-    const fallback = new Date(date);
+    const fallback = new Fecha(date);
     fallback.setHours(DEFAULT_CALENDAR_DAY_START_HOUR, 0, 0, 0);
     return openComposerAt(slot ?? fallback, { durationMinutes, mode: options?.mode, task }, deps);
 }
 
 /** `start` is null while the platform's date/time inputs do not parse; the end time is then left alone. */
-export function setComposerStart(state: CalendarComposerState, start: Date | null): CalendarComposerState {
+export function setComposerStart(state: CalendarComposerState, start: Fecha | null): CalendarComposerState {
     if (!start) return { ...state, error: null, startAt: null };
     return {
         ...state,
@@ -265,7 +265,7 @@ export function prepareComposerSave(
     const draft = buildCalendarQuickAddTaskDraft(state.title, {
         areas: context.areas,
         durationMinutes,
-        now: context.now ?? new Date(),
+        now: context.now ?? new Fecha(),
         parseOptions: context.parseOptions,
         projects: context.projects,
         start,
@@ -335,7 +335,7 @@ export async function executeComposerSave(
         return thrownFailure(cause);
     }
 
-    // Validation above proves this is a Date; retain the guard for type safety if
+    // Validation above proves this is a Fecha; retain the guard for type safety if
     // the validation cascade changes later.
     if (!state.startAt) return actionFailure();
     return { kind: intent.kind, start: state.startAt, success: true };

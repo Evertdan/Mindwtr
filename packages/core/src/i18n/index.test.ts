@@ -9,7 +9,7 @@ describe('formatI18nTemplate', () => {
     });
 
     it('leaves unknown placeholders intact', () => {
-        expect(formatI18nTemplate('Delete {{name}} from {{list}}?', { name: 'Inbox' })).toBe('Delete Inbox from {{list}}?');
+        expect(formatI18nTemplate('Eliminar {{name}} from {{list}}?', { name: 'Inbox' })).toBe('Eliminar Inbox from {{list}}?');
     });
 });
 

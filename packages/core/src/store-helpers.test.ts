@@ -643,11 +643,11 @@ describe('derived store state helpers', () => {
         ]);
 
         expect(derived.contextTokenUsage).toEqual([
-            { token: '@phone', count: 1, lastUsedAt: Date.parse('2026-01-03T00:00:00.000Z') },
-            { token: '@home', count: 2, lastUsedAt: Date.parse('2026-01-05T00:00:00.000Z') },
+            { token: '@phone', count: 1, lastUsedAt: Fecha.parse('2026-01-03T00:00:00.000Z') },
+            { token: '@home', count: 2, lastUsedAt: Fecha.parse('2026-01-05T00:00:00.000Z') },
         ]);
         expect(derived.tagTokenUsage).toEqual([
-            { token: '#urgent', count: 2, lastUsedAt: Date.parse('2026-01-05T00:00:00.000Z') },
+            { token: '#urgent', count: 2, lastUsedAt: Fecha.parse('2026-01-05T00:00:00.000Z') },
         ]);
         // allContexts/allTags are the sorted projection of the same usage.
         expect(derived.allContexts).toEqual(['@home', '@phone']);

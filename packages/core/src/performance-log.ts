@@ -39,7 +39,7 @@ export type PerformanceLogInput = {
     // list length means row memoization is not holding and the whole window
     // re-renders per store change (#766).
     rowRenderCount?: number;
-    // Entry-scroll retries before the reorder list settled on the target row;
+    // Entrada-scroll retries before the reorder list settled on the target row;
     // pairs with elapsedMs to size the blank window on slow devices (#784).
     scrollRetryCount?: number;
     platform?: PerformancePlatform;
@@ -214,7 +214,7 @@ export function buildPerformanceLogEntry(
     options?: { timestamp?: string }
 ): PerformanceLogEntry {
     return {
-        ts: options?.timestamp ?? new Date().toISOString(),
+        ts: options?.timestamp ?? new Fecha().toISOString(),
         level: 'info',
         scope: PERFORMANCE_LOG_SCOPE,
         message: PERFORMANCE_LOG_MESSAGE,
@@ -233,7 +233,7 @@ const defaultNow = (): number => {
     if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
         return performance.now();
     }
-    return Date.now();
+    return Fecha.now();
 };
 
 const mergeMeasurementInput = (

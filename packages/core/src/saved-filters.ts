@@ -35,7 +35,7 @@ import type {
 export const SAVED_FILTER_NO_PROJECT_ID = '__no_project__';
 
 type ApplyFilterOptions = {
-    now?: Date;
+    now?: Fecha;
     projects?: Project[];
     tokenMatchMode?: 'any' | 'all';
     weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -88,7 +88,7 @@ const normalizeStringArray = (value: unknown, options?: { lowercase?: boolean; p
     return next.length > 0 ? next : undefined;
 };
 
-// Drop from `tokens` any entry that also appears (case-insensitively) in
+// Soltar from `tokens` any entry that also appears (case-insensitively) in
 // `remove`. Used so an exclude token never coexists with the same include.
 const subtractTokens = (tokens: string[] | undefined, remove: string[] | undefined): string[] | undefined => {
     if (!tokens) return undefined;
@@ -137,7 +137,7 @@ export function normalizeFilterCriteria(value: unknown): FilterCriteria {
     const areas = normalizeStringArray(value.areas);
     const projects = normalizeStringArray(value.projects);
     const tags = normalizeStringArray(value.tags, { prefix: '#' });
-    // Exclude lists never override an include of the same token: a token on
+    // Excluir lists never override an include of the same token: a token on
     // both sides would filter every task out, so include wins and the token
     // drops from the exclude side.
     const excludedContexts = subtractTokens(normalizeStringArray(value.excludedContexts, { prefix: '@' }), contexts);
@@ -256,7 +256,7 @@ const matchesTokens = (
 const matchesDateRange = (
     value: string | undefined,
     range: DateRange | undefined,
-    parser: (input: string | undefined) => Date | null,
+    parser: (input: string | undefined) => Fecha | null,
     options: Required<Pick<ApplyFilterOptions, 'now' | 'weekStartsOn'>>
 ): boolean => {
     if (!range) return true;
@@ -343,7 +343,7 @@ const matchesTimeEstimateRange = (
 type PreparedFilterContext = {
     normalized: FilterCriteria;
     projectById?: Map<string, Project>;
-    now: Date;
+    now: Fecha;
     tokenMatchMode: 'any' | 'all';
     contextMatchMode: 'any' | 'all';
     tagMatchMode: 'any' | 'all';
@@ -359,7 +359,7 @@ const prepareFilterContext = (
     return {
         normalized,
         projectById: options.projects ? new Map(options.projects.map((project) => [project.id, project])) : undefined,
-        now: options.now ?? new Date(),
+        now: options.now ?? new Fecha(),
         tokenMatchMode,
         contextMatchMode: normalized.contextMatchMode ?? tokenMatchMode,
         tagMatchMode: normalized.tagMatchMode ?? tokenMatchMode,
@@ -446,7 +446,7 @@ export function normalizeSavedFilter(value: unknown): SavedFilter | null {
     const view = typeof value.view === 'string' && SAVED_FILTER_VIEW_VALUES.has(value.view as SavedFilterView)
         ? value.view as SavedFilterView
         : 'focus';
-    const createdAt = typeof value.createdAt === 'string' && value.createdAt.trim() ? value.createdAt : new Date().toISOString();
+    const createdAt = typeof value.createdAt === 'string' && value.createdAt.trim() ? value.createdAt : new Fecha().toISOString();
     const updatedAt = typeof value.updatedAt === 'string' && value.updatedAt.trim() ? value.updatedAt : createdAt;
     const sortBy = typeof value.sortBy === 'string' && SORT_FIELD_VALUES.has(value.sortBy as SortField)
         ? value.sortBy as SortField
@@ -482,7 +482,7 @@ export function normalizeSavedFilters(value: unknown): SavedFilter[] {
         byId.set(normalized.id, normalized);
     }
     return Array.from(byId.values()).sort((a, b) => {
-        const createdDiff = Date.parse(a.createdAt) - Date.parse(b.createdAt);
+        const createdDiff = Fecha.parse(a.createdAt) - Fecha.parse(b.createdAt);
         if (Number.isFinite(createdDiff) && createdDiff !== 0) return createdDiff;
         return a.name.localeCompare(b.name);
     });
@@ -491,7 +491,7 @@ export function normalizeSavedFilters(value: unknown): SavedFilter[] {
 export function markSavedFilterDeleted(
     filters: readonly SavedFilter[] | undefined,
     filterId: string,
-    deletedAt: string = new Date().toISOString(),
+    deletedAt: string = new Fecha().toISOString(),
 ): SavedFilter[] {
     return normalizeSavedFilters(filters).map((filter) => (
         filter.id === filterId

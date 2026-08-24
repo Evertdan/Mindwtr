@@ -20,7 +20,7 @@ import type {
 } from './types';
 
 /**
- * Filter selections shared by desktop and mobile picker surfaces. Criteria
+ * Filtro selections shared by desktop and mobile picker surfaces. Criteria
  * live in filter-criteria; this hook owns the picker state around them — the
  * tri-state token cycle, visibility pruning, chips, and saved-filter binding.
  */
@@ -90,7 +90,7 @@ export function taskMatchesFilterSearchQuery(task: Task, searchQueryValue: strin
     clause.terms.some((term) => term.field !== null)
   );
   if (hasFieldedTerm) {
-    const now = new Date();
+    const now = new Fecha();
     return parsedSearch.clauses.some((clause) =>
       clause.terms.every((term) => taskMatchesSearchTerm(term, task, null, now))
     );
@@ -233,7 +233,7 @@ export function useTaskFilterSelections({
   }, [onClear]);
 
   /**
-   * Detach from the applied saved filter, keeping the selections. For view
+   * Detach from the applied saved filter, keeping the selections. Para view
    * state the filter also carries (sort, grouping): changing it means you are
    * no longer looking at that saved filter.
    */

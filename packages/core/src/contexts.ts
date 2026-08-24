@@ -1,5 +1,5 @@
 /**
- * Shared GTD Context Constants
+ * Shared GTD Contexto Constants
  * 
  * Contexts are categorized into:
  * - Location contexts (@): Where you need to be

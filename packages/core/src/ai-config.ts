@@ -111,11 +111,11 @@ export const parseOpenAIExtraBodyParamsInput = (input: string): OpenAIExtraBodyP
     try {
         const parsed = JSON.parse(trimmed) as unknown;
         if (!isObjectRecord(parsed)) {
-            return { ok: false, message: 'Enter a JSON object, for example { "thinking": { "type": "disabled" } }.' };
+            return { ok: false, message: 'Entrar a JSON object, for example { "thinking": { "type": "disabled" } }.' };
         }
         return { ok: true, value: normalizeOpenAIExtraBodyParams(parsed) };
     } catch {
-        return { ok: false, message: 'Enter valid JSON.' };
+        return { ok: false, message: 'Entrar valid JSON.' };
     }
 };
 

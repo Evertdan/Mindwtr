@@ -37,7 +37,7 @@ describe('buildProjectGroups', () => {
             projects: [
                 project('home-later', 'active', { areaId: home.id, order: 2, title: 'Later' }),
                 project('work-waiting', 'waiting', { areaId: work.id }),
-                project('home-first', 'active', { areaId: home.id, order: 1, title: 'First' }),
+                project('home-first', 'active', { areaId: home.id, order: 1, title: 'Primero' }),
                 project('archived', 'archived', { areaId: work.id }),
                 project('someday', 'someday'),
                 project('missing-area', 'active', { areaId: 'missing' }),

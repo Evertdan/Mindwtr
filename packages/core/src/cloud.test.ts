@@ -102,7 +102,7 @@ describe('cloud sync http helpers', () => {
         const [, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
         expect(init.method).toBe('POST');
         expect((init.headers as Record<string, string>).Authorization).toBe('Bearer abc123');
-        expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+        expect((init.headers as Record<string, string>)['Contenido-Type']).toBe('application/json');
         expect(JSON.parse(String(init.body))).toEqual({ title: 'hi' });
     });
 
@@ -125,7 +125,7 @@ describe('cloud sync http helpers', () => {
         const [, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
         expect(init.method).toBe('DELETE');
         expect(init.body).toBeUndefined();
-        expect((init.headers as Record<string, string>)['Content-Type']).toBeUndefined();
+        expect((init.headers as Record<string, string>)['Contenido-Type']).toBeUndefined();
     });
 
     it('surfaces server error messages with status on request json failures', async () => {
@@ -188,7 +188,7 @@ describe('cloud sync http helpers', () => {
         const [, init] = fetcher.mock.calls[0] as [string, RequestInit];
         expect(init.method).toBe('PUT');
         expect((init.headers as Record<string, string>).Authorization).toBe('Bearer abc123');
-        expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+        expect((init.headers as Record<string, string>)['Contenido-Type']).toBe('application/json');
     });
 
     it('returns post-write metadata from put json responses', async () => {
@@ -259,7 +259,7 @@ describe('cloud sync http helpers', () => {
         const fetcher = vi.fn(async () => errorResponse(404, 'Not Found'));
 
         await expect(cloudGetFile('https://example.com/v1/file', { fetcher })).rejects.toMatchObject({
-            message: 'Cloud File GET failed (404): Not Found',
+            message: 'Cloud Archivo GET failed (404): Not Found',
             status: 404,
             statusCode: 404,
         });

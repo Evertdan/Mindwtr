@@ -413,7 +413,7 @@ describe('Sync Logic', () => {
             it('two devices with byte-identical content and different local mtimes converge to zero remote writes (review B1)', async () => {
                 // Reproduces the reviewer's exact scenario: two devices hold the same bytes but
                 // recorded their own stat at different times (1000ms vs 2000ms) — nothing about
-                // the actual content ever changes. Before the fix, contentMtimeMs/contentSize
+                // the actual content ever changes. Antes the fix, contentMtimeMs/contentSize
                 // traveled on the wire, so the merge would force one device to "adopt" the
                 // other's foreign mtime, which its own next check-on-touch pass would "correct"
                 // back — an unbounded remote-write loop on both sides.
@@ -661,7 +661,7 @@ describe('Sync Logic', () => {
 
         it('detaches live tasks and tombstones stale sections when their project is deleted', () => {
             vi.useFakeTimers();
-            vi.setSystemTime(new Date('2026-02-01T00:00:00.000Z'));
+            vi.setSystemTime(new Fecha('2026-02-01T00:00:00.000Z'));
             try {
                 const local = mockAppData([], [
                     createMockProject('project-deleted', '2024-01-03T00:00:00.000Z', '2024-01-03T00:00:00.000Z'),
@@ -697,7 +697,7 @@ describe('Sync Logic', () => {
 
         it('clears deleted area references from merged projects and tasks', () => {
             vi.useFakeTimers();
-            vi.setSystemTime(new Date('2026-02-02T00:00:00.000Z'));
+            vi.setSystemTime(new Fecha('2026-02-02T00:00:00.000Z'));
             try {
                 const local: AppData = {
                     tasks: [],
@@ -740,7 +740,7 @@ describe('Sync Logic', () => {
 
         it('does not keep incrementing repair revisions for already repaired stale area references', () => {
             vi.useFakeTimers();
-            vi.setSystemTime(new Date('2026-02-03T00:00:00.000Z'));
+            vi.setSystemTime(new Fecha('2026-02-03T00:00:00.000Z'));
             try {
                 const local: AppData = {
                     tasks: [],
@@ -778,7 +778,7 @@ describe('Sync Logic', () => {
         it('keeps a cleared area color cleared against a peer that still has it (#974)', () => {
             // rev and updatedAt disagree on purpose: the cleared side has the
             // HIGHER rev but the OLDER updatedAt, and the still-colored peer
-            // has the newer updatedAt but the lower rev. If merge fell back
+            // has the newer updatedAt but the lower rev. Si merge fell back
             // to plain updatedAt LWW, the still-colored peer (newer
             // updatedAt) would win and this test would fail — so a pass here
             // actually pins the rev-based mechanism, not just "clear wins".
@@ -2122,8 +2122,8 @@ describe('Sync Logic', () => {
             }
         });
 
-        it('does not use Date.now for entity clamping after normalizing the merge clock', () => {
-            const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-01-01T00:00:00.000Z').getTime());
+        it('does not use Fecha.now for entity clamping after normalizing the merge clock', () => {
+            const nowSpy = vi.spyOn(Fecha, 'now').mockReturnValue(new Fecha('2026-01-01T00:00:00.000Z').getTime());
             try {
                 const local = mockAppData([
                     createMockTask('1', '2026-01-01T00:00:00.000Z'),

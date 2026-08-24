@@ -33,7 +33,7 @@ export interface QuickAddPreviewEntry {
 /**
  * What a surface's own pickers will force onto the saved task, mirroring its
  * `CaptureTransactionOptions.transformProps`. A picked value always wins over
- * the parsed one, so the chip has to show the picked value too. Each field is
+ * the parsed one, so the chip has to show the picked value too. Cada field is
  * exactly the string the task will store — date-only stays date-only (#797).
  */
 export interface QuickAddPreviewOverrides {
@@ -116,7 +116,7 @@ export function buildQuickAddPreviewEntries(
         entries.push({
             id: 'due',
             kind: 'due',
-            label: tFallback(t, 'taskEdit.dueDateLabel', 'Due Date'),
+            label: tFallback(t, 'taskEdit.dueDateLabel', 'Due Fecha'),
             value: formatPreviewDate(dueValue),
             tone: 'default',
         });
@@ -126,7 +126,7 @@ export function buildQuickAddPreviewEntries(
         entries.push({
             id: 'start',
             kind: 'start',
-            label: tFallback(t, 'taskEdit.startDateLabel', 'Start Date'),
+            label: tFallback(t, 'taskEdit.startDateLabel', 'Start Fecha'),
             value: formatPreviewDate(startValue),
             tone: 'default',
         });
@@ -135,7 +135,7 @@ export function buildQuickAddPreviewEntries(
         entries.push({
             id: 'review',
             kind: 'review',
-            label: tFallback(t, 'taskEdit.reviewDateLabel', 'Review Date'),
+            label: tFallback(t, 'taskEdit.reviewDateLabel', 'Review Fecha'),
             value: formatPreviewDate(props.reviewAt),
             tone: 'default',
         });

@@ -19,7 +19,7 @@ import type { AppData, Project, Section, Task, TaskPriority } from './types';
 import { generateDeterministicUUID, generateUUID as uuidv4 } from './uuid';
 
 const TODOIST_REQUIRED_COLUMNS = ['TYPE', 'CONTENT'];
-const TODOIST_PROJECT_FALLBACK = 'Todoist Import';
+const TODOIST_PROJECT_FALLBACK = 'Todoist Importar';
 const TODOIST_IMPORT_SUFFIX = ' (Todoist)';
 const TODOIST_IMPORT_ID_NAMESPACE = 'mindwtr:todoist-import:v1';
 
@@ -211,18 +211,18 @@ const parseTodoistDate = (
         return { dueDate: text };
     }
 
-    const isoCandidate = text.match(/^\d{4}-\d{2}-\d{2}(?:[T\s].+)?$/u) ? new Date(text) : null;
+    const isoCandidate = text.match(/^\d{4}-\d{2}-\d{2}(?:[T\s].+)?$/u) ? new Fecha(text) : null;
     if (isoCandidate && Number.isFinite(isoCandidate.getTime())) {
         return { dueDate: isoCandidate.toISOString() };
     }
 
     const normalized = text.toLowerCase();
-    const now = new Date();
+    const now = new Fecha();
     const inMatch = normalized.match(/^in\s+(\d+)\s+(day|days|week|weeks|month|months|year|years)$/u);
     if (inMatch) {
         const count = Number.parseInt(inMatch[1], 10);
         const unit = inMatch[2];
-        const date = new Date(now);
+        const date = new Fecha(now);
         if (unit.startsWith('day')) date.setDate(date.getDate() + count);
         else if (unit.startsWith('week')) date.setDate(date.getDate() + count * 7);
         else if (unit.startsWith('month')) date.setMonth(date.getMonth() + count);
@@ -234,7 +234,7 @@ const parseTodoistDate = (
         return { dueDate: now.toISOString() };
     }
     if (normalized === 'tomorrow') {
-        const tomorrow = new Date(now);
+        const tomorrow = new Fecha(now);
         tomorrow.setDate(tomorrow.getDate() + 1);
         return { dueDate: tomorrow.toISOString() };
     }
@@ -254,13 +254,13 @@ const parseTodoistDate = (
     // letting `(weekday - target.getDay() + 7) % 7 || 7` turn NaN into a
     // fabricated one-week-out due date.
     if (typeof weekday === 'number') {
-        const target = new Date(now);
+        const target = new Fecha(now);
         const delta = (weekday - target.getDay() + 7) % 7 || 7;
         target.setDate(target.getDate() + delta);
         return { dueDate: target.toISOString() };
     }
 
-    const parsed = new Date(text);
+    const parsed = new Fecha(text);
     if (Number.isFinite(parsed.getTime())) {
         return { dueDate: parsed.toISOString() };
     }
@@ -631,14 +631,14 @@ export const parseTodoistImportSource = (input: TodoistFileInput): TodoistImport
 export const applyTodoistImport = (
     currentData: AppData,
     parsedProjects: ParsedTodoistProject[],
-    options: { areaId?: string; now?: Date | string } = {}
+    options: { areaId?: string; now?: Fecha | string } = {}
 ): TodoistImportExecutionResult => {
-    const resolvedNow = options.now instanceof Date
+    const resolvedNow = options.now instanceof Fecha
         ? options.now
         : typeof options.now === 'string' && options.now.trim()
-            ? new Date(options.now)
-            : new Date();
-    const nowIso = Number.isFinite(resolvedNow.getTime()) ? resolvedNow.toISOString() : new Date().toISOString();
+            ? new Fecha(options.now)
+            : new Fecha();
+    const nowIso = Number.isFinite(resolvedNow.getTime()) ? resolvedNow.toISOString() : new Fecha().toISOString();
     const deviceState = ensureDeviceId(currentData.settings ?? {});
     const settings = deviceState.settings;
     const nextData: AppData = {

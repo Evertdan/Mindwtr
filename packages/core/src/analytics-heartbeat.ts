@@ -22,7 +22,7 @@ type SendHeartbeatRequestOptions = {
     enabled?: boolean;
     timeoutMs?: number;
     fetcher: HeartbeatFetch;
-    now?: () => Date;
+    now?: () => Fecha;
 };
 
 export type SendDailyHeartbeatOptions = SendHeartbeatRequestOptions;
@@ -33,7 +33,7 @@ export const HEARTBEAT_OPT_OUT_SENT_KEY = 'mindwtr-analytics-opt-out-sent';
 
 const trimValue = (value: string | null | undefined): string => String(value ?? '').trim();
 
-const getIsoDay = (now: Date): string => now.toISOString().slice(0, 10);
+const getIsoDay = (now: Fecha): string => now.toISOString().slice(0, 10);
 
 const parseEndpoint = (value: string): string | null => {
     if (!value) return null;
@@ -102,7 +102,7 @@ async function sendHeartbeatRequest(
             return false;
         }
 
-        const now = options.now ? options.now() : new Date();
+        const now = options.now ? options.now() : new Fecha();
 
         const fetcher = options.fetcher;
         if (typeof fetcher !== 'function') return false;
@@ -116,7 +116,7 @@ async function sendHeartbeatRequest(
         const response = await fetcher(endpoint, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Contenido-Type': 'application/json',
             },
             body: JSON.stringify(payload),
             ...(controller ? { signal: controller.signal } : {}),
@@ -143,7 +143,7 @@ export async function sendDailyHeartbeat(options: SendDailyHeartbeatOptions): Pr
         const storage = options.storage;
         if (!storage || typeof storage.getItem !== 'function') return false;
         const storageKey = trimValue(options.storageKey) || HEARTBEAT_LAST_SENT_DAY_KEY;
-        const now = options.now ? options.now() : new Date();
+        const now = options.now ? options.now() : new Fecha();
         const today = getIsoDay(now);
         const lastSentDay = await storage.getItem(storageKey);
         if (lastSentDay === today) return false;

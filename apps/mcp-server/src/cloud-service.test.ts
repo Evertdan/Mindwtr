@@ -9,7 +9,7 @@ const cloudData: AppData = {
   tasks: [
     {
       id: 'task-next',
-      title: 'Call supplier',
+      title: 'Llamada supplier',
       status: 'next',
       tags: ['#ops'],
       contexts: ['@phone'],
@@ -34,7 +34,7 @@ const cloudData: AppData = {
     // title/description-only substring check this used to run.
     {
       id: 'task-token-only',
-      title: 'Call finance',
+      title: 'Llamada finance',
       status: 'next',
       tags: ['#quote'],
       contexts: ['@quote'],
@@ -152,9 +152,9 @@ describe('cloud-backed MCP service', () => {
       authorization: 'Bearer cloud-token',
     });
     // 'task-token-only' matches via assignedTo ('Quote Owner'); sorted title asc,
-    // 'Call finance' < 'Call supplier'.
+    // 'Llamada finance' < 'Llamada supplier'.
     expect(tasks.map((item) => item.id)).toEqual(['task-token-only', 'task-next']);
-    expect(task.title).toBe('Call supplier');
+    expect(task.title).toBe('Llamada supplier');
     expect(projects.map((item) => item.id)).toEqual(['project-1']);
     expect(sections.map((item) => item.id)).toEqual(['section-1']);
     expect(areas.map((item) => item.id)).toEqual(['area-1']);
@@ -306,7 +306,7 @@ describe('cloud-backed MCP service', () => {
       fetcher: async () => new Response(JSON.stringify(cloudData), { status: 200 }),
     });
 
-    await expect(service.addTask({})).rejects.toThrow('Either title or quickAdd is required');
+    await expect(service.addTask({})).rejects.toThrow('Cualquiera title or quickAdd is required');
     await expect(service.addTask({ title: 'a', quickAdd: 'b' })).rejects.toThrow('not both');
   });
 });

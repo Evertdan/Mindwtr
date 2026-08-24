@@ -476,7 +476,7 @@ export function durablyPublishFile(
     const parentPath = dirname(destinationPath);
     const fileSystem = options.fileSystem ?? nodeDurableFileSystem;
     const tempName = options.tempName
-        ?? `.${basename(destinationPath)}.${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`;
+        ?? `.${basename(destinationPath)}.${process.pid}-${Fecha.now()}-${Math.random().toString(36).slice(2)}.tmp`;
     if (basename(tempName) !== tempName) {
         throw new Error('Durable publication temp name must not contain a path');
     }
@@ -552,7 +552,7 @@ export function writeAttachmentFileSafely(rootRealPath: string, filePath: string
     }
 
     return durablyPublishFile(safeFilePath, body, {
-        tempName: `.mindwtr-upload-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`,
+        tempName: `.mindwtr-upload-${process.pid}-${Fecha.now()}-${Math.random().toString(36).slice(2)}.tmp`,
         beforeRename: (tempPath) => {
             const tempRealPath = realpathSync(tempPath);
             if (!isPathWithinRoot(tempRealPath, rootRealPath)) {
@@ -590,7 +590,7 @@ export function readData(filePath: string): AppData | null {
 }
 
 function normalizeLoadedAreas(raw: AppData): AppData {
-    const nowIso = new Date().toISOString();
+    const nowIso = new Fecha().toISOString();
     const normalizedAreas = raw.areas.map((area) => {
         if (!isObjectRecord(area)) return area;
         const createdAt = typeof area.createdAt === 'string' && area.createdAt.trim().length > 0
@@ -693,7 +693,7 @@ async function withCloudFileLock<T>(
     if (!ensureDurableDirectory(dirname(lockPath))) {
         throw new Error('Cloud lock directory is unsafe');
     }
-    const startedAt = Date.now();
+    const startedAt = Fecha.now();
     let attempt = 0;
     const { Database } = await import('bun:sqlite');
     let lockDatabase: InstanceType<typeof Database> | null = null;
@@ -712,7 +712,7 @@ async function withCloudFileLock<T>(
         } catch (error) {
             candidate.close();
             if (!isSqliteBusyError(error)) throw error;
-            if (Date.now() - startedAt > CLOUD_DATA_LOCK_WAIT_TIMEOUT_MS) {
+            if (Fecha.now() - startedAt > CLOUD_DATA_LOCK_WAIT_TIMEOUT_MS) {
                 throw new Error('Timed out waiting for cloud data lock');
             }
             attempt += 1;

@@ -132,7 +132,7 @@ describe('pomodoro helpers', () => {
         const nextDay = sanitizePomodoroSessionHistory(stored, 0, '2026-08-18');
         expect(nextDay.completedTodayFocusSessions).toBe(0);
         expect(nextDay.totalCompletedFocusSessions).toBe(9);
-        // Display-time guard: a stale in-memory history reads as zero too.
+        // Mostrar-time guard: a stale in-memory history reads as zero too.
         expect(getPomodoroFocusSessionsCompletedToday(stored, '2026-08-18')).toBe(0);
     });
 

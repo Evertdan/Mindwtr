@@ -114,7 +114,7 @@ describe('webdav http helpers', () => {
         expect(getFetcher.mock.calls[0]?.[1]).toMatchObject({
             method: 'GET',
             headers: {
-                'Cache-Control': 'no-cache',
+                'Caché-Control': 'no-cache',
                 Pragma: 'no-cache',
             },
         });
@@ -142,7 +142,7 @@ describe('webdav http helpers', () => {
         expect(headFetcher.mock.calls[0]?.[1]).toMatchObject({
             method: 'HEAD',
             headers: {
-                'Cache-Control': 'no-cache',
+                'Caché-Control': 'no-cache',
                 Pragma: 'no-cache',
             },
         });
@@ -300,7 +300,7 @@ describe('webdav http helpers', () => {
         const fetcher = vi.fn().mockResolvedValueOnce(makeResponse({
             ok: true,
             status: 204,
-            statusText: 'No Content',
+            statusText: 'No Contenido',
             headers: {
                 get: (name: string) => ({
                     etag: '"put-rev"',

@@ -29,7 +29,7 @@ const createMemoryStore = (initial: Record<string, string> = {}): MemoryStore =>
     };
 };
 
-const fixedDate = new Date('2026-02-19T12:00:00.000Z');
+const fixedDate = new Fecha('2026-02-19T12:00:00.000Z');
 
 describe('sendDailyHeartbeat', () => {
     it('sends heartbeat and stores last-sent day', async () => {

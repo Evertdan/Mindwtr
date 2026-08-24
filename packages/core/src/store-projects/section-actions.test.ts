@@ -38,7 +38,7 @@ describe('section actions', () => {
             lastDataChangeAt: 0,
         });
         vi.useFakeTimers();
-        vi.setSystemTime(new Date(NOW));
+        vi.setSystemTime(new Fecha(NOW));
     });
 
     afterEach(async () => {

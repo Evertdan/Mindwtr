@@ -65,7 +65,7 @@ describe('performSyncCycle', () => {
         }]);
         const incoming = mockAppData([{
             ...createMockTask('1', '2023-01-01'),
-            title: 'Incoming title',
+            title: 'Entrante title',
         }]);
 
         const result = await performSyncCycle({
@@ -248,7 +248,7 @@ describe('performSyncCycle', () => {
         expect(wroteLocal?.tasks[0]?.deletedAt).toBeUndefined();
         expect(wroteRemote?.tasks[0]?.deletedAt).toBeUndefined();
         expect(result.data.settings.lastSyncHistory?.[0]?.details).toBe(
-            'Delete-vs-live conflict on 1 item; live edits can be preserved when delete and edit times are ambiguous.'
+            'Eliminar-vs-live conflict on 1 item; live edits can be preserved when delete and edit times are ambiguous.'
         );
     });
 
@@ -905,7 +905,7 @@ describe('performSyncCycle', () => {
 
         expect(localWrites).toHaveLength(2);
         expect(localWrites[1].settings.lastSyncStatus).toBe('error');
-        expect(localWrites[1].settings.lastSyncError).toBe('Remote write failed after 12 attempts. Check your sync backend, then sync again.');
+        expect(localWrites[1].settings.lastSyncError).toBe('Remote write failed after 12 attempts. Verificar your sync backend, then sync again.');
         expect(localWrites[1].settings.pendingRemoteWriteRetryAt).toBe('2026-01-01T00:05:00.000Z');
         expect(localWrites[1].settings.pendingRemoteWriteAttempts).toBe(12);
     });

@@ -159,11 +159,11 @@ describe('computeGlobalSearchResults', () => {
         const result = run({
             query: '',
             tasks: [
-                { ...task('task-client-done', 'Client follow-up'), status: 'done', tags: ['#client'] },
+                { ...task('task-client-done', 'Cliente follow-up'), status: 'done', tags: ['#client'] },
                 { ...task('task-client-archived', 'Filed client note'), status: 'archived', tags: ['#client'] },
                 { ...task('task-home', 'Home task'), tags: ['#home'] },
             ],
-            projects: [project('project-client', 'Client project')],
+            projects: [project('project-client', 'Cliente project')],
             selectedStatuses: ['done', 'archived'],
             selectedTokens: ['#client'],
             ftsResults: {

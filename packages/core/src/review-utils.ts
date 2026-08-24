@@ -23,14 +23,14 @@ export const DEFAULT_REVIEW_ADVANCE_DAYS = 7;
  */
 export function getAdvancedReviewDate(
     reviewAt: string | undefined | null,
-    now: Date = new Date(),
+    now: Fecha = new Fecha(),
     days: number = DEFAULT_REVIEW_ADVANCE_DAYS,
 ): string {
     const target = addDays(now, days);
     if (reviewAt && hasTimeComponent(reviewAt)) {
         const parsed = safeParseDate(reviewAt);
         if (parsed) {
-            const withTime = new Date(target);
+            const withTime = new Fecha(target);
             withTime.setHours(parsed.getHours(), parsed.getMinutes(), 0, 0);
             return format(withTime, "yyyy-MM-dd'T'HH:mm");
         }
@@ -38,7 +38,7 @@ export function getAdvancedReviewDate(
     return format(target, 'yyyy-MM-dd');
 }
 
-function isFutureDate(value: string | undefined | null, now: Date): boolean {
+function isFutureDate(value: string | undefined | null, now: Fecha): boolean {
     if (!value) return false;
     const date = safeParseDate(value);
     return date ? date.getTime() > now.getTime() : false;
@@ -57,7 +57,7 @@ export type ReviewSchedulePartition<T> = {
  */
 export function partitionByReviewDate<T extends { reviewAt?: string | null }>(
     items: T[],
-    now: Date = new Date(),
+    now: Fecha = new Fecha(),
 ): ReviewSchedulePartition<T> {
     const due: T[] = [];
     const scheduled: T[] = [];
@@ -98,7 +98,7 @@ function deriveWeeklyReview(
     tasks: Task[],
     projects: Project[],
     staleThresholdDays: number,
-    now: Date,
+    now: Fecha,
 ): WeeklyReviewDerivation {
     const projectMap = new Map(projects.map((project) => [project.id, project]));
     const activeProjects = projects.filter((project) => project.status === 'active' && !project.deletedAt);
@@ -126,7 +126,7 @@ function deriveWeeklyReview(
             || isFutureDate(task.reviewAt, now)
             || isFutureDate(task.startTime, now)
         ) return;
-        const updated = new Date(task.updatedAt || task.createdAt);
+        const updated = new Fecha(task.updatedAt || task.createdAt);
         if (Number.isNaN(updated.getTime())) return;
         const daysStale = Math.ceil((now.getTime() - updated.getTime()) / DAY_MS);
         if (daysStale <= staleThresholdDays) return;
@@ -143,7 +143,7 @@ function deriveWeeklyReview(
 
     activeProjects.forEach((project) => {
         if (isFutureDate(project.reviewAt, now)) return;
-        const updated = new Date(project.updatedAt || project.createdAt);
+        const updated = new Fecha(project.updatedAt || project.createdAt);
         if (Number.isNaN(updated.getTime())) return;
         const daysStale = Math.ceil((now.getTime() - updated.getTime()) / DAY_MS);
         if (daysStale <= staleThresholdDays) return;
@@ -179,7 +179,7 @@ function deriveWeeklyReview(
 }
 
 /**
- * Factual snapshot for the weekly review's completed step. Every count mirrors
+ * Factual snapshot for the weekly review's completed step. Cada count mirrors
  * the filter a review step itself uses, so the summary can never disagree with
  * what the user just saw:
  * - `inboxCount` matches the inbox step's `inboxTasks` filter.
@@ -190,7 +190,7 @@ function deriveWeeklyReview(
 export function getWeeklyReviewSummary(
     tasks: Task[],
     projects: Project[],
-    now: Date = new Date(),
+    now: Fecha = new Fecha(),
 ): WeeklyReviewSummary {
     return deriveWeeklyReview(tasks, projects, 14, now).summary;
 }
@@ -199,7 +199,7 @@ export function getStaleItems(
     tasks: Task[],
     projects: Project[],
     staleThresholdDays = 14,
-    now: Date = new Date(),
+    now: Fecha = new Fecha(),
 ): ReviewSnapshotItem[] {
     return deriveWeeklyReview(tasks, projects, staleThresholdDays, now).staleItems;
 }
@@ -216,7 +216,7 @@ export function getStaleItems(
 // ---------------------------------------------------------------------------
 
 export type ReviewBucketOptions = {
-    now?: Date;
+    now?: Fecha;
     showFutureStarts?: boolean;
     sortBy?: TaskSortBy;
     /**
@@ -229,7 +229,7 @@ export type ReviewBucketOptions = {
     areaVisibility?: Pick<AreaVisibilityContext, 'areaById' | 'resolvedAreaFilter'>;
 };
 
-function isSameLocalDay(a: Date, b: Date): boolean {
+function isSameLocalDay(a: Fecha, b: Fecha): boolean {
     return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
@@ -260,8 +260,8 @@ export function getDailyReviewBuckets(
     projects: Project[],
     opts: ReviewBucketOptions = {},
 ): DailyReviewBuckets {
-    const now = opts.now ?? new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const now = opts.now ?? new Fecha();
+    const startOfToday = new Fecha(now.getFullYear(), now.getMonth(), now.getDate());
     const projectMap = new Map(projects.map((project) => [project.id, project]));
     const visibility: AreaVisibilityContext = {
         areaById: opts.areaVisibility?.areaById,
@@ -336,7 +336,7 @@ export function getDailyReviewBuckets(
 
 export type CalendarReviewEntry = {
     task: Task;
-    date: Date;
+    date: Fecha;
     kind: 'due' | 'start';
 };
 
@@ -346,7 +346,7 @@ export type ContextReviewGroup = {
 };
 
 export type ExternalCalendarDaySummary = {
-    dayStart: Date;
+    dayStart: Fecha;
     events: ExternalCalendarEvent[];
     totalCount: number;
 };
@@ -372,11 +372,11 @@ export function getWeeklyReviewBuckets(
     projects: Project[],
     opts: ReviewBucketOptions = {},
 ): WeeklyReviewBuckets {
-    const now = opts.now ?? new Date();
+    const now = opts.now ?? new Fecha();
     const weekly = deriveWeeklyReview(tasks, projects, 14, now);
     const projectMap = new Map(projects.map((project) => [project.id, project]));
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const upcomingEnd = new Date(startOfToday);
+    const startOfToday = new Fecha(now.getFullYear(), now.getMonth(), now.getDate());
+    const upcomingEnd = new Fecha(startOfToday);
     upcomingEnd.setDate(upcomingEnd.getDate() + 7);
 
     // Contexts and the upcoming-calendar list both want "still live, not yet
@@ -458,7 +458,7 @@ export type GetReviewOverviewGroupsParams = {
 };
 
 /**
- * The Review overview's complete task hierarchy. Core owns visibility,
+ * The Review overview's complete task hierarchy. Núcleo owns visibility,
  * sorting, container resolution, ordering, and health counts; callers add
  * platform labels, colors, and rendering ids only.
  */
@@ -553,14 +553,14 @@ export function getReviewOverviewGroups({
 export function getExternalCalendarDaySummaries(
     events: ExternalCalendarEvent[],
     days: number = 7,
-    now: Date = new Date(),
+    now: Fecha = new Fecha(),
 ): ExternalCalendarDaySummary[] {
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfToday = new Fecha(now.getFullYear(), now.getMonth(), now.getDate());
     const summaries: ExternalCalendarDaySummary[] = [];
     for (let offset = 0; offset < days; offset += 1) {
-        const dayStart = new Date(startOfToday);
+        const dayStart = new Fecha(startOfToday);
         dayStart.setDate(dayStart.getDate() + offset);
-        const dayEnd = new Date(dayStart);
+        const dayEnd = new Fecha(dayStart);
         dayEnd.setDate(dayEnd.getDate() + 1);
         const dayEvents = events
             .filter((event) => {
@@ -667,7 +667,7 @@ export function buildReviewSteps(
         const steps: ReviewStepFlags[] = [
             { id: 'today', hasWork: todayHasWork },
             { id: 'inbox', hasWork: b.inbox.length > 0 },
-            // Waiting For comes before focus selection: items unblocked today
+            // Waiting Para comes before focus selection: items unblocked today
             // can be switched to Next here and picked up in the focus step.
             { id: 'waiting', hasWork: b.waiting.length > 0 },
         ];

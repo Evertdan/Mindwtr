@@ -257,7 +257,7 @@ export function getSettingsSearchEntryKeys(pageId: SettingsSearchPageId): string
 
 export const SETTINGS_SEARCH_PAGE_IDS = Object.keys(SETTINGS_SEARCH_PAGE_KEYS) as SettingsSearchPageId[];
 
-// Every indexed setting across every page, flattened — the list search UIs
+// Cada indexed setting across every page, flattened — the list search UIs
 // walk to build results.
 export const SETTINGS_SEARCH_INDEX: readonly SettingsSearchIndexEntry[] =
     SETTINGS_SEARCH_PAGE_IDS.flatMap((pageId) => getSettingsSearchEntries(pageId));
@@ -265,7 +265,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsSearchIndexEntry[] =
 // Desktop page-search keys that mobile does not need to index verbatim, each
 // with the reason it's safe to skip: the feature doesn't exist on mobile, or
 // the key is a value-option/section-heading label whose parent setting is
-// indexed on its own. Every key in SETTINGS_SEARCH_PAGE_KEYS must be either
+// indexed on its own. Cada key in SETTINGS_SEARCH_PAGE_KEYS must be either
 // resolvable on mobile or listed here — see settings-search-keys.test.ts.
 export const SETTINGS_SEARCH_MOBILE_EXCLUSIONS: Record<string, string> = {
     density: 'No adjustable list density setting on mobile.',
@@ -288,8 +288,8 @@ export const SETTINGS_SEARCH_MOBILE_EXCLUSIONS: Record<string, string> = {
     networkProxyUrl: 'Desktop-only HTTP proxy override.',
     calendarFeed: 'The self-hosted server\'s calendar subscription is published and revoked from desktop settings only (#952).',
     integrations: 'No mobile settings row for this desktop page (folds Obsidian + local calendar-file import, neither of which exists on mobile).',
-    calendarName: 'Field of desktop\'s external-calendar add form; mobile\'s ICS subscription screen has its own labels.',
-    calendarUrl: 'Field of desktop\'s external-calendar add form; mobile\'s ICS subscription screen has its own labels.',
+    calendarName: 'Campo of desktop\'s external-calendar add form; mobile\'s ICS subscription screen has its own labels.',
+    calendarUrl: 'Campo of desktop\'s external-calendar add form; mobile\'s ICS subscription screen has its own labels.',
     calendarSystemTitle: 'Desktop system-calendar (EventKit/EDS) integration; mobile uses expo-calendar with its own screen.',
     calendarPushTitle: 'Part of the desktop system-calendar integration above.',
     calendarPushTarget: 'Part of the desktop system-calendar integration above.',
@@ -307,9 +307,9 @@ export const SETTINGS_SEARCH_MOBILE_EXCLUSIONS: Record<string, string> = {
     emailCaptureUsername: 'Part of the desktop-only email capture above.',
     emailCapturePassword: 'Part of the desktop-only email capture above.',
     emailCaptureFolder: 'Part of the desktop-only email capture above.',
-    version: 'Mobile\'s About screen renders the version from expo-constants under its own label.',
+    version: 'Mobile\'s Acerca de screen renders the version from expo-constants under its own label.',
     installChannel: 'Desktop install source (AUR, Flatpak, MS Store, …); mobile builds come from the app stores.',
-    github: 'No repository link row on mobile\'s About screen.',
+    github: 'No repository link row on mobile\'s Acerca de screen.',
 };
 
 // A settings row as search shows it: the translated setting name plus the
@@ -326,7 +326,7 @@ export type SettingsSearchResult = {
     keywords?: readonly string[];
 };
 
-// Build the searchable list of every indexed setting. `translate` takes an
+// Compilar the searchable list of every indexed setting. `translate` takes an
 // i18n key and returns the localized string; anything falsy, or the key echoed
 // back (how the app translators signal "missing"), falls back to English.
 export function buildSettingsSearchResults(
@@ -363,7 +363,7 @@ export function buildSettingsSearchResults(
     return results;
 }
 
-// "General → Input", or just the page title for a row that sits directly on
+// "General → Entrada", or just the page title for a row that sits directly on
 // the page.
 export function formatSettingsSearchPath(result: SettingsSearchResult): string {
     return result.sectionTitle ? `${result.pageTitle} → ${result.sectionTitle}` : result.pageTitle;

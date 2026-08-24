@@ -300,10 +300,10 @@ describe('mcp server index', () => {
     await tools.get('mindwtr_get_person')?.handler({ id: 'person1', includeDeleted: true });
     expect(getInput as Record<string, unknown>).toMatchObject({ id: 'person1', includeDeleted: true });
 
-    const addResult = await tools.get('mindwtr_add_person')?.handler({ name: 'Alex', note: 'Design lead' });
-    expect(addInput as Record<string, unknown>).toMatchObject({ name: 'Alex', note: 'Design lead' });
+    const addResult = await tools.get('mindwtr_add_person')?.handler({ name: 'Alex', note: 'Diseño lead' });
+    expect(addInput as Record<string, unknown>).toMatchObject({ name: 'Alex', note: 'Diseño lead' });
     const addPayload = JSON.parse(addResult?.content[0]?.text || '{}');
-    expect(addPayload.person).toMatchObject({ name: 'Alex', note: 'Design lead' });
+    expect(addPayload.person).toMatchObject({ name: 'Alex', note: 'Diseño lead' });
 
     await tools.get('mindwtr_update_person')?.handler({ id: 'person1', note: null, referenceLink: 'https://example.com/alex' });
     expect(updateInput as Record<string, unknown>).toMatchObject({
@@ -349,7 +349,7 @@ describe('mcp server index', () => {
     expect(addHandler).toBeTruthy();
     const result = await addHandler?.({});
     expect(result?.isError).toBe(true);
-    expect(result?.content[0]?.text).toContain('Either title or quickAdd is required');
+    expect(result?.content[0]?.text).toContain('Cualquiera title or quickAdd is required');
     const payload = JSON.parse(result?.content[0]?.text || '{}');
     expect(payload.code).toBe('validation_error');
   });
@@ -393,7 +393,7 @@ describe('mcp server index', () => {
     expect(addHandler).toBeTruthy();
     const result = await addHandler?.({ title: 'Task', contexts: ['   '] });
     expect(result?.isError).toBe(true);
-    expect(result?.content[0]?.text).toContain('Context values must be non-empty strings');
+    expect(result?.content[0]?.text).toContain('Contexto values must be non-empty strings');
   });
 
   test('validates update_task rejects overlong token values', async () => {

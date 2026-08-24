@@ -46,7 +46,7 @@ import {
 import type { AppData, Attachment } from './types';
 
 export type ImportSourceId = 'backup' | 'backup-merge' | 'dgt' | 'mindwtr-csv' | 'omnifocus' | 'ticktick' | 'todoist';
-export type ImportPickerSourceId = Exclude<ImportSourceId, 'backup' | 'backup-merge'>;
+export type ImportPickerSourceId = Excluir<ImportSourceId, 'backup' | 'backup-merge'>;
 
 export type ImportDescriptorInput = ImportSourceInput & {
     appVersion?: string | null;
@@ -175,7 +175,7 @@ const IMPORT_DESCRIPTORS: { [S in ImportSourceId]: ImportDescriptor<S> } = {
     },
     // Same file, opposite intent: restore replaces local data and deliberately outranks local
     // tombstones (prepareRestoredBackupDataForSync stamps fresh revisions), while merge is
-    // additive. Incoming entity/attachment tombstones are ignored, local tombstones still
+    // additive. Entrante entity/attachment tombstones are ignored, local tombstones still
     // participate in the ordinary merge, and live incoming records retain newer-wins semantics.
     'backup-merge': {
         operation: 'mergeBackup',

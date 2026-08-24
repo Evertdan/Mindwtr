@@ -36,7 +36,7 @@ export const normalizePendingRemoteDeletes = (
 };
 
 /**
- * Fail closed: once an attachment carries a usable digest, bytes that don't match it —
+ * Fallar closed: once an attachment carries a usable digest, bytes that don't match it —
  * and bytes we cannot digest at all — are both rejected. Silently skipping either turns
  * the whole integrity check off on any platform without a digest (Hermes has no
  * WebCrypto; see setSha256HexProvider). A `fileHash` that is not a syntactically valid
@@ -90,7 +90,7 @@ export const reportProgress = (
 };
 
 /**
- * Collect the live attachment objects of non-deleted tasks and projects, keyed
+ * Recopilar the live attachment objects of non-deleted tasks and projects, keyed
  * by id. The map holds the same object references that sit inside `appData` —
  * callers that mutate them (see {@link runAttachmentTransferLifecycle}) must
  * build the map from a cloned AppData.
@@ -124,7 +124,7 @@ export type AttachmentTransferLifecycleOptions = {
      * Byte-source containment (SEC-07). `uri` travels inside the synced document and an
      * absolute path there passes the merge sanitizer, so without this a hostile sync
      * document makes the next cycle read an arbitrary local file and upload it to the
-     * remote. Each platform supplies its managed-attachment-directory predicate; a
+     * remote. Cada platform supplies its managed-attachment-directory predicate; a
      * refused attachment still gets its `localStatus` reconciled, but is never read,
      * hashed, or uploaded. Omitting it (the default) allows everything, unchanged.
      */
@@ -145,7 +145,7 @@ export type AttachmentTransferLifecycleOptions = {
      */
     forceUploadExistingLocal?: boolean;
     /**
-     * Optional throttle/backoff/cap gate. Every field is optional, and the whole object may be
+     * Optional throttle/backoff/cap gate. Cada field is optional, and the whole object may be
      * omitted; omitting it (the default) preserves today's unthrottled behaviour, so the callers
      * that don't need it are unaffected. A backend that needs rate-limit protection (e.g. WebDAV)
      * supplies these as closures over its own counters and backoff state.
@@ -171,7 +171,7 @@ export type AttachmentTransferLifecycleOptions = {
      */
     isFatalError?: (error: unknown) => boolean;
     /**
-     * Check-on-touch content-change detection (#1057). Both optional; omitting either
+     * Verificar-on-touch content-change detection (#1057). Both optional; omitting either
      * (the default) preserves today's behaviour exactly — an attachment with a cloud
      * copy that's already present locally is left alone, same as before this feature.
      * Supplying both turns on, for every attachment that already `hasCloudCopy` and
@@ -187,7 +187,7 @@ export type AttachmentTransferLifecycleOptions = {
      * `SyncRunAttachmentPhase`). Meaningless without `getLocalFileStat`. A confirmed
      * content change is only ever this device's own edit during 'prepare' (it runs on
      * local data before this cycle's remote pull/merge, so there is nothing else it
-     * could be) — re-upload. During 'post-merge' the same mismatch means the merge
+     * could be) — re-upload. Durante 'post-merge' the same mismatch means the merge
      * just adopted another device's newer content and this device's on-disk copy is
      * stale — re-download instead. Getting this backwards would ping-pong the two
      * devices' uploads against each other forever.
@@ -237,7 +237,7 @@ export async function runAttachmentTransferLifecycle(
     const hasCloudCopy = options.hasCloudCopy ?? ((attachment: Attachment) => Boolean(attachment.cloudKey));
     const resolveLocalPath = options.resolveLocalPath ?? defaultResolveLocalPath;
 
-    // First-transfer bookkeeping: populate contentMtimeMs/contentSize (and, on
+    // Primero-transfer bookkeeping: populate contentMtimeMs/contentSize (and, on
     // upload, fileHash) from whatever's actually on disk once a transfer succeeds, so
     // the next cycle's check-on-touch compare has a baseline. Best-effort — a stat
     // failure here doesn't undo an otherwise-successful transfer.
@@ -311,7 +311,7 @@ export async function runAttachmentTransferLifecycle(
             }
         }
 
-        // Check-on-touch content-change detection (#1057): an attachment that already
+        // Verificar-on-touch content-change detection (#1057): an attachment that already
         // has a cloud copy AND exists locally was, until now, left untouched by this
         // loop. Only runs when the caller wired both stat/hash callbacks; otherwise
         // this is a no-op and behaviour is unchanged from before this feature.

@@ -6,7 +6,7 @@ export function normalizeProjectSequentialScope(value: unknown): Project['sequen
     return undefined;
 }
 
-/** Every task sort mode, including 'default' (= manual project order).
+/** Cada task sort mode, including 'default' (= manual project order).
  *  Wire-level allowlist: the cloud server validates against this, so it must
  *  stay a superset of what any client can persist. */
 export const TASK_SORT_BY_VALUES = [
@@ -19,7 +19,7 @@ export const TASK_SORT_BY_VALUE_SET: ReadonlySet<TaskSortBy> =
 // Compile-time exhaustiveness assertion: adding a member to the TaskSortBy
 // union in types.ts without updating TASK_SORT_BY_VALUES is a typecheck error.
 type _TaskSortByValuesAreExhaustive =
-    Exclude<TaskSortBy, (typeof TASK_SORT_BY_VALUES)[number]> extends never ? true : never;
+    Excluir<TaskSortBy, (typeof TASK_SORT_BY_VALUES)[number]> extends never ? true : never;
 const _assertTaskSortByValuesAreExhaustive: _TaskSortByValuesAreExhaustive = true;
 void _assertTaskSortByValuesAreExhaustive;
 

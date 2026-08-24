@@ -24,9 +24,9 @@ describe('stripMarkdown', () => {
     });
 
     it('removes markdown checklist and list markers', () => {
-        const input = '- [x] Done item\n[ ] Todo item\n+ Plain bullet';
+        const input = '- [x] Hecho item\n[ ] Todo item\n+ Plain bullet';
         const output = stripMarkdown(input);
-        expect(output).toContain('Done item');
+        expect(output).toContain('Hecho item');
         expect(output).toContain('Todo item');
         expect(output).toContain('Plain bullet');
         expect(output).not.toContain('[x]');

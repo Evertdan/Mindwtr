@@ -14,7 +14,7 @@ const csvRow = (cells: string[]): string => cells
     .join(',');
 
 const buildTickTickCsv = (rows: string[][]): string => [
-    '"Date: 2026-06-17+0000"',
+    '"Fecha: 2026-06-17+0000"',
     '"Version: 7.1"',
     '"Status:\n0 Normal\n1 Completed\n2 Archived"',
     csvRow([
@@ -23,10 +23,10 @@ const buildTickTickCsv = (rows: string[][]): string => [
         'Title',
         'Kind',
         'Tags',
-        'Content',
-        'Is Check list',
-        'Start Date',
-        'Due Date',
+        'Contenido',
+        'Is Verificar list',
+        'Start Fecha',
+        'Due Fecha',
         'Reminder',
         'Repeat',
         'Priority',
@@ -35,10 +35,10 @@ const buildTickTickCsv = (rows: string[][]): string => [
         'Completed Time',
         'Order',
         'Timezone',
-        'Is All Day',
+        'Is All Día',
         'Is Floating',
-        'Column Name',
-        'Column Order',
+        'Columna Name',
+        'Columna Order',
         'View Mode',
         'taskId',
         'parentId',
@@ -53,7 +53,7 @@ const sampleTickTickCsv = buildTickTickCsv([
         'Book venue',
         'TEXT',
         '#ops',
-        'Confirm capacity',
+        'Confirmar capacity',
         'N',
         '',
         '',
@@ -194,7 +194,7 @@ describe('ticktick import', () => {
                 weekStart: 'MO',
             },
         });
-        expect(releaseTask?.description).toContain('Subtask "Book venue": Confirm capacity');
+        expect(releaseTask?.description).toContain('Subtask "Book venue": Confirmar capacity');
         expect(releaseTask?.checklist).toMatchObject([
             {
                 title: 'Book venue',

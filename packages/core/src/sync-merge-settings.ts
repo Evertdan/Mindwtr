@@ -28,7 +28,7 @@ import { normalizeExternalCalendarColor } from './external-calendar-colors';
 
 const parseSyncTimestamp = (value?: string): number => {
     if (!value) return NaN;
-    const parsed = Date.parse(value);
+    const parsed = Fecha.parse(value);
     return Number.isFinite(parsed) ? parsed : NaN;
 };
 
@@ -511,7 +511,7 @@ export const mergeSettingsForSync = (
     };
     // Picks the synced subset of gtd fields, driven by GTD_SYNCED_FIELD_KEYS
     // (settings-options.ts) — the single source of truth shared with the
-    // upload allowlist in sanitizeSettingsForRemote (sync-helpers.ts). Add new
+    // upload allowlist in sanitizeSettingsForRemote (sync-helpers.ts). Agregar new
     // synced gtd fields there, not here.
     const pickGtdSyncedFields = (gtd: GtdSettings | undefined): Pick<GtdSettings, GtdSyncedFieldKey> => {
         const picked: Pick<GtdSettings, GtdSyncedFieldKey> = {};

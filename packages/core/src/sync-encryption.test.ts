@@ -359,7 +359,7 @@ describe('fail-closed decrypt', () => {
         await expect(decryptRemoteArtifactOrThrow(sealed, wrongKey)).rejects.toBeInstanceOf(SyncEncryptionTerminalError);
     });
 
-    // Guard-removed check: without the wrap, the same inputs throw the raw sync-crypto
+    // Guardia-removed check: without the wrap, the same inputs throw the raw sync-crypto
     // error class instead — proving this test would fail if decryptRemoteArtifactOrThrow
     // stopped reclassifying.
     it('raw decryptSyncArtifact (no wrapper) throws a different class than the terminal wrapper', async () => {

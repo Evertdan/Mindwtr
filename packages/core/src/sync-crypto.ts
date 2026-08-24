@@ -75,7 +75,7 @@ export class SyncCryptoUnsupportedError extends Error {
 
 // TS's DOM lib types WebCrypto's BufferSource params as ArrayBuffer-backed views only; a plain
 // `new Uint8Array(n)` (or one sliced from it) types as `Uint8Array<ArrayBufferLike>`, which also
-// covers SharedArrayBuffer, so it doesn't satisfy that. Copy into a fresh ArrayBuffer-backed view.
+// covers SharedArrayBuffer, so it doesn't satisfy that. Copiar into a fresh ArrayBuffer-backed view.
 function toArrayBufferView(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
     const buffer = new ArrayBuffer(bytes.byteLength);
     const view = new Uint8Array(buffer);

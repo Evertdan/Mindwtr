@@ -71,7 +71,7 @@ describe('i18n-loader sync fallback', () => {
         const zhHans = await loadTranslations('zh');
         const zhHant = await loadTranslations('zh-Hant');
 
-        expect(en['settings.deviceCalendars']).toBe('Device calendars');
+        expect(en['settings.deviceCalendars']).toBe('Dispositivo calendars');
         expect(en['settings.syncOff']).toBe('Sync is off');
 
         expect(zhHans['settings.deviceCalendars']).toBe('设备日历');
@@ -86,8 +86,8 @@ describe('i18n-loader sync fallback', () => {
 
         expect(en['sort.created']).toBe('Oldest');
         expect(en['sort.created-desc']).toBe('Newest');
-        expect(en['quickAdd.example']).toBe('e.g. Call mom /due:tomorrow @phone');
-        expect(en['quickAdd.inlineHint']).toBe('Try: Call mom /due:tomorrow 5pm @phone #family');
+        expect(en['quickAdd.example']).toBe('e.g. Llamada mom /due:tomorrow @phone');
+        expect(en['quickAdd.inlineHint']).toBe('Try: Llamada mom /due:tomorrow 5pm @phone #family');
         expect(en['quickAdd.inlineHint']).not.toContain('/start:<when>');
     });
 

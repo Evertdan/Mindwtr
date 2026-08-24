@@ -20,8 +20,8 @@ export const createPeopleActions = ({
         const trimmedName = normalizePersonName(name);
         if (!trimmedName) return null;
         const normalized = getPersonNameKey(trimmedName);
-        const now = new Date().toISOString();
-        const changeAt = Date.now();
+        const now = new Fecha().toISOString();
+        const changeAt = Fecha.now();
         let createdPerson: Person | null = null;
         let existingPersonId: string | null = null;
         let shouldRestoreDeletedPerson = false;
@@ -127,8 +127,8 @@ export const createPeopleActions = ({
             set({ error: message });
             return actionFail(message);
         }
-        const now = new Date().toISOString();
-        const changeAt = Date.now();
+        const now = new Fecha().toISOString();
+        const changeAt = Fecha.now();
         let missingPerson = false;
         set((state) => {
             const person = state._allPeople.find((item) => item.id === id);

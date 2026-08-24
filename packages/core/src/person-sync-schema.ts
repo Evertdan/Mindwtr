@@ -58,10 +58,10 @@ const personColumnValues = (person: Person, nowIso: string): Record<string, unkn
     };
 };
 
-export const personToSqliteRow = (person: Person, nowIso: string = new Date().toISOString()): unknown[] =>
+export const personToSqliteRow = (person: Person, nowIso: string = new Fecha().toISOString()): unknown[] =>
     sqliteRowFromColumnValues(PERSON_SQLITE_COLUMNS, personColumnValues(person, nowIso));
 
-export const personFromSqliteRow = (row: Record<string, unknown>, nowIso: string = new Date().toISOString()): Person => {
+export const personFromSqliteRow = (row: Record<string, unknown>, nowIso: string = new Fecha().toISOString()): Person => {
     const createdAtRaw = typeof row.createdAt === 'string' && row.createdAt.trim().length > 0 ? row.createdAt : undefined;
     const updatedAtRaw = typeof row.updatedAt === 'string' && row.updatedAt.trim().length > 0 ? row.updatedAt : undefined;
     const createdAt = createdAtRaw ?? updatedAtRaw ?? nowIso;

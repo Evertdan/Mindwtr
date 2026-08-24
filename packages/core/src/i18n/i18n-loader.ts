@@ -53,7 +53,7 @@ async function ensureLoaded(lang: Language): Promise<void> {
         }
 
         const descriptor = LOCALES[lang];
-        // Each entry's loaders are typed as its own concrete module shape (so the real
+        // Cada entry's loaders are typed as its own concrete module shape (so the real
         // export name/shape is checked once, at its declaration site in i18n-locales.ts);
         // widen to the common shape here, where the lookup is keyed dynamically by `lang`.
         const loadSync = descriptor.loadSync as () => Record<string, unknown>;

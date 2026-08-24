@@ -4,8 +4,8 @@ import type { Attachment } from './types';
 /** Remote folder name for synced attachment bytes, under every backend. */
 export const ATTACHMENTS_DIR_NAME = 'attachments';
 
-/** Extension (with leading dot, lowercased) from a title or URI, ignoring any
- *  query string or fragment. Empty string when none is found. */
+/** Extensión (with leading dot, lowercased) from a title or URI, ignoring any
+ *  query string or fragment. Vacío string when none is found. */
 export const extractExtension = (value?: string): string => {
     if (!value) return '';
     const stripped = value.split('?')[0].split('#')[0];

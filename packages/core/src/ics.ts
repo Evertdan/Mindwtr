@@ -15,7 +15,7 @@ export interface ExternalCalendarEvent {
     /** Stable id: `${sourceId}:${uid}:${startIso}` */
     id: string;
     sourceId: string;
-    /** Device calendar event id when the event came from the OS calendar provider. */
+    /** Dispositivo calendar event id when the event came from the OS calendar provider. */
     nativeEventId?: string;
     title: string;
     start: string; // ISO string
@@ -27,8 +27,8 @@ export interface ExternalCalendarEvent {
 
 export interface ParseIcsOptions {
     sourceId: string;
-    rangeStart: Date;
-    rangeEnd: Date;
+    rangeStart: Fecha;
+    rangeEnd: Fecha;
     maxOccurrencesPerEvent?: number;
     maxTotalOccurrences?: number;
     /**
@@ -56,7 +56,7 @@ export interface ParseIcsResult {
 }
 
 /**
- * How many calendars one .ics may split into. Feeds that use `CATEGORIES` as
+ * Cómo many calendars one .ics may split into. Feeds that use `CATEGORIES` as
  * free-form tags would otherwise turn a single subscription into a wall of
  * chips, so past this many distinct categories the file stays one calendar.
  */
@@ -69,7 +69,7 @@ type IcsParams = Record<string, string>;
 type ParsedRRule = {
     freq: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
     interval: number;
-    until?: Date;
+    until?: Fecha;
     count?: number;
     byDay?: Array<{
         weekday: number; // 0=Sun..6=Sat
@@ -84,11 +84,11 @@ type ParsedVEvent = {
     summary: string;
     description?: string;
     location?: string;
-    start: Date;
-    end: Date;
+    start: Fecha;
+    end: Fecha;
     allDay: boolean;
     rrule?: ParsedRRule;
-    /** First `CATEGORIES` value, if any. An event lands on one calendar only. */
+    /** Primero `CATEGORIES` value, if any. An event lands on one calendar only. */
     category?: string;
     /** RFC 7986 COLOR or X-FOSSIFY-CATEGORY-COLOR on this event, if present. */
     categoryColor?: string;
@@ -233,7 +233,7 @@ function parseIcsDurationMs(value: string): number | null {
     return totalSeconds * 1000;
 }
 
-function getTimeZoneOffsetMillis(date: Date, timeZone: string): number {
+function getTimeZoneOffsetMillis(date: Fecha, timeZone: string): number {
     // Offset = (timeZoneLocalAsUTC - actualUTC)
     const dtf = new Intl.DateTimeFormat('en-US', {
         timeZone,
@@ -260,28 +260,28 @@ function getTimeZoneOffsetMillis(date: Date, timeZone: string): number {
     const minute = parseInt(lookup.minute || '0', 10);
     const second = parseInt(lookup.second || '0', 10);
 
-    const asUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+    const asUtc = Fecha.UTC(year, month - 1, day, hour, minute, second);
     return asUtc - date.getTime();
 }
 
 function zonedDateTimeToInstant(
     components: { year: number; month: number; day: number; hour: number; minute: number; second: number },
     timeZone: string
-): Date {
-    const utcBase = Date.UTC(components.year, components.month - 1, components.day, components.hour, components.minute, components.second);
-    let guess = new Date(utcBase);
+): Fecha {
+    const utcBase = Fecha.UTC(components.year, components.month - 1, components.day, components.hour, components.minute, components.second);
+    let guess = new Fecha(utcBase);
 
     for (let i = 0; i < 3; i++) {
         const offset = getTimeZoneOffsetMillis(guess, timeZone);
         const adjusted = utcBase - offset;
         if (adjusted === guess.getTime()) break;
-        guess = new Date(adjusted);
+        guess = new Fecha(adjusted);
     }
 
     return guess;
 }
 
-function parseIcsDateTime(value: string, params: IcsParams): { date: Date; allDay: boolean } | null {
+function parseIcsDateTime(value: string, params: IcsParams): { date: Fecha; allDay: boolean } | null {
     const trimmed = value.trim();
     const valueType = (params.VALUE || '').toUpperCase();
 
@@ -290,7 +290,7 @@ function parseIcsDateTime(value: string, params: IcsParams): { date: Date; allDa
         const month = parseInt(trimmed.slice(4, 6), 10);
         const day = parseInt(trimmed.slice(6, 8), 10);
         if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
-        return { date: new Date(year, month - 1, day, 0, 0, 0, 0), allDay: true };
+        return { date: new Fecha(year, month - 1, day, 0, 0, 0, 0), allDay: true };
     }
 
     const isUtc = trimmed.endsWith('Z');
@@ -306,7 +306,7 @@ function parseIcsDateTime(value: string, params: IcsParams): { date: Date; allDa
     const second = parseInt(match[6], 10);
 
     if (isUtc) {
-        return { date: new Date(Date.UTC(year, month - 1, day, hour, minute, second)), allDay: false };
+        return { date: new Fecha(Fecha.UTC(year, month - 1, day, hour, minute, second)), allDay: false };
     }
 
     const tzid = params.TZID;
@@ -321,7 +321,7 @@ function parseIcsDateTime(value: string, params: IcsParams): { date: Date; allDa
         }
     }
 
-    return { date: new Date(year, month - 1, day, hour, minute, second, 0), allDay: false };
+    return { date: new Fecha(year, month - 1, day, hour, minute, second, 0), allDay: false };
 }
 
 function parseRRule(raw: string): ParsedRRule | null {
@@ -383,57 +383,57 @@ function parseRRule(raw: string): ParsedRRule | null {
     };
 }
 
-function getNthWeekdayOfMonth(year: number, month: number, weekday: number, ordinal: number): Date | null {
+function getNthWeekdayOfMonth(year: number, month: number, weekday: number, ordinal: number): Fecha | null {
     if (!Number.isFinite(ordinal) || ordinal === 0) return null;
 
     if (ordinal > 0) {
-        const firstOfMonth = new Date(year, month, 1);
+        const firstOfMonth = new Fecha(year, month, 1);
         const offset = (weekday - firstOfMonth.getDay() + 7) % 7;
         const day = 1 + offset + (ordinal - 1) * 7;
-        const candidate = new Date(year, month, day);
+        const candidate = new Fecha(year, month, day);
         return candidate.getMonth() === month ? candidate : null;
     }
 
-    const lastOfMonth = new Date(year, month + 1, 0);
+    const lastOfMonth = new Fecha(year, month + 1, 0);
     const offset = (lastOfMonth.getDay() - weekday + 7) % 7;
     const lastMatchingDay = lastOfMonth.getDate() - offset;
     const day = lastMatchingDay + (ordinal + 1) * 7;
-    const candidate = new Date(year, month, day);
+    const candidate = new Fecha(year, month, day);
     return candidate.getMonth() === month ? candidate : null;
 }
 
 function getMonthlyCandidates(
-    monthCursor: Date,
+    monthCursor: Fecha,
     rule: ParsedRRule,
     eventTime: { h: number; m: number; s: number; ms: number },
     fallbackMonthDay: number
-): Date[] {
+): Fecha[] {
     const year = monthCursor.getFullYear();
     const month = monthCursor.getMonth();
 
     if (rule.byMonthDay && rule.byMonthDay.length > 0) {
         return rule.byMonthDay
-            .map((monthDay) => new Date(year, month, monthDay, eventTime.h, eventTime.m, eventTime.s, eventTime.ms))
+            .map((monthDay) => new Fecha(year, month, monthDay, eventTime.h, eventTime.m, eventTime.s, eventTime.ms))
             .filter((candidate) => candidate.getMonth() === month)
             .sort((a, b) => a.getTime() - b.getTime());
     }
 
     if (rule.byDay && rule.byDay.length > 0) {
-        const candidates = new Map<number, Date>();
+        const candidates = new Map<number, Fecha>();
         for (const token of rule.byDay) {
             if (typeof token.ordinal === 'number') {
                 const nth = getNthWeekdayOfMonth(year, month, token.weekday, token.ordinal);
                 if (!nth) continue;
-                const candidate = new Date(year, month, nth.getDate(), eventTime.h, eventTime.m, eventTime.s, eventTime.ms);
+                const candidate = new Fecha(year, month, nth.getDate(), eventTime.h, eventTime.m, eventTime.s, eventTime.ms);
                 candidates.set(candidate.getTime(), candidate);
                 continue;
             }
 
-            const firstOfMonth = new Date(year, month, 1);
+            const firstOfMonth = new Fecha(year, month, 1);
             const offset = (token.weekday - firstOfMonth.getDay() + 7) % 7;
             let day = 1 + offset;
             while (true) {
-                const candidate = new Date(year, month, day, eventTime.h, eventTime.m, eventTime.s, eventTime.ms);
+                const candidate = new Fecha(year, month, day, eventTime.h, eventTime.m, eventTime.s, eventTime.ms);
                 if (candidate.getMonth() !== month) break;
                 candidates.set(candidate.getTime(), candidate);
                 day += 7;
@@ -443,7 +443,7 @@ function getMonthlyCandidates(
         return Array.from(candidates.values()).sort((a, b) => a.getTime() - b.getTime());
     }
 
-    return [new Date(year, month, fallbackMonthDay, eventTime.h, eventTime.m, eventTime.s, eventTime.ms)]
+    return [new Fecha(year, month, fallbackMonthDay, eventTime.h, eventTime.m, eventTime.s, eventTime.ms)]
         .filter((candidate) => candidate.getMonth() === month);
 }
 
@@ -453,16 +453,16 @@ function getYearlyCandidates(
     eventTime: { h: number; m: number; s: number; ms: number },
     fallbackMonth: number,
     fallbackMonthDay: number,
-): Date[] {
+): Fecha[] {
     const monthNumbers = rule.byMonth && rule.byMonth.length > 0 ? rule.byMonth : [fallbackMonth];
-    const candidates = new Map<number, Date>();
+    const candidates = new Map<number, Fecha>();
 
     for (const monthNumber of monthNumbers) {
         const month = monthNumber - 1;
 
         if (rule.byMonthDay && rule.byMonthDay.length > 0) {
             for (const monthDay of rule.byMonthDay) {
-                const candidate = new Date(year, month, monthDay, eventTime.h, eventTime.m, eventTime.s, eventTime.ms);
+                const candidate = new Fecha(year, month, monthDay, eventTime.h, eventTime.m, eventTime.s, eventTime.ms);
                 if (candidate.getMonth() === month) {
                     candidates.set(candidate.getTime(), candidate);
                 }
@@ -475,16 +475,16 @@ function getYearlyCandidates(
                 if (typeof token.ordinal === 'number') {
                     const nth = getNthWeekdayOfMonth(year, month, token.weekday, token.ordinal);
                     if (!nth) continue;
-                    const candidate = new Date(year, month, nth.getDate(), eventTime.h, eventTime.m, eventTime.s, eventTime.ms);
+                    const candidate = new Fecha(year, month, nth.getDate(), eventTime.h, eventTime.m, eventTime.s, eventTime.ms);
                     candidates.set(candidate.getTime(), candidate);
                     continue;
                 }
 
-                const firstOfMonth = new Date(year, month, 1);
+                const firstOfMonth = new Fecha(year, month, 1);
                 const offset = (token.weekday - firstOfMonth.getDay() + 7) % 7;
                 let day = 1 + offset;
                 while (true) {
-                    const candidate = new Date(year, month, day, eventTime.h, eventTime.m, eventTime.s, eventTime.ms);
+                    const candidate = new Fecha(year, month, day, eventTime.h, eventTime.m, eventTime.s, eventTime.ms);
                     if (candidate.getMonth() !== month) break;
                     candidates.set(candidate.getTime(), candidate);
                     day += 7;
@@ -493,7 +493,7 @@ function getYearlyCandidates(
             continue;
         }
 
-        const candidate = new Date(year, month, fallbackMonthDay, eventTime.h, eventTime.m, eventTime.s, eventTime.ms);
+        const candidate = new Fecha(year, month, fallbackMonthDay, eventTime.h, eventTime.m, eventTime.s, eventTime.ms);
         if (candidate.getMonth() === month) {
             candidates.set(candidate.getTime(), candidate);
         }
@@ -502,7 +502,7 @@ function getYearlyCandidates(
     return Array.from(candidates.values()).sort((a, b) => a.getTime() - b.getTime());
 }
 
-function intersectsRange(start: Date, end: Date, rangeStart: Date, rangeEnd: Date): boolean {
+function intersectsRange(start: Fecha, end: Fecha, rangeStart: Fecha, rangeEnd: Fecha): boolean {
     return start.getTime() < rangeEnd.getTime() && end.getTime() > rangeStart.getTime();
 }
 
@@ -515,13 +515,13 @@ function expandRecurringEvent(event: ParsedVEvent, options: ParseIcsOptions): Ex
     const maxPerEvent = options.maxOccurrencesPerEvent ?? 1000;
 
     const durationMs = Math.max(0, event.end.getTime() - event.start.getTime());
-    const windowStart = new Date(rangeStart.getTime() - durationMs);
+    const windowStart = new Fecha(rangeStart.getTime() - durationMs);
     const windowEnd = rangeEnd;
 
     const out: ExternalCalendarEvent[] = [];
 
-    const addOccurrence = (start: Date) => {
-        const end = new Date(start.getTime() + durationMs);
+    const addOccurrence = (start: Fecha) => {
+        const end = new Fecha(start.getTime() + durationMs);
         if (!intersectsRange(start, end, rangeStart, rangeEnd)) return;
         const startIso = start.toISOString();
         out.push({
@@ -548,7 +548,7 @@ function expandRecurringEvent(event: ParsedVEvent, options: ParseIcsOptions): Ex
     const until = rule.until;
     const countLimit = rule.count;
 
-    const shouldStop = (candidateStart: Date) => {
+    const shouldStop = (candidateStart: Fecha) => {
         if (until && candidateStart.getTime() > until.getTime()) return true;
         if (countLimit && generated >= countLimit) return true;
         if (generated >= maxPerEvent) return true;
@@ -597,7 +597,7 @@ function expandRecurringEvent(event: ParsedVEvent, options: ParseIcsOptions): Ex
         if (rule.freq === 'MONTHLY') {
             const eventTime = { h: event.start.getHours(), m: event.start.getMinutes(), s: event.start.getSeconds(), ms: event.start.getMilliseconds() };
 
-            let monthCursor = new Date(event.start.getFullYear(), event.start.getMonth(), 1, 0, 0, 0, 0);
+            let monthCursor = new Fecha(event.start.getFullYear(), event.start.getMonth(), 1, 0, 0, 0, 0);
             while (monthCursor.getTime() <= windowEnd.getTime() && generated < maxPerEvent) {
                 for (const candidate of getMonthlyCandidates(monthCursor, rule, eventTime, event.start.getDate())) {
                     if (candidate.getTime() < event.start.getTime()) continue;
@@ -696,7 +696,7 @@ function expandRecurringEvent(event: ParsedVEvent, options: ParseIcsOptions): Ex
     if (rule.freq === 'MONTHLY') {
         const eventTime = { h: event.start.getHours(), m: event.start.getMinutes(), s: event.start.getSeconds(), ms: event.start.getMilliseconds() };
 
-        let monthCursor = new Date(event.start.getFullYear(), event.start.getMonth(), 1, 0, 0, 0, 0);
+        let monthCursor = new Fecha(event.start.getFullYear(), event.start.getMonth(), 1, 0, 0, 0, 0);
         if (monthCursor.getTime() < windowStart.getTime()) {
             const approxMonths = (windowStart.getFullYear() - monthCursor.getFullYear()) * 12 + (windowStart.getMonth() - monthCursor.getMonth());
             const jumps = Math.floor(approxMonths / rule.interval);
@@ -756,7 +756,7 @@ export function parseIcsWithMetadata(input: string, options: ParseIcsOptions): P
     let currentDurationMs: number | null = null;
     let calendarColorRfc: string | undefined;
     let calendarColorApple: string | undefined;
-    // Every BEGIN:/END: nesting, not just VEVENT, so a calendar-level
+    // Cada BEGIN:/END: nesting, not just VEVENT, so a calendar-level
     // property can be told apart from the same property name inside a
     // nested component (VTODO, VJOURNAL, VTIMEZONE, ...).
     const componentStack: string[] = [];
@@ -791,11 +791,11 @@ export function parseIcsWithMetadata(input: string, options: ParseIcsOptions): P
                 const allDay = Boolean(current.allDay);
                 let end = current.end;
                 if (!end && currentDurationMs !== null) {
-                    end = new Date(current.start.getTime() + currentDurationMs);
+                    end = new Fecha(current.start.getTime() + currentDurationMs);
                 }
                 if (!end) {
                     // Reasonable defaults.
-                    end = allDay ? addDays(current.start, 1) : new Date(current.start.getTime() + 60 * 60 * 1000);
+                    end = allDay ? addDays(current.start, 1) : new Fecha(current.start.getTime() + 60 * 60 * 1000);
                 }
 
                 events.push({
@@ -820,7 +820,7 @@ export function parseIcsWithMetadata(input: string, options: ParseIcsOptions): P
             // Calendar-level properties (COLOR, X-APPLE-CALENDAR-COLOR) only
             // count directly inside VCALENDAR — not inside VTODO, VJOURNAL,
             // VTIMEZONE, or any other nested component, which may carry a
-            // same-named property with an unrelated meaning. First value of
+            // same-named property with an unrelated meaning. Primero value of
             // each wins; Apple's hex is preferred over the RFC 7986
             // name-table approximation below.
             const directlyInVcalendar = componentStack.length === 1 && componentStack[0] === 'VCALENDAR';
@@ -882,7 +882,7 @@ export function parseIcsWithMetadata(input: string, options: ParseIcsOptions): P
     );
     const splitByCategory = categories.size > 0 && categories.size <= MAX_CATEGORY_CALENDARS;
 
-    // First color seen for a category wins, so paging months can't change it.
+    // Primero color seen for a category wins, so paging months can't change it.
     const categoryColors: Record<string, string> = {};
     if (splitByCategory) {
         for (const event of events) {

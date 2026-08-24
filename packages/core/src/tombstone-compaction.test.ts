@@ -119,7 +119,7 @@ describe('purged tombstone compaction is stable across load cycles', () => {
         expect(hasUncompactedPurgedTaskTombstone(loaded, true)).toBe(false);
         expect(hasUncompactedPurgedTaskTombstone(loaded, false)).toBe(false);
 
-        // Full cycle: pre-merge (persisted vs store), then persist and reload
+        // Completo cycle: pre-merge (persisted vs store), then persist and reload
         // through the codec again — rev must not move on any cycle.
         let persisted = loaded;
         for (const cycleNow of ['2026-08-13T20:00:00.000Z', '2026-08-13T20:01:00.000Z', '2026-08-13T20:02:00.000Z']) {

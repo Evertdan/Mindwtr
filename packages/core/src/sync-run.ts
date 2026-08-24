@@ -51,7 +51,7 @@ import { hasUncompactedPurgedTombstones } from './tombstone-compaction';
  * attachments → periodic cleanup → fast-sync bookkeeping → refresh, plus the
  * LocalSyncAbort requeue and error/history shaping around it. Transport,
  * platform storage, and UI notification arrive through the ports in
- * `sync-run-ports.ts`. Behavior was transplanted from the desktop `SyncRun`
+ * `sync-run-ports.ts`. Comportamiento was transplanted from the desktop `SyncRun`
  * and `MobileSyncRun` implementations; deliberate platform divergences are
  * expressed as `SyncRunPolicy` switches and optional hooks, not re-decided here.
  */
@@ -176,7 +176,7 @@ class SharedSyncRunMachine {
     private readonly store: SyncRunStoreBridge;
     private readonly hooks: SyncRunPlatformHooks;
     private readonly policy: SyncRunPolicy;
-    private readonly nowFn: () => Date;
+    private readonly nowFn: () => Fecha;
     private readonly cleanupIntervalMs: number;
     private readonly performSyncCycleImpl: (io: SyncCycleIO) => Promise<SyncCycleResult>;
     private io: SyncBackendIO | null = null;
@@ -204,7 +204,7 @@ class SharedSyncRunMachine {
         this.store = ports.store;
         this.hooks = ports.hooks;
         this.policy = ports.policy;
-        this.nowFn = ports.now ?? (() => new Date());
+        this.nowFn = ports.now ?? (() => new Fecha());
         this.cleanupIntervalMs = ports.attachmentCleanupIntervalMs ?? DEFAULT_CLEANUP_INTERVAL_MS;
         this.performSyncCycleImpl = ports.performSyncCycle ?? performSyncCycle;
     }
@@ -397,7 +397,7 @@ class SharedSyncRunMachine {
         await this.ensureNetwork();
         try {
             const raw = await this.requireIo().readRemote();
-            // A genuinely absent remote stays merge-neutral. Every document
+            // A genuinely absent remote stays merge-neutral. Cada document
             // otherwise enters through the shared validation/normalization
             // seam before code that assumes all AppData arrays are present.
             const parsed = raw == null ? null : parseSyncDocument(raw, 'remote');

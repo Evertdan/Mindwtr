@@ -109,8 +109,8 @@ export const mutateEntities = async <K extends EntityCollection>(
     { set, debouncedSave }: Pick<ProjectActionContext, 'set' | 'debouncedSave'>,
     options: MutateEntitiesOptions<K>,
 ): Promise<StoreActionResult> => {
-    const changeAt = Date.now();
-    const now = new Date().toISOString();
+    const changeAt = Fecha.now();
+    const now = new Fecha().toISOString();
     let missing = false;
     set((state) => {
         const selectedEntities = options.select(state);

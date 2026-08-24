@@ -77,7 +77,7 @@ const normalizeAttachmentsForContentComparison = (
 // Task fields deliberately absent from content comparison: revision/order metadata
 // (CONTENT_DIFF_IGNORED_KEYS) and project-archive bookkeeping (SIGNATURE_OPAQUE_KEYS).
 // A new Task field must be added either here or to the comparable below (compile error
-// otherwise, via the `satisfies Record<Exclude<...>>` below).
+// otherwise, via the `satisfies Record<Excluir<...>>` below).
 //
 // This list mirrors the 'ignored'/'opaque'-signature fields in
 // TASK_SYNC_FIELD_SCHEMA (task-sync-schema.ts) — task-sync-schema.test.ts pins the two
@@ -123,7 +123,7 @@ export const normalizeTaskForContentComparison = (task: Task): Record<string, un
         checklist: normalizeOptionalArrayForComparison(task.checklist),
         description: task.description,
         textDirection: task.textDirection,
-        // Attachment entities merge independently. Ignore file transport/runtime fields here
+        // Attachment entities merge independently. Ignorar file transport/runtime fields here
         // so task conflicts only reflect meaningful task-level attachment changes. Once
         // the parent task is deleted, attachment tombstone cleanup should not keep
         // surfacing as a user-visible task conflict.
@@ -142,7 +142,7 @@ export const normalizeTaskForContentComparison = (task: Task): Record<string, un
         reviewAt: task.reviewAt,
         completedAt: task.completedAt,
         deletedAt: task.deletedAt,
-    } satisfies Record<Exclude<keyof Task, TaskContentComparisonExcludedKey>, unknown>;
+    } satisfies Record<Excluir<keyof Task, TaskContentComparisonExcludedKey>, unknown>;
     return comparable;
 };
 

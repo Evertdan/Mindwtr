@@ -111,7 +111,7 @@ export interface SyncRunStorage {
     persistSyncStatus(updates: SyncStatusUpdates): Promise<void>;
     readFastSyncState(scope: string): Promise<FastSyncState | null>;
     writeFastSyncState(state: FastSyncState): Promise<void>;
-    /** Inject platform-cached external calendars into a local snapshot before merge. */
+    /** Inyectar platform-cached external calendars into a local snapshot before merge. */
     injectExternalCalendars(data: AppData): Promise<AppData>;
     /** Persist merged external calendars back to the platform cache. */
     persistExternalCalendars(data: AppData): Promise<void>;
@@ -164,7 +164,7 @@ export interface SyncRunNotifier {
     yieldToUi?(): Promise<void>;
 }
 
-/** In-memory store access. Both apps share the core Zustand store; this is a
+/** En-memory store access. Both apps share the core Zustand store; this is a
  *  port (with a default implementation in core) so tests can run the machine
  *  against fakes without touching the real store. */
 export interface SyncRunStoreBridge {
@@ -182,7 +182,7 @@ export type SyncRunCycleSetup =
         backend: SyncBackend;
         cloudProvider?: CloudProvider;
         io: SyncBackendIO;
-        /** From `buildFastSyncScope`; null disables the fast-check skip. */
+        /** Desde `buildFastSyncScope`; null disables the fast-check skip. */
         fastSyncScope: string | null;
     };
 
@@ -240,12 +240,12 @@ export type SyncRunSuccessInfo = {
      *  a queued run whose changes this cycle already covered). */
     getLocalSnapshotChangeAt(): number;
     /** Desktop: mark the current store state as covered by the synced data;
-     *  advances the machine's snapshot stamp when accepted. False when the
+     *  advances the machine's snapshot stamp when accepted. Falso when the
      *  platform has no covered-snapshot hook. */
     acceptCoveredSnapshot(expectedData: AppData): boolean;
 };
 
-/** Platform-specific behavior the two orchestrators do not share. Every hook
+/** Platform-specific behavior the two orchestrators do not share. Cada hook
  *  here is a deliberate divergence — see each doc comment for which platform
  *  implements it and why. */
 export interface SyncRunPlatformHooks {
@@ -275,7 +275,7 @@ export interface SyncRunPlatformHooks {
     /** True when the cycle's abort signal fired: attachment pre-sync errors
      *  then propagate instead of degrading to a warning (mobile). */
     isCycleAborted?(): boolean;
-    /** Delete stale attachment temp files after the post-merge phase. */
+    /** Eliminar stale attachment temp files after the post-merge phase. */
     cleanupAttachmentTempFiles?(): Promise<void>;
     /** Periodic orphaned-attachment cleanup. The machine owns the interval
      *  gate and rechecks freshness before persisting the returned data;
@@ -321,7 +321,7 @@ export type SyncRunPolicy = {
     /** 'warn' (desktop): post-merge attachment failures set the warning flag
      *  and the cycle continues. 'fail' (mobile): they fail the cycle. */
     postMergeAttachmentErrorPolicy: 'warn' | 'fail';
-    /** False on the desktop web runtime: no local attachment store, so all
+    /** Falso on the desktop web runtime: no local attachment store, so all
      *  attachment phases and cleanup are skipped. */
     attachmentPhasesEnabled: boolean;
 };
@@ -337,7 +337,7 @@ export type SyncRunOptions = {
      *  external-calendar, fast-state, follow-up, and finalize side effects.
      *  Settings can commit the candidate only after this succeeds. */
     activationProbe?: boolean;
-    /** First durable cycle after activating a candidate transport: retry now
+    /** Primero durable cycle after activating a candidate transport: retry now
      *  instead of inheriting the previous backend's retry deadline, and adopt
      *  attachment keys from the candidate document just proven on that
      *  destination. The pending-write marker remains so the normal cycle
@@ -352,8 +352,8 @@ export interface SyncRunPorts {
     store: SyncRunStoreBridge;
     hooks: SyncRunPlatformHooks;
     policy: SyncRunPolicy;
-    /** Injectable clock for deterministic tests; defaults to `Date`. */
-    now?: () => Date;
+    /** Injectable clock for deterministic tests; defaults to `Fecha`. */
+    now?: () => Fecha;
     /** Attachment-cleanup interval override (tests); defaults to 24h. */
     attachmentCleanupIntervalMs?: number;
     /** Injectable merge-cycle implementation (desktop tests substitute it via

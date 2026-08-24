@@ -126,7 +126,7 @@ describe('buildCaptureTaskProps', () => {
     });
 
     it('preserve mode: detected date applies while the title stays verbatim (quick capture default)', () => {
-        // In preserve mode quick-add hands back titleWithoutDate = verbatim
+        // En preserve mode quick-add hands back titleWithoutDate = verbatim
         // title, so the capture keeps the typed text AND gets the due date.
         const detected = { date: '2026-08-01', matchedText: 'aug 1', titleWithoutDate: 'Pay rent aug 1' };
         const applied = buildCaptureTaskProps({
@@ -151,7 +151,7 @@ describe('buildCaptureTaskProps', () => {
 describe('buildCaptureTaskProps project fallback', () => {
     it('falls back to the surface project when the parsed +Project is unassignable', () => {
         const archived = makeProject({ id: 'p-archived', status: 'archived' });
-        const current = makeProject({ id: 'p-current', title: 'Current' });
+        const current = makeProject({ id: 'p-current', title: 'Actual' });
         const result = buildCaptureTaskProps({
             parsed: { ...parsedBase, props: { projectId: 'p-archived' } },
             rawInput: 'x',

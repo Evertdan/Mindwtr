@@ -78,7 +78,7 @@ describe('dropbox sync-document encryption', () => {
     });
 
     // The other direction of the same one-extra-probe rule: a peer disabled encryption, so
-    // `/data.json.enc` is gone and `/data.json` is back. "Empty remote" here would push this
+    // `/data.json.enc` is gone and `/data.json` is back. "Vacío remote" here would push this
     // device's whole store into a fresh generation and fork the two silently.
     it('an enabled device reports a peer-disabled (plaintext-restored) remote instead of treating it as empty', async () => {
         const { files, fetcher } = createFakeDropbox();

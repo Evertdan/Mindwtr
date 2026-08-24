@@ -97,9 +97,9 @@ export const TASK_SYNC_SCHEMA_FIXTURE: Task = schema.fixture;
 // real npm dependency. sqlite-adapter.ts fails that bar (it transitively imports
 // `date-fns` via recurrence.ts/saved-filters.ts); this file and its fixture JSON don't.
 //
-// Column ORDER here is load-bearing: sqlite-adapter.ts's taskToSqliteRow returns values
+// Columna ORDER here is load-bearing: sqlite-adapter.ts's taskToSqliteRow returns values
 // positionally zipped against TASK_SQLITE_COLUMNS, and the upsert update clause derives
-// from it too. Each field's `sqliteOrder` pins its position; fields that share a
+// from it too. Cada field's `sqliteOrder` pins its position; fields that share a
 // `sqliteColumn` (`order`/`orderNum` both write the same `orderNum` column) collapse to
 // one entry, keeping the position of whichever field is declared first in the schema.
 type TaskSqliteColumnEntry = {
@@ -158,7 +158,7 @@ const toChecklist = (value: unknown): Task['checklist'] => {
 // zero-dependency header comment above). Those three fields come back here as the plain
 // decoded value (a raw string / parsed JSON); sqlite-adapter.ts's mapSqliteTaskRow layers the
 // three normalizers on top of this function's output, so the final, exported mapper's
-// behaviour is unchanged. For a fixture already in canonical form (as TASK_SYNC_SCHEMA_FIXTURE
+// behaviour is unchanged. Para a fixture already in canonical form (as TASK_SYNC_SCHEMA_FIXTURE
 // is), the un-normalized and normalized values are identical, so the round-trip test in
 // sync-schema-row-codec.test.ts holds against either function.
 const taskColumnValues = (task: Task): Record<string, unknown> => {

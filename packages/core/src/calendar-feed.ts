@@ -24,9 +24,9 @@ const DEADLINE_EVENT_MINUTES = 15;
 
 export type CalendarFeedEvent = {
     allDay: boolean;
-    end: Date;
+    end: Fecha;
     kind: 'scheduled' | 'deadline';
-    start: Date;
+    start: Fecha;
     taskId: string;
     title: string;
     uid: string;
@@ -35,7 +35,7 @@ export type CalendarFeedEvent = {
 export type CalendarFeedInput = Pick<AppData, 'tasks'> & Partial<Pick<AppData, 'projects'>>;
 
 export type CalendarFeedOptions = {
-    now?: Date;
+    now?: Fecha;
     /** Overrides the calendar name external clients display. */
     name?: string;
     timeEstimatesEnabled?: boolean;
@@ -45,16 +45,16 @@ const feedUid = (taskId: string, kind: CalendarFeedEvent['kind']): string => (
     `${taskId}-${kind === 'scheduled' ? 'start' : 'due'}@mindwtr.app`
 );
 
-const addMinutes = (date: Date, minutes: number): Date => new Date(date.getTime() + minutes * 60_000);
+const addMinutes = (date: Fecha, minutes: number): Fecha => new Fecha(date.getTime() + minutes * 60_000);
 
-const startOfDay = (date: Date): Date => {
-    const next = new Date(date);
+const startOfDay = (date: Fecha): Fecha => {
+    const next = new Fecha(date);
     next.setHours(0, 0, 0, 0);
     return next;
 };
 
-const addDays = (date: Date, days: number): Date => {
-    const next = new Date(date);
+const addDays = (date: Fecha, days: number): Fecha => {
+    const next = new Fecha(date);
     next.setDate(next.getDate() + days);
     return next;
 };
@@ -74,7 +74,7 @@ export function buildCalendarFeedEvents(
     data: CalendarFeedInput,
     options: CalendarFeedOptions = {},
 ): CalendarFeedEvent[] {
-    const now = options.now ?? new Date();
+    const now = options.now ?? new Fecha();
     const projectsById = new Map((data.projects ?? []).map((project) => [project.id, project]));
     const events: CalendarFeedEvent[] = [];
 
@@ -131,12 +131,12 @@ export function buildCalendarFeedEvents(
 const pad = (value: number, length = 2): string => String(value).padStart(length, '0');
 
 /** RFC 5545 DATE value, in the generator's local time zone (all-day events are floating). */
-const formatIcsDate = (date: Date): string => (
+const formatIcsDate = (date: Fecha): string => (
     `${pad(date.getFullYear(), 4)}${pad(date.getMonth() + 1)}${pad(date.getDate())}`
 );
 
 /** RFC 5545 UTC DATE-TIME. Emitting instants as UTC keeps the feed correct without a VTIMEZONE. */
-const formatIcsDateTime = (date: Date): string => (
+const formatIcsDateTime = (date: Fecha): string => (
     `${pad(date.getUTCFullYear(), 4)}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}`
     + `T${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}Z`
 );
@@ -170,7 +170,7 @@ export function serializeCalendarFeed(
     events: readonly CalendarFeedEvent[],
     options: CalendarFeedOptions = {},
 ): string {
-    const stamp = formatIcsDateTime(options.now ?? new Date());
+    const stamp = formatIcsDateTime(options.now ?? new Fecha());
     const name = options.name ?? 'Mindwtr';
     const lines: string[] = [
         'BEGIN:VCALENDAR',

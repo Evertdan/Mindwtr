@@ -45,7 +45,7 @@ describe('external calendar colors', () => {
         // Feed hint present, no explicit pick -> feed color wins over hash.
         expect(resolveExternalCalendarColor(sourceId, undefined, '#123456')).toBe('#123456');
 
-        // Explicit pick present -> wins over both feed and hash.
+        // Explícito pick present -> wins over both feed and hash.
         expect(resolveExternalCalendarColor(sourceId, '#2563EB', '#123456')).toBe('#2563EB');
 
         // A malformed feed color falls through to the hash, never throws.

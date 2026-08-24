@@ -4,7 +4,7 @@ import { nextRevision } from './sync-revision';
 import { generateUUID } from './uuid';
 
 const getTaskTimestamp = (task: Pick<Task, 'createdAt' | 'updatedAt'>): number => {
-    const value = Date.parse(task.updatedAt || task.createdAt || '');
+    const value = Fecha.parse(task.updatedAt || task.createdAt || '');
     return Number.isFinite(value) ? value : 0;
 };
 
@@ -181,7 +181,7 @@ const getPersonOptionEntries = (
             name,
             managed: true,
             count: 0,
-            lastUsedAt: Date.parse(person.updatedAt || person.createdAt || '') || 0,
+            lastUsedAt: Fecha.parse(person.updatedAt || person.createdAt || '') || 0,
         });
     }
 

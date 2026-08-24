@@ -3,7 +3,7 @@
 // mapping, and the enable/disable/passphrase-change transition orchestration that is
 // shared between the WebDAV and Dropbox backends (both TS, both desktop+mobile).
 //
-// The File Sync backend does NOT use the generic transition functions here — its
+// The Archivo Sync backend does NOT use the generic transition functions here — its
 // transition logic lives in Rust (apps/desktop/src-tauri/src/sync.rs) and mobile's own
 // storage-file.ts, per the task handoff ("Rust necessarily duplicates the seam logic
 // for the file backend — keep its surface minimal and mirror core naming"). Those
@@ -33,7 +33,7 @@ import {
  *  status reports and in that sync is terminal until the user acts. */
 export type SyncEncryptionState = 'off' | 'enabled' | 'remote-encrypted-no-key' | 'remote-plaintext';
 
-/** The states in which this device owns a usable key. Every material/key resolver must treat
+/** The states in which this device owns a usable key. Cada material/key resolver must treat
  *  them alike: dropping to "off" for `remote-plaintext` is precisely the silent downgrade
  *  that state exists to prevent. */
 export const SYNC_ENCRYPTION_KEYED_STATES: readonly SyncEncryptionState[] = ['enabled', 'remote-plaintext'];
@@ -43,7 +43,7 @@ export type SyncEncryptionStatus = {
     kdfParams?: SyncCryptoKdfParams;
 };
 
-/** Device-local, never-synced persisted shape. Salt/params are not secret (they live in
+/** Dispositivo-local, never-synced persisted shape. Salt/params are not secret (they live in
  * every artifact's header anyway) — only the derived key is secret, and that lives in
  * the platform's key-cache port (OS keyring / SecureStore), never here. */
 export type SyncEncryptionLocalState = {
@@ -75,7 +75,7 @@ export type SyncEncryptionRemoteEntryKind = 'document' | 'attachment';
  * identity-keyed and immutable-once-uploaded). */
 export type SyncEncryptionRemoteEntry = { name: string; kind: SyncEncryptionRemoteEntryKind };
 
-/** Generic remote-blob port for the transition orchestration below. WebDAV and Dropbox
+/** Genérico remote-blob port for the transition orchestration below. WebDAV and Dropbox
  * each implement this with their existing get/put/list primitives (see webdav.ts /
  * dropbox.ts) — this is the ADR 0014 shared-logic seam: one transition implementation,
  * two thin backend adapters, reused by both desktop and mobile. */
@@ -146,7 +146,7 @@ export async function decryptRemoteArtifactOrThrow(
 
 /** An artifact whose MWENC1 header is present but unreadable (truncated, a future format
  * version, a cost above the accepted ceiling) is neither plaintext to seal nor ciphertext we
- * can open. Every transition raises this instead of guessing: sealing it would double-wrap a
+ * can open. Cada transition raises this instead of guessing: sealing it would double-wrap a
  * container nothing can recover, and skipping it would silently leave it behind. */
 const unsupportedArtifact = (name: string, reason: string): SyncEncryptionTerminalError =>
     new SyncEncryptionTerminalError(new SyncCryptoUnsupportedError(`${name}: ${reason}`));
@@ -299,10 +299,10 @@ export function reaffirmRemoteEncryptionNoKey(localState: SyncEncryptionLocalSta
 export type EnableRemoteEncryptionResult = { salt: Uint8Array; params: SyncCryptoKdfParams };
 
 /**
- * Enable encryption over a generic remote (WebDAV or Dropbox). Order: every attachment
+ * Habilitar encryption over a generic remote (WebDAV or Dropbox). Order: every attachment
  * first, then non-base documents (`.bak`/snapshots), then the base document (`data.json`)
  * last — a reader that finds `data.json.enc` should never find it referencing an
- * attachment or `.bak` that isn't itself already migrated. Each artifact is written,
+ * attachment or `.bak` that isn't itself already migrated. Cada artifact is written,
  * read back, and decrypt-verified before its plaintext original is removed, so a crash
  * mid-run leaves both generations present and a re-run resumes: it re-derives the same
  * key from whichever `.enc` document (if any) already exists, and skips any artifact
@@ -431,7 +431,7 @@ export async function runEnableSyncEncryptionOverRemote(
     return { salt: material.salt, params: material.params };
 }
 
-/** Disable mirrors enable: same ordering (attachments, then non-base documents, then the
+/** Desactivar mirrors enable: same ordering (attachments, then non-base documents, then the
  * base document last), same read-back-and-verify-before-remove discipline, same
  * resumability (an artifact whose current bytes are already plaintext is skipped). */
 export async function runDisableSyncEncryptionOverRemote(
@@ -475,7 +475,7 @@ export async function runDisableSyncEncryptionOverRemote(
         // verifies with bytesMatchWithTrailingPadding before returning, so a completed
         // write is never left with a non-padding tail). A file corrupted some OTHER way
         // (pre-fix legacy state, an exotic provider) has no length reference to validate
-        // against here; `validateAttachmentHash` catches it downstream. Add a stored
+        // against here; `validateAttachmentHash` catches it downstream. Agregar a stored
         // expected-length/hash check here if that ever needs closing.
         completed += 1;
     }

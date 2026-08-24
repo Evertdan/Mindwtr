@@ -37,7 +37,7 @@ function parseComparator(value: string): { comparator: SearchComparator | null; 
     return { comparator: match[1] as SearchComparator, rest: match[2].trim() };
 }
 
-function parseRelativeDate(expr: string, now: Date): Date | null {
+function parseRelativeDate(expr: string, now: Fecha): Fecha | null {
     const raw = expr.trim().toLowerCase();
     if (raw === 'today') return startOfDay(now);
     if (raw === 'tomorrow') return startOfDay(addDays(now, 1));
@@ -54,13 +54,13 @@ function parseRelativeDate(expr: string, now: Date): Date | null {
 
     if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
         const parsed = parseISO(raw);
-        return parsed.toString() !== 'Invalid Date' ? parsed : null;
+        return parsed.toString() !== 'Invalid Fecha' ? parsed : null;
     }
 
     return null;
 }
 
-function compareDates(date: Date, comparator: SearchComparator, target: Date): boolean {
+function compareDates(date: Fecha, comparator: SearchComparator, target: Fecha): boolean {
     switch (comparator) {
         case '<':
             return isBefore(date, target);
@@ -147,7 +147,7 @@ function normalizeContext(value: string): string {
     return normalizePrefixedToken(value, '@');
 }
 
-function matchDateField(dateStr: string | undefined, comparator: SearchComparator | null, value: string, now: Date): boolean {
+function matchDateField(dateStr: string | undefined, comparator: SearchComparator | null, value: string, now: Fecha): boolean {
     if (!dateStr) return false;
     const date = safeParseDate(dateStr);
     if (!date) return false;
@@ -158,7 +158,7 @@ function matchDateField(dateStr: string | undefined, comparator: SearchComparato
     if (!target) return false;
 
     if (effectiveComparator === '=') {
-        // Compare on day granularity.
+        // Comparar on day granularity.
         const start = startOfDay(target);
         const end = endOfDay(target);
         return (isAfter(date, start) || isEqual(date, start)) && (isBefore(date, end) || isEqual(date, end));
@@ -167,7 +167,7 @@ function matchDateField(dateStr: string | undefined, comparator: SearchComparato
     return compareDates(date, effectiveComparator, target);
 }
 
-function matchDueDateField(dateStr: string | undefined, comparator: SearchComparator | null, value: string, now: Date): boolean {
+function matchDueDateField(dateStr: string | undefined, comparator: SearchComparator | null, value: string, now: Fecha): boolean {
     if (!dateStr) return false;
     const date = safeParseDueDate(dateStr);
     if (!date) return false;
@@ -186,7 +186,7 @@ function matchDueDateField(dateStr: string | undefined, comparator: SearchCompar
     return compareDates(date, effectiveComparator, target);
 }
 
-export function matchesTask(term: SearchTerm, task: Task, projectById: Map<string, Project> | null, now: Date): boolean {
+export function matchesTask(term: SearchTerm, task: Task, projectById: Map<string, Project> | null, now: Fecha): boolean {
     if (task.deletedAt) return false;
 
     const field = term.field;
@@ -238,7 +238,7 @@ export function matchesTask(term: SearchTerm, task: Task, projectById: Map<strin
     return term.negated ? !result : result;
 }
 
-export function matchesProject(term: SearchTerm, project: Project, now: Date): boolean {
+export function matchesProject(term: SearchTerm, project: Project, now: Fecha): boolean {
     if (project.deletedAt) return false;
 
     const field = term.field;
@@ -260,7 +260,7 @@ export function matchesProject(term: SearchTerm, project: Project, now: Date): b
     return term.negated ? !result : result;
 }
 
-export function filterTasksBySearch(tasks: Task[], projects: Project[], query: string, now: Date = new Date()): Task[] {
+export function filterTasksBySearch(tasks: Task[], projects: Project[], query: string, now: Fecha = new Fecha()): Task[] {
     if (!query.trim()) {
         return tasks.filter((task) => !task.deletedAt);
     }
@@ -281,7 +281,7 @@ export function filterTasksBySearch(tasks: Task[], projects: Project[], query: s
     });
 }
 
-export function filterProjectsBySearch(projects: Project[], query: string, now: Date = new Date()): Project[] {
+export function filterProjectsBySearch(projects: Project[], query: string, now: Fecha = new Fecha()): Project[] {
     if (!query.trim()) {
         return projects.filter((project) => !project.deletedAt);
     }
@@ -296,7 +296,7 @@ export function filterProjectsBySearch(projects: Project[], query: string, now: 
     });
 }
 
-export function searchAll(tasks: Task[], projects: Project[], query: string, now: Date = new Date()): SearchResults {
+export function searchAll(tasks: Task[], projects: Project[], query: string, now: Fecha = new Fecha()): SearchResults {
     const matchedProjects = filterProjectsBySearch(projects, query, now);
     const matchedTasks = filterTasksBySearch(tasks, projects, query, now);
     const limited = matchedProjects.length > SEARCH_RESULT_LIMIT || matchedTasks.length > SEARCH_RESULT_LIMIT;

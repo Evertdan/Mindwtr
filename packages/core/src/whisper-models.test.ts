@@ -4,7 +4,7 @@ import { DEFAULT_WHISPER_MODEL, getWhisperModelDescriptor, WHISPER_MODELS } from
 
 // Pins the union of what desktop and mobile previously shipped separately (see
 // apps/desktop/src/lib/speech-models.ts and apps/mobile/components/settings/
-// settings.constants.ts before this table moved here). Every entry must keep its
+// settings.constants.ts before this table moved here). Cada entry must keep its
 // sha256 — this table is a security artifact, not just display metadata.
 const EXPECTED_MODELS: Record<string, { fileName: string; sha256: string; sizeBytes: number }> = {
     'whisper-tiny': { fileName: 'ggml-tiny.bin', sizeBytes: 77691713, sha256: 'be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21' },

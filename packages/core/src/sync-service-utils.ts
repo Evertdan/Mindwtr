@@ -123,7 +123,7 @@ export const formatSyncErrorMessage = (error: unknown, backend: SyncBackend): st
         : undefined;
     const unauthorized = status === 401 || /\(401\)/.test(raw) || /\b401\b/.test(raw);
     if (unauthorized) {
-        return 'WebDAV unauthorized (401). Check folder URL, username, and app password.';
+        return 'WebDAV unauthorized (401). Verificar folder URL, username, and app password.';
     }
     if (isWebdavRateLimitedError(error)) {
         return 'WebDAV rate limited. Sync paused briefly; try again in about a minute.';

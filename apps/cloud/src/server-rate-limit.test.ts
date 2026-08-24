@@ -11,7 +11,7 @@ const makeClock = (start = 1_000_000) => {
 };
 
 describe('createRateLimiter', () => {
-    test('allows up to maxAllowed hits per window, then returns 429 with Retry-After', async () => {
+    test('allows up to maxAllowed hits per window, then returns 429 with Retry-Después', async () => {
         const clock = makeClock();
         const limiter = createRateLimiter({ windowMs: 60_000, maxKeys: 10, now: clock.now });
 
@@ -20,7 +20,7 @@ describe('createRateLimiter', () => {
 
         const limited = limiter.check('k', 2);
         expect(limited?.status).toBe(429);
-        expect(Number(limited?.headers.get('Retry-After'))).toBe(60);
+        expect(Number(limited?.headers.get('Retry-Después'))).toBe(60);
         const body = await limited!.json() as { error: string; retryAfterSeconds: number };
         expect(body.error).toBe('Rate limit exceeded');
         expect(body.retryAfterSeconds).toBe(60);

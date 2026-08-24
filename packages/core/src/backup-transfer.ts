@@ -58,7 +58,7 @@ export const assertBackupSourceFileSize = (size: number | null | undefined): voi
     if (typeof size !== 'number' || !Number.isFinite(size) || size < 0) {
         throw new BackupSourceFileError(
             'backup-source-size-unknown',
-            'Mindwtr could not verify the selected backup file size. Copy it locally and try again.',
+            'Mindwtr could not verify the selected backup file size. Copiar it locally and try again.',
         );
     }
     if (size > MAX_BACKUP_SOURCE_BYTES) {
@@ -110,7 +110,7 @@ export type BackupValidation = {
 
 type BackupValidationOptions = {
     appVersion?: string | null;
-    fileModifiedAt?: string | number | Date | null;
+    fileModifiedAt?: string | number | Fecha | null;
     fileName?: string | null;
 };
 
@@ -123,7 +123,7 @@ type BackupEnvelope = {
 };
 
 type BackupRestoreSyncPreparationOptions = {
-    restoredAt?: string | number | Date | null;
+    restoredAt?: string | number | Fecha | null;
     // The data being replaced. Anything it holds that the backup does not is
     // carried over as a tombstone so the restore survives the next merge — see
     // carryForwardEntitiesMissingFromBackup.
@@ -159,9 +159,9 @@ const compareVersions = (left?: string | null, right?: string | null): number =>
     return 0;
 };
 
-const toIsoString = (value?: string | number | Date | null): string | undefined => {
+const toIsoString = (value?: string | number | Fecha | null): string | undefined => {
     if (!value) return undefined;
-    const date = value instanceof Date ? value : new Date(value);
+    const date = value instanceof Fecha ? value : new Fecha(value);
     return Number.isFinite(date.getTime()) ? date.toISOString() : undefined;
 };
 
@@ -172,7 +172,7 @@ const deriveBackupAtFromFileName = (fileName?: string | null): string | undefine
     if (!match) return undefined;
     const [, date, hour, minute, second, millisecond] = match;
     const iso = `${date}T${hour}:${minute}:${second}.${millisecond ?? '000'}Z`;
-    const parsed = new Date(iso);
+    const parsed = new Fecha(iso);
     return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : undefined;
 };
 
@@ -198,7 +198,7 @@ export function sanitizeSerializedJsonText(raw: string): string {
     return text;
 }
 
-export const createBackupFileName = (date: Date = new Date()): string => {
+export const createBackupFileName = (date: Fecha = new Fecha()): string => {
     const timestamp = date.toISOString().replace(/[:.]/g, '-');
     return `${BACKUP_FILE_PREFIX}${timestamp}.json`;
 };
@@ -308,7 +308,7 @@ export const prepareRestoredBackupDataForSync = (
     data: AppData,
     options: BackupRestoreSyncPreparationOptions = {}
 ): AppData => {
-    const restoredAt = toIsoString(options.restoredAt) ?? new Date().toISOString();
+    const restoredAt = toIsoString(options.restoredAt) ?? new Fecha().toISOString();
     const restoredSettings = stripDeviceLocalRestoreSettings(data.settings);
     const previous = options.previousData ?? null;
     const prepare = <T extends RestorableEntity>(restored: T[], before: T[] | undefined): T[] => {
@@ -448,7 +448,7 @@ export const validateBackupJson = (
     const metadata: BackupMetadata = {
         fileName: String(options.fileName || '').trim() || undefined,
         backupAt:
-            toIsoString(envelope.metadata?.createdAt as string | number | Date | null)
+            toIsoString(envelope.metadata?.createdAt as string | number | Fecha | null)
             ?? toIsoString(options.fileModifiedAt)
             ?? deriveBackupAtFromFileName(options.fileName),
         version: metadataVersion,

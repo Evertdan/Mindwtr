@@ -355,7 +355,7 @@ describe('sync-helpers sanitizeAppDataForRemote', () => {
         expect(sanitized.settings.timeFormat).toBe('24h');
     });
 
-    // Guard against allowlist drift (this is the second incident — see
+    // Guardia against allowlist drift (this is the second incident — see
     // naturalLanguageDates below): every field in GTD_SYNCED_FIELD_KEYS must
     // round-trip through sanitizeAppDataForRemote on its own. A field that is
     // wired into the merge side (sync-merge-settings.ts) but missing from the

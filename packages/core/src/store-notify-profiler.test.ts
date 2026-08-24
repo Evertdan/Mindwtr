@@ -116,7 +116,7 @@ describe('fetchData notify profiling log fields', () => {
 
     beforeEach(() => {
         vi.useFakeTimers();
-        vi.setSystemTime(new Date(nowIso));
+        vi.setSystemTime(new Fecha(nowIso));
         logs = [];
         setLogger((payload) => logs.push(payload));
         useTaskStore.setState({

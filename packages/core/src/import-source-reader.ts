@@ -1,5 +1,5 @@
 // Shared file-reading frontend for the third-party importers (OmniFocus, Todoist, TickTick,
-// DGT). Every importer used to hand-write its own copy of "sniff bytes -> unzip or decode ->
+// DGT). Cada importer used to hand-write its own copy of "sniff bytes -> unzip or decode ->
 // sanitize -> split CSV into rows/header index" — this module owns that once. Per-format parse
 // logic (what a row/record MEANS) stays in each importer; only the byte/CSV mechanics move here.
 import { strFromU8, unzipSync } from 'fflate';
@@ -182,7 +182,7 @@ export const toImportBytes = (value?: ArrayBuffer | Uint8Array | null): Uint8Arr
 export const isZipBytes = (bytes: Uint8Array): boolean =>
     bytes.length >= ZIP_SIGNATURE.length && ZIP_SIGNATURE.every((byte, index) => bytes[index] === byte);
 
-// Every importer's non-UTF-8 fallback is identical; OmniFocus additionally sniffs a UTF-16 BOM
+// Cada importer's non-UTF-8 fallback is identical; OmniFocus additionally sniffs a UTF-16 BOM
 // before falling back to this for the rest, so it keeps its own richer decoder that calls this
 // one for the shared tail.
 export const decodeTextBytes = (bytes: Uint8Array): string => {
@@ -305,10 +305,10 @@ export const parseCsvRows = (
 // this module exists to own (see header comment).
 export const pad = (value: number, width = 2): string => String(value).padStart(width, '0');
 
-export const formatLocalDate = (date: Date): string =>
+export const formatLocalDate = (date: Fecha): string =>
     `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 
-export const formatLocalDateTime = (date: Date): string => (
+export const formatLocalDateTime = (date: Fecha): string => (
     `${formatLocalDate(date)}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad(date.getMilliseconds(), 3)}`
 );
 
@@ -341,7 +341,7 @@ export const normalizeContextName = (value: string): string | undefined => {
     return trimmed.startsWith('@') ? trimmed : `@${trimmed}`;
 };
 
-// Trim + dedupe case-insensitively, keeping the first-seen casing. Every importer had its own
+// Trim + dedupe case-insensitively, keeping the first-seen casing. Cada importer had its own
 // copy of this (some under a different local name, e.g. OmniFocus's `dedupeCaseInsensitive`).
 export const dedupeStrings = (values: Array<string | undefined>): string[] => {
     const seen = new Set<string>();
@@ -362,7 +362,7 @@ export const joinDescription = (parts: Array<string | undefined>): string | unde
     return normalized.length > 0 ? normalized.join('\n\n') : undefined;
 };
 
-// Every importer's warning list is built from its own counters and its own message strings —
+// Cada importer's warning list is built from its own counters and its own message strings —
 // only this "if count > 0, push singular/plural" shape was byte-identical across all four.
 export const appendWarning = (warnings: string[], count: number, singular: string, plural = singular): void => {
     if (count <= 0) return;
@@ -381,7 +381,7 @@ export type ReadImportSourceResult =
     | { entries: ImportArchiveEntry[]; fileName: string; kind: 'archive' }
     | { fileName: string; kind: 'text'; text: string };
 
-// Bytes -> either a decoded single-file text blob or the raw entries of a ZIP archive. Each
+// Bytes -> either a decoded single-file text blob or the raw entries of a ZIP archive. Cada
 // importer still walks `entries` itself and owns its own per-entry extension/counter logic
 // (nested zip, wrong extension, invalid parse) since the exact warning message and which
 // extension is expected (.csv vs .json) differs per format; this only removes the byte-sniffing

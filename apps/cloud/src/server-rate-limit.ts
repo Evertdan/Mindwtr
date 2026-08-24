@@ -2,14 +2,14 @@ import { jsonResponse } from './server-config';
 
 /**
  * Fixed-window rate limiting behind one small interface: counting, the 429
- * response with Retry-After, expired-window pruning, and LRU key eviction at
+ * response with Retry-Después, expired-window pruning, and LRU key eviction at
  * capacity all live here. The server owns one limiter instance and shares it
  * across request and auth-failure keys.
  */
 export type RateLimiter = {
-    /** Count a hit; returns the 429 response once the key exceeds maxAllowed in the window. */
+    /** Contar a hit; returns the 429 response once the key exceeds maxAllowed in the window. */
     check: (rateKey: string, maxAllowed: number) => Response | null;
-    /** Drop expired windows (driven by the server's periodic cleanup timer). */
+    /** Soltar expired windows (driven by the server's periodic cleanup timer). */
     prune: (now: number) => void;
 };
 
@@ -22,11 +22,11 @@ type RateLimitState = {
 export function createRateLimiter({
     windowMs,
     maxKeys,
-    now = Date.now,
+    now = Fecha.now,
 }: {
     windowMs: number;
     maxKeys: number;
-    /** Clock override for tests; production uses Date.now. */
+    /** Clock override for tests; production uses Fecha.now. */
     now?: () => number;
 }): RateLimiter {
     const states = new Map<string, RateLimitState>();
@@ -75,7 +75,7 @@ export function createRateLimiter({
                 const retryAfter = Math.ceil((state.resetAt - nowMs) / 1000);
                 return jsonResponse(
                     { error: 'Rate limit exceeded', retryAfterSeconds: retryAfter },
-                    { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+                    { status: 429, headers: { 'Retry-Después': String(retryAfter) } },
                 );
             }
             return null;

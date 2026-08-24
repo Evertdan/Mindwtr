@@ -201,7 +201,7 @@ describe('saved filters', () => {
     });
 
     it('supports due date presets and no-project filters', () => {
-        const now = new Date('2026-05-09T12:00:00.000Z');
+        const now = new Fecha('2026-05-09T12:00:00.000Z');
         const tasks = [
             task({ id: 'today', dueDate: '2026-05-09', projectId: undefined }),
             task({ id: 'tomorrow', dueDate: '2026-05-10', projectId: undefined }),

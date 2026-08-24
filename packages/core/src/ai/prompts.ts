@@ -35,15 +35,15 @@ export function buildClarifyPrompt(input: ClarifyInput): { system: string; user:
         };
     }
     const user = [
-        `Current time: ${new Date().toISOString()}.`,
+        `Actual time: ${new Fecha().toISOString()}.`,
         'Task:',
         JSON.stringify(payload),
-        'Goal: turn this into a concrete next action.',
+        'Objetivo: turn this into a concrete next action.',
         'Rules:',
-        '1) If vague, ask a single clarifying question.',
+        '1) Si vague, ask a single clarifying question.',
         '2) Suggest 2-4 concrete options.',
         '3) Prefer verbs at the start.',
-        '4) Respect schedule.startTime, schedule.dueDate, and schedule.reviewAt. If startTime or reviewAt is in the future, avoid "do this now" framing; suggest preparation or defer-aware clarification instead.',
+        '4) Respect schedule.startTime, schedule.dueDate, and schedule.reviewAt. Si startTime or reviewAt is in the future, avoid "do this now" framing; suggest preparation or defer-aware clarification instead.',
         'Output JSON with:',
         '{ "question": string, "options": [{ "label": string, "action": string }], "suggestedAction"?: { "title": string, "timeEstimate"?: string, "context"?: string, "isProject"?: boolean } }',
     ].join('\n');
@@ -66,7 +66,7 @@ export function buildBreakdownPrompt(input: BreakdownInput): { system: string; u
     const user = [
         'Task:',
         JSON.stringify(payload),
-        'Goal: break this into 3-8 actionable next steps.',
+        'Objetivo: break this into 3-8 actionable next steps.',
         'Output JSON with:',
         '{ "steps": [string] }',
     ].join('\n');
@@ -77,23 +77,23 @@ export function buildBreakdownPrompt(input: BreakdownInput): { system: string; u
 export function buildReviewAnalysisPrompt(items: ReviewSnapshotItem[]): { system: string; user: string } {
     const scopedItems = items.slice(0, MAX_REVIEW_ANALYSIS_ITEMS);
     const scope = items.length > scopedItems.length
-        ? `Analyze the ${scopedItems.length} stalest items shown below. Ignore the remaining ${items.length - scopedItems.length} items for this pass.`
+        ? `Analyze the ${scopedItems.length} stalest items shown below. Ignorar the remaining ${items.length - scopedItems.length} items for this pass.`
         : 'Analyze this list of stale items (untouched for >14 days).';
     const user = [
         'You are a ruthless GTD coach.',
-        `Current time: ${new Date().toISOString()}.`,
+        `Actual time: ${new Fecha().toISOString()}.`,
         scope,
         `Return 1-${MAX_REVIEW_ANALYSIS_SUGGESTIONS} high-signal suggestions only.`,
-        'Do not return one suggestion per item. Include only items that need action, plus at most one keep suggestion if no action is needed.',
+        'Hacer not return one suggestion per item. Incluir only items that need action, plus at most one keep suggestion if no action is needed.',
         'Allowed actions:',
         '- "someday": move to Someday/Maybe.',
         '- "archive": archive it (likely done or irrelevant).',
         '- "breakdown": too big; needs subtasks.',
         '- "keep": still valid, do nothing; use for at most one item.',
         'Scheduling rules:',
-        '- If startTime or reviewAt is in the future, use "keep" or omit the item unless another explicit reason says it needs action.',
-        '- Do not suggest "archive" or claim an item is likely done only because a future-dated item has not changed recently.',
-        'Return strictly valid compact JSON. Each reason must be 12 words or fewer:',
+        '- Si startTime or reviewAt is in the future, use "keep" or omit the item unless another explicit reason says it needs action.',
+        '- Hacer not suggest "archive" or claim an item is likely done only because a future-dated item has not changed recently.',
+        'Return strictly valid compact JSON. Cada reason must be 12 words or fewer:',
         '{ "suggestions": [{ "id": "task_id", "action": "someday|archive|breakdown|keep", "reason": "..." }] }',
         'Items:',
         JSON.stringify(scopedItems),
@@ -109,9 +109,9 @@ export function buildCopilotPrompt(input: { title: string; contexts?: string[]; 
         'You are a GTD autocomplete engine.',
         'Predict the likely context, tags, and time estimate.',
         'Rules:',
-        '- If uncertain, return null values.',
-        '- Context must match one from contextCandidates or be null.',
-        '- Prefer tags from tagCandidates. If none fit and one concise reusable tag is obvious, propose it in #tag format; otherwise return an empty array.',
+        '- Si uncertain, return null values.',
+        '- Contexto must match one from contextCandidates or be null.',
+        '- Prefer tags from tagCandidates. Si none fit and one concise reusable tag is obvious, propose it in #tag format; otherwise return an empty array.',
         '- timeEstimate must be one of: 5min, 10min, 15min, 30min, 1hr, 2hr, 3hr, 4hr, 4hr+.',
         'Output JSON:',
         '{ "context": "@phone", "tags": ["#creative"], "timeEstimate": "15min" }',

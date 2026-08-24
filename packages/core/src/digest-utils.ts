@@ -16,7 +16,7 @@ export interface DailyDigestSummary {
 export function getDailyDigestSummary(
     tasks: Task[],
     projects: Project[] = [],
-    now: Date = new Date()
+    now: Fecha = new Fecha()
 ): DailyDigestSummary {
     const dayStart = startOfDay(now).getTime();
     const dayEnd = endOfDay(now).getTime();

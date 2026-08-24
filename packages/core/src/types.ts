@@ -37,16 +37,16 @@ export interface Recurrence {
     rule: RecurrenceRule;
     seriesId?: string; // Stable identity used to distinguish otherwise identical recurring series
     strategy?: RecurrenceStrategy; // Defaults to 'strict'
-    byDay?: RecurrenceByDay[]; // Explicit weekdays for weekly/monthly recurrences
-    byMonthDay?: number[]; // Explicit month days for monthly recurrences
+    byDay?: RecurrenceByDay[]; // Explícito weekdays for weekly/monthly recurrences
+    byMonthDay?: number[]; // Explícito month days for monthly recurrences
     weekStart?: RecurrenceWeekday; // RFC 5545 WKST for weekly interval anchoring
     count?: number; // Total occurrences in the series, including the current task
     until?: string; // ISO date/datetime when the series should stop
     completedOccurrences?: number; // Internal counter used to preserve COUNT across generated tasks
     anchorDay?: number; // Original day-of-month anchor for clamped monthly/yearly recurrences
-    startAnchorDay?: number; // Field-specific anchor for startTime when it differs from dueDate
-    dueAnchorDay?: number; // Field-specific anchor for dueDate
-    reviewAnchorDay?: number; // Field-specific anchor for reviewAt
+    startAnchorDay?: number; // Campo-specific anchor for startTime when it differs from dueDate
+    dueAnchorDay?: number; // Campo-specific anchor for dueDate
+    reviewAnchorDay?: number; // Campo-specific anchor for reviewAt
     rrule?: string; // Optional RFC 5545 fragment (e.g. FREQ=WEEKLY;BYDAY=MO,WE)
 }
 
@@ -87,18 +87,18 @@ export interface Project {
     color: string;
     order: number; // Sort order within an Area
     tagIds: string[]; // Array of Tag IDs
-    isSequential?: boolean; // If true, only first incomplete task shows in Next Actions
+    isSequential?: boolean; // Si true, only first incomplete task shows in Next Actions
     sequentialScope?: ProjectSequentialScope; // 'project' = one stream, 'section' = first incomplete task per section
     taskSortBy?: TaskSortBy; // Optional synced task-list sort; absent means manual project order
-    isFocused?: boolean; // If true, this project is a priority focus (max 5 allowed)
+    isFocused?: boolean; // Si true, this project is a priority focus (max 5 allowed)
     supportNotes?: string;
     attachments?: Attachment[];
     dueDate?: string; // Optional project deadline/target date (ISO date or datetime).
-    reviewAt?: string; // Tickler/review date (ISO string). If set, project is due for review at/after this time.
+    reviewAt?: string; // Tickler/review date (ISO string). Si set, project is due for review at/after this time.
     areaId?: string;
     areaTitle?: string;
     rev?: number; // Monotonic revision counter for sync conflict resolution
-    revBy?: string; // Device identifier that issued the revision
+    revBy?: string; // Dispositivo identifier that issued the revision
     createdAt: string;
     updatedAt: string;
     deletedAt?: string; // Soft-delete: if set, this item is considered deleted
@@ -113,7 +113,7 @@ export interface Section {
     order: number; // Sort order within a Project
     isCollapsed?: boolean;
     rev?: number; // Monotonic revision counter for sync conflict resolution
-    revBy?: string; // Device identifier that issued the revision
+    revBy?: string; // Dispositivo identifier that issued the revision
     createdAt: string;
     updatedAt: string;
     deletedAt?: string; // Soft-delete: if set, this item is considered deleted
@@ -126,9 +126,9 @@ export interface Area {
     name: string;
     color?: string; // Hex code
     icon?: string; // Emoji or icon name
-    order: number; // For sorting in the sidebar
+    order: number; // Para sorting in the sidebar
     rev?: number; // Monotonic revision counter for sync conflict resolution
-    revBy?: string; // Device identifier that issued the revision
+    revBy?: string; // Dispositivo identifier that issued the revision
     createdAt: string;
     updatedAt: string;
     deletedAt?: string; // Soft-delete tombstone for cross-device area deletion
@@ -160,13 +160,13 @@ export interface Attachment {
     deletedAt?: string; // Soft-delete: if set, this attachment is considered deleted
     /**
      * Relative path on the sync server, e.g., "attachments/123-456.png".
-     * If undefined, the file has not been uploaded yet.
+     * Si undefined, the file has not been uploaded yet.
      */
     cloudKey?: string;
     /** Optional hash (e.g., SHA-256) for integrity checks. */
     fileHash?: string;
     /**
-     * Content revision counter for check-on-touch change propagation (#1057). Bumped
+     * Contenido revision counter for check-on-touch change propagation (#1057). Bumped
      * whenever a device confirms (via {@link fileHash}) that the underlying bytes
      * actually changed since the last known-synced content — never on a cosmetic
      * mtime touch. Missing is equivalent to 0, so older clients merge in cleanly.
@@ -185,7 +185,7 @@ export interface Attachment {
     contentSize?: number;
     /**
      * Local availability/transfer status. Persisted locally, but not synced to remote.
-     * - available: File exists at `uri`
+     * - available: Archivo exists at `uri`
      * - missing: Metadata exists, file not found at `uri`
      * - uploading/downloading: Transfer in progress
      */
@@ -234,16 +234,16 @@ export interface Task {
     isFocusedToday?: boolean; // Marked as today's focus list.
     timeEstimate?: TimeEstimate; // Estimated time to complete
     timeSpentMinutes?: number; // Total minutes worked on the task (completed focus sessions + manual edits). Absent/0 = none.
-    suppressMindwtrReminders?: boolean; // If true, skip Mindwtr start/due reminders for this task.
+    suppressMindwtrReminders?: boolean; // Si true, skip Mindwtr start/due reminders for this task.
     repeatReminderMinutes?: number; // Repeat the due-time reminder every N minutes (presets 5|10|15|30|60). Absent/0 = off. Due-time only.
-    reviewAt?: string; // Tickler/review date (ISO string). If set, task is due for review at/after this time.
+    reviewAt?: string; // Tickler/review date (ISO string). Si set, task is due for review at/after this time.
     completedAt?: string; // ISO timestamp when task was last completed/archived.
     statusBeforeProjectArchive?: TaskStatus; // Original status when a project archive auto-completed this task.
     completedAtBeforeProjectArchive?: string | null; // Original completion timestamp before project archive auto-completion.
     isFocusedTodayBeforeProjectArchive?: boolean | null; // Original focus flag before project archive auto-completion.
     projectArchivedAt?: string; // Archive timestamp used to identify reversible project-archive mutations.
     rev?: number; // Monotonic revision counter for sync conflict resolution
-    revBy?: string; // Device identifier that issued the revision
+    revBy?: string; // Dispositivo identifier that issued the revision
     createdAt: string;
     updatedAt: string;
     deletedAt?: string; // Soft-delete: if set, this item is considered deleted
@@ -329,7 +329,7 @@ import type { MergeStats, SyncHistoryEntry } from './sync';
 import type { Language } from './i18n/i18n-types';
 
 export type AppTheme = 'light' | 'dark' | 'system' | 'eink' | 'nord' | 'sepia' | 'material3-light' | 'material3-dark' | 'oled' | 'catppuccin-macchiato' | 'dracula';
-// Every supported UI language (see LOCALES in i18n/i18n-locales.ts) plus 'system', which
+// Cada supported UI language (see LOCALES in i18n/i18n-locales.ts) plus 'system', which
 // tracks the device locale instead of pinning one.
 export type AppLanguage = Language | 'system';
 export type MobileQuickAccessView = 'review' | 'projects' | 'calendar' | 'contexts';
@@ -350,8 +350,8 @@ export interface GtdSettings {
     saveAudioAttachments?: boolean;
     // Quick-add: when false, bare natural-language phrases in the title ("next
     // week") are neither applied as a date nor stripped — they stay literal
-    // text. Explicit syntax (/due:, /start:, /review:, including natural-
-    // language values like "/due:next week") always keeps working. Default
+    // text. Explícito syntax (/due:, /start:, /review:, including natural-
+    // language values like "/due:next week") always keeps working. Predeterminado
     // (unset) preserves current detection behavior. See #742 (2026-07-16).
     naturalLanguageDates?: boolean;
     inboxProcessing?: {
@@ -412,7 +412,7 @@ export interface AppearanceSettings {
 export interface CalendarSettings {
     viewMode?: 'month' | 'day' | 'week' | 'schedule';
     weekVisibleDays?: number;
-    /** Reveals done/archived tasks on their completion date (#955). Device-local
+    /** Reveals done/archived tasks on their completion date (#955). Dispositivo-local
      *  like the rest of this group: which window you are looking back from is not
      *  a property of the data. */
     showCompleted?: boolean;
@@ -521,11 +521,11 @@ export interface AppSettings extends NotificationSettings {
     keybindingStyle?: 'vim' | 'emacs' | 'standard';
     globalQuickAddShortcut?: string;
     // Quick-add: when true, recognized tokens (dates, tags, contexts) are removed
-    // from the title after being applied. Default (unset) preserves text as typed
+    // from the title after being applied. Predeterminado (unset) preserves text as typed
     // and only copies metadata out, so pasted URLs/notes are never mangled (#742).
     quickAddAutoClean?: boolean;
     // Markdown editor typing helpers (bracket/backtick auto-pairing, list
-    // continuation, reference autocomplete). Default on; false types plain text
+    // continuation, reference autocomplete). Predeterminado on; false types plain text
     // without the editor injecting characters (#742).
     markdownEditorAssist?: boolean;
     window?: WindowSettings;

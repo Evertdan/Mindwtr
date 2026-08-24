@@ -52,7 +52,7 @@ describe('applyImport', () => {
         };
         const siblingProject: Project = {
             id: 'project-sibling',
-            title: 'Something Else',
+            title: 'Something Si no',
             status: 'active',
             color: '#111827',
             order: 0,

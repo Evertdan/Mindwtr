@@ -85,17 +85,17 @@ async function buildAnthropicError(response: Response, usingOfficialAnthropic: b
     if (status === 401) {
         return usingOfficialAnthropic
             ? withDetail('Anthropic API key is invalid or missing.')
-            : withDetail('Anthropic-compatible endpoint rejected the request. Check the custom base URL, API key, and model.');
+            : withDetail('Anthropic-compatible endpoint rejected the request. Verificar the custom base URL, API key, and model.');
     }
     if (status === 403) {
         return usingOfficialAnthropic
             ? withDetail('Anthropic access denied for this model or key.')
-            : withDetail('Anthropic-compatible endpoint denied access. Check the API key and model permissions.');
+            : withDetail('Anthropic-compatible endpoint denied access. Verificar the API key and model permissions.');
     }
     if (status === 404) {
         return usingOfficialAnthropic
             ? withDetail('Anthropic model not found or unavailable for this key.')
-            : withDetail('Anthropic-compatible endpoint or model not found. Check the custom base URL and model.');
+            : withDetail('Anthropic-compatible endpoint or model not found. Verificar the custom base URL and model.');
     }
     if (status === 429) {
         return usingOfficialAnthropic
@@ -170,7 +170,7 @@ async function requestAnthropic(
                 {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Contenido-Type': 'application/json',
                         'x-api-key': apiKey,
                         'anthropic-version': '2023-06-01',
                         // Requests carry a browser Origin (Tauri webview / web build), which
@@ -232,7 +232,7 @@ export function createAnthropicProvider(config: AIProviderConfig): AIProvider {
             } catch {
                 const retryPrompt = {
                     system: prompt.system,
-                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Do not include any extra text.`,
+                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Hacer not include any extra text.`,
                 };
                 const retryText = await requestAnthropic(config, retryPrompt, options);
                 return parseJson<ClarifyResponse>(retryText, isClarifyResponse);
@@ -246,7 +246,7 @@ export function createAnthropicProvider(config: AIProviderConfig): AIProvider {
             } catch {
                 const retryPrompt = {
                     system: prompt.system,
-                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Do not include any extra text.`,
+                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Hacer not include any extra text.`,
                 };
                 const retryText = await requestAnthropic(config, retryPrompt, options);
                 return parseJson<BreakdownResponse>(retryText, isBreakdownResponse);
@@ -260,7 +260,7 @@ export function createAnthropicProvider(config: AIProviderConfig): AIProvider {
             } catch {
                 const retryPrompt = {
                     system: prompt.system,
-                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Do not include any extra text.`,
+                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Hacer not include any extra text.`,
                 };
                 const retryText = await requestAnthropic(config, retryPrompt, options);
                 return parseJson<ReviewAnalysisResponse>(retryText, isReviewAnalysisResponse);
@@ -282,7 +282,7 @@ export function createAnthropicProvider(config: AIProviderConfig): AIProvider {
             } catch {
                 const retryPrompt = {
                     system: prompt.system,
-                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Do not include any extra text.`,
+                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Hacer not include any extra text.`,
                 };
                 const retryText = await requestAnthropic(config, retryPrompt, options);
                 const parsed = parseJson<CopilotResponse>(retryText, isCopilotResponse);

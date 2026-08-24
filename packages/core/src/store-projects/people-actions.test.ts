@@ -37,7 +37,7 @@ describe('people actions', () => {
             lastDataChangeAt: 0,
         });
         vi.useFakeTimers();
-        vi.setSystemTime(new Date(BASE_NOW));
+        vi.setSystemTime(new Fecha(BASE_NOW));
     });
 
     afterEach(async () => {
@@ -55,7 +55,7 @@ describe('people actions', () => {
 
     it('renames a person and updates exact task assignments', async () => {
         const { addPerson, addTask, renamePerson } = useTaskStore.getState();
-        const person = await addPerson('Alex', { note: 'Design lead', referenceLink: 'obsidian://open?vault=People&file=Alex' });
+        const person = await addPerson('Alex', { note: 'Diseño lead', referenceLink: 'obsidian://open?vault=People&file=Alex' });
         expect(person).not.toBeNull();
         if (!person) return;
         const taskResult = await addTask('Waiting on mockups', { status: 'waiting', assignedTo: 'Alex' });
@@ -68,7 +68,7 @@ describe('people actions', () => {
         const state = useTaskStore.getState();
         expect(state.people.find((item) => item.id === person.id)).toMatchObject({
             name: 'Alexandra',
-            note: 'Design lead',
+            note: 'Diseño lead',
             referenceLink: 'obsidian://open?vault=People&file=Alex',
             updatedAt: BASE_NOW,
         });

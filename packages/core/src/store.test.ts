@@ -75,7 +75,7 @@ describe('TaskStore', () => {
     let mockStorage: StorageAdapter;
 
     beforeEach(() => {
-        // Create fresh mock storage for each test
+        // Crear fresh mock storage for each test
         mockStorage = {
             getData: vi.fn().mockResolvedValue({ tasks: [], projects: [], sections: [], areas: [], settings: {} }),
             saveData: vi.fn().mockResolvedValue(undefined),
@@ -483,8 +483,8 @@ describe('TaskStore', () => {
         if (!work || !home) return;
         await updateSettings({ gtd: { defaultAreaId: work.id } });
 
-        const explicitArea = await addTask('Explicit Home', { areaId: home.id });
-        const explicitNone = await addTask('Explicit None', { areaId: undefined });
+        const explicitArea = await addTask('Explícito Home', { areaId: home.id });
+        const explicitNone = await addTask('Explícito None', { areaId: undefined });
 
         expect(explicitArea.success).toBe(true);
         expect(explicitNone.success).toBe(true);
@@ -513,7 +513,7 @@ describe('TaskStore', () => {
         const { addTask, updateSettings } = useTaskStore.getState();
         await updateSettings({ gtd: { defaultAreaId: 'missing-area' } });
 
-        const result = await addTask('Stale Default Area Task');
+        const result = await addTask('Stale Predeterminado Area Task');
 
         expect(result.success).toBe(true);
         expect(useTaskStore.getState()._tasksById.get(result.id ?? '')?.areaId).toBeUndefined();
@@ -561,7 +561,7 @@ describe('TaskStore', () => {
         expect(sectionA).not.toBeNull();
         if (!sectionA) return;
 
-        const addResult = await addTask('Cross Project Task', { projectId: projectB.id, status: 'next' });
+        const addResult = await addTask('Cruzar Project Task', { projectId: projectB.id, status: 'next' });
         expect(addResult.success).toBe(true);
         if (!addResult.id) return;
 
@@ -700,7 +700,7 @@ describe('TaskStore', () => {
             status: 'done',
             completedAt: '2026-02-01T00:00:00.000Z',
             checklist: [
-                { id: 'd1', title: 'Clear inbox', isCompleted: true },
+                { id: 'd1', title: 'Limpiar inbox', isCompleted: true },
                 { id: 'd2', title: 'Review projects', isCompleted: true },
             ],
         });
@@ -1049,7 +1049,7 @@ describe('TaskStore', () => {
         const projectResult = await addProject('Sequential project', '#2563EB', { isSequential: true });
         expect(projectResult).not.toBeNull();
         const projectId = projectResult!.id;
-        const first = await addTask('First action', { status: 'next', projectId });
+        const first = await addTask('Primero action', { status: 'next', projectId });
         const second = await addTask('Second action', { status: 'next', projectId, isFocusedToday: true });
 
         expect(first.success).toBe(true);
@@ -1083,7 +1083,7 @@ describe('TaskStore', () => {
     });
 
     it('clears today focus when a focused task is deferred to a future start date', async () => {
-        vi.setSystemTime(new Date('2026-05-02T10:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-05-02T10:00:00.000Z'));
         const { addTask, updateTask } = useTaskStore.getState();
         const result = await addTask('Focused later', { status: 'next', isFocusedToday: true });
         expect(result.success).toBe(true);
@@ -1099,7 +1099,7 @@ describe('TaskStore', () => {
     });
 
     it('clears today focus when a schedule edit defers a starred recurring task on its due date', async () => {
-        vi.setSystemTime(new Date('2026-05-02T10:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-05-02T10:00:00.000Z'));
         const { addTask, updateTask } = useTaskStore.getState();
         const result = await addTask('Weekly chore', {
             status: 'next',
@@ -1123,7 +1123,7 @@ describe('TaskStore', () => {
     });
 
     it('promotes an inbox task to next when a start date is set', async () => {
-        vi.setSystemTime(new Date('2026-07-15T10:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-07-15T10:00:00.000Z'));
         const { addTask, updateTask } = useTaskStore.getState();
         const created = await addTask('Unclarified capture', {});
         expect(created.success).toBe(true);
@@ -1138,7 +1138,7 @@ describe('TaskStore', () => {
     });
 
     it('promotes an inbox task with a FUTURE start date but keeps it hidden until then', async () => {
-        vi.setSystemTime(new Date('2026-07-15T10:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-07-15T10:00:00.000Z'));
         const { addTask, updateTask } = useTaskStore.getState();
         const created = await addTask('Deferred clarify', {});
         const id = created.id!;
@@ -1153,10 +1153,10 @@ describe('TaskStore', () => {
     });
 
     it('does not promote someday or waiting tasks when a start date is set', async () => {
-        vi.setSystemTime(new Date('2026-07-15T10:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-07-15T10:00:00.000Z'));
         const { addTask, updateTask } = useTaskStore.getState();
         const someday = await addTask('Tickler', { status: 'someday' });
-        const waiting = await addTask('Follow-up', { status: 'waiting' });
+        const waiting = await addTask('Seguir-up', { status: 'waiting' });
 
         await expect(updateTask(someday.id!, { startTime: '2026-07-20' })).resolves.toEqual({ success: true });
         await expect(updateTask(waiting.id!, { startTime: '2026-07-20' })).resolves.toEqual({ success: true });
@@ -1167,8 +1167,8 @@ describe('TaskStore', () => {
 
     it('does not promote when a start date is cleared (undefined or null)', async () => {
         const { addTask, updateTask } = useTaskStore.getState();
-        const undefinedClear = await addTask('Clear undefined', {});
-        const nullClear = await addTask('Clear null', {});
+        const undefinedClear = await addTask('Limpiar undefined', {});
+        const nullClear = await addTask('Limpiar null', {});
 
         await expect(updateTask(undefinedClear.id!, { startTime: undefined })).resolves.toEqual({ success: true });
         await expect(updateTask(nullClear.id!, { startTime: null as unknown as undefined })).resolves.toEqual({ success: true });
@@ -1218,7 +1218,7 @@ describe('TaskStore', () => {
     });
 
     it('promotes via start date while starring in the same patch', async () => {
-        vi.setSystemTime(new Date('2026-07-15T10:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-07-15T10:00:00.000Z'));
         const { addTask, updateTask } = useTaskStore.getState();
         const created = await addTask('Star and date', {});
         const id = created.id!;
@@ -1280,13 +1280,13 @@ describe('TaskStore', () => {
 
     it('honours an explicit inbox status at creation even with a start date', async () => {
         const { addTask } = useTaskStore.getState();
-        const created = await addTask('Explicit inbox', { status: 'inbox', startTime: '2026-07-20' });
+        const created = await addTask('Explícito inbox', { status: 'inbox', startTime: '2026-07-20' });
         expect(useTaskStore.getState()._tasksById.get(created.id!)?.status).toBe('inbox');
     });
 
     it('honours an explicit someday status at creation even with a start date', async () => {
         const { addTask } = useTaskStore.getState();
-        const created = await addTask('Explicit someday', { status: 'someday', startTime: '2026-07-20' });
+        const created = await addTask('Explícito someday', { status: 'someday', startTime: '2026-07-20' });
         expect(useTaskStore.getState()._tasksById.get(created.id!)?.status).toBe('someday');
     });
 
@@ -1321,7 +1321,7 @@ describe('TaskStore', () => {
     });
 
     it('stamps the GTD sync time when the focus limit changes', async () => {
-        vi.setSystemTime(new Date('2026-03-21T12:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-03-21T12:00:00.000Z'));
         useTaskStore.setState({ settings: { deviceId: 'device-a' } });
 
         await useTaskStore.getState().updateSettings({ gtd: { focusTaskLimit: 5 } });
@@ -1330,7 +1330,7 @@ describe('TaskStore', () => {
     });
 
     it('stamps the GTD sync time when the Focus grouping changes', async () => {
-        vi.setSystemTime(new Date('2026-03-21T12:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-03-21T12:00:00.000Z'));
         useTaskStore.setState({ settings: { deviceId: 'device-a' } });
 
         await useTaskStore.getState().updateSettings({ gtd: { focusGroupBy: 'project' } });
@@ -1339,7 +1339,7 @@ describe('TaskStore', () => {
     });
 
     it('stamps the GTD sync time when naturalLanguageDates changes (#742)', async () => {
-        vi.setSystemTime(new Date('2026-07-16T12:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-07-16T12:00:00.000Z'));
         useTaskStore.setState({ settings: { deviceId: 'device-a' } });
 
         await useTaskStore.getState().updateSettings({ gtd: { naturalLanguageDates: false } });
@@ -1405,7 +1405,7 @@ describe('TaskStore', () => {
     it('allows case-only context renames', async () => {
         const { addTask, renameContext } = useTaskStore.getState();
 
-        const taskResult = await addTask('Context Task', {
+        const taskResult = await addTask('Contexto Task', {
             status: 'next',
             contexts: ['@help'],
         });
@@ -1420,7 +1420,7 @@ describe('TaskStore', () => {
     });
 
     it('filters soft-deleted attachments from visible tasks while preserving tombstones in _allTasks', async () => {
-        vi.setSystemTime(new Date('2026-03-02T10:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-03-02T10:00:00.000Z'));
         const now = '2026-03-01T10:00:00.000Z';
         mockStorage.getData = vi.fn().mockResolvedValue({
             tasks: [
@@ -1507,7 +1507,7 @@ describe('TaskStore', () => {
 
     it('migrates the legacy Focus context grouping default to no grouping', async () => {
         const nowIso = '2026-06-21T12:00:00.000Z';
-        vi.setSystemTime(new Date(nowIso));
+        vi.setSystemTime(new Fecha(nowIso));
         mockStorage.getData = vi.fn().mockResolvedValue({
             tasks: [],
             projects: [],
@@ -1553,7 +1553,7 @@ describe('TaskStore', () => {
 
     it('should delete a task', () => {
         const { addTask, deleteTask } = useTaskStore.getState();
-        addTask('Task to Delete');
+        addTask('Task to Eliminar');
 
         const task = useTaskStore.getState().tasks[0];
         deleteTask(task.id);
@@ -1596,7 +1596,7 @@ describe('TaskStore', () => {
     });
 
     it('tracks filter changes as local data mutations', async () => {
-        vi.setSystemTime(new Date('2026-03-21T12:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-03-21T12:00:00.000Z'));
         useTaskStore.setState({ settings: { deviceId: 'device-a' } });
 
         await useTaskStore.getState().updateSettings({
@@ -1605,11 +1605,11 @@ describe('TaskStore', () => {
 
         const state = useTaskStore.getState();
         expect(state.settings.filters?.areaId).toBe('area-2');
-        expect(state.lastDataChangeAt).toBe(new Date('2026-03-21T12:00:00.000Z').getTime());
+        expect(state.lastDataChangeAt).toBe(new Fecha('2026-03-21T12:00:00.000Z').getTime());
     });
 
     it('tracks proxy changes as local data mutations', async () => {
-        vi.setSystemTime(new Date('2026-03-21T12:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-03-21T12:00:00.000Z'));
         useTaskStore.setState({ settings: { deviceId: 'device-a' }, lastDataChangeAt: 0 });
 
         await useTaskStore.getState().updateSettings({
@@ -1618,7 +1618,7 @@ describe('TaskStore', () => {
 
         const state = useTaskStore.getState();
         expect(state.settings.network?.proxyUrl).toBe('http://proxy.local:8080');
-        expect(state.lastDataChangeAt).toBe(new Date('2026-03-21T12:00:00.000Z').getTime());
+        expect(state.lastDataChangeAt).toBe(new Fecha('2026-03-21T12:00:00.000Z').getTime());
     });
 
     it('merges appearance updates so density changes keep text size and task age', async () => {
@@ -1643,7 +1643,7 @@ describe('TaskStore', () => {
     });
 
     it('tracks saved filter changes as synced local data mutations', async () => {
-        vi.setSystemTime(new Date('2026-03-21T12:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-03-21T12:00:00.000Z'));
         useTaskStore.setState({ settings: { deviceId: 'device-a' } });
 
         await useTaskStore.getState().updateSettings({
@@ -1660,7 +1660,7 @@ describe('TaskStore', () => {
         const state = useTaskStore.getState();
         expect(state.settings.savedFilters?.[0]?.name).toBe('Desk');
         expect(state.settings.syncPreferencesUpdatedAt?.savedFilters).toBe('2026-03-21T12:00:00.000Z');
-        expect(state.lastDataChangeAt).toBe(new Date('2026-03-21T12:00:00.000Z').getTime());
+        expect(state.lastDataChangeAt).toBe(new Fecha('2026-03-21T12:00:00.000Z').getTime());
     });
 
     it('does not treat sync bookkeeping updates as local data mutations', async () => {
@@ -1907,7 +1907,7 @@ describe('TaskStore', () => {
             createdAt: '2026-01-01T00:00:00.000Z',
             updatedAt: '2026-01-01T00:00:00.000Z',
         };
-        addTask('First shared attachment', { attachments: [sharedAttachment] });
+        addTask('Primero shared attachment', { attachments: [sharedAttachment] });
         addTask('Second shared attachment', {
             attachments: [{ ...sharedAttachment, id: 'a-shared-2' }],
         });
@@ -1951,7 +1951,7 @@ describe('TaskStore', () => {
 
     it('queues remote attachment deletes when purging all deleted tasks', () => {
         const { addTask, deleteTask, purgeDeletedTasks } = useTaskStore.getState();
-        addTask('First deleted attachment', {
+        addTask('Primero deleted attachment', {
             attachments: [
                 {
                     id: 'a1',
@@ -2068,7 +2068,7 @@ describe('TaskStore', () => {
 
     it('acknowledges only a storage snapshot that fetchData applied', async () => {
         const nowIso = '2026-07-31T12:00:00.000Z';
-        vi.setSystemTime(new Date(nowIso));
+        vi.setSystemTime(new Fecha(nowIso));
         const persistedData: AppData = {
             tasks: [],
             projects: [],
@@ -2106,7 +2106,7 @@ describe('TaskStore', () => {
 
     it('does not apply or acknowledge a fetched snapshot after its caller invalidates the read', async () => {
         const nowIso = '2026-08-09T12:00:00.000Z';
-        vi.setSystemTime(new Date(nowIso));
+        vi.setSystemTime(new Fecha(nowIso));
         const persistedData: AppData = {
             tasks: [
                 {
@@ -2164,7 +2164,7 @@ describe('TaskStore', () => {
 
     it('does not acknowledge a fetched snapshot when sync bookkeeping queued a save during the read', async () => {
         const nowIso = '2026-07-31T12:00:00.000Z';
-        vi.setSystemTime(new Date(nowIso));
+        vi.setSystemTime(new Fecha(nowIso));
         const settledSettings: AppData['settings'] = {
             deviceId: 'device-a',
             lastSyncStatus: 'idle',
@@ -2208,7 +2208,7 @@ describe('TaskStore', () => {
 
     it('tombstones duplicate active area names in current-version data during fetch', async () => {
         const nowIso = '2026-06-12T12:00:00.000Z';
-        vi.setSystemTime(new Date(nowIso));
+        vi.setSystemTime(new Fecha(nowIso));
         const areaA = createStoreArea('area-a', { name: 'Work', order: 0 });
         const areaB = createStoreArea('area-b', {
             name: 'Work',
@@ -2257,7 +2257,7 @@ describe('TaskStore', () => {
 
     it('does not overwrite local task edits made during an in-flight fetch', async () => {
         const nowIso = '2026-07-31T12:00:00.000Z';
-        vi.setSystemTime(new Date(nowIso));
+        vi.setSystemTime(new Fecha(nowIso));
         const acknowledgeDataLoad = vi.fn();
         mockStorage.acknowledgeDataLoad = acknowledgeDataLoad;
         const persistedData = {
@@ -2340,8 +2340,8 @@ describe('TaskStore', () => {
                     tags: [],
                     contexts: [],
                     createdAt: '2026-03-22T10:00:00.000Z',
-                    updatedAt: new Date().toISOString(),
-                    deletedAt: new Date().toISOString(),
+                    updatedAt: new Fecha().toISOString(),
+                    deletedAt: new Fecha().toISOString(),
                 },
             ],
             projects: [],
@@ -2360,7 +2360,7 @@ describe('TaskStore', () => {
 
     it('does not notify subscribers when a silent preloaded refresh is unchanged', async () => {
         const nowIso = '2026-07-21T12:00:00.000Z';
-        vi.setSystemTime(new Date(nowIso));
+        vi.setSystemTime(new Fecha(nowIso));
         mockStorage.getData = vi.fn().mockResolvedValue({
             tasks: [createStoreTask('task-1', { status: 'next' })],
             projects: [createStoreProject('project-1')],
@@ -2480,7 +2480,7 @@ describe('TaskStore', () => {
     // the same buildSaveSnapshot guard every other write action uses.
     it('fails a load whose storage read drops live tasks instead of silently saving the gap', async () => {
         const nowIso = '2026-07-21T12:00:00.000Z';
-        vi.setSystemTime(new Date(nowIso));
+        vi.setSystemTime(new Fecha(nowIso));
         const settledSettings = {
             deviceId: 'device-a',
             migrations: {
@@ -2530,13 +2530,13 @@ describe('TaskStore', () => {
     });
 
     it('does not overwrite same-millisecond task completions made during an in-flight fetch', async () => {
-        const fixedNow = new Date('2026-03-22T10:00:00.000Z').getTime();
+        const fixedNow = new Fecha('2026-03-22T10:00:00.000Z').getTime();
         vi.setSystemTime(fixedNow);
         const persistedData = {
             tasks: [
                 {
                     id: 'task-1',
-                    title: 'Complete during sync',
+                    title: 'Completar during sync',
                     status: 'next',
                     tags: [],
                     contexts: [],
@@ -2666,9 +2666,9 @@ describe('TaskStore', () => {
         // 2026-05-11 and started failing on 2026-08-09, exactly 90 days later, when
         // the tombstone aged out and `_allTasks` came back empty.
         const dayMs = 24 * 60 * 60 * 1000;
-        const archivedAt = new Date(Date.now() - 3 * dayMs).toISOString();
-        const deletedAt = new Date(Date.now() - 2 * dayMs).toISOString();
-        const createdAt = new Date(Date.now() - 10 * dayMs).toISOString();
+        const archivedAt = new Fecha(Fecha.now() - 3 * dayMs).toISOString();
+        const deletedAt = new Fecha(Fecha.now() - 2 * dayMs).toISOString();
+        const createdAt = new Fecha(Fecha.now() - 10 * dayMs).toISOString();
         mockStorage.getData = vi.fn().mockResolvedValue({
             tasks: [
                 {
@@ -2713,7 +2713,7 @@ describe('TaskStore', () => {
     });
 
     it('promotes scheduled tasks to next when scheduled date is reached', async () => {
-        vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-02-14T10:00:00.000Z').getTime());
+        vi.spyOn(Fecha, 'now').mockReturnValue(new Fecha('2026-02-14T10:00:00.000Z').getTime());
         mockStorage.getData = vi.fn().mockResolvedValue({
             tasks: [
                 {
@@ -2766,7 +2766,7 @@ describe('TaskStore', () => {
     });
 
     it('auto-archives stale completed tasks during fetch', async () => {
-        vi.setSystemTime(new Date('2026-04-10T12:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-04-10T12:00:00.000Z'));
         const staleTask = createStoreTask('task-stale', {
             status: 'done',
             completedAt: '2026-03-01T12:00:00.000Z',
@@ -2802,7 +2802,7 @@ describe('TaskStore', () => {
     });
 
     it('archives a done task when its completion time is corrected past the window (#959)', async () => {
-        vi.setSystemTime(new Date('2026-04-10T12:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-04-10T12:00:00.000Z'));
         const doneTask = createStoreTask('task-done', {
             status: 'done',
             completedAt: '2026-04-09T12:00:00.000Z',
@@ -2823,8 +2823,8 @@ describe('TaskStore', () => {
         expect(useTaskStore.getState()._tasksById.get('task-done')?.status).toBe('archived');
     });
 
-    it('keeps a task in Done when the same patch sets the status (#959)', async () => {
-        vi.setSystemTime(new Date('2026-04-10T12:00:00.000Z'));
+    it('keeps a task in Hecho when the same patch sets the status (#959)', async () => {
+        vi.setSystemTime(new Fecha('2026-04-10T12:00:00.000Z'));
         const archivedTask = createStoreTask('task-archived', {
             status: 'archived',
             completedAt: '2025-06-01T17:45:00.000Z',
@@ -2838,7 +2838,7 @@ describe('TaskStore', () => {
             lastDataChangeAt: 0,
         });
 
-        // Archive's "move back to Done" deliberately keeps the old completion
+        // Archive's "move back to Hecho" deliberately keeps the old completion
         // time; re-archiving it in the same write would make it a no-op.
         await useTaskStore.getState().updateTask('task-archived', {
             status: 'done',
@@ -2849,7 +2849,7 @@ describe('TaskStore', () => {
     });
 
     it('archives a done task when the full editor resends the unchanged status (#959)', async () => {
-        vi.setSystemTime(new Date('2026-04-10T12:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-04-10T12:00:00.000Z'));
         const doneTask = createStoreTask('task-done-editor', {
             status: 'done',
             completedAt: '2026-04-09T12:00:00.000Z',
@@ -2864,7 +2864,7 @@ describe('TaskStore', () => {
         });
 
         // The desktop full editor's submit always resends the task's current
-        // status, unlike the bare `{ completedAt }` patch from "Edit completion
+        // status, unlike the bare `{ completedAt }` patch from "Editar completion
         // time" — the rule must fire for both.
         await useTaskStore.getState().updateTask('task-done-editor', {
             status: 'done',
@@ -2877,7 +2877,7 @@ describe('TaskStore', () => {
     });
 
     it('does not archive a done task when a completion-time edit clears completedAt (#959)', async () => {
-        vi.setSystemTime(new Date('2026-04-10T12:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-04-10T12:00:00.000Z'));
         const doneTask = createStoreTask('task-done-cleared', {
             status: 'done',
             completedAt: '2026-04-09T12:00:00.000Z',
@@ -2899,8 +2899,8 @@ describe('TaskStore', () => {
         expect(useTaskStore.getState()._tasksById.get('task-done-cleared')?.status).toBe('done');
     });
 
-    it('does not archive a backdated-complete task moving from Next to Done (#959)', async () => {
-        vi.setSystemTime(new Date('2026-04-10T12:00:00.000Z'));
+    it('does not archive a backdated-complete task moving from Next to Hecho (#959)', async () => {
+        vi.setSystemTime(new Fecha('2026-04-10T12:00:00.000Z'));
         const nextTask = createStoreTask('task-next-backdated', {
             status: 'next',
             completedAt: undefined,
@@ -2923,7 +2923,7 @@ describe('TaskStore', () => {
     });
 
     it('auto-archives stale completed tasks when archive days change', async () => {
-        vi.setSystemTime(new Date('2026-04-10T12:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-04-10T12:00:00.000Z'));
         const staleTask = createStoreTask('task-stale', {
             status: 'done',
             completedAt: '2026-03-01T12:00:00.000Z',
@@ -2949,12 +2949,12 @@ describe('TaskStore', () => {
         expect(archivedTask?.rev).toBe(2);
         expect(archivedTask?.revBy).toBe('device-a');
         expect(useTaskStore.getState().tasks.some((task) => task.id === staleTask.id)).toBe(false);
-        expect(useTaskStore.getState().lastDataChangeAt).toBe(new Date('2026-04-10T12:00:00.000Z').getTime());
+        expect(useTaskStore.getState().lastDataChangeAt).toBe(new Fecha('2026-04-10T12:00:00.000Z').getTime());
         expect(mockStorage.saveData).toHaveBeenCalled();
     });
 
     it('marks active tasks that belong to archived projects as done during fetch', async () => {
-        vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-02-14T10:00:00.000Z').getTime());
+        vi.spyOn(Fecha, 'now').mockReturnValue(new Fecha('2026-02-14T10:00:00.000Z').getTime());
         mockStorage.getData = vi.fn().mockResolvedValue({
             tasks: [
                 {
@@ -3007,7 +3007,7 @@ describe('TaskStore', () => {
     });
 
     it('repairs invalid project, section, and area references during fetch', async () => {
-        vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-02-14T10:00:00.000Z').getTime());
+        vi.spyOn(Fecha, 'now').mockReturnValue(new Fecha('2026-02-14T10:00:00.000Z').getTime());
         mockStorage.getData = vi.fn().mockResolvedValue({
             tasks: [
                 {
@@ -3158,7 +3158,7 @@ describe('TaskStore', () => {
             "Star up to 3 tasks for Today's Focus",
             "Make Mindwtr yours: hide what you don't use",
             'Set up sync across your devices',
-            'Import tasks from another app',
+            'Importar tasks from another app',
             'Run your first weekly review',
         ]);
         expect(starterTasks.every((task) => task.status === 'next')).toBe(true);
@@ -3248,7 +3248,7 @@ describe('TaskStore', () => {
             "Star up to 3 tasks for Today's Focus",
             "Make Mindwtr yours: hide what you don't use",
             'Set up sync across your devices',
-            'Import tasks from another app',
+            'Importar tasks from another app',
             'Run your first weekly review',
         ]);
     });
@@ -3303,7 +3303,7 @@ describe('TaskStore', () => {
             "Star up to 3 tasks for Today's Focus",
             "Make Mindwtr yours: hide what you don't use",
             'Set up sync across your devices',
-            'Import tasks from another app',
+            'Importar tasks from another app',
             'Run your first weekly review',
         ]);
         expect(visibleStarterTasks.filter((task) => task.title === 'Start here: process your first inbox item')).toHaveLength(1);
@@ -3383,7 +3383,7 @@ describe('TaskStore', () => {
             "Star up to 3 tasks for Today's Focus",
             "Make Mindwtr yours: hide what you don't use",
             'Set up sync across your devices',
-            'Import tasks from another app',
+            'Importar tasks from another app',
             'Run your first weekly review',
         ]);
     });
@@ -3598,7 +3598,7 @@ describe('TaskStore', () => {
         // 1. Trigger a change
         addTask('Test Save');
 
-        // 2. Flush pending save (should be safe even if already in-flight)
+        // 2. Vaciar pending save (should be safe even if already in-flight)
         await flushPendingSave();
 
         // Should have saved exactly once
@@ -3810,7 +3810,7 @@ describe('TaskStore', () => {
         setStorageAdapter(mockStorage);
 
         await expect(runWithImmediateSaveTracking(
-            () => useTaskStore.getState().updateTask(task.id, { title: 'First edit' })
+            () => useTaskStore.getState().updateTask(task.id, { title: 'Primero edit' })
         )).rejects.toThrow('secret adapter detail');
 
         expect(useTaskStore.getState().persistenceFailure).toMatchObject({
@@ -3872,7 +3872,7 @@ describe('TaskStore', () => {
 
         // Dispatch the incremental save. Its retry snapshot is captured now, before
         // the newer task below is created.
-        void useTaskStore.getState().updateTask(task.id, { title: 'First edit' });
+        void useTaskStore.getState().updateTask(task.id, { title: 'Primero edit' });
 
         // A newer full snapshot (with the extra task) is enqueued via debouncedSave
         // while the incremental save above is still in flight.
@@ -3918,7 +3918,7 @@ describe('TaskStore', () => {
         void useTaskStore.getState().updateTask(task2.id, { title: 'B edit' });
         expect(rejectors).toHaveLength(2);
 
-        // Both fail, in dispatch order (A's write settles first). Each
+        // Both fail, in dispatch order (A's write settles first). Cada
         // rejection's catch chain (trackImmediateSave's internal .catch()
         // .finally(), then store-tasks.ts's outer .catch()) needs a couple of
         // microtask hops to fully settle; ticking between them (and after)
@@ -4167,14 +4167,14 @@ describe('TaskStore', () => {
             sectionId: section.id,
             status: 'reference',
             checklist: [
-                { id: 'c1', title: 'Confirm venue', isCompleted: true },
+                { id: 'c1', title: 'Confirmar venue', isCompleted: true },
                 { id: 'c2', title: 'Send agenda', isCompleted: false },
             ],
         });
 
         const duplicated = await duplicateProject(project.id);
 
-        expect(duplicated?.title).toBe('Launch Template (Copy)');
+        expect(duplicated?.title).toBe('Launch Template (Copiar)');
         const duplicatedSection = useTaskStore.getState()._allSections.find((item) => (
             item.projectId === duplicated?.id && item.title === 'Preparation'
         ));
@@ -4188,7 +4188,7 @@ describe('TaskStore', () => {
             title: item.title,
             isCompleted: item.isCompleted,
         }))).toEqual([
-            { title: 'Confirm venue', isCompleted: false },
+            { title: 'Confirmar venue', isCompleted: false },
             { title: 'Send agenda', isCompleted: false },
         ]);
         expect(duplicatedTask?.checklist?.map((item) => item.id)).not.toEqual(['c1', 'c2']);
@@ -4201,7 +4201,7 @@ describe('TaskStore', () => {
         const project = useTaskStore.getState().projects[0];
         addTask('Task 1', { status: 'next', projectId: project.id });
         addTask('Task 2', { status: 'waiting', projectId: project.id });
-        addTask('Already Done', {
+        addTask('Already Hecho', {
             status: 'done',
             completedAt: '2026-03-20T10:00:00.000Z',
             updatedAt: '2026-03-20T10:00:00.000Z',
@@ -4224,8 +4224,8 @@ describe('TaskStore', () => {
         expect(projectTasks.filter((task) => task.status === 'done')).toHaveLength(3);
         expect(projectTasks.find((task) => task.title === 'Task 1')?.statusBeforeProjectArchive).toBe('next');
         expect(projectTasks.find((task) => task.title === 'Task 2')?.statusBeforeProjectArchive).toBe('waiting');
-        expect(projectTasks.find((task) => task.title === 'Already Done')?.completedAt).toBe('2026-03-20T10:00:00.000Z');
-        expect(projectTasks.find((task) => task.title === 'Already Done')?.statusBeforeProjectArchive).toBeUndefined();
+        expect(projectTasks.find((task) => task.title === 'Already Hecho')?.completedAt).toBe('2026-03-20T10:00:00.000Z');
+        expect(projectTasks.find((task) => task.title === 'Already Hecho')?.statusBeforeProjectArchive).toBeUndefined();
         expect(projectTasks.find((task) => task.title === 'Already Archived')?.status).toBe('archived');
         expect(projectSections).toHaveLength(1);
         expect(projectSections[0].deletedAt).toBeTruthy();
@@ -4244,7 +4244,7 @@ describe('TaskStore', () => {
             isFocusedToday: true,
         });
         addTask('Waiting Task', { status: 'waiting', projectId: project.id });
-        addTask('Already Done', {
+        addTask('Already Hecho', {
             status: 'done',
             completedAt: '2026-03-20T10:00:00.000Z',
             projectId: project.id,
@@ -4258,7 +4258,7 @@ describe('TaskStore', () => {
         const projectTasks = useTaskStore.getState()._allTasks.filter(t => t.projectId === project.id && !t.deletedAt);
         const nextTask = projectTasks.find((task) => task.title === 'Next Task');
         const waitingTask = projectTasks.find((task) => task.title === 'Waiting Task');
-        const doneTask = projectTasks.find((task) => task.title === 'Already Done');
+        const doneTask = projectTasks.find((task) => task.title === 'Already Hecho');
         const projectSections = useTaskStore.getState()._allSections.filter((item) => item.projectId === project.id);
 
         expect(nextTask?.status).toBe('next');
@@ -4367,7 +4367,7 @@ describe('TaskStore', () => {
     });
 
     it('stamps a recurring follow-up task with revision metadata', async () => {
-        vi.setSystemTime(new Date('2026-07-01T12:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-07-01T12:00:00.000Z'));
         const { addTask, moveTask } = useTaskStore.getState();
         await addTask('Daily stamped task', {
             status: 'next',
@@ -4391,7 +4391,7 @@ describe('TaskStore', () => {
     // instead of dropping below every sibling (which is what a missing order, sorted
     // as +Infinity by compareTasksByProjectOrder, or a max+1 reservation would do).
     it('gives a recurring follow-up the completed task place in the project', async () => {
-        vi.setSystemTime(new Date('2026-07-01T12:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-07-01T12:00:00.000Z'));
         const { addProject, addTask, moveTask } = useTaskStore.getState();
         const project = await addProject('Ops', '#123456');
         const recurring = await addTask('Daily standup', {
@@ -4415,7 +4415,7 @@ describe('TaskStore', () => {
     });
 
     it('keeps the completed task place for a follow-up created in a batch update', async () => {
-        vi.setSystemTime(new Date('2026-07-01T12:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-07-01T12:00:00.000Z'));
         const { addProject, addTask, batchMoveTasks } = useTaskStore.getState();
         const project = await addProject('Ops batch', '#123456');
         const recurring = await addTask('Daily batch standup', {
@@ -4435,7 +4435,7 @@ describe('TaskStore', () => {
     });
 
     it('reserves an order for a follow-up whose completed task had none', async () => {
-        vi.setSystemTime(new Date('2026-07-01T12:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-07-01T12:00:00.000Z'));
         const project = createStoreProject('project-legacy');
         const sibling = createStoreTask('sibling', { status: 'next', projectId: project.id, order: 0, orderNum: 0 });
         // Legacy row from before project ordering: in a project, but no order.
@@ -4464,7 +4464,7 @@ describe('TaskStore', () => {
     });
 
     it('does not append a duplicate recurring follow-up when one already exists', async () => {
-        vi.setSystemTime(new Date('2026-06-09T00:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-06-09T00:00:00.000Z'));
 
         const current: Task = {
             id: 'weekly-current',
@@ -4499,7 +4499,7 @@ describe('TaskStore', () => {
     });
 
     it('does not merge independent recurring series with the same title and schedule', async () => {
-        vi.setSystemTime(new Date('2026-06-09T00:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-06-09T00:00:00.000Z'));
 
         const current: Task = {
             id: 'home-timeblock',
@@ -4556,7 +4556,7 @@ describe('TaskStore', () => {
     });
 
     it('keeps duplicated recurring tasks as independent series', async () => {
-        vi.setSystemTime(new Date('2026-06-09T00:00:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-06-09T00:00:00.000Z'));
         const { addTask, duplicateTask, updateTask } = useTaskStore.getState();
         const originalResult = await addTask('Timeblock', {
             status: 'next',
@@ -4587,7 +4587,7 @@ describe('TaskStore', () => {
     // scan sees the pre-update snapshot, where the task being completed still reads
     // as live, so it used to match itself and the series silently ended (#867).
     it('keeps spawning when a fluid occurrence and its follow-up are completed the same day', async () => {
-        vi.setSystemTime(new Date('2026-07-22T09:30:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-07-22T09:30:00.000Z'));
 
         const chore: Task = {
             id: 'chore',
@@ -4632,14 +4632,14 @@ describe('TaskStore', () => {
 
         expect(completed.completedAt).toBeTruthy();
         const completedAt = completed.completedAt!;
-        const base = safeParseDate(completedAt) ?? new Date(completedAt);
+        const base = safeParseDate(completedAt) ?? new Fecha(completedAt);
         const expectedNext = addDays(base, 1).toISOString();
         expect(nextInstance.dueDate).toBe(expectedNext);
     });
 
     it('should increment pushCount when dueDate is pushed later', () => {
         const { addTask, updateTask } = useTaskStore.getState();
-        addTask('Push Count', {
+        addTask('Push Contar', {
             status: 'next',
             dueDate: '2025-01-01T09:00:00.000Z',
         });
@@ -4705,7 +4705,7 @@ describe('TaskStore', () => {
             expect(project).not.toBeNull();
             if (!project) return;
 
-            const section = await addSection(project.id, 'Delete once');
+            const section = await addSection(project.id, 'Eliminar once');
             expect(section).not.toBeNull();
             if (!section) return;
 
@@ -4729,7 +4729,7 @@ describe('TaskStore', () => {
             expect(otherProject).not.toBeNull();
             if (!project || !otherProject) return;
 
-            const first = await addSection(project.id, 'First');
+            const first = await addSection(project.id, 'Primero');
             const second = await addSection(project.id, 'Second');
             const third = await addSection(project.id, 'Third');
             const other = await addSection(otherProject.id, 'Other');
@@ -4844,11 +4844,11 @@ describe('TaskStore', () => {
             const task = useTaskStore.getState()._allTasks.find((item) => item.title === 'Existing Task')!;
 
             const result = await batchUpdateTasks([
-                { id: task.id, updates: { title: 'First change' } },
+                { id: task.id, updates: { title: 'Primero change' } },
                 { id: task.id, updates: { title: 'Second change' } },
             ]);
 
-            expect(result).toEqual({ success: false, error: `Duplicate task ids in batch update: ${task.id}` });
+            expect(result).toEqual({ success: false, error: `Duplicado task ids in batch update: ${task.id}` });
             expect(useTaskStore.getState()._allTasks.find((item) => item.id === task.id)?.title).toBe('Existing Task');
         });
 
@@ -4895,18 +4895,18 @@ describe('TaskStore', () => {
 
         it('keeps the task lookup aligned after batch updates and deletes', async () => {
             const { addTask, batchDeleteTasks, batchUpdateTasks } = useTaskStore.getState();
-            await addTask('First Task', { status: 'next' });
+            await addTask('Primero Task', { status: 'next' });
             await addTask('Second Task', { status: 'next' });
-            const firstTask = useTaskStore.getState()._allTasks.find((item) => item.title === 'First Task')!;
+            const firstTask = useTaskStore.getState()._allTasks.find((item) => item.title === 'Primero Task')!;
             const secondTask = useTaskStore.getState()._allTasks.find((item) => item.title === 'Second Task')!;
 
             await batchUpdateTasks([
-                { id: firstTask.id, updates: { title: 'Updated First Task' } },
+                { id: firstTask.id, updates: { title: 'Updated Primero Task' } },
             ]);
             let state = useTaskStore.getState();
             const updatedFirstTask = state._allTasks.find((item) => item.id === firstTask.id)!;
             expect(state._tasksById.get(firstTask.id)).toBe(updatedFirstTask);
-            expect(state._tasksById.get(firstTask.id)?.title).toBe('Updated First Task');
+            expect(state._tasksById.get(firstTask.id)?.title).toBe('Updated Primero Task');
 
             await batchDeleteTasks([firstTask.id, secondTask.id]);
 
@@ -4921,7 +4921,7 @@ describe('TaskStore', () => {
 
         it('detaches live project task section ids when deleting a project', async () => {
             const { addProject, addSection, addTask, deleteProject, restoreProject } = useTaskStore.getState();
-            const project = await addProject('Delete Project', '#333333');
+            const project = await addProject('Eliminar Project', '#333333');
             expect(project).not.toBeNull();
             if (!project) return;
             const section = await addSection(project.id, 'Cleanup');
@@ -5012,7 +5012,7 @@ describe('TaskStore', () => {
 
         it('purges all deleted projects from Trash', async () => {
             const { addProject, deleteProject, purgeDeletedProjects } = useTaskStore.getState();
-            const first = await addProject('First Deleted Project', '#444444');
+            const first = await addProject('Primero Deleted Project', '#444444');
             const second = await addProject('Second Deleted Project', '#555555');
             expect(first).not.toBeNull();
             expect(second).not.toBeNull();
@@ -5045,7 +5045,7 @@ describe('TaskStore', () => {
             vi.useFakeTimers();
             try {
                 await deleteTask(deletedTask.id);
-                vi.setSystemTime(new Date('2026-04-01T12:00:01.000Z'));
+                vi.setSystemTime(new Fecha('2026-04-01T12:00:01.000Z'));
                 await deleteProject(project.id);
                 await restoreProject(project.id);
             } finally {

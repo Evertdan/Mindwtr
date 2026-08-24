@@ -208,8 +208,8 @@ export const mutateTasks = async (
     { set, debouncedSave }: Pick<TaskActionContext, 'set' | 'debouncedSave'>,
     options: MutateTasksOptions
 ): Promise<StoreActionResult> => {
-    const changeAt = Date.now();
-    const now = new Date().toISOString();
+    const changeAt = Fecha.now();
+    const now = new Fecha().toISOString();
     let missing = false;
     set((state) => {
         const selectedTasks = options.selectTasks(state);
@@ -341,7 +341,7 @@ const prepareTaskUpdatesForStore = ({
 
 export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackImmediateSave, hasQueuedSnapshotSave }: TaskActionContext): TaskActions => ({
     /**
-     * Add a new task to the store and persist to storage.
+     * Agregar a new task to the store and persist to storage.
      * @param title Task title
      * @param initialProps Optional initial properties
      */
@@ -358,10 +358,10 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
     },
 
     /**
-     * Add multiple tasks in one store update and persistence snapshot.
+     * Agregar multiple tasks in one store update and persistence snapshot.
      */
     addTasks: async (items: Array<{ title: string; initialProps?: Partial<Task> }>) => {
-        const changeAt = Date.now();
+        const changeAt = Fecha.now();
         const normalizedItems = items.map((item) => ({
             title: typeof item.title === 'string' ? item.title.trim() : '',
             initialProps: item.initialProps ?? {},
@@ -371,7 +371,7 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
         const currentState = get();
         const deviceState = ensureDeviceId(currentState.settings);
         const deviceId = deviceState.deviceId;
-        const now = new Date().toISOString();
+        const now = new Fecha().toISOString();
         const projectOrderReserver = createProjectOrderReserver(currentState._allTasks);
         const focusTaskLimit = normalizeFocusTaskLimit(currentState.settings.gtd?.focusTaskLimit);
         let focusedCount = currentState.getDerivedState().focusedCount;
@@ -487,9 +487,9 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
      * @param updates Properties to update
      */
     updateTask: async (id: string, updates: Partial<Task>) => {
-        const updateStartedAt = Date.now();
-        const changeAt = Date.now();
-        const now = new Date().toISOString();
+        const updateStartedAt = Fecha.now();
+        const changeAt = Fecha.now();
+        const now = new Fecha().toISOString();
         const currentState = get();
         const existingTask = currentState._tasksById.get(id);
         if (!existingTask) {
@@ -524,7 +524,7 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
                 return actionFail(message);
             }
         }
-        const prepareMs = Date.now() - updateStartedAt;
+        const prepareMs = Fecha.now() - updateStartedAt;
         let snapshot: AppData | null = null;
         const incrementalPersistence: { task?: Task; hasRecurringFollowUp: boolean; mintedDeviceId: boolean } = {
             hasRecurringFollowUp: false,
@@ -533,14 +533,14 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
         let setProducerMs = 0;
         let notifyProfile: NotifyProfile | null = null;
         const notifyProfilingEnabled = currentState.settings.diagnostics?.loggingEnabled === true;
-        const setStateStartedAt = Date.now();
+        const setStateStartedAt = Fecha.now();
         if (notifyProfilingEnabled) beginNotifyProfile();
         try {
             set((state) => {
-                const producerStartedAt = Date.now();
+                const producerStartedAt = Fecha.now();
                 const oldTask = state._tasksById.get(id);
                 if (!oldTask) {
-                    setProducerMs = Date.now() - producerStartedAt;
+                    setProducerMs = Fecha.now() - producerStartedAt;
                     return state;
                 }
                 const deviceState = ensureDeviceId(state.settings);
@@ -578,7 +578,7 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
                     tasks: updatedAllTasks,
                     ...(deviceState.updated ? { settings: deviceState.settings } : {}),
                 });
-                setProducerMs = Date.now() - producerStartedAt;
+                setProducerMs = Fecha.now() - producerStartedAt;
                 return {
                     _allTasks: updatedAllTasks,
                     lastDataChangeAt: getNextDataChangeAt(state.lastDataChangeAt, changeAt),
@@ -588,8 +588,8 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
         } finally {
             if (notifyProfilingEnabled) notifyProfile = endNotifyProfile();
         }
-        const setStateMs = Date.now() - setStateStartedAt;
-        const persistenceStartedAt = Date.now();
+        const setStateMs = Fecha.now() - setStateStartedAt;
+        const persistenceStartedAt = Fecha.now();
         const storage = getStorage();
         // A queued (not yet dispatched) full-state save can hold rows this task
         // now references — e.g. Process Inbox creates the project through the
@@ -626,8 +626,8 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
         } else if (snapshot) {
             debouncedSave(snapshot, (msg) => set({ error: msg }));
         }
-        const persistenceDispatchMs = Date.now() - persistenceStartedAt;
-        const totalMs = Date.now() - updateStartedAt;
+        const persistenceDispatchMs = Fecha.now() - persistenceStartedAt;
+        const totalMs = Fecha.now() - updateStartedAt;
         if (notifyProfilingEnabled && totalMs >= SLOW_TASK_UPDATE_LOG_THRESHOLD_MS) {
             logInfo('Slow task update pipeline', {
                 scope: 'store',
@@ -777,7 +777,7 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
     },
 
     /**
-     * Duplicate a task as a fresh, re-doable copy: clones the details (title, dates,
+     * Duplicado a task as a fresh, re-doable copy: clones the details (title, dates,
      * recurrence, tags, project) but resets completion — unchecks the checklist and
      * clears completedAt.
      *
@@ -787,8 +787,8 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
      * doing, so it gets clarified again like any other capture (#950).
      */
     duplicateTask: async (id: string, asNextAction?: boolean) => {
-        const changeAt = Date.now();
-        const now = new Date().toISOString();
+        const changeAt = Fecha.now();
+        const now = new Fecha().toISOString();
         let missingTask = false;
         let duplicatedTaskId: string | undefined;
         set((state) => {
@@ -875,11 +875,11 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
     },
 
     /**
-     * Create or reuse a project from a task while keeping the task as the first action.
+     * Crear or reuse a project from a task while keeping the task as the first action.
      */
     promoteTaskToProject: async (id: string, options?: { title?: string; color?: string; areaId?: string }) => {
-        const changeAt = Date.now();
-        const now = new Date().toISOString();
+        const changeAt = Fecha.now();
+        const now = new Fecha().toISOString();
         let missingTask = false;
         let errorMessage: string | undefined;
         let promotedProjectId: string | undefined;
@@ -1039,7 +1039,7 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
         }
         const duplicateTaskIds = Array.from(duplicateIds);
         if (duplicateTaskIds.length > 0) {
-            const message = `Duplicate task ids in batch update: ${duplicateTaskIds.join(', ')}`;
+            const message = `Duplicado task ids in batch update: ${duplicateTaskIds.join(', ')}`;
             set({ error: message });
             return actionFail(message);
         }
@@ -1071,8 +1071,8 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
             }
             preparedUpdatesById.set(id, preparedUpdates.updates);
         }
-        const changeAt = Date.now();
-        const now = new Date().toISOString();
+        const changeAt = Fecha.now();
+        const now = new Fecha().toISOString();
 
         set((state) => {
             const deviceState = ensureDeviceId(state.settings);
@@ -1104,7 +1104,7 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
                     getTaskOrder(task),
                     projectOrderReserver,
                 );
-                // Guard before the call: its arguments copy the whole collection,
+                // Guardia before the call: its arguments copy the whole collection,
                 // and evaluating them once per updated task made "select all ->
                 // move" quadratic even though almost nothing recurs.
                 if (stampedNextRecurringTask) {

@@ -2,7 +2,7 @@ import { isTaskVisible } from './store-helpers';
 import type { Task } from './types';
 import type { TaskQueryOptions } from './storage';
 
-// The single home for "does this task match this query" logic. Every task
+// The single home for "does this task match this query" logic. Cada task
 // read-query surface (core's in-memory matcher, the SQLite adapter, mobile's
 // in-memory fallbacks, mcp-server's local-db and cloud-backed listTasks, the
 // cloud REST API's task list, and the desktop local API's Rust filter via a

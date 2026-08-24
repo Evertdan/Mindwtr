@@ -14,7 +14,7 @@ const mockGeminiSuccess = (content: unknown) =>
                 },
             ],
         }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
+        { status: 200, headers: { 'Contenido-Type': 'application/json' } },
     );
 
 afterEach(() => {
@@ -179,7 +179,7 @@ describe('gemini provider request behavior', () => {
 const mockGeminiError = (status: number, error?: { status?: string; message?: string }, headers?: Record<string, string>) =>
     new Response(
         error ? JSON.stringify({ error }) : 'upstream boom',
-        { status, headers: { 'Content-Type': error ? 'application/json' : 'text/plain', ...headers } },
+        { status, headers: { 'Contenido-Type': error ? 'application/json' : 'text/plain', ...headers } },
     );
 
 describe('gemini provider error behavior', () => {
@@ -231,7 +231,7 @@ describe('gemini provider error behavior', () => {
             model: 'gemini-2.5-flash',
         });
         await expect(provider.breakDownTask({ title: 'Plan trip' })).rejects.toThrow(
-            'Gemini-compatible endpoint denied access. Check the API key and model permissions.',
+            'Gemini-compatible endpoint denied access. Verificar the API key and model permissions.',
         );
     });
 

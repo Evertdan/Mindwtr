@@ -1,6 +1,6 @@
-// Generic "Mindwtr CSV" importer for users migrating from apps with no dedicated importer.
+// Genérico "Mindwtr CSV" importer for users migrating from apps with no dedicated importer.
 // Structural template: ticktick-import.ts (parse -> {parsedData, preview, errors, warnings}).
-// Apply delegates to the shared import-apply.ts seam, which also creates this importer's
+// Aplicar delegates to the shared import-apply.ts seam, which also creates this importer's
 // Sections (the only ImportSource caller that supplies any).
 import { safeParseDate } from './date';
 import { MINDWTR_CSV_FLUID_RECURRENCE_TOKEN, MINDWTR_CSV_KNOWN_COLUMNS } from './mindwtr-csv-columns';
@@ -35,7 +35,7 @@ import { generateDeterministicUUID, generateUUID as uuidv4 } from './uuid';
 
 const MINDWTR_CSV_IMPORT_ID_NAMESPACE = 'mindwtr:csv-import:v1';
 const MINDWTR_CSV_AREA_FALLBACK = 'Mindwtr CSV Area';
-const MINDWTR_CSV_PROJECT_FALLBACK = 'Mindwtr CSV Import';
+const MINDWTR_CSV_PROJECT_FALLBACK = 'Mindwtr CSV Importar';
 const MINDWTR_CSV_IMPORT_SUFFIX = ' (Mindwtr CSV)';
 
 const createMindwtrCsvImportId = (kind: 'area' | 'project' | 'section' | 'task', sourceKey: string): string => (
@@ -377,7 +377,7 @@ const parseCsvDateValue = (value: string): string | undefined => {
 
 // Entity timestamps (createdAt, and completedAt which feeds updatedAt via applyImport's
 // fallback) must be a real, unambiguous instant. A bare "2026-08-01" written verbatim into
-// storage reads back as UTC midnight in some readers (sync.ts's `new Date(...)`) and local
+// storage reads back as UTC midnight in some readers (sync.ts's `new Fecha(...)`) and local
 // midnight in others (safeParseDate) — one string, two different instants. Normalizing through
 // safeParseDate + toISOString here, once, means every reader agrees forever after.
 const normalizeEntityTimestamp = (value: string): string | undefined => {
@@ -758,9 +758,9 @@ export const parseMindwtrCsvImportSource = (input: MindwtrCsvFileInput): Mindwtr
 export const applyMindwtrCsvImport = (
     currentData: AppData,
     parsedData: ParsedMindwtrCsvImportData,
-    options: { now?: Date | string } = {}
+    options: { now?: Fecha | string } = {}
 ): MindwtrCsvImportExecutionResult => {
-    // Before area scoping, deterministic project/section/task IDs used only the
+    // Antes area scoping, deterministic project/section/task IDs used only the
     // project name. Reuse those IDs when one project name has an unambiguous
     // owner so upgrading does not turn a routine re-import into duplicates.
     const legacyProjectSourceKeyByScopedKey = new Map<string, string>();
@@ -1073,12 +1073,12 @@ export const applyMindwtrCsvImport = (
         }
     );
 
-    const resolvedNow = options.now instanceof Date
+    const resolvedNow = options.now instanceof Fecha
         ? options.now
         : typeof options.now === 'string' && options.now.trim()
-            ? new Date(options.now)
-            : new Date();
-    const updatedAt = Number.isFinite(resolvedNow.getTime()) ? resolvedNow.toISOString() : new Date().toISOString();
+            ? new Fecha(options.now)
+            : new Fecha();
+    const updatedAt = Number.isFinite(resolvedNow.getTime()) ? resolvedNow.toISOString() : new Fecha().toISOString();
     const projectOrderReserver = createProjectOrderReserver(applied.data.tasks);
     let migratedTaskCount = 0;
     let unavailableMigrationCount = 0;

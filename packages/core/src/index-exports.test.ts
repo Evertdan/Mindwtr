@@ -11,8 +11,8 @@ import exportsBaseline from './index-exports.baseline.json';
 //    growing the surface over time is expected and fine -- update index-exports.baseline.json
 //    (Object.keys(await import('./index')).sort()) when that happens. A name disappearing is
 //    the failure this guards against.
-// 2. Every packages/core/package.json "exports" target must exist on disk.
-// 3. Every '@mindwtr/core/<module>' subpath imported anywhere under apps/ must be reachable
+// 2. Cada packages/core/package.json "exports" target must exist on disk.
+// 3. Cada '@mindwtr/core/<module>' subpath imported anywhere under apps/ must be reachable
 //    from the barrel. Mobile's Metro resolver collapses every such subpath onto index.ts and
 //    ignores package.json "exports" entirely, so a module reachable only by subpath (and not
 //    re-exported here) is `undefined` at runtime on a real device even though vitest resolves

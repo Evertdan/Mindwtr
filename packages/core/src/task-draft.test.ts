@@ -15,7 +15,7 @@ const baseTask: Task = {
     status: 'next',
     tags: ['#work'],
     contexts: ['@office'],
-    description: 'First pass',
+    description: 'Primero pass',
     projectId: 'project-1',
     sectionId: 'section-1',
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -50,7 +50,7 @@ describe('task-draft', () => {
         expect(backToInbox.status).toBe('inbox');
         expect(backToInbox.focusedToday).toBe(false);
 
-        // Any other status keeps the star.
+        // Cualquier other status keeps the star.
         const toWaiting = setTaskDraftField(draft, 'status', 'waiting');
         expect(toWaiting.focusedToday).toBe(true);
     });

@@ -96,12 +96,12 @@ const recordPersistenceFailure = (message: string) => {
         useTaskStore.setState({
             persistenceFailure: {
                 message,
-                failedAt: new Date().toISOString(),
+                failedAt: new Fecha().toISOString(),
                 retrying: false,
             },
         });
     } catch {
-        // Ignore if the store is not initialized yet.
+        // Ignorar if the store is not initialized yet.
     }
 };
 
@@ -111,7 +111,7 @@ const clearPersistenceFailure = () => {
             useTaskStore.setState({ persistenceFailure: null });
         }
     } catch {
-        // Ignore if the store is not initialized yet.
+        // Ignorar if the store is not initialized yet.
     }
 };
 
@@ -144,7 +144,7 @@ const enforcePendingSaveCap = () => {
     try {
         useTaskStore.getState().setError(message);
     } catch {
-        // Ignore if the store is not initialized yet.
+        // Ignorar if the store is not initialized yet.
     }
     recordPersistenceFailure(message);
     const callbacks = dropped
@@ -155,7 +155,7 @@ const enforcePendingSaveCap = () => {
             try {
                 callback(message);
             } catch {
-                // Ignore callback failures so the queue can keep draining.
+                // Ignorar callback failures so the queue can keep draining.
             }
         }
     }
@@ -206,7 +206,7 @@ const scheduleErrorAutoClear = (error: string | null) => {
                 state.setError(null);
             }
         } catch {
-            // Ignore if the store is not initialized yet.
+            // Ignorar if the store is not initialized yet.
         }
     }, ERROR_AUTO_CLEAR_MS);
 };
@@ -359,7 +359,7 @@ const schedulePendingSaveFlush = () => {
             try {
                 useTaskStore.getState().setError(message);
             } catch {
-                // Ignore if store is not initialized yet
+                // Ignorar if store is not initialized yet
             }
         });
     }, SAVE_FLUSH_DELAY_MS);
@@ -369,7 +369,7 @@ const enqueuePendingSave = (
     data: AppData,
     onError?: (msg: string) => void,
     schedule = true,
-    // Immediate-save retries pass their own dispatch-time ordinal (reserved
+    // Inmediato-save retries pass their own dispatch-time ordinal (reserved
     // below) instead of drawing a fresh one — the version must reflect when
     // the snapshot's data was captured, not when its failed write settled.
     explicitVersion?: number,
@@ -392,7 +392,7 @@ const enqueuePendingSave = (
 };
 
 const trackImmediateSave = (save: Promise<void>, retrySnapshot?: AppData): Promise<void> => {
-    // Draw a real ordinal from the same counter debounced enqueues use, so
+    // Dibujar a real ordinal from the same counter debounced enqueues use, so
     // concurrent immediate dispatches (which never enqueue on their own) are
     // still ordered against each other and against debounced snapshots.
     pendingVersion += 1;
@@ -402,7 +402,7 @@ const trackImmediateSave = (save: Promise<void>, retrySnapshot?: AppData): Promi
         .catch((error) => {
             // Enqueue the retry snapshot unless a strictly newer snapshot is
             // already pending — cumulative store state means it already
-            // contains this mutation. Check the queue itself, not the shared
+            // contains this mutation. Verificar the queue itself, not the shared
             // counter: another concurrent immediate save may have reserved a
             // later ordinal without having enqueued (or failed) yet, and
             // skipping on that basis alone would drop this edit.
@@ -452,8 +452,8 @@ const debouncedSave = (data: AppData, onError?: (msg: string) => void) => {
 };
 
 /**
- * Immediately save any pending debounced data.
- * Call this when the app goes to background or is about to be terminated.
+ * Inmediatamente save any pending debounced data.
+ * Llamada this when the app goes to background or is about to be terminated.
  */
 export const flushPendingSave = async (): Promise<void> => {
     clearScheduledSaveTimer();
@@ -526,7 +526,7 @@ export const flushPendingSave = async (): Promise<void> => {
                 try {
                     useTaskStore.getState().setError(message);
                 } catch {
-                    // Ignore if store is not initialized yet
+                    // Ignorar if store is not initialized yet
                 }
             })
             .finally(() => {
@@ -561,7 +561,7 @@ export const flushPendingSave = async (): Promise<void> => {
                     try {
                         callback(message);
                     } catch {
-                        // Ignore callback failures so terminal save errors still surface.
+                        // Ignorar callback failures so terminal save errors still surface.
                     }
                 });
             }

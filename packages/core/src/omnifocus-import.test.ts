@@ -57,7 +57,7 @@ const buildOmniFocusJsonZip = (): Uint8Array => zipSync({
             },
             {
                 id: 'task-1a',
-                name: 'Confirm scope',
+                name: 'Confirmar scope',
                 note: '',
                 dueDate: null,
                 deferDate: null,
@@ -160,22 +160,22 @@ const buildOmniFocusRRuleZip = (ruleString: string): Uint8Array => zipSync({
 describe('omnifocus import', () => {
     it('parses OmniFocus CSV rows into projects and tasks, preserving unmapped fields in notes', () => {
         const csv = [
-            'Task ID,Type,Name,Status,Project,Context,Start Date,Planned Date,Due Date,Completion Date,Duration,Flagged,Notes,Tags',
+            'Task ID,Type,Name,Status,Project,Contexto,Start Fecha,Planned Fecha,Due Fecha,Completion Fecha,Duration,Flagged,Notes,Tags',
             '1,Project,House Renovation,Active,,,,,2026-05-10,,,0,Project support note,Home',
             '2,Action,Buy paint,Available,House Renovation,Errands,2026-05-01,2026-05-03,2026-05-06,,45m,1,Eggshell white,Deep Work',
-            '3,Action,Inbox follow-up,Completed,,Calls,"May 7, 2026","May 8, 2026","May 9, 2026","May 10, 2026",,0,Call contractor,Phone',
-            '4,Action Group,Pack tools,Available,House Renovation,,,,,,0,,Prep list,Workshop',
+            '3,Action,Inbox follow-up,Completed,,Calls,"May 7, 2026","May 8, 2026","May 9, 2026","May 10, 2026",,0,Llamada contractor,Phone',
+            '4,Action Grupo,Pack tools,Available,House Renovation,,,,,,0,,Prep list,Workshop',
         ].join('\n');
 
         const result = parseOmniFocusImportSource({
-            fileName: 'OmniFocus Export.csv',
+            fileName: 'OmniFocus Exportar.csv',
             text: csv,
         });
 
         expect(result.valid).toBe(true);
         expect(result.errors).toEqual([]);
         expect(result.preview).toMatchObject({
-            fileName: 'OmniFocus Export.csv',
+            fileName: 'OmniFocus Exportar.csv',
             projectCount: 1,
             taskCount: 3,
             standaloneTaskCount: 1,
@@ -222,7 +222,7 @@ describe('omnifocus import', () => {
 
     it('parses UTF-16 OmniFocus CSV files', () => {
         const csv = [
-            'Task ID,Type,Name,Status,Project,Context,Start Date,Planned Date,Due Date,Completion Date,Duration,Flagged,Notes,Tags',
+            'Task ID,Type,Name,Status,Project,Contexto,Start Fecha,Planned Fecha,Due Fecha,Completion Fecha,Duration,Flagged,Notes,Tags',
             '1,Action,Sample inbox task,Available,,,,,,,,0,,',
         ].join('\n');
 
@@ -265,12 +265,12 @@ describe('omnifocus import', () => {
 
     it('imports parsed OmniFocus data into projects and standalone inbox tasks', () => {
         const parseResult = parseOmniFocusImportSource({
-            fileName: 'OmniFocus Export.csv',
+            fileName: 'OmniFocus Exportar.csv',
             text: [
-                'Task ID,Type,Name,Status,Project,Context,Start Date,Planned Date,Due Date,Completion Date,Duration,Flagged,Notes,Tags',
+                'Task ID,Type,Name,Status,Project,Contexto,Start Fecha,Planned Fecha,Due Fecha,Completion Fecha,Duration,Flagged,Notes,Tags',
                 '1,Project,House Renovation,Active,,,,,2026-05-10,,,0,Project support note,Home',
                 '2,Action,Buy paint,Available,House Renovation,Errands,2026-05-01,,2026-05-06,,45m,1,Eggshell white,Deep Work',
-                '3,Action,Inbox follow-up,Available,,Calls,,,,,,0,Call contractor,Phone',
+                '3,Action,Inbox follow-up,Available,,Calls,,,,,,0,Llamada contractor,Phone',
             ].join('\n'),
         });
         if (!parseResult.valid || !parseResult.parsedData) {
@@ -335,7 +335,7 @@ describe('omnifocus import', () => {
             status: 'inbox',
             tags: ['#phone'],
             contexts: ['@Calls'],
-            description: 'Call contractor',
+            description: 'Llamada contractor',
         });
     });
 
@@ -375,7 +375,7 @@ describe('omnifocus import', () => {
 
         const parentTask = parsed?.tasks.find((task) => task.title === 'Plan sprint');
         expect(parentTask).toMatchObject({
-            checklist: [{ title: 'Confirm scope', isCompleted: true }],
+            checklist: [{ title: 'Confirmar scope', isCompleted: true }],
             dueDate: '2026-04-23T21:00:00.000Z',
             priority: 'high',
             projectSourceKey: 'omnifocus-project:project-1',
@@ -479,7 +479,7 @@ describe('omnifocus import', () => {
 
         const checklistTask = result.data.tasks.find((task) => task.title === 'Plan sprint');
         expect(checklistTask).toMatchObject({
-            checklist: [{ title: 'Confirm scope', isCompleted: true }],
+            checklist: [{ title: 'Confirmar scope', isCompleted: true }],
             dueDate: '2026-04-23T21:00:00.000Z',
             priority: 'high',
             projectId: importedProject?.id,

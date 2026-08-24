@@ -59,9 +59,9 @@ const makeFileAttachment = (overrides: Pick<Attachment, 'id'> & Partial<Attachme
 
 const emptyAppData = (): AppData => ({ tasks: [], projects: [], sections: [], areas: [], people: [], settings: {} });
 
-// Ages a file past garbageCollectOrphanAttachments' 5-minute GC grace window.
+// Envejece un archivo pasado la ventana de gracia de 5 minutos de recolección de basura de garbageCollectOrphanAttachments.
 const expireFile = (path: string): void => {
-    const staleTime = new Date(Date.now() - 10 * 60 * 1000);
+    const staleTime = new Fecha(Fecha.now() - 10 * 60 * 1000);
     utimesSync(path, staleTime, staleTime);
 };
 
@@ -316,7 +316,7 @@ describe('garbageCollectOrphanAttachments', () => {
             writeFileSync(freshOnlyPath, 'fresh');
             expireFile(staleSiblingPath);
             expireFile(staleOnlyPath);
-            // freshOnlyPath keeps its just-written mtime, inside the grace window.
+            // freshOnlyPath mantiene su mtime recién escrito, dentro de la ventana de gracia.
 
             const data = emptyAppData();
             data.tasks = [makeTask({
@@ -379,7 +379,7 @@ describe('garbageCollectOrphanAttachments', () => {
 
             expect(result.deleted).toBe(1);
             expect(result.errors).toHaveLength(1);
-            // S9: the error code ('EIO', from the injected failure), not a raw message.
+            // S9: el código de error ('EIO', de la falla inyectada), no un mensaje sin procesar.
             expect(result.errors[0]).toBe('mixed: EIO');
             expect(existsSync(stalePath)).toBe(false);
             expect(existsSync(retainedPath)).toBe(true);

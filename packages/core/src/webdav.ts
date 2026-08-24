@@ -16,7 +16,7 @@ import { decryptRemoteArtifactOrThrow, isPlaintextSyncArtifact, syncEncryptedArt
 import { encryptSyncArtifact, inspectSyncArtifact, type SyncCryptoPrimitives, type SyncKeyMaterial } from './sync-crypto';
 
 export interface WebDavOptions {
-    /** Download ceiling for this call. Defaults to the per-attachment cap; the sync
+    /** Descargar ceiling for this call. Defaults to the per-attachment cap; the sync
      *  document is not an attachment and passes MAX_SYNC_DOCUMENT_BYTES instead. */
     maxBytes?: number;
     username?: string;
@@ -99,7 +99,7 @@ function buildHeaders(options: WebDavOptions): Record<string, string> {
 
 function buildReadHeaders(options: WebDavOptions): Record<string, string> {
     const headers = buildHeaders(options);
-    headers['Cache-Control'] = 'no-cache';
+    headers['Caché-Control'] = 'no-cache';
     headers.Pragma = 'no-cache';
     return headers;
 }
@@ -153,7 +153,7 @@ export const buildHttpRemoteFileFingerprint = (
         const warnOnceKey = options.warnOnceKey ?? source;
         if (shouldWarn && !warnedWeakFingerprintSources.has(warnOnceKey)) {
             warnedWeakFingerprintSources.add(warnOnceKey);
-            logWarn('WebDAV server did not provide ETag; using Last-Modified and Content-Length for fast sync fingerprint', {
+            logWarn('WebDAV server did not provide ETag; using Last-Modified and Contenido-Length for fast sync fingerprint', {
                 scope: 'sync',
                 category: 'network',
                 context: { source, warnOnceKey },
@@ -383,7 +383,7 @@ export async function webdavPutJson(
     assertWebdavUrl(url, options);
     const fetcher = options.fetcher ?? fetch;
     const headers = buildHeaders(options);
-    headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+    headers['Contenido-Type'] = headers['Contenido-Type'] || 'application/json';
     headers[WEBDAV_AUTOMKCOL_HEADER] = headers[WEBDAV_AUTOMKCOL_HEADER] || '1';
 
     const payload = JSON.stringify(data, null, 2);
@@ -437,7 +437,7 @@ async function putWebdavBytes(
     assertWebdavUrl(url, options);
     const fetcher = options.fetcher ?? fetch;
     const headers = buildHeaders(options);
-    headers['Content-Type'] = 'application/octet-stream';
+    headers['Contenido-Type'] = 'application/octet-stream';
     headers[WEBDAV_AUTOMKCOL_HEADER] = headers[WEBDAV_AUTOMKCOL_HEADER] || '1';
     const body = new Uint8Array(bytes);
     const sendPut = async (): Promise<Response> => fetchWithTimeout(
@@ -465,7 +465,7 @@ async function putWebdavBytes(
 }
 
 export type WebDavSyncDataOptions = WebDavOptions & {
-    /** Full key material (key + salt + params, e.g. from the local key cache combined
+    /** Completo key material (key + salt + params, e.g. from the local key cache combined
      *  with the locally-recorded salt/params). Omitting this is the encryption-off path
      *  and is byte-for-byte identical to calling webdavGetJson/webdavPutJson directly —
      *  same URL, same request shape, same errors (backward-compat invariant #1). */
@@ -576,7 +576,7 @@ export async function webdavPutFile(
     const payloadBytes = await toUint8Array(data);
     const buildRequest = (): { headers: Record<string, string>; body: BodyInit } => {
         const headers = buildHeaders(options);
-        headers['Content-Type'] = contentType || 'application/octet-stream';
+        headers['Contenido-Type'] = contentType || 'application/octet-stream';
         headers[WEBDAV_AUTOMKCOL_HEADER] = headers[WEBDAV_AUTOMKCOL_HEADER] || '1';
 
         const bodyBytes = new Uint8Array(payloadBytes);
@@ -584,8 +584,8 @@ export async function webdavPutFile(
         if (options.onProgress) {
             const stream = createProgressStream(bodyBytes, options.onProgress);
             body = stream ?? bodyBytes;
-            if (!headers['Content-Length']) {
-                headers['Content-Length'] = String(bodyBytes.length);
+            if (!headers['Contenido-Length']) {
+                headers['Contenido-Length'] = String(bodyBytes.length);
             }
         }
 
@@ -609,7 +609,7 @@ export async function webdavPutFile(
     }
 
     if (!res.ok) {
-        const error = new Error(`WebDAV File PUT failed (${res.status})`);
+        const error = new Error(`WebDAV Archivo PUT failed (${res.status})`);
         (error as { status?: number }).status = res.status;
         throw error;
     }
@@ -689,7 +689,7 @@ export async function webdavGetFile(
     );
 
     if (!res.ok) {
-        const error = new Error(`WebDAV File GET failed (${res.status})`);
+        const error = new Error(`WebDAV Archivo GET failed (${res.status})`);
         (error as { status?: number }).status = res.status;
         throw error;
     }

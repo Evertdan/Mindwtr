@@ -378,7 +378,7 @@ const appendEntityRevisions = (parts: string[], entities: readonly RevisionedEnt
  * computeSyncPayloadFingerprint answers the same question, but it deep clones,
  * sanitizes, key-sorts and hashes the whole library — measured at ~5 s per
  * store change on a 5k-task Android library, blocking every tap behind it
- * (#766). Every synced write bumps rev/updatedAt, and that same tuple is what
+ * (#766). Cada synced write bumps rev/updatedAt, and that same tuple is what
  * reconcileEntityCollection already trusts when it decides an in-memory entity
  * is unchanged, so digesting the tuples plus the (small) sanitized settings
  * answers the change question at a fraction of the cost. Use the payload

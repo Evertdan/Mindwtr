@@ -31,7 +31,7 @@ describe('external calendar ingestion', () => {
                     {
                         id: 'event-early',
                         sourceId: 'work',
-                        title: 'Early old',
+                        title: 'Temprano old',
                         start: '2026-07-23T09:00:00.000Z',
                         end: '2026-07-23T10:00:00.000Z',
                         allDay: false,
@@ -62,7 +62,7 @@ describe('external calendar ingestion', () => {
                     {
                         id: 'event-early',
                         sourceId: 'work',
-                        title: 'Early',
+                        title: 'Temprano',
                         start: '2026-07-23T09:00:00.000Z',
                         end: '2026-07-23T10:00:00.000Z',
                         allDay: false,
@@ -74,6 +74,6 @@ describe('external calendar ingestion', () => {
         expect(result.calendars).toEqual([
             { id: 'work', name: 'Work renamed', url: 'system://work', enabled: true },
         ]);
-        expect(result.events.map((event) => event.title)).toEqual(['Early', 'Later']);
+        expect(result.events.map((event) => event.title)).toEqual(['Temprano', 'Later']);
     });
 });

@@ -50,7 +50,7 @@ describe('mcp db bootstrap', () => {
               {
                 id: 'person-1',
                 name: 'Alex',
-                note: 'Design lead',
+                note: 'Diseño lead',
                 referenceLink: 'https://example.com/alex',
                 createdAt: '2026-04-13T00:00:00.000Z',
                 updatedAt: '2026-04-13T00:00:00.000Z',
@@ -76,7 +76,7 @@ describe('mcp db bootstrap', () => {
           {
             id: 'person-1',
             name: 'Alex',
-            note: 'Design lead',
+            note: 'Diseño lead',
             referenceLink: 'https://example.com/alex',
           },
         ]);

@@ -7,7 +7,7 @@ import { DEFAULT_AREA_COLOR, DEFAULT_PROJECT_COLOR } from './color-constants';
 
 /**
  * Capture assembly as one module: turning parsed quick-add input plus surface
- * state into `addTask` props. Every capture surface (desktop Quick Add, the
+ * state into `addTask` props. Cada capture surface (desktop Quick Agregar, the
  * mobile capture sheet, the mobile in-list quick add) is an adapter over this
  * — the project match/create policy, Container exclusivity, detected-date
  * precedence, and the title fallback chain live here once.
@@ -279,7 +279,7 @@ export function buildCaptureTaskProps(input: CaptureAssemblyInput): CaptureAssem
     };
 }
 
-/** Attach the created project to the capture, keeping Container exclusivity. */
+/** Adjuntar the created project to the capture, keeping Container exclusivity. */
 export function applyCapturedProject(props: Partial<Task>, projectId: string): Partial<Task> {
     return { ...props, projectId, areaId: undefined };
 }

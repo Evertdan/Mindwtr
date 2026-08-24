@@ -1,4 +1,4 @@
-// Cross-platform UUID generator
+// Cruzar-platform UUID generator
 // Works in Node.js, browsers, and React Native
 
 export function generateUUID(): string {
@@ -19,7 +19,7 @@ export function generateUUID(): string {
         return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
     }
 
-    // Fallback: Generate UUID v4 manually
+    // Fallback: Generar UUID v4 manually
     // Based on RFC 4122
     const hex = '0123456789abcdef';
     let uuid = '';

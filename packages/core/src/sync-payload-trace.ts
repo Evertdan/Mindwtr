@@ -1,6 +1,6 @@
 // Formatters for the optional `tracePayload` sync port (sync-run-ports.ts).
 // Shared by desktop and mobile so a trace read from either platform's log means
-// the same thing. Every string here is ids, field names, counts and
+// the same thing. Cada string here is ids, field names, counts and
 // fingerprints — never task content (#854).
 import {
     computeStableValueFingerprint,

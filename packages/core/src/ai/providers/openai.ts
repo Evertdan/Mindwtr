@@ -15,7 +15,7 @@ const resolveTimeoutMs = (value?: number) =>
 // OpenAI reasoning models such as the GPT-5 family and o-series do not support
 // configurable sampling temperature. Some models/endpoints reject explicit
 // temperature values with 400 unsupported_parameter or unsupported_value errors.
-// Detect them so we omit temperature and rely on the model default.
+// Detectar them so we omit temperature and rely on the model default.
 const isReasoningModel = (model: string): boolean => {
     const id = model.trim().toLowerCase();
     return id.startsWith('gpt-5') || /^o\d+(?:-|$)/.test(id);
@@ -205,7 +205,7 @@ async function readOpenAIErrorInfo(response: Response): Promise<OpenAIErrorInfo>
 }
 
 // A pre-Structured-Outputs official model (e.g. a manually-entered gpt-4-turbo)
-// rejects response_format: json_schema with a 400. Detect it so we can retry the
+// rejects response_format: json_schema with a 400. Detectar it so we can retry the
 // same request with the looser json_object rather than failing every AI call.
 const isUnsupportedResponseFormatError = (info: OpenAIErrorInfo): boolean => {
     if (info.status !== 400) return false;
@@ -227,17 +227,17 @@ function buildOpenAIError(info: OpenAIErrorInfo, usingOfficialOpenAI: boolean): 
     if (status === 401) {
         return usingOfficialOpenAI
             ? new Error('OpenAI API key is invalid or missing.')
-            : new Error('OpenAI-compatible endpoint rejected the request. Check the custom base URL, API key, and model.');
+            : new Error('OpenAI-compatible endpoint rejected the request. Verificar the custom base URL, API key, and model.');
     }
     if (status === 403) {
         return usingOfficialOpenAI
             ? new Error('OpenAI access denied for this model or key.')
-            : new Error('OpenAI-compatible endpoint denied access. Check the API key and model permissions.');
+            : new Error('OpenAI-compatible endpoint denied access. Verificar the API key and model permissions.');
     }
     if (status === 404) {
         return usingOfficialOpenAI
             ? new Error('OpenAI model not found or unavailable for this key.')
-            : new Error('OpenAI-compatible endpoint or model not found. Check the custom base URL and model.');
+            : new Error('OpenAI-compatible endpoint or model not found. Verificar the custom base URL and model.');
     }
     if (status === 429) {
         return usingOfficialOpenAI
@@ -301,7 +301,7 @@ async function requestOpenAI(config: AIProviderConfig, prompt: { system: string;
     };
 
     const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
+        'Contenido-Type': 'application/json',
     };
     if (apiKey) {
         headers.Authorization = `Bearer ${apiKey}`;
@@ -384,7 +384,7 @@ export function createOpenAIProvider(config: AIProviderConfig): AIProvider {
             } catch {
                 const retryPrompt = {
                     system: prompt.system,
-                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Do not include any extra text.`,
+                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Hacer not include any extra text.`,
                 };
                 const retryText = await requestOpenAI(config, retryPrompt, CLARIFY_JSON_SCHEMA, options);
                 return parseJson<ClarifyResponse>(retryText, isClarifyResponse);
@@ -398,7 +398,7 @@ export function createOpenAIProvider(config: AIProviderConfig): AIProvider {
             } catch {
                 const retryPrompt = {
                     system: prompt.system,
-                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Do not include any extra text.`,
+                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Hacer not include any extra text.`,
                 };
                 const retryText = await requestOpenAI(config, retryPrompt, BREAKDOWN_JSON_SCHEMA, options);
                 return parseJson<BreakdownResponse>(retryText, isBreakdownResponse);
@@ -412,7 +412,7 @@ export function createOpenAIProvider(config: AIProviderConfig): AIProvider {
             } catch {
                 const retryPrompt = {
                     system: prompt.system,
-                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Do not include any extra text.`,
+                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Hacer not include any extra text.`,
                 };
                 const retryText = await requestOpenAI(config, retryPrompt, REVIEW_JSON_SCHEMA, options);
                 return parseJson<ReviewAnalysisResponse>(retryText, isReviewAnalysisResponse);
@@ -434,7 +434,7 @@ export function createOpenAIProvider(config: AIProviderConfig): AIProvider {
             } catch {
                 const retryPrompt = {
                     system: prompt.system,
-                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Do not include any extra text.`,
+                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Hacer not include any extra text.`,
                 };
                 const retryText = await requestOpenAI(config, retryPrompt, COPILOT_JSON_SCHEMA, options);
                 const parsed = parseJson<CopilotResponse>(retryText, isCopilotResponse);

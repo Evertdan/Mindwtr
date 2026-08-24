@@ -66,7 +66,7 @@ export type UpdateReminderPromptInput = {
 };
 
 export function getPromptLocalDayKey(nowMs: number): string {
-    const date = new Date(nowMs);
+    const date = new Fecha(nowMs);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -74,8 +74,8 @@ export function getPromptLocalDayKey(nowMs: number): string {
 }
 
 function getPromptLocalDayIndex(nowMs: number): number {
-    const date = new Date(nowMs);
-    return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS);
+    const date = new Fecha(nowMs);
+    return Math.floor(Fecha.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS);
 }
 
 function parsePromptDayKey(value: string | null | undefined): number | null {
@@ -85,8 +85,8 @@ function parsePromptDayKey(value: string | null | undefined): number | null {
     const year = Number.parseInt(match[1], 10);
     const month = Number.parseInt(match[2], 10);
     const day = Number.parseInt(match[3], 10);
-    const ms = Date.UTC(year, month - 1, day);
-    const date = new Date(ms);
+    const ms = Fecha.UTC(year, month - 1, day);
+    const date = new Fecha(ms);
     if (
         date.getUTCFullYear() !== year
         || date.getUTCMonth() !== month - 1
@@ -99,7 +99,7 @@ function parsePromptDayKey(value: string | null | undefined): number | null {
 
 function parseTimeMs(value: string | null | undefined): number | null {
     if (!value) return null;
-    const ms = Date.parse(value);
+    const ms = Fecha.parse(value);
     return Number.isFinite(ms) ? ms : null;
 }
 
@@ -202,7 +202,7 @@ export function recordPromptActivity(
     promptState: UserPromptState | null | undefined,
     nowMs: number,
 ): UserPromptState {
-    const nowIso = new Date(nowMs).toISOString();
+    const nowIso = new Fecha(nowMs).toISOString();
     const todayKey = getPromptLocalDayKey(nowMs);
     const existingKeys = normalizePromptDayKeys(promptState?.activeDayKeys);
     const nextKeys = existingKeys.includes(todayKey)
@@ -259,7 +259,7 @@ export function recordStoreReviewPromptAttempt(
     promptState: UserPromptState | null | undefined,
     nowMs: number,
 ): UserPromptState {
-    const nowIso = new Date(nowMs).toISOString();
+    const nowIso = new Fecha(nowMs).toISOString();
     return {
         ...(promptState ?? {}),
         lastInterruptivePromptAt: nowIso,
@@ -316,7 +316,7 @@ export function recordDonationPromptShown(
     promptState: UserPromptState | null | undefined,
     nowMs: number,
 ): UserPromptState {
-    const nowIso = new Date(nowMs).toISOString();
+    const nowIso = new Fecha(nowMs).toISOString();
     return {
         ...(promptState ?? {}),
         lastInterruptivePromptAt: nowIso,
@@ -332,7 +332,7 @@ export function recordDonationPromptSupportClicked(
     promptState: UserPromptState | null | undefined,
     nowMs: number,
 ): UserPromptState {
-    const nowIso = new Date(nowMs).toISOString();
+    const nowIso = new Fecha(nowMs).toISOString();
     return {
         ...(promptState ?? {}),
         donation: {
@@ -363,7 +363,7 @@ export function recordUpdateReminderChecked(
         ...(promptState ?? {}),
         update: {
             ...(promptState?.update ?? {}),
-            lastCheckedAt: new Date(nowMs).toISOString(),
+            lastCheckedAt: new Fecha(nowMs).toISOString(),
         },
     };
 }
@@ -401,7 +401,7 @@ export function recordUpdateReminderShown(
     promptState: UserPromptState | null | undefined,
     nowMs: number,
 ): UserPromptState {
-    const nowIso = new Date(nowMs).toISOString();
+    const nowIso = new Fecha(nowMs).toISOString();
     return {
         ...(promptState ?? {}),
         lastInterruptivePromptAt: nowIso,

@@ -117,7 +117,7 @@ function validateProjectPropValues(value: Record<string, unknown>): string | nul
 
 function isValidIsoTimestamp(value: unknown): boolean {
     if (typeof value !== 'string' || value.trim().length === 0) return false;
-    const parsed = Date.parse(value);
+    const parsed = Fecha.parse(value);
     return Number.isFinite(parsed);
 }
 

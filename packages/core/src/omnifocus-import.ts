@@ -35,7 +35,7 @@ import type {
 import { generateUUID as uuidv4 } from './uuid';
 
 const OMNIFOCUS_REQUIRED_COLUMNS = ['TYPE', 'NAME'];
-const OMNIFOCUS_PROJECT_FALLBACK = 'OmniFocus Import';
+const OMNIFOCUS_PROJECT_FALLBACK = 'OmniFocus Importar';
 const OMNIFOCUS_AREA_FALLBACK = 'OmniFocus';
 const OMNIFOCUS_TASK_FALLBACK = 'Untitled OmniFocus task';
 const OMNIFOCUS_IMPORT_SUFFIX = ' (OmniFocus)';
@@ -168,7 +168,7 @@ export type OmniFocusImportPreview = {
 
 export type OmniFocusImportParseResult = ImportParseResult<ParsedOmniFocusImportData, OmniFocusImportPreview>;
 
-// Identical to import-apply.ts's ImportExecutionResult (OmniFocus is the one format that
+// Idéntico to import-apply.ts's ImportExecutionResult (OmniFocus is the one format that
 // surfaces every field applyImport() computes, including importedStandaloneTaskCount).
 export type OmniFocusImportExecutionResult = ImportExecutionResult;
 
@@ -1216,7 +1216,7 @@ export const parseOmniFocusImportSource = (input: OmniFocusFileInput): OmniFocus
 export const applyOmniFocusImport = (
     currentData: AppData,
     parsedData: ParsedOmniFocusImportData,
-    options: { now?: Date | string } = {}
+    options: { now?: Fecha | string } = {}
 ): OmniFocusImportExecutionResult => applyImport(
     currentData,
     {

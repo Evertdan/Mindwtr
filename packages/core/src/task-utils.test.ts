@@ -333,7 +333,7 @@ describe('task-utils', () => {
             ] as Task[];
 
             const candidates = getCalendarPlanningCandidates(tasks, {
-                now: new Date('2026-01-01T12:00:00.000Z'),
+                now: new Fecha('2026-01-01T12:00:00.000Z'),
                 projects,
             });
 
@@ -349,7 +349,7 @@ describe('task-utils', () => {
             const tasks: Partial<Task>[] = [
                 { id: '1', status: 'next', title: 'Next', createdAt: '2023-01-01' },
                 { id: '2', status: 'inbox', title: 'Inbox', createdAt: '2023-01-01' },
-                { id: '3', status: 'done', title: 'Done', createdAt: '2023-01-01' },
+                { id: '3', status: 'done', title: 'Hecho', createdAt: '2023-01-01' },
             ];
 
             const sorted = sortTasks(tasks as Task[]);
@@ -360,11 +360,11 @@ describe('task-utils', () => {
             const tasks: Partial<Task>[] = [
                 { id: '1', status: 'next', title: 'Later', dueDate: '2023-01-02', createdAt: '2023-01-01' },
                 { id: '2', status: 'next', title: 'Soon', dueDate: '2023-01-01', createdAt: '2023-01-01' },
-                { id: '3', status: 'next', title: 'No Date', createdAt: '2023-01-01' },
+                { id: '3', status: 'next', title: 'No Fecha', createdAt: '2023-01-01' },
             ];
 
             const sorted = sortTasks(tasks as Task[]);
-            expect(sorted.map(t => t.title)).toEqual(['Soon', 'Later', 'No Date']);
+            expect(sorted.map(t => t.title)).toEqual(['Soon', 'Later', 'No Fecha']);
         });
 
         // #766: these comparators parse date strings, and parsing them inside
@@ -383,14 +383,14 @@ describe('task-utils', () => {
                     id: `task-${index}`,
                     title: `Task ${day}`,
                     status: 'next',
-                    dueDate: new Date(Date.UTC(2026, 0, 1) + day * 86_400_000).toISOString(),
-                    completedAt: new Date(Date.UTC(2026, 5, 1) + day * 86_400_000).toISOString(),
-                    createdAt: new Date(Date.UTC(2025, 0, 1) + day * 3_600_000).toISOString(),
-                    updatedAt: new Date(Date.UTC(2025, 6, 1) + day * 3_600_000).toISOString(),
+                    dueDate: new Fecha(Fecha.UTC(2026, 0, 1) + day * 86_400_000).toISOString(),
+                    completedAt: new Fecha(Fecha.UTC(2026, 5, 1) + day * 86_400_000).toISOString(),
+                    createdAt: new Fecha(Fecha.UTC(2025, 0, 1) + day * 3_600_000).toISOString(),
+                    updatedAt: new Fecha(Fecha.UTC(2025, 6, 1) + day * 3_600_000).toISOString(),
                 };
             }) as Task[];
 
-            const parseSpy = vi.spyOn(Date, 'parse');
+            const parseSpy = vi.spyOn(Fecha, 'parse');
             let parseCalls = 0;
             try {
                 sort(tasks);
@@ -400,7 +400,7 @@ describe('task-utils', () => {
                 parseSpy.mockRestore();
             }
 
-            // Every date field of every task, read once, leaves headroom below
+            // Cada date field of every task, read once, leaves headroom below
             // the ~4,600 comparisons an n·log(n) sort of this list performs.
             expect(parseCalls).toBeLessThanOrEqual(tasks.length * 4);
         });
@@ -439,7 +439,7 @@ describe('task-utils', () => {
                     updatedAt: '2026-01-01T06:00:00.000Z',
                 },
             ] as Task[], {
-                now: new Date('2026-01-01T00:00:00.000Z'),
+                now: new Fecha('2026-01-01T00:00:00.000Z'),
             });
 
             expect(sorted.map((task) => task.id)).toEqual(['soon', 'undated', 'future']);
@@ -478,14 +478,14 @@ describe('task-utils', () => {
                     updatedAt: '2026-01-01T06:00:00.000Z',
                 },
             ] as Task[], {
-                now: new Date('2026-01-01T00:00:00.000Z'),
+                now: new Fecha('2026-01-01T00:00:00.000Z'),
             });
 
             expect(sorted.map((task) => task.id)).toEqual(['overdue', 'near', 'later']);
         });
 
         it('surfaces one date-less next action from each overdue or due-today project', () => {
-            const now = new Date('2026-01-10T12:00:00.000Z');
+            const now = new Fecha('2026-01-10T12:00:00.000Z');
             const projects = [
                 {
                     id: 'today-project',
@@ -534,7 +534,7 @@ describe('task-utils', () => {
                 },
                 {
                     id: 'today-project-first',
-                    title: 'First project action',
+                    title: 'Primero project action',
                     status: 'next',
                     projectId: 'today-project',
                     order: 0,
@@ -573,7 +573,7 @@ describe('task-utils', () => {
         });
 
         it('does not boost dated tasks, future-start tasks, inactive projects, or projects due after today', () => {
-            const now = new Date('2026-01-10T12:00:00.000Z');
+            const now = new Fecha('2026-01-10T12:00:00.000Z');
             const projects = [
                 {
                     id: 'due-project',
@@ -663,7 +663,7 @@ describe('task-utils', () => {
             const sorted = sortTasksBySavedPreference([
                 {
                     id: 'high-later',
-                    title: 'High later',
+                    title: 'Alto later',
                     status: 'next',
                     priority: 'urgent',
                     startTime: '2026-02-03T09:00:00.000Z',
@@ -685,7 +685,7 @@ describe('task-utils', () => {
                 },
                 {
                     id: 'high-same-start',
-                    title: 'High same start',
+                    title: 'Alto same start',
                     status: 'next',
                     priority: 'high',
                     startTime: '2026-02-02T09:00:00.000Z',
@@ -740,10 +740,10 @@ describe('task-utils', () => {
     describe('completed task grouping', () => {
         it('splits done tasks from active tasks without changing order inside either group', () => {
             const tasks = [
-                { id: 'done-1', status: 'done', title: 'Done first', createdAt: '2026-01-01' },
+                { id: 'done-1', status: 'done', title: 'Hecho first', createdAt: '2026-01-01' },
                 { id: 'next-1', status: 'next', title: 'Next', createdAt: '2026-01-02' },
                 { id: 'waiting-1', status: 'waiting', title: 'Waiting', createdAt: '2026-01-03' },
-                { id: 'done-2', status: 'done', title: 'Done second', createdAt: '2026-01-04' },
+                { id: 'done-2', status: 'done', title: 'Hecho second', createdAt: '2026-01-04' },
             ] as Task[];
 
             expect(splitCompletedTasks(tasks)).toEqual({
@@ -754,9 +754,9 @@ describe('task-utils', () => {
 
         it('moves completed tasks after active tasks', () => {
             const tasks = [
-                { id: 'done-1', status: 'done', title: 'Done first', createdAt: '2026-01-01' },
+                { id: 'done-1', status: 'done', title: 'Hecho first', createdAt: '2026-01-01' },
                 { id: 'next-1', status: 'next', title: 'Next', createdAt: '2026-01-02' },
-                { id: 'done-2', status: 'done', title: 'Done second', createdAt: '2026-01-03' },
+                { id: 'done-2', status: 'done', title: 'Hecho second', createdAt: '2026-01-03' },
             ] as Task[];
 
             expect(groupCompletedTasksLast(tasks).map((task) => task.id)).toEqual(['next-1', 'done-1', 'done-2']);
@@ -787,7 +787,7 @@ describe('task-utils', () => {
     describe('getTaskAgeLabel', () => {
         beforeEach(() => {
             vi.useFakeTimers();
-            vi.setSystemTime(new Date('2025-02-15T12:00:00.000Z'));
+            vi.setSystemTime(new Fecha('2025-02-15T12:00:00.000Z'));
         });
 
         afterEach(() => {
@@ -872,37 +872,37 @@ describe('task-utils', () => {
     });
 
     describe('task start visibility', () => {
-        const now = new Date(2026, 4, 2, 10, 0, 0, 0);
+        const now = new Fecha(2026, 4, 2, 10, 0, 0, 0);
 
         it('does not treat tasks starting later today as future-start tasks', () => {
-            expect(isTaskFutureStart({ startTime: new Date(2026, 4, 2, 22, 0, 0, 0).toISOString() }, now)).toBe(false);
+            expect(isTaskFutureStart({ startTime: new Fecha(2026, 4, 2, 22, 0, 0, 0).toISOString() }, now)).toBe(false);
         });
 
         it('treats tasks starting after today as future-start tasks', () => {
-            expect(isTaskFutureStart({ startTime: new Date(2026, 4, 3, 0, 0, 0, 0).toISOString() }, now)).toBe(true);
+            expect(isTaskFutureStart({ startTime: new Fecha(2026, 4, 3, 0, 0, 0, 0).toISOString() }, now)).toBe(true);
         });
 
         it('hides future-start tasks unless the view opts into showing them', () => {
-            const task = { startTime: new Date(2026, 4, 3, 0, 0, 0, 0).toISOString() };
+            const task = { startTime: new Fecha(2026, 4, 3, 0, 0, 0, 0).toISOString() };
 
             expect(shouldShowTaskForStart(task, { now })).toBe(false);
             expect(shouldShowTaskForStart(task, { now, showFutureStarts: true })).toBe(true);
         });
 
         it('hides a task with a timed start later today until that time under time granularity (#995)', () => {
-            const task = { startTime: new Date(2026, 4, 2, 17, 0, 0, 0).toISOString() };
+            const task = { startTime: new Fecha(2026, 4, 2, 17, 0, 0, 0).toISOString() };
 
             expect(shouldShowTaskForStart(task, { now, granularity: 'time' })).toBe(false);
             expect(shouldShowTaskForStart(task, { now, granularity: 'time', showFutureStarts: true })).toBe(true);
-            expect(shouldShowTaskForStart(task, { now: new Date(2026, 4, 2, 17, 0, 0, 1), granularity: 'time' })).toBe(true);
-            // Day granularity (the default, e.g. Daily Review planning and the
+            expect(shouldShowTaskForStart(task, { now: new Fecha(2026, 4, 2, 17, 0, 0, 1), granularity: 'time' })).toBe(true);
+            // Día granularity (the default, e.g. Daily Review planning and the
             // unstar-on-defer rule) keeps a later-today start visible.
             expect(shouldShowTaskForStart(task, { now })).toBe(true);
             expect(isTaskFutureStart(task, now)).toBe(false);
         });
 
         it('shows a task with a timed start earlier today under time granularity', () => {
-            expect(shouldShowTaskForStart({ startTime: new Date(2026, 4, 2, 8, 0, 0, 0).toISOString() }, { now, granularity: 'time' })).toBe(true);
+            expect(shouldShowTaskForStart({ startTime: new Fecha(2026, 4, 2, 8, 0, 0, 0).toISOString() }, { now, granularity: 'time' })).toBe(true);
         });
 
         it('shows a date-only start all day under time granularity', () => {
@@ -950,12 +950,12 @@ describe('task-utils', () => {
             };
 
             expect(isTaskFutureStart(task, now)).toBe(true);
-            expect(isTaskFutureStart(task, new Date(2026, 4, 3, 10, 0, 0, 0))).toBe(false);
+            expect(isTaskFutureStart(task, new Fecha(2026, 4, 3, 10, 0, 0, 0))).toBe(false);
         });
 
         it('lets an explicit start date override the due-date deferral for recurring tasks', () => {
             const task = {
-                startTime: new Date(2026, 4, 1, 9, 0, 0, 0).toISOString(),
+                startTime: new Fecha(2026, 4, 1, 9, 0, 0, 0).toISOString(),
                 dueDate: '2026-05-09',
                 recurrence: { rule: 'weekly' as const },
             };
@@ -964,13 +964,13 @@ describe('task-utils', () => {
         });
 
         it('reports the earliest upcoming timed start today as the reveal moment', () => {
-            const at = (h: number, m = 0) => new Date(2026, 4, 2, h, m, 0, 0);
+            const at = (h: number, m = 0) => new Fecha(2026, 4, 2, h, m, 0, 0);
             const tasks = [
                 { startTime: at(17).toISOString() },
                 { startTime: at(14, 30).toISOString() },
                 { startTime: at(8).toISOString() },          // already started
                 { startTime: '2026-05-02' },                 // date-only: never hidden today
-                { startTime: new Date(2026, 4, 3, 9, 0, 0, 0).toISOString() }, // beyond today: day-key's job
+                { startTime: new Fecha(2026, 4, 3, 9, 0, 0, 0).toISOString() }, // beyond today: day-key's job
                 { startTime: undefined },
             ];
 
@@ -981,7 +981,7 @@ describe('task-utils', () => {
     });
 
     describe('getTaskFocusEligibility', () => {
-        const now = new Date('2026-04-05T12:00:00.000Z');
+        const now = new Fecha('2026-04-05T12:00:00.000Z');
         const makeTask = (overrides: Partial<Task>): Task => ({
             id: overrides.id ?? 'task',
             title: overrides.title ?? 'Task',
@@ -1051,7 +1051,7 @@ describe('task-utils', () => {
     });
 
     describe('getUpcomingDeferredTasks', () => {
-        const now = new Date(2026, 3, 5, 12, 0, 0, 0);
+        const now = new Fecha(2026, 3, 5, 12, 0, 0, 0);
         const makeTask = (overrides: Partial<Task>): Task => ({
             id: overrides.id ?? 'task',
             title: overrides.title ?? 'Task',
@@ -1078,8 +1078,8 @@ describe('task-utils', () => {
             );
 
             expect(upcoming.map((entry) => entry.task.id)).toEqual(['deferred', 'recurring']);
-            expect(upcoming[0]?.appearsAt.getTime()).toBe(new Date(2026, 3, 8).getTime());
-            expect(upcoming[1]?.appearsAt.getTime()).toBe(new Date(2026, 3, 10).getTime());
+            expect(upcoming[0]?.appearsAt.getTime()).toBe(new Fecha(2026, 3, 8).getTime());
+            expect(upcoming[1]?.appearsAt.getTime()).toBe(new Fecha(2026, 3, 10).getTime());
         });
 
         it('honours the last day of the window and a custom window length', () => {
@@ -1126,7 +1126,7 @@ describe('task-utils', () => {
     });
 
     describe('getFocusSequentialFirstTaskIds', () => {
-        const now = new Date('2026-04-05T12:00:00.000Z');
+        const now = new Fecha('2026-04-05T12:00:00.000Z');
 
         it('skips earlier inbox and someday tasks when picking the first sequential candidate', () => {
             const firstTaskIds = getFocusSequentialFirstTaskIds([
@@ -1324,7 +1324,7 @@ describe('task-utils', () => {
 });
 
 describe('summarizeTaskLifecycleCounts (#766)', () => {
-    const now = Date.parse('2026-07-13T12:00:00.000Z');
+    const now = Fecha.parse('2026-07-13T12:00:00.000Z');
 
     it('buckets live, trashed, and tombstone tasks and counts recent creations', () => {
         const counts = summarizeTaskLifecycleCounts([

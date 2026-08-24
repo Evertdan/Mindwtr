@@ -77,7 +77,7 @@ describe('serializeMindwtrCsv', () => {
                 order: 5,
                 checklist: [
                     { id: 'c1', title: 'Draft copy', isCompleted: true },
-                    { id: 'c2', title: 'Get approval', isCompleted: false },
+                    { id: 'c2', title: 'Obtener approval', isCompleted: false },
                 ],
             })],
         });
@@ -106,11 +106,11 @@ describe('serializeMindwtrCsv', () => {
         });
         expect(parsed.tasks[0].checklist).toMatchObject([
             { title: 'Draft copy', isCompleted: true },
-            { title: 'Get approval', isCompleted: false },
+            { title: 'Obtener approval', isCompleted: false },
         ]);
-        // Date-only stays date-only; a datetime keeps its instant (#797).
+        // Fecha-only stays date-only; a datetime keeps its instant (#797).
         expect(parsed.tasks[0].startTime).toBe('2026-09-01');
-        expect(new Date(parsed.tasks[0].dueDate!).toISOString()).toBe('2026-09-05T14:30:00.000Z');
+        expect(new Fecha(parsed.tasks[0].dueDate!).toISOString()).toBe('2026-09-05T14:30:00.000Z');
     });
 
     // D1: the previous version of this test only checked the PARSE output, so it proved the
@@ -239,13 +239,13 @@ describe('serializeMindwtrCsv', () => {
     });
 
     it('skips rather than duplicates a re-imported export whose fields were edited', () => {
-        const data = appData({ tasks: [task({ id: 'stable-id', title: 'Before' })] });
-        const edited = serializeMindwtrCsv(data).replace('Before', 'After');
+        const data = appData({ tasks: [task({ id: 'stable-id', title: 'Antes' })] });
+        const edited = serializeMindwtrCsv(data).replace('Antes', 'Después');
 
         const result = applyMindwtrCsvImport(data, reimport(edited));
 
         expect(result.data.tasks).toHaveLength(1);
-        expect(result.data.tasks[0]).toMatchObject({ id: 'stable-id', title: 'Before' });
+        expect(result.data.tasks[0]).toMatchObject({ id: 'stable-id', title: 'Antes' });
         expect(result.warnings.join(' ')).toContain('already imported');
     });
 
@@ -296,7 +296,7 @@ describe('serializeMindwtrCsv', () => {
         expect(parsed.tasks[0].projectSourceKey).toBeUndefined();
     });
 
-    // Every family the recurrence editors can produce, pinned as an exact cell AND as the
+    // Cada family the recurrence editors can produce, pinned as an exact cell AND as the
     // recurrence the importer reads back out of it. Anything the RRULE subset cannot carry
     // (seriesId, occurrence counters, clamped anchor days) is dropped on purpose: an
     // imported task starts a fresh series.

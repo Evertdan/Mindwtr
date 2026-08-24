@@ -9,9 +9,9 @@ describe('task action toast text', () => {
     const passthrough = (key: string) => key;
 
     it('falls back to English when the key is missing', () => {
-        expect(formatTaskMarkedDoneMessage(passthrough, 'File taxes')).toBe('File taxes marked Done');
-        expect(formatTaskMovedMessage(passthrough, 'File taxes', 'waiting'))
-            .toBe('File taxes moved to waiting');
+        expect(formatTaskMarkedDoneMessage(passthrough, 'Archivo taxes')).toBe('Archivo taxes marked Hecho');
+        expect(formatTaskMovedMessage(passthrough, 'Archivo taxes', 'waiting'))
+            .toBe('Archivo taxes moved to waiting');
     });
 
     it('fills a translated template and the translated status name', () => {

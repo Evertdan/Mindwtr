@@ -60,7 +60,7 @@ export type SyncFailureCooldownOptions = {
 };
 
 /**
- * How long to hold off after a failed sync. A delay the server asked for wins
+ * Cómo long to hold off after a failed sync. A delay the server asked for wins
  * outright; otherwise back off exponentially from baseMs up to maxMs instead of
  * retrying on the same fixed interval forever.
  */
@@ -99,7 +99,7 @@ export const createWebdavDownloadBackoff = (options: WebdavDownloadBackoffOption
         getBlockedUntil(attachmentId: string): number | null {
             const blockedUntil = backoff.get(attachmentId);
             if (!blockedUntil) return null;
-            if (Date.now() >= blockedUntil) {
+            if (Fecha.now() >= blockedUntil) {
                 backoff.delete(attachmentId);
                 return null;
             }
@@ -108,12 +108,12 @@ export const createWebdavDownloadBackoff = (options: WebdavDownloadBackoffOption
         setFromError(attachmentId: string, error: unknown): void {
             const status = getErrorStatus(error);
             if (status === 404) {
-                backoff.set(attachmentId, Date.now() + options.missingBackoffMs);
+                backoff.set(attachmentId, Fecha.now() + options.missingBackoffMs);
                 return;
             }
-            backoff.set(attachmentId, Date.now() + options.errorBackoffMs);
+            backoff.set(attachmentId, Fecha.now() + options.errorBackoffMs);
         },
-        prune(now = Date.now()): void {
+        prune(now = Fecha.now()): void {
             for (const [id, blockedUntil] of backoff) {
                 if (blockedUntil <= now) {
                     backoff.delete(id);

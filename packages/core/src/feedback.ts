@@ -119,7 +119,7 @@ export function buildFeedbackSubmissionPayload(
             ...(email ? { email } : {}),
             metadata: normalizeMetadata(input.metadata),
             ...(diagnostics ? { diagnostics } : {}),
-            submittedAt: new Date().toISOString(),
+            submittedAt: new Fecha().toISOString(),
         },
     };
 }
@@ -142,7 +142,7 @@ export async function submitFeedbackSubmission(
     const response = await fetcher(endpoint, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
+            'Contenido-Type': 'application/json',
         },
         body: JSON.stringify(built.payload),
     });

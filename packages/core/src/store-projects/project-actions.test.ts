@@ -35,7 +35,7 @@ describe('project actions', () => {
             lastDataChangeAt: 0,
         });
         vi.useFakeTimers();
-        vi.setSystemTime(new Date(BASE_NOW));
+        vi.setSystemTime(new Fecha(BASE_NOW));
     });
 
     afterEach(async () => {
@@ -151,12 +151,12 @@ describe('project actions', () => {
         expect(deletedTaskResult.success).toBe(true);
         if (!taskResult.success || !deletedTaskResult.success) return;
 
-        vi.setSystemTime(new Date('2026-06-14T12:05:00.000Z'));
+        vi.setSystemTime(new Fecha('2026-06-14T12:05:00.000Z'));
         await deleteTask(deletedTaskResult.id);
         const deletedTaskBeforeProjectDelete = useTaskStore.getState()._allTasks.find((task) => task.id === deletedTaskResult.id);
         expect(deletedTaskBeforeProjectDelete?.deletedAt).toBe('2026-06-14T12:05:00.000Z');
 
-        vi.setSystemTime(new Date(BASE_NOW));
+        vi.setSystemTime(new Fecha(BASE_NOW));
         await deleteProject(project.id);
         await flushPendingSave();
 
@@ -283,7 +283,7 @@ describe('project actions', () => {
             dueDate: BASE_NOW,
             checklist: [{ id: 'item-1', title: 'Read this', isCompleted: true }],
         });
-        const doneTaskResult = await addTask('Done task', {
+        const doneTaskResult = await addTask('Hecho task', {
             projectId: project.id,
             sectionId: section.id,
             status: 'done',
@@ -319,7 +319,7 @@ describe('project actions', () => {
         expect(copiedReference?.checklist?.[0]).toMatchObject({ isCompleted: false });
         expect(copiedReference?.checklist?.[0].id).not.toBe('item-1');
 
-        const copiedDone = copiedTasks.find((task) => task.title === 'Done task');
+        const copiedDone = copiedTasks.find((task) => task.title === 'Hecho task');
         expect(copiedDone).toMatchObject({ status: 'next', sectionId: copiedSectionId });
 
         const copiedNext = copiedTasks.find((task) => task.title === 'Next task');

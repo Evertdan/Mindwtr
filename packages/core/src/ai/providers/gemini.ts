@@ -90,17 +90,17 @@ async function buildGeminiError(response: Response, usingOfficialGemini: boolean
     if (httpStatus === 401) {
         return usingOfficialGemini
             ? new Error('Gemini API key is invalid or missing.')
-            : new Error('Gemini-compatible endpoint rejected the request. Check the custom base URL, API key, and model.');
+            : new Error('Gemini-compatible endpoint rejected the request. Verificar the custom base URL, API key, and model.');
     }
     if (httpStatus === 403) {
         return usingOfficialGemini
             ? new Error('Gemini access denied for this model or key.')
-            : new Error('Gemini-compatible endpoint denied access. Check the API key and model permissions.');
+            : new Error('Gemini-compatible endpoint denied access. Verificar the API key and model permissions.');
     }
     if (httpStatus === 404) {
         return usingOfficialGemini
             ? new Error('Gemini model not found or unavailable for this key.')
-            : new Error('Gemini-compatible endpoint or model not found. Check the custom base URL and model.');
+            : new Error('Gemini-compatible endpoint or model not found. Verificar the custom base URL and model.');
     }
     if (httpStatus === 429) {
         return usingOfficialGemini
@@ -208,7 +208,7 @@ async function requestGemini(config: AIProviderConfig, prompt: { system: string;
         }
         url = parsed.toString();
     } catch {
-        // If URL parsing fails, fall back to a manual cleanup of key params.
+        // Si URL parsing fails, fall back to a manual cleanup of key params.
         url = rawUrl.replace(/([?&])key=[^&]+&?/gi, '$1').replace(/[?&]$/, '');
     }
     // Gemini 2.5 uses numeric token budgets. Gemini 3 replaced those with relative
@@ -249,7 +249,7 @@ async function requestGemini(config: AIProviderConfig, prompt: { system: string;
                 {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Contenido-Type': 'application/json',
                         'x-goog-api-key': apiKey,
                     },
                     body: JSON.stringify(body),
@@ -300,7 +300,7 @@ export function createGeminiProvider(config: AIProviderConfig): AIProvider {
             } catch (error) {
                 const retryPrompt = {
                     system: prompt.system,
-                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Do not include any extra text.`,
+                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Hacer not include any extra text.`,
                 };
                 const retryText = await requestGemini(config, retryPrompt, CLARIFY_SCHEMA, options);
                 return parseJson<ClarifyResponse>(retryText, isClarifyResponse);
@@ -314,7 +314,7 @@ export function createGeminiProvider(config: AIProviderConfig): AIProvider {
             } catch (error) {
                 const retryPrompt = {
                     system: prompt.system,
-                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Do not include any extra text.`,
+                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Hacer not include any extra text.`,
                 };
                 const retryText = await requestGemini(config, retryPrompt, BREAKDOWN_SCHEMA, options);
                 return parseJson<BreakdownResponse>(retryText, isBreakdownResponse);
@@ -328,7 +328,7 @@ export function createGeminiProvider(config: AIProviderConfig): AIProvider {
             } catch (error) {
                 const retryPrompt = {
                     system: prompt.system,
-                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Do not include any extra text.`,
+                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Hacer not include any extra text.`,
                 };
                 const retryText = await requestGemini(config, retryPrompt, REVIEW_SCHEMA, options);
                 return parseJson<ReviewAnalysisResponse>(retryText, isReviewAnalysisResponse);
@@ -350,7 +350,7 @@ export function createGeminiProvider(config: AIProviderConfig): AIProvider {
             } catch (error) {
                 const retryPrompt = {
                     system: prompt.system,
-                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Do not include any extra text.`,
+                    user: `${prompt.user}\n\nReturn ONLY valid JSON. Hacer not include any extra text.`,
                 };
                 const retryText = await requestGemini(config, retryPrompt, COPILOT_SCHEMA, options);
                 const parsed = parseJson<CopilotResponse>(retryText, isCopilotResponse);

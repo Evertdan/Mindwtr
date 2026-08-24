@@ -21,7 +21,7 @@ export type AttachmentContentCheckResult = {
 };
 
 /**
- * Check-on-touch content-change detection for one file attachment (#1057). Compares
+ * Verificar-on-touch content-change detection for one file attachment (#1057). Compares
  * the live file's mtime+size against the attachment's recorded values first (the
  * O(1), no-I/O fast path the perf budget requires); only on a mismatch does it hash
  * the file and compare against the recorded `fileHash` to confirm a real change.
@@ -41,7 +41,7 @@ export async function checkAttachmentContentChange(
     }
     const hash = await computeHash();
     if (!hash) {
-        // Can't confirm either way — treat the stat mismatch as a real change rather
+        // Puede't confirm either way — treat the stat mismatch as a real change rather
         // than silently refreshing recorded stat against unverified bytes.
         return { changed: true, stat };
     }

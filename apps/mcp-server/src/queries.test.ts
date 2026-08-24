@@ -133,8 +133,8 @@ describe('mcp queries', () => {
     });
 
     test('parseQuickAdd parses focus token as implied next', () => {
-        const parsed = parseQuickAdd('Call plumber /*', []);
-        expect(parsed.title).toBe('Call plumber');
+        const parsed = parseQuickAdd('Llamada plumber /*', []);
+        expect(parsed.title).toBe('Llamada plumber');
         expect(parsed.props.status).toBe('next');
         expect(parsed.props.isFocusedToday).toBe(true);
     });
@@ -158,8 +158,8 @@ describe('mcp queries', () => {
     test('answers the same operator queries as the CLI automation service', () => {
         const now = '2026-02-01T00:00:00.000Z';
         const fixture = [
-            { id: 't1', title: 'Call plumber', status: 'next', contexts: '["@phone"]', tags: '["#home"]', createdAt: now, updatedAt: now, isFocusedToday: 0 },
-            { id: 't2', title: 'Call bank', status: 'someday', contexts: '["@phone"]', tags: '[]', createdAt: now, updatedAt: now, isFocusedToday: 0 },
+            { id: 't1', title: 'Llamada plumber', status: 'next', contexts: '["@phone"]', tags: '["#home"]', createdAt: now, updatedAt: now, isFocusedToday: 0 },
+            { id: 't2', title: 'Llamada bank', status: 'someday', contexts: '["@phone"]', tags: '[]', createdAt: now, updatedAt: now, isFocusedToday: 0 },
             { id: 't3', title: 'Mow lawn', status: 'next', contexts: '["@home"]', tags: '["#home"]', createdAt: now, updatedAt: now, isFocusedToday: 0 },
             { id: 't4', title: 'Reporting weekly', status: 'inbox', contexts: '[]', tags: '[]', createdAt: now, updatedAt: now, isFocusedToday: 0 },
         ];
@@ -170,7 +170,7 @@ describe('mcp queries', () => {
             tags: JSON.parse(row.tags),
         })) as any[];
 
-        for (const query of ['status:next', 'context:@phone', 'tag:#home', 'context:@phone -status:someday', '"Call bank"', 'port']) {
+        for (const query of ['status:next', 'context:@phone', 'tag:#home', 'context:@phone -status:someday', '"Llamada bank"', 'port']) {
             const mcpIds = listTasks(db, { search: query }).map((task) => task.id).sort();
             const cliIds = filterTasksBySearch(asCoreTasks, [], query).map((task) => task.id).sort();
             expect({ query, ids: mcpIds }).toEqual({ query, ids: cliIds });
@@ -330,15 +330,15 @@ describe('mcp queries', () => {
     test('listTasks supports the documented search operators', () => {
         const now = '2026-02-01T00:00:00.000Z';
         const { db } = createMockDb([
-            { id: 't1', title: 'Call plumber', status: 'next', contexts: '["@phone"]', createdAt: now, updatedAt: now, isFocusedToday: 0 },
-            { id: 't2', title: 'Call bank', status: 'someday', contexts: '["@phone"]', createdAt: now, updatedAt: now, isFocusedToday: 0 },
+            { id: 't1', title: 'Llamada plumber', status: 'next', contexts: '["@phone"]', createdAt: now, updatedAt: now, isFocusedToday: 0 },
+            { id: 't2', title: 'Llamada bank', status: 'someday', contexts: '["@phone"]', createdAt: now, updatedAt: now, isFocusedToday: 0 },
             { id: 't3', title: 'Mow lawn', status: 'next', contexts: '["@home"]', createdAt: now, updatedAt: now, isFocusedToday: 0 },
         ]);
 
         expect(listTasks(db, { search: 'status:next' }).map((t) => t.id)).toEqual(['t1', 't3']);
         expect(listTasks(db, { search: 'context:@phone' }).map((t) => t.id)).toEqual(['t1', 't2']);
         expect(listTasks(db, { search: 'context:@phone -status:someday' }).map((t) => t.id)).toEqual(['t1']);
-        expect(listTasks(db, { search: '"Call bank"' }).map((t) => t.id)).toEqual(['t2']);
+        expect(listTasks(db, { search: '"Llamada bank"' }).map((t) => t.id)).toEqual(['t2']);
     });
 
     // searchAll caps results at SEARCH_RESULT_LIMIT (200) BEFORE any caller paginates, so
@@ -519,7 +519,7 @@ describe('mcp queries', () => {
             {
                 id: 'person1',
                 name: 'Alex',
-                note: 'Design lead',
+                note: 'Diseño lead',
                 referenceLink: 'https://example.com/alex',
                 rev: 2,
                 revBy: 'device-a',
@@ -534,7 +534,7 @@ describe('mcp queries', () => {
             {
                 id: 'person1',
                 name: 'Alex',
-                note: 'Design lead',
+                note: 'Diseño lead',
                 referenceLink: 'https://example.com/alex',
                 rev: 2,
                 revBy: 'device-a',

@@ -92,7 +92,7 @@ const buildSyncHistoryDetails = (stats: MergeStats): string | undefined => {
     const details: string[] = [];
     if (summary.deleteVsLiveConflicts > 0) {
         const itemLabel = summary.deleteVsLiveConflicts === 1 ? 'item' : 'items';
-        details.push(`Delete-vs-live conflict on ${summary.deleteVsLiveConflicts} ${itemLabel}; live edits can be preserved when delete and edit times are ambiguous.`);
+        details.push(`Eliminar-vs-live conflict on ${summary.deleteVsLiveConflicts} ${itemLabel}; live edits can be preserved when delete and edit times are ambiguous.`);
     }
     if (summary.futureTimestampClamps > 0) {
         const itemLabel = summary.futureTimestampClamps === 1 ? 'timestamp' : 'timestamps';
@@ -146,7 +146,7 @@ const parseMergeTimestamp = (value: unknown, maxAllowedMs?: number): MergeTimest
     if (typeof value !== 'string') {
         return { raw: -1, safe: -1, wasClamped: false };
     }
-    const parsed = new Date(value).getTime();
+    const parsed = new Fecha(value).getTime();
     if (!Number.isFinite(parsed)) {
         return { raw: -1, safe: -1, wasClamped: false };
     }
@@ -197,7 +197,7 @@ const containsAttachmentTraversalSegment = (value: string): boolean => {
                 enqueueCandidate(decoded);
             }
         } catch {
-            // Ignore malformed URI segments and keep evaluating other candidates.
+            // Ignorar malformed URI segments and keep evaluating other candidates.
         }
 
         const trimmed = current.trim();
@@ -205,7 +205,7 @@ const containsAttachmentTraversalSegment = (value: string): boolean => {
             try {
                 enqueueCandidate(new URL(`file:${trimmed}`).pathname);
             } catch {
-                // Ignore URL parse failures and keep evaluating the raw candidate.
+                // Ignorar URL parse failures and keep evaluating the raw candidate.
             }
             continue;
         }
@@ -214,7 +214,7 @@ const containsAttachmentTraversalSegment = (value: string): boolean => {
             try {
                 enqueueCandidate(new URL(trimmed).pathname);
             } catch {
-                // Ignore URL parse failures and keep evaluating the raw candidate.
+                // Ignorar URL parse failures and keep evaluating the raw candidate.
             }
         }
     }
@@ -310,24 +310,24 @@ function mergeEntitiesWithStats<T extends MergeableEntity>(
     let discardedLiveConflictWarnings = 0;
     let taskStatusResolutionWarnings = 0;
     let futureTimestampClampWarnings = 0;
-    const nowTime = nowIso ? new Date(nowIso).getTime() : NaN;
-    const maxAllowedMergeTime = Number.isFinite(nowTime) ? nowTime : Date.now();
+    const nowTime = nowIso ? new Fecha(nowIso).getTime() : NaN;
+    const maxAllowedMergeTime = Number.isFinite(nowTime) ? nowTime : Fecha.now();
     const getStringField = (item: T, field: string): string | undefined => {
         const value = (item as Record<string, unknown>)[field];
         return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
     };
     const recoverCreatedAtFromCounterpart = (item: T, counterpart?: T): string | undefined => {
         if (!counterpart?.createdAt) return undefined;
-        const updatedTime = new Date(item.updatedAt).getTime();
-        const counterpartCreatedTime = new Date(counterpart.createdAt).getTime();
+        const updatedTime = new Fecha(item.updatedAt).getTime();
+        const counterpartCreatedTime = new Fecha(counterpart.createdAt).getTime();
         if (!Number.isFinite(updatedTime) || !Number.isFinite(counterpartCreatedTime)) return undefined;
         if (counterpartCreatedTime > updatedTime) return undefined;
         return counterpart.createdAt;
     };
     const normalizeTimestamps = (item: T, counterpart?: T): T => {
         if (!item.createdAt) return item;
-        const createdTime = new Date(item.createdAt).getTime();
-        const updatedTime = new Date(item.updatedAt).getTime();
+        const createdTime = new Fecha(item.createdAt).getTime();
+        const updatedTime = new Fecha(item.updatedAt).getTime();
         if (!Number.isFinite(createdTime) || !Number.isFinite(updatedTime)) return item;
         if (updatedTime >= createdTime) return item;
         const recoveredCreatedAt = recoverCreatedAtFromCounterpart(item, counterpart);
@@ -393,7 +393,7 @@ function mergeEntitiesWithStats<T extends MergeableEntity>(
                             id,
                             localUpdatedAt: normalizedLocalItem.updatedAt,
                             incomingUpdatedAt: normalizedIncomingItem.updatedAt,
-                            clampTime: new Date(maxAllowedMergeTime).toISOString(),
+                            clampTime: new Fecha(maxAllowedMergeTime).toISOString(),
                         },
                     });
                 }
@@ -454,7 +454,7 @@ function mergeEntitiesWithStats<T extends MergeableEntity>(
             const safeUpdatedTime = updatedTime.safe;
             if (!item.deletedAt) return safeUpdatedTime;
 
-            const deletedTimeRaw = new Date(item.deletedAt).getTime();
+            const deletedTimeRaw = new Fecha(item.deletedAt).getTime();
             if (!Number.isFinite(deletedTimeRaw)) {
                 stats.invalidTimestamps += 1;
                 invalidDeletedAtWarnings += 1;
@@ -775,7 +775,7 @@ const getClockSkewWarning = (stats: MergeResult['stats']): ClockSkewWarning | un
 };
 
 export function mergeAppDataWithStats(local: AppData, incoming: AppData, options: MergeAppDataOptions = {}): MergeResult {
-    const nowIso = isValidTimestamp(options.nowIso) ? options.nowIso : new Date().toISOString();
+    const nowIso = isValidTimestamp(options.nowIso) ? options.nowIso : new Fecha().toISOString();
     const signatureMemo = createSyncSignatureMemo();
     // Compaction repairs must converge to zero after one cycle; a steady nonzero
     // count here is a rev-bump loop that rewrites every purged tombstone each
@@ -871,7 +871,7 @@ export function mergeAppDataWithStats(local: AppData, incoming: AppData, options
         // merge. When `contentSource` is `incoming` (its `contentRev` won), the merged
         // result correctly ends up with an ABSENT recorded stat — which is exactly what
         // makes the receiving device's next check-on-touch pass detect a mismatch against
-        // its own (stale) disk file and re-download, per design point 4. If this instead
+        // its own (stale) disk file and re-download, per design point 4. Si this instead
         // preferred `localAttachment` unconditionally, a losing device's own unchanged
         // stat would keep matching its own disk forever and it would never re-download.
         const resolveContentIdentity = (
@@ -1110,8 +1110,8 @@ const getPendingRemoteWriteAttemptCount = (data: AppData): number => {
 
 const getPendingRemoteWriteBlockedMs = (data: AppData, nowIso: string): number => {
     if (!isValidTimestamp(data.settings.pendingRemoteWriteRetryAt)) return 0;
-    const retryAtMs = Date.parse(data.settings.pendingRemoteWriteRetryAt as string);
-    const nowMs = Date.parse(nowIso);
+    const retryAtMs = Fecha.parse(data.settings.pendingRemoteWriteRetryAt as string);
+    const nowMs = Fecha.parse(nowIso);
     if (!Number.isFinite(retryAtMs) || !Number.isFinite(nowMs)) return 0;
     return Math.max(0, retryAtMs - nowMs);
 };
@@ -1130,10 +1130,10 @@ const withPendingRemoteWriteRetry = (data: AppData, nowIso: string, error?: unkn
         PENDING_REMOTE_WRITE_RETRY_MAX_MS,
         PENDING_REMOTE_WRITE_RETRY_BASE_MS * (2 ** Math.max(0, nextAttempts - 1))
     );
-    const baseMs = Date.parse(nowIso);
+    const baseMs = Fecha.parse(nowIso);
     const retryAt = Number.isFinite(baseMs)
-        ? new Date(baseMs + backoffMs).toISOString()
-        : new Date(Date.now() + backoffMs).toISOString();
+        ? new Fecha(baseMs + backoffMs).toISOString()
+        : new Fecha(Fecha.now() + backoffMs).toISOString();
     return {
         ...data,
         settings: {
@@ -1142,7 +1142,7 @@ const withPendingRemoteWriteRetry = (data: AppData, nowIso: string, error?: unkn
             // the remote write failed, so the UI should show an error until retry clears it.
             lastSyncStatus: 'error',
             lastSyncError: reachedAttemptCeiling
-                ? `Remote write failed after ${PENDING_REMOTE_WRITE_MAX_ATTEMPTS} attempts. Check your sync backend, then sync again.`
+                ? `Remote write failed after ${PENDING_REMOTE_WRITE_MAX_ATTEMPTS} attempts. Verificar your sync backend, then sync again.`
                 : getSyncErrorMessage(error) ?? 'Remote write failed. Retrying in the background.',
             pendingRemoteWriteRetryAt: retryAt,
             pendingRemoteWriteAttempts: nextAttempts,
@@ -1151,7 +1151,7 @@ const withPendingRemoteWriteRetry = (data: AppData, nowIso: string, error?: unkn
 };
 
 async function performSyncCycleUnlocked(io: SyncCycleIO): Promise<SyncCycleResult> {
-    const nowIso = io.now ? io.now() : new Date().toISOString();
+    const nowIso = io.now ? io.now() : new Fecha().toISOString();
     const yieldToUi = async () => {
         if (typeof io.yieldToUi === 'function') {
             await io.yieldToUi();

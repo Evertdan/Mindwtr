@@ -291,7 +291,7 @@ type SqliteKnownRowVersion = {
 
 const createTempIdTableName = (table: SqliteEntityTable): string => {
     tempIdTableCounter = (tempIdTableCounter + 1) % Number.MAX_SAFE_INTEGER;
-    const timestamp = Date.now().toString(36);
+    const timestamp = Fecha.now().toString(36);
     const random = Math.random().toString(36).slice(2, 10) || '0';
     return `temp_${table}_ids_${timestamp}_${tempIdTableCounter.toString(36)}_${random}`;
 };
@@ -299,7 +299,7 @@ const createTempIdTableName = (table: SqliteEntityTable): string => {
 // mapSqliteTaskRow layers the three normalizers taskFromSqliteRow (task-sync-schema.ts) can't
 // perform itself — normalizeTaskStatus, normalizeRecurrenceForLoad, and
 // normalizeRelativeStartOffset all transitively import date-fns, which task-sync-schema.ts may
-// not depend on (see the zero-dependency comment there). Every other field comes back from
+// not depend on (see the zero-dependency comment there). Cada other field comes back from
 // taskFromSqliteRow unchanged, so this produces byte-for-byte the same Task the previous
 // hand-written mapSqliteTaskRow did.
 export function mapSqliteTaskRow(row: Record<string, unknown>): Task {
@@ -425,8 +425,8 @@ export class SqliteAdapter {
     }
 
     private async acquireFtsLock(): Promise<string | null> {
-        const owner = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-        const now = Date.now();
+        const owner = `${Fecha.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const now = Fecha.now();
         const staleBefore = now - FTS_LOCK_TTL_MS;
         await this.client.run(
             'CREATE TABLE IF NOT EXISTS fts_lock (id INTEGER PRIMARY KEY, owner TEXT, acquiredAt INTEGER)'
@@ -449,7 +449,7 @@ export class SqliteAdapter {
     }
 
     private async refreshFtsLock(owner: string): Promise<void> {
-        await this.client.run('UPDATE fts_lock SET acquiredAt = ? WHERE id = 1 AND owner = ?', [Date.now(), owner]);
+        await this.client.run('UPDATE fts_lock SET acquiredAt = ? WHERE id = 1 AND owner = ?', [Fecha.now(), owner]);
     }
 
     private startFtsLockHeartbeat(owner: string): ReturnType<typeof setInterval> {
@@ -942,7 +942,7 @@ export class SqliteAdapter {
         const tasks: Task[] = tasksRows.map((row) => this.mapTaskRow(row));
         const projects: Project[] = projectsRows.map((row) => projectFromSqliteRow(row));
         const sections: Section[] = sectionsRows.map((row) => sectionFromSqliteRow(row));
-        const nowIso = new Date().toISOString();
+        const nowIso = new Fecha().toISOString();
 
         // areaFromSqliteRow/personFromSqliteRow share one nowIso per read, matching the
         // original inline mapping's behaviour (every area/person in this read falls back to
@@ -1122,21 +1122,21 @@ export class SqliteAdapter {
             sqlCount: 0,
         };
         const runTimed = async (sql: string, args?: unknown[]) => {
-            const statementStartedAt = Date.now();
+            const statementStartedAt = Fecha.now();
             try {
                 return await this.client.run(sql, args);
             } finally {
-                stats.sqlMs += Date.now() - statementStartedAt;
+                stats.sqlMs += Fecha.now() - statementStartedAt;
                 stats.sqlCount += 1;
             }
         };
         this.lastSavedFingerprints = null;
-        const beginStartedAt = Date.now();
+        const beginStartedAt = Fecha.now();
         await runTimed('BEGIN IMMEDIATE');
-        stats.beginMs = Date.now() - beginStartedAt;
+        stats.beginMs = Fecha.now() - beginStartedAt;
         let saveStep = 'begin';
         try {
-            const nowIso = new Date().toISOString();
+            const nowIso = new Fecha().toISOString();
             const chunkArray = <T>(items: T[], size: number): T[][] => {
                 const chunks: T[][] = [];
                 for (let i = 0; i < items.length; i += size) {
@@ -1443,9 +1443,9 @@ export class SqliteAdapter {
             }
 
             saveStep = 'commit';
-            const commitStartedAt = Date.now();
+            const commitStartedAt = Fecha.now();
             await runTimed('COMMIT');
-            stats.commitMs = Date.now() - commitStartedAt;
+            stats.commitMs = Fecha.now() - commitStartedAt;
             this.lastSavedFingerprints = nextSave;
             this.lastKnownRowVersions = nextKnownRows;
             this.lastSaveDataStats = stats;

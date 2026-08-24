@@ -5,7 +5,7 @@ import type { Project, Task } from './types';
 
 describe('getDailyDigestSummary', () => {
     it('counts due/overdue/focus/review', () => {
-        const now = new Date('2025-01-10T12:00:00.000Z');
+        const now = new Fecha('2025-01-10T12:00:00.000Z');
 
         const tasks: Task[] = [
             {
@@ -50,7 +50,7 @@ describe('getDailyDigestSummary', () => {
             },
             {
                 id: '5',
-                title: 'Done (ignored)',
+                title: 'Hecho (ignored)',
                 status: 'done',
                 tags: [],
                 contexts: [],

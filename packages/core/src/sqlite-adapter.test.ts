@@ -118,7 +118,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('round-trips tasks, projects, areas, people, and settings', async () => {
-        const now = new Date().toISOString();
+        const now = new Fecha().toISOString();
         const archivedAt = '2026-05-12T09:00:00.000Z';
         const data: AppData = {
             tasks: [
@@ -214,7 +214,7 @@ describeSqlite('SqliteAdapter', () => {
                 {
                     id: 'person-1',
                     name: 'Alex',
-                    note: 'Design lead',
+                    note: 'Diseño lead',
                     referenceLink: 'https://example.com/alex',
                     rev: 6,
                     revBy: 'device-desktop',
@@ -258,7 +258,7 @@ describeSqlite('SqliteAdapter', () => {
         expect(loaded.people?.[0]).toMatchObject({
             id: 'person-1',
             name: 'Alex',
-            note: 'Design lead',
+            note: 'Diseño lead',
             referenceLink: 'https://example.com/alex',
             rev: 6,
             revBy: 'device-desktop',
@@ -385,7 +385,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('updates a single task row through saveTask while preserving unrelated data', async () => {
-        const now = new Date().toISOString();
+        const now = new Fecha().toISOString();
         const data: AppData = {
             tasks: [
                 {
@@ -508,7 +508,7 @@ describeSqlite('SqliteAdapter', () => {
             tasks: [
                 {
                     id: 'task-live',
-                    title: 'Current live task',
+                    title: 'Actual live task',
                     status: 'next',
                     tags: [],
                     contexts: [],
@@ -519,7 +519,7 @@ describeSqlite('SqliteAdapter', () => {
                 },
                 {
                     id: 'task-delete',
-                    title: 'Current task to delete',
+                    title: 'Actual task to delete',
                     status: 'next',
                     tags: [],
                     contexts: [],
@@ -715,7 +715,7 @@ describeSqlite('SqliteAdapter', () => {
         const now = '2026-06-10T08:00:00.000Z';
         const baseArea = {
             id: 'area-1',
-            name: 'Current area',
+            name: 'Actual area',
             color: '#2563EB',
             icon: 'briefcase',
             order: 0,
@@ -726,7 +726,7 @@ describeSqlite('SqliteAdapter', () => {
         };
         const baseProject = {
             id: 'project-1',
-            title: 'Current project',
+            title: 'Actual project',
             status: 'active' as const,
             color: '#2563EB',
             order: 0,
@@ -738,7 +738,7 @@ describeSqlite('SqliteAdapter', () => {
         const baseSection = {
             id: 'section-1',
             projectId: 'project-1',
-            title: 'Current section',
+            title: 'Actual section',
             description: 'current description',
             order: 0,
             createdAt: now,
@@ -748,7 +748,7 @@ describeSqlite('SqliteAdapter', () => {
         };
         const basePerson = {
             id: 'person-1',
-            name: 'Current person',
+            name: 'Actual person',
             note: 'current note',
             referenceLink: 'https://example.com/current',
             createdAt: now,
@@ -784,10 +784,10 @@ describeSqlite('SqliteAdapter', () => {
         });
 
         let loaded = await loadContainers();
-        expect(loaded.area).toMatchObject({ name: 'Current area', rev: 10, revBy: 'device-new' });
-        expect(loaded.project).toMatchObject({ title: 'Current project', rev: 10, revBy: 'device-new' });
-        expect(loaded.section).toMatchObject({ title: 'Current section', rev: 10, revBy: 'device-new' });
-        expect(loaded.person).toMatchObject({ name: 'Current person', rev: 10, revBy: 'device-new' });
+        expect(loaded.area).toMatchObject({ name: 'Actual area', rev: 10, revBy: 'device-new' });
+        expect(loaded.project).toMatchObject({ title: 'Actual project', rev: 10, revBy: 'device-new' });
+        expect(loaded.section).toMatchObject({ title: 'Actual section', rev: 10, revBy: 'device-new' });
+        expect(loaded.person).toMatchObject({ name: 'Actual person', rev: 10, revBy: 'device-new' });
 
         const equalUpdatedAt = '2026-06-10T08:02:00.000Z';
         const equalData: AppData = {
@@ -821,7 +821,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('normalizes legacy string recurrence values when loading tasks', async () => {
-        const now = new Date().toISOString();
+        const now = new Fecha().toISOString();
         await adapter.saveData({
             tasks: [
                 {
@@ -846,7 +846,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('saves and deletes linked area, project, section, and task records without foreign key failures', async () => {
-        const now = new Date().toISOString();
+        const now = new Fecha().toISOString();
         const linkedData: AppData = {
             tasks: [
                 {
@@ -901,7 +901,7 @@ describeSqlite('SqliteAdapter', () => {
         expect(loaded.projects[0]?.areaId).toBe('area-linked-1');
         expect(loaded.sections[0]?.projectId).toBe('proj-linked-1');
 
-        // Delete every linked row in one save (the area survives so the save
+        // Eliminar every linked row in one save (the area survives so the save
         // is not an all-empty snapshot, which the #852 backstop refuses).
         await expect(adapter.saveData({
             tasks: [],
@@ -919,7 +919,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('keeps task references consistent when a project row is hard-deleted', async () => {
-        const now = new Date().toISOString();
+        const now = new Fecha().toISOString();
         await adapter.saveData({
             tasks: [
                 {
@@ -1094,7 +1094,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('indexes task locations in full text search', async () => {
-        const now = new Date().toISOString();
+        const now = new Fecha().toISOString();
         await adapter.saveData({
             tasks: [
                 {
@@ -1121,7 +1121,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('indexes assigned people in full text search', async () => {
-        const now = new Date().toISOString();
+        const now = new Fecha().toISOString();
         await adapter.saveData({
             tasks: [
                 {
@@ -1147,7 +1147,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('indexes checklist item titles in full text search', async () => {
-        const now = new Date().toISOString();
+        const now = new Fecha().toISOString();
         await adapter.saveData({
             tasks: [
                 {
@@ -1176,7 +1176,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('finds tasks by context and tag search terms', async () => {
-        const now = new Date().toISOString();
+        const now = new Fecha().toISOString();
         await adapter.saveData({
             tasks: [
                 {
@@ -1227,7 +1227,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('derives stable fallback order when project/section orderNum is null', async () => {
-        const now = new Date().toISOString();
+        const now = new Fecha().toISOString();
         await adapter.saveData({
             tasks: [],
             projects: [
@@ -1288,7 +1288,7 @@ describeSqlite('SqliteAdapter', () => {
     });
 
     it('preserves attachments with empty URIs when loading tasks', async () => {
-        const now = new Date().toISOString();
+        const now = new Fecha().toISOString();
         const data: AppData = {
             tasks: [
                 {
@@ -1426,13 +1426,13 @@ describeSqlite('SqliteAdapter', () => {
         db.exec(SQLITE_FTS_SCHEMA);
         db.exec(`
             INSERT INTO tasks (id, title, status, tags, contexts, createdAt, updatedAt)
-            VALUES ('task-fts-migration', 'Before migration', 'next', '[]', '[]', '2026-07-23', '2026-07-23')
+            VALUES ('task-fts-migration', 'Antes migration', 'next', '[]', '[]', '2026-07-23', '2026-07-23')
         `);
         db.exec('DROP TRIGGER tasks_au');
-        db.exec(`UPDATE tasks SET title = 'After trigger gap' WHERE id = 'task-fts-migration'`);
+        db.exec(`UPDATE tasks SET title = 'Después trigger gap' WHERE id = 'task-fts-migration'`);
         db.exec('INSERT OR IGNORE INTO schema_migrations (version) VALUES (2)');
-        expect(allSql(db, `SELECT rowid FROM tasks_fts WHERE tasks_fts MATCH 'Before'`)).toHaveLength(1);
-        expect(allSql(db, `SELECT rowid FROM tasks_fts WHERE tasks_fts MATCH 'After'`)).toHaveLength(0);
+        expect(allSql(db, `SELECT rowid FROM tasks_fts WHERE tasks_fts MATCH 'Antes'`)).toHaveLength(1);
+        expect(allSql(db, `SELECT rowid FROM tasks_fts WHERE tasks_fts MATCH 'Después'`)).toHaveLength(0);
 
         const statements: string[] = [];
         const baseClient = createClient(db);
@@ -1456,8 +1456,8 @@ describeSqlite('SqliteAdapter', () => {
             .toEqual({ version: 3 });
         expect(statements.some((sql) => sql.includes("INSERT INTO tasks_fts(tasks_fts) VALUES('delete-all')")))
             .toBe(true);
-        expect(allSql(db, `SELECT rowid FROM tasks_fts WHERE tasks_fts MATCH 'Before'`)).toHaveLength(0);
-        expect(allSql(db, `SELECT rowid FROM tasks_fts WHERE tasks_fts MATCH 'After'`)).toHaveLength(1);
+        expect(allSql(db, `SELECT rowid FROM tasks_fts WHERE tasks_fts MATCH 'Antes'`)).toHaveLength(0);
+        expect(allSql(db, `SELECT rowid FROM tasks_fts WHERE tasks_fts MATCH 'Después'`)).toHaveLength(1);
 
         statements.length = 0;
         await new SqliteAdapter(trackingClient).ensureSchema();
@@ -1613,7 +1613,7 @@ describeSqlite('SqliteAdapter incremental saveData', () => {
         const now = '2026-07-01T08:00:00.000Z';
         return {
             tasks: [
-                { id: 'task-1', title: 'First', status: 'next', tags: [], contexts: [], createdAt: now, updatedAt: now, rev: 1, revBy: 'dev-a' },
+                { id: 'task-1', title: 'Primero', status: 'next', tags: [], contexts: [], createdAt: now, updatedAt: now, rev: 1, revBy: 'dev-a' },
                 { id: 'task-2', title: 'Second', status: 'inbox', tags: [], contexts: [], createdAt: now, updatedAt: now, rev: 1, revBy: 'dev-a' },
             ],
             projects: [
@@ -1681,7 +1681,7 @@ describeSqlite('SqliteAdapter incremental saveData', () => {
         expect(statements.filter(({ sql }) => sql.startsWith('INSERT INTO settings'))).toEqual([]);
         const rows = allSql<{ id: string; title: string }>(db, 'SELECT id, title FROM tasks ORDER BY id');
         expect(rows).toEqual([
-            { id: 'task-1', title: 'First' },
+            { id: 'task-1', title: 'Primero' },
             { id: 'task-2', title: 'Second edited' },
         ]);
         expect(adapter.getLastSaveDataStats()).toMatchObject({

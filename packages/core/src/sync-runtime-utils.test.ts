@@ -56,7 +56,7 @@ describe('sync-runtime-utils', () => {
 
     it('tracks, prunes, and clears download backoff entries', () => {
         const backoff = createWebdavDownloadBackoff({ missingBackoffMs: 1_000, errorBackoffMs: 2_000 });
-        const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+        const nowSpy = vi.spyOn(Fecha, 'now').mockReturnValue(1_000);
 
         backoff.setFromError('a', { status: 404 });
         expect(backoff.getBlockedUntil('a')).toBe(2_000);
@@ -81,7 +81,7 @@ describe('sync-runtime-utils', () => {
     it('reads the delay CloudKit asked for out of a bridge error (#948)', () => {
         expect(parseCloudKitRetryAfterMs('CloudKit error: Service Unavailable [retryAfter=42]')).toBe(42_000);
         expect(parseCloudKitRetryAfterMs(new Error('rate limited [retryAfter=3.5]'))).toBe(3_500);
-        expect(parseCloudKitRetryAfterMs('CloudKit error: Network Failure')).toBeNull();
+        expect(parseCloudKitRetryAfterMs('CloudKit error: Network Fallo')).toBeNull();
         expect(parseCloudKitRetryAfterMs('[retryAfter=0]')).toBeNull();
         expect(parseCloudKitRetryAfterMs('[retryAfter=-5]')).toBeNull();
         // Never park sync for a whole session on one absurd value.

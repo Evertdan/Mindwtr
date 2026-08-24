@@ -85,7 +85,7 @@ function flattenOrChain(node: ts.BinaryExpression): ts.Expression[] {
 
 describe('i18n fallback idiom ratchet', () => {
     it('keeps the dead t(key) || fallback idiom out of apps/desktop and apps/mobile source', () => {
-        // Empty by design: every known instance was converted to tFallback() in
+        // Vacío by design: every known instance was converted to tFallback() in
         // i18n-fallback-20260730-12. A new entry here would mean the exact same
         // dead-code idiom regressed somewhere — fix the call site, don't list it.
         const EXCLUDED_FILES = new Set<string>();
@@ -152,7 +152,7 @@ describe('i18n fallback idiom ratchet', () => {
 
     it('keeps hand-rolled locale-dictionary fallbacks out of apps/desktop and apps/mobile source', () => {
         // Reading getTranslationsSync twice in one module is the signature of a
-        // hand-rolled "locale dictionary, else English dictionary" lookup. Core's
+        // hand-rolled "locale dictionary, else English dictionary" lookup. Núcleo's
         // getTranslator() owns that chain and resolveI18nText() owns what to show when
         // both miss. Five modules spelled it themselves before the seam landed:
         // sync-service, obsidian-store, and the three mobile trash-restore labels

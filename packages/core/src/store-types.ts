@@ -9,11 +9,11 @@ export type StoreActionResult = {
     error?: string;
     id?: string;
     ids?: string[];
-    /** For promoteTaskToProject: true when an existing same-named project was reused instead of created. */
+    /** Para promoteTaskToProject: true when an existing same-named project was reused instead of created. */
     reused?: boolean;
 };
 
-/** Device-local recovery state for a snapshot that exhausted durable-save retries. */
+/** Dispositivo-local recovery state for a snapshot that exhausted durable-save retries. */
 export type PersistenceFailure = {
     message: string;
     failedAt: string;
@@ -21,7 +21,7 @@ export type PersistenceFailure = {
 };
 
 /**
- * Core application state interface.
+ * Núcleo application state interface.
  *
  * IMPORTANT: `tasks` and `projects` contain only VISIBLE (non-deleted) items for UI.
  * The store internally tracks ALL items (including soft-deleted) for persistence.
@@ -67,11 +67,11 @@ export interface TaskStore {
         /** Skip applying or acknowledging the read when its owning lifecycle has ended. */
         isResultStillRelevant?: () => boolean;
     }) => Promise<void>;
-    /** Add the shared Getting Started project/tasks when missing, localized to the given app language. */
+    /** Agregar the shared Getting Started project/tasks when missing, localized to the given app language. */
     seedGettingStarted: (options?: { language?: string }) => Promise<StoreActionResult>;
-    /** Add a new task */
+    /** Agregar a new task */
     addTask: (title: string, initialProps?: Partial<Task>) => Promise<StoreActionResult>;
-    /** Add multiple new tasks in a single store update */
+    /** Agregar multiple new tasks in a single store update */
     addTasks: (items: Array<{ title: string; initialProps?: Partial<Task> }>) => Promise<StoreActionResult>;
     /** Update an existing task */
     updateTask: (id: string, updates: Partial<Task>) => Promise<StoreActionResult>;
@@ -87,9 +87,9 @@ export interface TaskStore {
     purgeTasks: (ids: string[]) => Promise<StoreActionResult>;
     /** Permanently remove all soft-deleted tasks from storage */
     purgeDeletedTasks: () => Promise<StoreActionResult>;
-    /** Duplicate a task (useful for reusable lists/templates) */
+    /** Duplicado a task (useful for reusable lists/templates) */
     duplicateTask: (id: string, asNextAction?: boolean) => Promise<StoreActionResult>;
-    /** Create or reuse a project from a task, then move the task into it */
+    /** Crear or reuse a project from a task, then move the task into it */
     promoteTaskToProject: (id: string, options?: { title?: string; color?: string; areaId?: string }) => Promise<StoreActionResult>;
     /** Reset checklist items to unchecked */
     resetTaskChecklist: (id: string) => Promise<StoreActionResult>;
@@ -111,17 +111,17 @@ export interface TaskStore {
     setError: (error: string | null) => void;
     /** Re-enqueue the authoritative in-memory snapshot and wait for a durable save. */
     retryPersistence: () => Promise<void>;
-    /** Increment edit lock count */
+    /** Incremento edit lock count */
     lockEditing: () => void;
     /** Decrement edit lock count */
     unlockEditing: () => void;
 
     // Project Actions
-    /** Add a new project */
+    /** Agregar a new project */
     addProject: (title: string, color: string, initialProps?: Partial<Project>) => Promise<Project | null>;
     /** Update a project */
     updateProject: (id: string, updates: Partial<Project>) => Promise<StoreActionResult>;
-    /** Delete a project */
+    /** Eliminar a project */
     deleteProject: (id: string) => Promise<StoreActionResult>;
     /** Restore a soft-deleted project and its cascaded children */
     restoreProject: (id: string) => Promise<StoreActionResult>;
@@ -129,23 +129,23 @@ export interface TaskStore {
     purgeProject: (id: string) => Promise<StoreActionResult>;
     /** Permanently remove all soft-deleted projects from Trash */
     purgeDeletedProjects: () => Promise<StoreActionResult>;
-    /** Duplicate a project with its sections/tasks (fresh task state) */
+    /** Duplicado a project with its sections/tasks (fresh task state) */
     duplicateProject: (id: string) => Promise<Project | null>;
     /** Toggle focus status of a project (max 5) */
     toggleProjectFocus: (id: string) => Promise<void>;
 
     // Section Actions
-    /** Add a new section within a project */
+    /** Agregar a new section within a project */
     addSection: (projectId: string, title: string, initialProps?: Partial<Section>) => Promise<Section | null>;
     /** Update a section */
     updateSection: (id: string, updates: Partial<Section>) => Promise<StoreActionResult>;
-    /** Delete a section and clear sectionId on child tasks */
+    /** Eliminar a section and clear sectionId on child tasks */
     deleteSection: (id: string) => Promise<StoreActionResult>;
     /** Reorder sections within a project by id list */
     reorderSections: (projectId: string, orderedIds: string[]) => Promise<void>;
 
     // Area Actions
-    /** Add a new area */
+    /** Agregar a new area */
     addArea: (name: string, initialProps?: Partial<Area>) => Promise<Area | null>;
     /** Update an area */
     updateArea: (id: string, updates: Partial<Area>) => Promise<StoreActionResult>;
@@ -163,7 +163,7 @@ export interface TaskStore {
     reorderBoardTasks: (status: TaskStatus, orderedIds: string[]) => Promise<void>;
 
     // People Actions
-    /** Add a new managed person for delegated tasks */
+    /** Agregar a new managed person for delegated tasks */
     addPerson: (name: string, initialProps?: Partial<Person>) => Promise<Person | null>;
     /** Update managed person metadata */
     updatePerson: (id: string, updates: Partial<Person>) => Promise<StoreActionResult>;
@@ -175,13 +175,13 @@ export interface TaskStore {
     restorePerson: (id: string) => Promise<StoreActionResult>;
 
     // Tag Actions
-    /** Delete a tag from tasks and projects */
+    /** Eliminar a tag from tasks and projects */
     deleteTag: (tagId: string) => Promise<void>;
     /** Rename a tag across all tasks and projects */
     renameTag: (oldTagId: string, newTagId: string) => Promise<void>;
 
-    // Context Actions
-    /** Delete a context from all tasks */
+    // Contexto Actions
+    /** Eliminar a context from all tasks */
     deleteContext: (context: string) => Promise<void>;
     /** Rename a context across all tasks */
     renameContext: (oldContext: string, newContext: string) => Promise<void>;
@@ -191,7 +191,7 @@ export interface TaskStore {
     updateSettings: (updates: Partial<AppData['settings']>) => Promise<void>;
     /** Persist current in-memory snapshot through the save queue */
     persistSnapshot: () => Promise<void>;
-    /** Highlight a task in UI lists (non-persistent) */
+    /** Resaltar a task in UI lists (non-persistent) */
     setHighlightTask: (id: string | null) => void;
 
     /** Derived state selector (cached by data references) */

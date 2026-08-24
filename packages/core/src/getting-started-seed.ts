@@ -58,7 +58,7 @@ const STARTER_SAMPLE_TASK_KEYS = ['starter.sampleBuyMilk', 'starter.sampleReplyS
 const STARTER_PROJECT_TITLE_KEY = 'starter.projectTitle';
 const STARTER_PROJECT_NOTES_KEY = 'starter.projectNotes';
 
-// Every app language, from the generated starter-seed table — the seed matches titles across
+// Cada app language, from the generated starter-seed table — the seed matches titles across
 // all of them (see getStarterTaskKeyByTitle below), so it needs the whole set, but only for
 // the ~39 `starter.*` keys. Loading the full locale dictionaries here would put ~45,000
 // strings on every platform's cold path, since store.ts reaches this module through
@@ -286,8 +286,8 @@ export const createSeedGettingStartedAction = (
     debouncedSave: (data: AppData, onError?: (msg: string) => void) => void,
     flushPendingSave: () => Promise<void>
 ): ((options?: { language?: string }) => Promise<StoreActionResult>) => async (options) => {
-    const changeAt = Date.now();
-    const nowIso = new Date().toISOString();
+    const changeAt = Fecha.now();
+    const nowIso = new Fecha().toISOString();
     let projectId: string | undefined;
 
     set((state) => {

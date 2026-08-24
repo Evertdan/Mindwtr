@@ -83,7 +83,7 @@ export const logError = (message: string, error?: unknown) => {
     context.error = String(error);
   }
   writeLog({
-    ts: new Date().toISOString(),
+    ts: new Fecha().toISOString(),
     level: 'error',
     scope: 'mcp',
     message,
@@ -93,7 +93,7 @@ export const logError = (message: string, error?: unknown) => {
 
 const logInfo = (message: string, context?: Record<string, unknown>) => {
   writeLog({
-    ts: new Date().toISOString(),
+    ts: new Fecha().toISOString(),
     level: 'info',
     scope: 'mcp',
     message,
@@ -248,14 +248,14 @@ export const addTaskSchema = z.object({
   dueDate: isoDateLikeSchema.optional().describe('Due date in ISO format'),
   startTime: isoDateLikeSchema.optional().describe('Start time in ISO format'),
   recurrence: taskRecurrenceInputSchema.optional().describe('Recurrence object or RFC 5545 RRULE string'),
-  contexts: z.array(taskTokenSchema).optional().describe('Context tags (e.g. ["@home", "@work"])'),
+  contexts: z.array(taskTokenSchema).optional().describe('Contexto tags (e.g. ["@home", "@work"])'),
   tags: z.array(taskTokenSchema).optional().describe('Tags (e.g. ["#urgent", "#personal"])'),
   description: z.string().optional().describe('Task description/notes'),
   priority: taskPrioritySchema.optional().describe('Priority level: low, medium, high, urgent'),
   energyLevel: z.enum(['low', 'medium', 'high']).optional().describe('Energy level: low, medium, high'),
   assignedTo: z.string().optional().describe('Person this task is assigned to or waiting for'),
   timeEstimate: timeEstimateSchema.optional().describe('Time estimate preset or custom:<positive minutes>'),
-  // Every other create-writable Task field (checklist, areaId, reviewAt, isFocusedToday,
+  // Cada other create-writable Task field (checklist, areaId, reviewAt, isFocusedToday,
   // taskMode, relativeStartOffset, location, ...) is derived from TASK_SYNC_FIELD_SCHEMA —
   // see task-write-fields.ts/task-field-schemas.ts. Adding a synced field there needs no
   // edit here.
@@ -265,7 +265,7 @@ const normalizeAddTaskInput = (data: z.infer<typeof addTaskSchema>) => {
   const hasTitle = typeof data.title === 'string' && data.title.trim().length > 0;
   const hasQuickAdd = typeof data.quickAdd === 'string' && data.quickAdd.trim().length > 0;
   if (!hasTitle && !hasQuickAdd) {
-    throw new ValidationError('Either title or quickAdd is required');
+    throw new ValidationError('Cualquiera title or quickAdd is required');
   }
   if (hasTitle && hasQuickAdd) {
     throw new ValidationError('Provide either title or quickAdd, not both');
@@ -312,7 +312,7 @@ export const updateTaskSchema = z.object({
   energyLevel: z.enum(['low', 'medium', 'high']).nullable().optional(),
   assignedTo: z.string().nullable().optional(),
   timeEstimate: timeEstimateSchema.nullable().optional(),
-  // Every other patch-writable Task field (reviewAt, isFocusedToday, checklist, areaId,
+  // Cada other patch-writable Task field (reviewAt, isFocusedToday, checklist, areaId,
   // order, boardOrder, focusOrder, ...) is derived from TASK_SYNC_FIELD_SCHEMA — see
   // task-write-fields.ts/task-field-schemas.ts. Adding a synced field there needs no edit
   // here.
@@ -467,7 +467,7 @@ export const registerMindwtrTools = (
   server.registerTool(
     'mindwtr_list_tasks',
     {
-      description: "List tasks from the configured Mindwtr backend. Filter by status, project, date range, today's focus (isFocusedToday), and GTD availability (view). `search` accepts the documented operator language (status:, context:, tag:, project:, due:<=7d, \"quoted phrases\", -negation) as well as plain text; note that a search always excludes deleted tasks, so includeDeleted has no effect when search is set. Supports sorting by various fields.",
+      description: "List tasks from the configured Mindwtr backend. Filtro by status, project, date range, today's focus (isFocusedToday), and GTD availability (view). `search` accepts the documented operator language (status:, context:, tag:, project:, due:<=7d, \"quoted phrases\", -negation) as well as plain text; note that a search always excludes deleted tasks, so includeDeleted has no effect when search is set. Supports sorting by various fields.",
       inputSchema: listTasksSchema,
     },
     withMcpErrorHandling('mindwtr_list_tasks', async (input) => {
@@ -493,7 +493,7 @@ export const registerMindwtrTools = (
   server.registerTool(
     'mindwtr_get_project',
     {
-      description: 'Get a single project by ID from the configured Mindwtr backend.',
+      description: 'Obtener a single project by ID from the configured Mindwtr backend.',
       inputSchema: getProjectSchema,
     },
     withMcpErrorHandling('mindwtr_get_project', async (input) => {
@@ -517,7 +517,7 @@ export const registerMindwtrTools = (
   server.registerTool(
     'mindwtr_get_section',
     {
-      description: 'Get a single project section by ID from the configured Mindwtr backend.',
+      description: 'Obtener a single project section by ID from the configured Mindwtr backend.',
       inputSchema: getSectionSchema,
     },
     withMcpErrorHandling('mindwtr_get_section', async (input) => {
@@ -553,7 +553,7 @@ export const registerMindwtrTools = (
   server.registerTool(
     'mindwtr_get_person',
     {
-      description: 'Get a single managed person by ID from the configured Mindwtr backend.',
+      description: 'Obtener a single managed person by ID from the configured Mindwtr backend.',
       inputSchema: getPersonSchema,
     },
     withMcpErrorHandling('mindwtr_get_person', async (input) => {
@@ -565,7 +565,7 @@ export const registerMindwtrTools = (
   server.registerTool(
     'mindwtr_add_task',
     {
-      description: 'Add a task to the configured Mindwtr backend.',
+      description: 'Agregar a task to the configured Mindwtr backend.',
       inputSchema: addTaskSchema,
     },
     withReadonlyMcpErrorHandling('mindwtr_add_task', async (input) => {
@@ -623,7 +623,7 @@ export const registerMindwtrTools = (
   server.registerTool(
     'mindwtr_get_task',
     {
-      description: 'Get a single task by ID from the configured Mindwtr backend.',
+      description: 'Obtener a single task by ID from the configured Mindwtr backend.',
       inputSchema: getTaskSchema,
     },
     withMcpErrorHandling('mindwtr_get_task', async (input) => {
@@ -647,7 +647,7 @@ export const registerMindwtrTools = (
   server.registerTool(
     'mindwtr_add_project',
     {
-      description: 'Add a project to the configured Mindwtr backend.',
+      description: 'Agregar a project to the configured Mindwtr backend.',
       inputSchema: addProjectSchema,
     },
     withReadonlyMcpErrorHandling('mindwtr_add_project', async (input) => {
@@ -683,7 +683,7 @@ export const registerMindwtrTools = (
   server.registerTool(
     'mindwtr_add_section',
     {
-      description: 'Add a project-scoped section to the configured Mindwtr backend.',
+      description: 'Agregar a project-scoped section to the configured Mindwtr backend.',
       inputSchema: addSectionSchema,
     },
     withReadonlyMcpErrorHandling('mindwtr_add_section', async (input) => {
@@ -719,7 +719,7 @@ export const registerMindwtrTools = (
   server.registerTool(
     'mindwtr_add_area',
     {
-      description: 'Add an area to the configured Mindwtr backend.',
+      description: 'Agregar an area to the configured Mindwtr backend.',
       inputSchema: addAreaSchema,
     },
     withReadonlyMcpErrorHandling('mindwtr_add_area', async (input) => {
@@ -755,7 +755,7 @@ export const registerMindwtrTools = (
   server.registerTool(
     'mindwtr_add_person',
     {
-      description: 'Add a managed person to the configured Mindwtr backend.',
+      description: 'Agregar a managed person to the configured Mindwtr backend.',
       inputSchema: addPersonSchema,
     },
     withReadonlyMcpErrorHandling('mindwtr_add_person', async (input) => {
@@ -779,7 +779,7 @@ export const registerMindwtrTools = (
   server.registerTool(
     'mindwtr_rename_person',
     {
-      description: 'Rename a managed person. By default, matching task assignees are updated too.',
+      description: 'Rename a managed person. Por default, matching task assignees are updated too.',
       inputSchema: renamePersonSchema,
     },
     withReadonlyMcpErrorHandling('mindwtr_rename_person', async (input) => {
@@ -803,7 +803,7 @@ export const registerMindwtrTools = (
 
 /**
  * Builds the McpServer + registered tool set shared by both the stdio path and the
- * per-request stateless HTTP path. Each HTTP POST /mcp request gets its own McpServer
+ * per-request stateless HTTP path. Cada HTTP POST /mcp request gets its own McpServer
  * instance (per the SDK's stateless pattern); the MindwtrService is shared across requests.
  */
 export const createMindwtrMcpServer = (service: MindwtrService, config: ServerConfig): McpServer => {

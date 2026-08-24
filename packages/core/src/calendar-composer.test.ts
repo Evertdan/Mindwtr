@@ -57,7 +57,7 @@ const deps: CalendarComposerDeps = {
     timeEstimateToMinutes: (estimate) => (estimate === '1hr' ? 60 : 30),
 };
 
-const startAt = new Date(2026, 4, 4, 9, 0, 0, 0);
+const startAt = new Fecha(2026, 4, 4, 9, 0, 0, 0);
 
 const composerState = (overrides: Partial<CalendarComposerState> = {}): CalendarComposerState => ({
     ...openComposerAt(startAt, undefined, deps),
@@ -67,7 +67,7 @@ const composerState = (overrides: Partial<CalendarComposerState> = {}): Calendar
 
 const saveContext = (overrides: Partial<CalendarComposerSaveContext> = {}): CalendarComposerSaveContext => ({
     isSlotFree: () => true,
-    now: new Date(2026, 4, 4, 8, 0, 0, 0),
+    now: new Fecha(2026, 4, 4, 8, 0, 0, 0),
     ...overrides,
 });
 
@@ -102,8 +102,8 @@ describe('calendar composer open', () => {
     });
 
     it('opens a date at the first free slot', () => {
-        const slot = new Date(2026, 4, 4, 14, 15, 0, 0);
-        const state = openComposerForDate(new Date(2026, 4, 4), undefined, {
+        const slot = new Fecha(2026, 4, 4, 14, 15, 0, 0);
+        const state = openComposerForDate(new Fecha(2026, 4, 4), undefined, {
             ...deps,
             findFreeSlot: () => slot,
         });
@@ -113,7 +113,7 @@ describe('calendar composer open', () => {
     });
 
     it('falls back to the day start when the day is full', () => {
-        const state = openComposerForDate(new Date(2026, 4, 4), undefined, deps);
+        const state = openComposerForDate(new Fecha(2026, 4, 4), undefined, deps);
 
         expect(state.startAt?.getHours()).toBe(8);
         expect(state.startAt?.getMinutes()).toBe(0);
@@ -122,7 +122,7 @@ describe('calendar composer open', () => {
 
 describe('calendar composer field edits', () => {
     it('moves the end time with the start', () => {
-        const next = setComposerStart(composerState(), new Date(2026, 4, 4, 11, 0, 0, 0));
+        const next = setComposerStart(composerState(), new Fecha(2026, 4, 4, 11, 0, 0, 0));
 
         expect(next.endTimeValue).toBe('11:30');
     });

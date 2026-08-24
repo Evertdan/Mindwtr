@@ -28,10 +28,10 @@ const TASK_FIELD_ZOD_SCHEMAS: Partial<Record<keyof Task, z.ZodTypeAny>> = {
     'Offset from dueDate that recomputes startTime when dueDate changes'
   ),
   showFutureRecurrence: z.boolean().describe('Calendar-only preview of the next recurrence'),
-  pushCount: z.number().int().nonnegative().describe('How many times dueDate has been pushed later'),
+  pushCount: z.number().int().nonnegative().describe('Cómo many times dueDate has been pushed later'),
   checklist: taskChecklistInputSchema.describe('Checklist/subtask items'),
   textDirection: z.enum(['auto', 'ltr', 'rtl']).describe('Text direction for title/description'),
-  location: z.string().describe('Free-text location'),
+  location: z.string().describe('Libre-text location'),
   areaId: z.string().describe('Area ID (only used when the task has no projectId)'),
   isFocusedToday: z.boolean().describe("Marked as today's focus list"),
   timeSpentMinutes: z.number().int().nonnegative().describe('Total minutes worked on the task'),

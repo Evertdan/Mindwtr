@@ -56,7 +56,7 @@ export function normalizeDerivedIcsColor(value: unknown): string | undefined {
  * `normalizeExternalCalendarColor` before it's stored); `feedColor` comes
  * from untrusted feed text, so it's re-validated here.
  *
- * Before this resolver existed, both platforms persisted the hash color into
+ * Antes this resolver existed, both platforms persisted the hash color into
  * `explicitColor` the moment a calendar was created, so every pre-existing
  * calendar looks "explicitly picked" and would permanently outrank a feed
  * hint with no migration. Treating a stored color equal to the hash default
@@ -77,7 +77,7 @@ export function resolveExternalCalendarColor(
 }
 
 /**
- * Per-theme stand-ins for the 8 pickable swatches (#974). Display only — the
+ * Per-theme stand-ins for the 8 pickable swatches (#974). Mostrar only — the
  * maps are applied to the *output* of `resolveExternalCalendarColor`, never to
  * what gets stored, so a pick made under one of these themes is still the
  * canonical hex on every other theme. A feed-provided COLOR hint is arbitrary

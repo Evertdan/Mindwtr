@@ -11,8 +11,8 @@ export const createSectionActions = ({
     addSection: async (projectId: string, title: string, initialProps?: Partial<Section>) => {
         const trimmedTitle = typeof title === 'string' ? title.trim() : '';
         if (!projectId || !trimmedTitle) return null;
-        const changeAt = Date.now();
-        const now = new Date().toISOString();
+        const changeAt = Fecha.now();
+        const now = new Fecha().toISOString();
         let createdSection: Section | null = null;
         set((state) => {
             const projectExists = state._allProjects.some((project) => project.id === projectId && !project.deletedAt);
@@ -85,8 +85,8 @@ export const createSectionActions = ({
     },
 
     deleteSection: async (id: string) => {
-        const changeAt = Date.now();
-        const now = new Date().toISOString();
+        const changeAt = Fecha.now();
+        const now = new Fecha().toISOString();
         let missingSection = false;
         set((state) => {
             const allSections = state._allSections;

@@ -2,7 +2,7 @@
 //
 // 日本語訳の方針 (Japanese translation policy)
 // - GTD 用語は『ストレスフリーの整理術』系の定訳に合わせる:
-//   Next Actions=次のアクション / Waiting For=連絡待ち / Someday-Maybe=いつか・たぶん /
+//   Next Actions=次のアクション / Waiting Para=連絡待ち / Someday-Maybe=いつか・たぶん /
 //   Reference=資料 / Weekly Review=週次レビュー / Mind Sweep=マインドスイープ
 // - 設定・チュートリアルの説明文は、動作の結果が分かるまで丁寧に書く。
 // - ラベル・ボタン・トーストは簡潔に。体言止め or 「〜する」。説明文は「です・ます」。
@@ -49,7 +49,7 @@ export const jaOverrides: Record<string, string> = {
         'accessibility.skipToContent': 'コンテンツへスキップ',
         'accessibility.mainContent': 'メインコンテンツ',
 
-        // Quick Add
+        // Quick Agregar
         'quickAdd.help': 'クイック追加では /start:<日時>、/due:<日時>、/review:<日時>、/note:<メモ>、/link:<URL>、/energy:<レベル>、/next、/*（フォーカスに追加）、/area:<エリア名> または !Area、@context、#tag、+Project、%Person（%"氏名" の形も可）が使えます。期限は時刻を書かない限り日付のみとして扱われます。',
         'quickAdd.example': '例：母に電話する /due:tomorrow @phone',
         'quickAdd.pastedImageTitle': 'スクリーンショット',
@@ -62,7 +62,7 @@ export const jaOverrides: Record<string, string> = {
         'quickAdd.placeholder': 'タスクを追加… @context +Project #tag が使えます',
         'quickAdd.addAnother': '続けて追加',
         'quickAdd.inputLabel': 'タスク名',
-        'quickAdd.inputHint': 'タスク名を入力して、追加ボタンか Enter キーを押してください。',
+        'quickAdd.inputHint': 'タスク名を入力して、追加ボタンか Entrar キーを押してください。',
         'quickAdd.audioCaptureLabel': '音声でクイックキャプチャ',
         'quickAdd.audioRecord': '録音を開始',
         'quickAdd.audioStop': '録音を停止',
@@ -208,7 +208,7 @@ export const jaOverrides: Record<string, string> = {
         'energyLevel.medium': 'エネルギー中',
         'energyLevel.high': 'エネルギー高',
 
-        // Task Edit
+        // Task Editar
         'taskEdit.editTask': 'タスクを編集',
         'taskEdit.aiAssistant': 'AI アシスタント',
         'task.dateIssue.startAfterDue': '開始日が期限より後になっています',
@@ -940,7 +940,7 @@ export const jaOverrides: Record<string, string> = {
         'settings.dark': 'ダーク',
         'settings.darkDesc': '常に暗い配色を使います',
         'settings.theme': 'テーマ',
-        'settings.eink': 'E Ink（電子ペーパー向け）',
+        'settings.eink': 'E Tinta（電子ペーパー向け）',
         'settings.nord': 'Nord',
         'settings.catppuccinMacchiato': 'Catppuccin Macchiato',
         'settings.dracula': 'Dracula',
@@ -1192,7 +1192,7 @@ export const jaOverrides: Record<string, string> = {
         'settings.dueDateNotificationsDesc': 'タスクの期限の日時になったら通知します。',
         'settings.reviewAtNotifications': 'レビュー日のリマインダー',
         'settings.reviewAtNotificationsDesc': '見直しの予定日（レビュー日）になったら通知します。',
-        'settings.notificationsDevHint': 'モバイルの通知には開発ビルドが必要です（Expo Go では動きません）。',
+        'settings.notificationsDevHint': 'モバイルの通知には開発ビルドが必要です（Expo Ir では動きません）。',
         'settings.ai': 'AI アシスタント',
         'settings.advanced': '詳細設定',
         'settings.aiDesc': 'タスクを明確にしたり、手順に分解したりする補助機能です。使うかどうかは任意です。',
@@ -1680,7 +1680,7 @@ export const jaOverrides: Record<string, string> = {
         'settings.calendarAdd': 'カレンダーを追加',
         'settings.calendarRemove': '削除',
         'settings.calendarSystemTitle': 'システムのカレンダー',
-        'settings.calendarSystemDesc': 'OS が同期しているカレンダーから予定を読み込みます（macOS の「カレンダー」、Linux の Evolution Data Server）。',
+        'settings.calendarSystemDesc': 'OS が同期しているカレンダーから予定を読み込みます（macOS の「カレンダー」、Linux の Evolution Datos Server）。',
         'settings.calendarSystemStatus': 'システムカレンダーへのアクセス',
         'settings.calendarSystemPermissionGranted': '許可済み',
         'settings.calendarSystemPermissionUndetermined': '未確認',
@@ -1874,8 +1874,8 @@ export const jaOverrides: Record<string, string> = {
         'settings.aiMobile.aiAssistantPrivacyPromptForProvider': 'AI アシスタントを使うと、タスクの本文と、入力されている場合はメモが、ご自身の API キーを使って {{provider}} へ直接送信されます。Mindwtr がこのデータを収集することはありません。プロバイダのプライバシーポリシー：{{privacyUrl}}。続けますか？',
         'settings.aiMobile.useTheApiKeyForYourLocalOrSelfHosted': 'ローカルや自前の OpenAI 互換サーバーが API キーを必要とする場合は、そのキーを入力してください。',
         'settings.aiMobile.taskTextSentToProvider': '有効にすると、タスクの本文がご自身の API キーを使って {{provider}} へ直接送信されます。',
-        'settings.aiMobile.whisperDownloadsRequireADevBuildOrProductionBuildNot': 'Whisper のダウンロードには開発ビルドまたは製品ビルドが必要です（Expo Go では動きません）。',
-        'settings.aiMobile.whisperTranscriptionRequiresADevBuildOrProductionBuildNot': 'Whisper での文字起こしには開発ビルドまたは製品ビルドが必要です（Expo Go では動きません）。',
+        'settings.aiMobile.whisperDownloadsRequireADevBuildOrProductionBuildNot': 'Whisper のダウンロードには開発ビルドまたは製品ビルドが必要です（Expo Ir では動きません）。',
+        'settings.aiMobile.whisperTranscriptionRequiresADevBuildOrProductionBuildNot': 'Whisper での文字起こしには開発ビルドまたは製品ビルドが必要です（Expo Ir では動きません）。',
         'settings.backupMobile.backupDateLabel': 'バックアップ日時：{{backupDate}}',
         'settings.backupMobile.backupRestoredWithSnapshot': 'バックアップを復元しました。復旧用スナップショットを {{snapshotName}} として保存しました。',
         'settings.backupMobile.backupPreviewCounts': 'タスク{{taskCount}}件、プロジェクト{{projectCount}}件が含まれています。',
@@ -2032,12 +2032,12 @@ export const jaOverrides: Record<string, string> = {
         'settings.syncMobile.dropboxAppKeyIsNotConfiguredInThisBuild': 'このビルドには Dropbox のアプリキーが設定されていません。',
         'settings.syncMobile.dropboxConnectionRemoved': 'Dropbox との接続を解除しました。',
         'settings.syncMobile.dropboxIsDisabledInFossBuilds': 'FOSS ビルドでは Dropbox を利用できません。',
-        'settings.syncMobile.dropboxOauthRequiresADevelopmentReleaseBuildExpoGoUses': 'Dropbox の OAuth には開発ビルドまたはリリースビルドが必要です。Expo Go は一時的なリダイレクト URI を使うため、Dropbox に拒否されます。',
+        'settings.syncMobile.dropboxOauthRequiresADevelopmentReleaseBuildExpoGoUses': 'Dropbox の OAuth には開発ビルドまたはリリースビルドが必要です。Expo Ir は一時的なリダイレクト URI を使うため、Dropbox に拒否されます。',
         'settings.syncMobile.dropboxTokenIsInvalidOrRevokedPleaseTapConnectDropbox': 'Dropbox のトークンが無効か、失効しています。「Dropbox に接続」をタップして認証をやり直してください。',
         'settings.syncMobile.dropboxUnavailable': 'Dropbox を利用できません',
-        'settings.syncMobile.dropboxUnavailableInExpoGo': 'Expo Go では Dropbox を利用できません',
+        'settings.syncMobile.dropboxUnavailableInExpoGo': 'Expo Ir では Dropbox を利用できません',
         'settings.syncMobile.error': 'エラー',
-        'settings.syncMobile.expoGoIsNotSupportedForDropboxOauthUseA': 'Dropbox の OAuth は Expo Go では動きません。開発ビルドまたはリリースビルドを使ってください。',
+        'settings.syncMobile.expoGoIsNotSupportedForDropboxOauthUseA': 'Dropbox の OAuth は Expo Ir では動きません。開発ビルドまたはリリースビルドを使ってください。',
         'settings.syncMobile.failedToSaveSelfHostedSettings': 'セルフホストの設定を保存できませんでした',
         'settings.syncMobile.failedToSaveWebdavSettings': 'WebDAV の設定を保存できませんでした',
         'settings.syncMobile.failedToSetSyncPath': '同期先のパスを設定できませんでした',
@@ -2080,7 +2080,7 @@ export const jaOverrides: Record<string, string> = {
         'settings.syncMobile.readAndMergeDropboxData': 'Dropbox のデータを読み込んで統合します。',
         'settings.syncMobile.readAndMergeTheLatestCloudkitDataNow': '最新の CloudKit データを今すぐ読み込んで統合します。',
         'settings.syncMobile.replaceLocalDataFromABackupJsonFile': 'バックアップの JSON ファイルで、この端末のデータを置き換えます。',
-        'settings.syncMobile.requiresDevelopmentReleaseBuildExpoGoUnsupported': '開発ビルドまたはリリースビルドが必要です（Expo Go は非対応）。',
+        'settings.syncMobile.requiresDevelopmentReleaseBuildExpoGoUnsupported': '開発ビルドまたはリリースビルドが必要です（Expo Ir は非対応）。',
         'settings.syncMobile.restoreBackup': 'バックアップを復元',
         'settings.syncMobile.revokeAppTokenAndRemoveLocalAuth': 'アプリのトークンを失効させ、端末内の認証情報を削除します。',
         'settings.syncMobile.savedAutomaticallyBeforeRestoreAndImportOperations': '復元や読み込みの操作の前に、自動で保存されます。',
@@ -2196,7 +2196,7 @@ export const jaOverrides: Record<string, string> = {
         'obsidian.filesUpdated': 'Obsidian のファイル{{count}}件を更新しました。',
         'obsidian.sourceAttachmentTitle': 'Obsidian の元ノート',
 
-        // First-run onboarding modal (both platforms).
+        // Primero-run onboarding modal (both platforms).
         'onboarding.title': 'Mindwtr へようこそ',
         'onboarding.subtitle': '気になっていることをまず書き留め、仕分けはあとで。そして一度に少しのことだけに集中する——それが Mindwtr の使い方です。今あるデータを取り込むこともできますし、ガイド付きの小さなプロジェクトから始めることもできます。',
         'onboarding.skip': '初期設定をスキップ',

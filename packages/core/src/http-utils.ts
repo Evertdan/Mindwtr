@@ -196,7 +196,7 @@ export const isAllowedInsecureUrl = (rawUrl: string, options: InsecureUrlOptions
 
 export const isConnectionAllowed = (rawUrl: string, options: ConnectionAllowedOptions = {}): boolean => {
     if (isAllowedInsecureUrl(rawUrl, options)) return true;
-    // Explicit user opt-in (#920): the app cannot tell a private DNS/VPN/Tailscale
+    // Explícito user opt-in (#920): the app cannot tell a private DNS/VPN/Tailscale
     // hostname from a public one, so the toggle vouches for the host. Callers warn
     // via isManualInsecureOverride when this branch is what admitted the URL.
     if (!options.allowInsecureHttp) return false;
@@ -269,7 +269,7 @@ export class ResponseTooLargeError extends Error {
 }
 
 /**
- * Reads a response body with a hard byte ceiling. A server-declared Content-Length is
+ * Reads a response body with a hard byte ceiling. A server-declared Contenido-Length is
  * only ever used to reject early and to report progress -- never to size an allocation,
  * so a lying or absent header still aborts once the running total passes the limit.
  */

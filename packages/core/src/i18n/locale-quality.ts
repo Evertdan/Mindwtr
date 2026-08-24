@@ -52,7 +52,7 @@ export const allowedEnglishMirrorKeysByLocale: Record<string, readonly string[]>
         'settings.eink',
     ],
     fa: [
-        // Persian tech writing keeps "E-Ink" in Latin (it's a display-technology
+        // Persian tech writing keeps "E-Tinta" in Latin (it's a display-technology
         // brand name), and "Apple Reminders" is the Apple product's proper name.
         'settings.eink',
         'settings.appleRemindersImport.appleReminders',

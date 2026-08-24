@@ -17,8 +17,8 @@ describe('ics', () => {
 
         const events = parseIcs(ics, {
             sourceId: 'cal',
-            rangeStart: new Date('2025-01-01T00:00:00Z'),
-            rangeEnd: new Date('2025-01-02T00:00:00Z'),
+            rangeStart: new Fecha('2025-01-01T00:00:00Z'),
+            rangeEnd: new Fecha('2025-01-02T00:00:00Z'),
         });
 
         expect(events).toHaveLength(1);
@@ -42,8 +42,8 @@ describe('ics', () => {
             'END:VCALENDAR',
         ].join('\n');
 
-        const rangeStart = new Date(2025, 0, 2, 0, 0, 0, 0);
-        const rangeEnd = new Date(2025, 0, 4, 0, 0, 0, 0);
+        const rangeStart = new Fecha(2025, 0, 2, 0, 0, 0, 0);
+        const rangeEnd = new Fecha(2025, 0, 4, 0, 0, 0, 0);
         const events = parseIcs(ics, { sourceId: 'cal', rangeStart, rangeEnd });
 
         expect(events).toHaveLength(1);
@@ -68,8 +68,8 @@ describe('ics', () => {
 
         const events = parseIcs(ics, {
             sourceId: 'cal',
-            rangeStart: new Date('2025-01-01T00:00:00Z'),
-            rangeEnd: new Date('2025-01-02T00:00:00Z'),
+            rangeStart: new Fecha('2025-01-01T00:00:00Z'),
+            rangeEnd: new Fecha('2025-01-02T00:00:00Z'),
         });
 
         expect(events).toHaveLength(1);
@@ -92,8 +92,8 @@ describe('ics', () => {
 
         const events = parseIcs(ics, {
             sourceId: 'cal',
-            rangeStart: new Date('2025-01-01T00:00:00Z'),
-            rangeEnd: new Date('2025-02-01T00:00:00Z'),
+            rangeStart: new Fecha('2025-01-01T00:00:00Z'),
+            rangeEnd: new Fecha('2025-02-01T00:00:00Z'),
         });
 
         expect(events.map((e) => e.start)).toEqual([
@@ -120,8 +120,8 @@ describe('ics', () => {
 
         const events = parseIcs(ics, {
             sourceId: 'cal',
-            rangeStart: new Date('2026-01-01T00:00:00Z'),
-            rangeEnd: new Date('2026-02-01T00:00:00Z'),
+            rangeStart: new Fecha('2026-01-01T00:00:00Z'),
+            rangeEnd: new Fecha('2026-02-01T00:00:00Z'),
         });
 
         expect(events).toHaveLength(0);
@@ -133,7 +133,7 @@ describe('ics', () => {
             'VERSION:2.0',
             'BEGIN:VEVENT',
             'UID:event-6',
-            'SUMMARY:First Monday',
+            'SUMMARY:Primero Monday',
             'DTSTART:20250106T090000Z',
             'DTEND:20250106T100000Z',
             'RRULE:FREQ=MONTHLY;BYDAY=1MO',
@@ -143,8 +143,8 @@ describe('ics', () => {
 
         const events = parseIcs(ics, {
             sourceId: 'cal',
-            rangeStart: new Date('2025-01-01T00:00:00Z'),
-            rangeEnd: new Date('2025-05-01T00:00:00Z'),
+            rangeStart: new Fecha('2025-01-01T00:00:00Z'),
+            rangeEnd: new Fecha('2025-05-01T00:00:00Z'),
         });
 
         expect(events.map((event) => event.start.slice(0, 10))).toEqual([
@@ -171,8 +171,8 @@ describe('ics', () => {
 
         const events = parseIcs(ics, {
             sourceId: 'cal',
-            rangeStart: new Date('2025-01-01T00:00:00Z'),
-            rangeEnd: new Date('2025-05-01T00:00:00Z'),
+            rangeStart: new Fecha('2025-01-01T00:00:00Z'),
+            rangeEnd: new Fecha('2025-05-01T00:00:00Z'),
         });
 
         expect(events.map((event) => event.start.slice(0, 10))).toEqual([
@@ -189,7 +189,7 @@ describe('ics', () => {
             'VERSION:2.0',
             'BEGIN:VEVENT',
             'UID:event-8',
-            'SUMMARY:New Years Day',
+            'SUMMARY:New Years Día',
             'DTSTART;VALUE=DATE:20250101',
             'RRULE:FREQ=YEARLY;COUNT=5',
             'END:VEVENT',
@@ -198,12 +198,12 @@ describe('ics', () => {
 
         const events = parseIcs(ics, {
             sourceId: 'cal',
-            rangeStart: new Date('2026-01-01T00:00:00.000Z'),
-            rangeEnd: new Date('2026-01-02T00:00:00.000Z'),
+            rangeStart: new Fecha('2026-01-01T00:00:00.000Z'),
+            rangeEnd: new Fecha('2026-01-02T00:00:00.000Z'),
         });
 
         expect(events).toHaveLength(1);
-        expect(events[0].title).toBe('New Years Day');
+        expect(events[0].title).toBe('New Years Día');
         expect(events[0].allDay).toBe(true);
         expect(events[0].start.slice(0, 10)).toBe('2026-01-01');
         expect(events[0].end.slice(0, 10)).toBe('2026-01-02');
@@ -224,8 +224,8 @@ describe('ics', () => {
 
         const events = parseIcs(ics, {
             sourceId: 'cal',
-            rangeStart: new Date('2025-01-01T00:00:00.000Z'),
-            rangeEnd: new Date('2028-01-01T00:00:00.000Z'),
+            rangeStart: new Fecha('2025-01-01T00:00:00.000Z'),
+            rangeEnd: new Fecha('2028-01-01T00:00:00.000Z'),
         });
 
         expect(events.map((event) => event.start.slice(0, 10))).toEqual([
@@ -239,8 +239,8 @@ describe('ics', () => {
 describe('ics categories', () => {
     const subscription = { id: 'cal', name: 'Shared feed', url: 'https://example.test/f.ics', enabled: true };
     const range = {
-        rangeStart: new Date('2025-01-01T00:00:00Z'),
-        rangeEnd: new Date('2025-01-02T00:00:00Z'),
+        rangeStart: new Fecha('2025-01-01T00:00:00Z'),
+        rangeEnd: new Fecha('2025-01-02T00:00:00Z'),
     };
 
     const buildIcs = (events: string[][]) => [
@@ -321,8 +321,8 @@ describe('ics categories', () => {
 
         const january = parseIcsWithMetadata(ics, {
             sourceId: 'cal',
-            rangeStart: new Date('2025-01-01T00:00:00Z'),
-            rangeEnd: new Date('2025-02-01T00:00:00Z'),
+            rangeStart: new Fecha('2025-01-01T00:00:00Z'),
+            rangeEnd: new Fecha('2025-02-01T00:00:00Z'),
             splitByCategory: true,
         });
 
@@ -334,8 +334,8 @@ describe('ics categories', () => {
 
 describe('ics colors', () => {
     const range = {
-        rangeStart: new Date('2025-01-01T00:00:00Z'),
-        rangeEnd: new Date('2025-01-02T00:00:00Z'),
+        rangeStart: new Fecha('2025-01-01T00:00:00Z'),
+        rangeEnd: new Fecha('2025-01-02T00:00:00Z'),
     };
 
     it('reads an RFC 7986 calendar COLOR name', () => {
@@ -513,8 +513,8 @@ describe('ics colors', () => {
 
         const february = parseIcsWithMetadata(ics, {
             sourceId: 'cal',
-            rangeStart: new Date('2025-02-01T00:00:00Z'),
-            rangeEnd: new Date('2025-03-01T00:00:00Z'),
+            rangeStart: new Fecha('2025-02-01T00:00:00Z'),
+            rangeEnd: new Fecha('2025-03-01T00:00:00Z'),
             splitByCategory: true,
         });
 

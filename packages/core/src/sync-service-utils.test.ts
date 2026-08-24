@@ -79,7 +79,7 @@ describe('sync-service-utils', () => {
     });
 
     it('formats readonly file sync errors with actionable guidance', () => {
-        const message = formatSyncErrorMessage(new Error("File '/tmp/data.json' is not writable"), 'file');
+        const message = formatSyncErrorMessage(new Error("Archivo '/tmp/data.json' is not writable"), 'file');
 
         expect(message).toContain('Sync file is not writable');
         expect(message).toContain('Re-select the sync folder');

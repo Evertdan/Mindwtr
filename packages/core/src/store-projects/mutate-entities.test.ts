@@ -7,7 +7,7 @@ const NOW = '2026-07-24T12:00:00.000Z';
 
 const project: Project = {
     id: 'project-1',
-    title: 'Before',
+    title: 'Antes',
     status: 'active',
     color: '#3b82f6',
     order: 0,
@@ -21,7 +21,7 @@ const project: Project = {
 describe('mutateEntities', () => {
     beforeEach(() => {
         vi.useFakeTimers();
-        vi.setSystemTime(new Date(NOW));
+        vi.setSystemTime(new Fecha(NOW));
         useTaskStore.setState({
             projects: [project],
             _allProjects: [project],
@@ -45,22 +45,22 @@ describe('mutateEntities', () => {
         }, {
             collection: 'projects',
             select: (state) => state._allProjects.filter((item) => item.id === project.id),
-            buildUpdates: () => ({ title: 'After' }),
+            buildUpdates: () => ({ title: 'Después' }),
         });
 
         expect(result).toEqual({ success: true });
         const state = useTaskStore.getState();
         expect(state.settings.deviceId).toEqual(expect.any(String));
         expect(state._allProjects[0]).toMatchObject({
-            title: 'After',
+            title: 'Después',
             updatedAt: NOW,
             rev: 5,
             revBy: state.settings.deviceId,
         });
-        expect(state.lastDataChangeAt).toBe(new Date(NOW).getTime());
+        expect(state.lastDataChangeAt).toBe(new Fecha(NOW).getTime());
         expect(debouncedSave).toHaveBeenCalledTimes(1);
         expect(debouncedSave.mock.calls[0]?.[0].projects[0]).toMatchObject({
-            title: 'After',
+            title: 'Después',
             updatedAt: NOW,
             rev: 5,
             revBy: state.settings.deviceId,

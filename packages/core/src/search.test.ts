@@ -22,12 +22,12 @@ describe('search', () => {
     });
 
     it('supports status, OR groups, and negation', () => {
-        const now = new Date('2025-01-01T10:00:00Z');
+        const now = new Fecha('2025-01-01T10:00:00Z');
 
         const tasks: Task[] = [
             {
                 id: 't1',
-                title: 'Call mom',
+                title: 'Llamada mom',
                 status: 'inbox',
                 tags: [],
                 contexts: [],
@@ -60,7 +60,7 @@ describe('search', () => {
     });
 
     it('supports reference status filter', () => {
-        const now = new Date('2025-01-01T10:00:00Z');
+        const now = new Fecha('2025-01-01T10:00:00Z');
         const tasks: Task[] = [
             {
                 id: 't1',
@@ -87,7 +87,7 @@ describe('search', () => {
     });
 
     it('supports relative date comparisons', () => {
-        const now = new Date('2025-01-01T00:00:00Z');
+        const now = new Fecha('2025-01-01T00:00:00Z');
         const tasks: Task[] = [
             {
                 id: 't1',
@@ -116,7 +116,7 @@ describe('search', () => {
     });
 
     it('matches parent context filters against slash-delimited child contexts', () => {
-        const nowIso = new Date('2025-01-01T00:00:00Z').toISOString();
+        const nowIso = new Fecha('2025-01-01T00:00:00Z').toISOString();
         const tasks: Task[] = [
             {
                 id: 't1',
@@ -143,7 +143,7 @@ describe('search', () => {
     });
 
     it('matches project filter by title', () => {
-        const nowIso = new Date('2025-01-01T00:00:00Z').toISOString();
+        const nowIso = new Fecha('2025-01-01T00:00:00Z').toISOString();
         const projects: Project[] = [
             {
                 id: 'p1',
@@ -173,11 +173,11 @@ describe('search', () => {
     });
 
     it('matches assigned task filters and combines them with tags', () => {
-        const nowIso = new Date('2025-01-01T00:00:00Z').toISOString();
+        const nowIso = new Fecha('2025-01-01T00:00:00Z').toISOString();
         const tasks: Task[] = [
             {
                 id: 't1',
-                title: 'Follow up',
+                title: 'Seguir up',
                 status: 'waiting',
                 assignedTo: 'Tom',
                 tags: ['#urgent'],
@@ -212,11 +212,11 @@ describe('search', () => {
     });
 
     it('supports quoted assignee filters', () => {
-        const nowIso = new Date('2025-01-01T00:00:00Z').toISOString();
+        const nowIso = new Fecha('2025-01-01T00:00:00Z').toISOString();
         const tasks: Task[] = [
             {
                 id: 't1',
-                title: 'Follow up',
+                title: 'Seguir up',
                 status: 'waiting',
                 assignedTo: 'Tom Smith',
                 tags: [],
@@ -226,7 +226,7 @@ describe('search', () => {
             },
             {
                 id: 't2',
-                title: 'Check brief',
+                title: 'Verificar brief',
                 status: 'waiting',
                 assignedTo: 'Tom',
                 tags: [],
@@ -241,11 +241,11 @@ describe('search', () => {
     });
 
     it('matches assigned people in unfielded task searches', () => {
-        const nowIso = new Date('2025-01-01T00:00:00Z').toISOString();
+        const nowIso = new Fecha('2025-01-01T00:00:00Z').toISOString();
         const tasks: Task[] = [
             {
                 id: 't1',
-                title: 'Follow up on invoice',
+                title: 'Seguir up on invoice',
                 status: 'waiting',
                 assignedTo: 'John Smith',
                 tags: [],
@@ -270,7 +270,7 @@ describe('search', () => {
     });
 
     it('matches location text and location field filters', () => {
-        const nowIso = new Date('2025-01-01T00:00:00Z').toISOString();
+        const nowIso = new Fecha('2025-01-01T00:00:00Z').toISOString();
         const tasks: Task[] = [
             {
                 id: 't1',
@@ -299,7 +299,7 @@ describe('search', () => {
     });
 
     it('matches checklist item text in task searches', () => {
-        const nowIso = new Date('2025-01-01T00:00:00Z').toISOString();
+        const nowIso = new Fecha('2025-01-01T00:00:00Z').toISOString();
         const tasks: Task[] = [
             {
                 id: 't1',
@@ -331,7 +331,7 @@ describe('search', () => {
     });
 
     it('matches task id filters', () => {
-        const nowIso = new Date('2025-01-01T00:00:00Z').toISOString();
+        const nowIso = new Fecha('2025-01-01T00:00:00Z').toISOString();
         const tasks: Task[] = [
             {
                 id: '018f4d3a-b89c-74c3-81aa-0c1ef3de0001',
@@ -365,11 +365,11 @@ describe('search', () => {
     });
 
     it('does not build project lookup when query has no project terms', () => {
-        const nowIso = new Date('2025-01-01T00:00:00Z').toISOString();
+        const nowIso = new Fecha('2025-01-01T00:00:00Z').toISOString();
         const tasks: Task[] = [
             {
                 id: 't1',
-                title: 'Call mom',
+                title: 'Llamada mom',
                 status: 'inbox',
                 tags: [],
                 contexts: [],

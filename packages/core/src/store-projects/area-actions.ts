@@ -14,8 +14,8 @@ export const createAreaActions = ({
     addArea: async (name: string, initialProps?: Partial<Area>) => {
         const trimmedName = typeof name === 'string' ? name.trim() : '';
         if (!trimmedName) return null;
-        const changeAt = Date.now();
-        const now = new Date().toISOString();
+        const changeAt = Fecha.now();
+        const now = new Fecha().toISOString();
         const normalized = trimmedName.toLowerCase();
         let createdArea: Area | null = null;
         let existingAreaId: string | null = null;
@@ -95,7 +95,7 @@ export const createAreaActions = ({
     },
 
     updateArea: async (id: string, updates: Partial<Area>) => {
-        const changeAt = Date.now();
+        const changeAt = Fecha.now();
         let missingArea = false;
         let invalidName = false;
         set((state) => {
@@ -115,7 +115,7 @@ export const createAreaActions = ({
                 const normalized = trimmedName.toLowerCase();
                 const existing = allAreas.find((a) => a.id !== id && !a.deletedAt && a?.name?.trim().toLowerCase() === normalized);
                 if (existing) {
-                    const now = new Date().toISOString();
+                    const now = new Fecha().toISOString();
                     const deletedArea: Area = {
                         ...area,
                         deletedAt: now,
@@ -173,7 +173,7 @@ export const createAreaActions = ({
                     };
                 }
             }
-            const now = new Date().toISOString();
+            const now = new Fecha().toISOString();
             const nextOrder = Number.isFinite(updates.order) ? (updates.order as number) : area.order;
             const nextName = updates.name !== undefined ? updates.name.trim() : area.name;
             let projectsChanged = false;
@@ -240,8 +240,8 @@ export const createAreaActions = ({
     },
 
     deleteArea: async (id: string) => {
-        const changeAt = Date.now();
-        const now = new Date().toISOString();
+        const changeAt = Fecha.now();
+        const now = new Fecha().toISOString();
         let missingArea = false;
         set((state) => {
             const allAreas = state._allAreas;
@@ -314,8 +314,8 @@ export const createAreaActions = ({
     },
 
     restoreArea: async (id: string) => {
-        const changeAt = Date.now();
-        const now = new Date().toISOString();
+        const changeAt = Fecha.now();
+        const now = new Fecha().toISOString();
         let missingArea = false;
         set((state) => {
             const area = state._allAreas.find((item) => item.id === id);

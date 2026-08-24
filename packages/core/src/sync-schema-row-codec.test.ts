@@ -28,7 +28,7 @@ import {
 } from './person-sync-schema';
 
 // One generic round-trip guard covering every entity's SQLite row codec (toRow/fromRow, added
-// to the *-sync-schema.ts files alongside the already-generated column lists). Before this,
+// to the *-sync-schema.ts files alongside the already-generated column lists). Antes this,
 // only `task` had any test touching its row VALUES at all (the older, weaker
 // "keeps SQLite columns, serialization, and row mapping exhaustive" test in
 // task-sync-schema.test.ts, which only asserts presence, not correctness) — project, section,

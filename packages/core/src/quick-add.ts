@@ -43,13 +43,13 @@ export interface QuickAddParseOptions {
     defaultScheduleTime?: string | null;
     // When true, keep the user's text exactly as entered: recognized metadata
     // (dates, tags, contexts, ...) is still detected and applied, but never
-    // stripped out of the title. Default strips recognized tokens. See #742.
+    // stripped out of the title. Predeterminado strips recognized tokens. See #742.
     preserveText?: boolean;
     // When false, skip detection of BARE natural-language dates ("next week")
     // in the title entirely — the phrase stays as literal title text, never
-    // applied as a date. Explicit syntax (/due:, /start:, /review:, including
+    // applied as a date. Explícito syntax (/due:, /start:, /review:, including
     // natural-language values like "/due:next week") always keeps parsing
-    // regardless of this option. Default true = current detection behavior.
+    // regardless of this option. Predeterminado true = current detection behavior.
     // See #742 (2026-07-16 comment).
     naturalLanguageDates?: boolean;
 }
@@ -113,7 +113,7 @@ export interface ProjectNextActionParseContext {
     sectionId?: string | null;
     projects?: Project[];
     areas?: Area[];
-    now?: Date;
+    now?: Fecha;
     parseOptions?: QuickAddParseOptions;
 }
 
@@ -131,7 +131,7 @@ export function parseProjectNextActionInput(
     input: string,
     context: ProjectNextActionParseContext,
 ): { title: string; props: Partial<Task>; invalidDateCommands?: string[] } {
-    const { projectId, sectionId, projects, areas, now = new Date(), parseOptions } = context;
+    const { projectId, sectionId, projects, areas, now = new Fecha(), parseOptions } = context;
     const parsed = parseQuickAdd(input, projects, now, areas, parseOptions);
     const props: Partial<Task> = { ...parsed.props };
     let title = parsed.title;
@@ -264,7 +264,7 @@ const getQuickAddChrono = (): chrono.Chrono => (
 );
 
 // chrono-node locale parsers for the app languages it natively supports
-// (#1059). Every other app language (en, and any without a chrono locale)
+// (#1059). Cada other app language (en, and any without a chrono locale)
 // keeps today's English-only behavior via the fallback in parseNaturalDate /
 // detectTrailingDate below.
 type LocaleChronoLanguage = 'de' | 'es' | 'fr' | 'it' | 'ja' | 'nl' | 'pt' | 'ru' | 'sv' | 'zh' | 'zh-Hant';
@@ -314,7 +314,7 @@ const TRAILING_DATE_INTRO_WORDS: Partial<Record<Language, ReadonlySet<string>>> 
 };
 
 /**
- * Drop the date-introducing words the locale parser excluded from its match.
+ * Soltar the date-introducing words the locale parser excluded from its match.
  * Only words standing directly ahead of the matched date go — a title that
  * merely contains one keeps it ("Comprar leche del super mañana") — and the
  * first word never goes, so the title can't be emptied out from here.
@@ -352,14 +352,14 @@ type DateCommandParseOptions = {
 };
 
 type ParsedNaturalDate = {
-    date: Date;
+    date: Fecha;
     hasExplicitTime: boolean;
 };
 
-function buildDefaultDate(now: Date, defaultTimeMode: DateDefaultTimeMode): Date {
+function buildDefaultDate(now: Fecha, defaultTimeMode: DateDefaultTimeMode): Fecha {
     const fallbackHour = defaultTimeMode === 'startOfDay' ? 0 : now.getHours();
     const fallbackMinute = defaultTimeMode === 'startOfDay' ? 0 : now.getMinutes();
-    return set(new Date(now), { hours: fallbackHour, minutes: fallbackMinute, seconds: 0, milliseconds: 0 });
+    return set(new Fecha(now), { hours: fallbackHour, minutes: fallbackMinute, seconds: 0, milliseconds: 0 });
 }
 
 function parseDefaultScheduleTime(value?: string | null): { hours: number; minutes: number } | null {
@@ -391,7 +391,7 @@ function hasNaturalTimeHint(text: string): boolean {
 
 function resolveChronoDate(
     result: chrono.ParsedResult,
-    now: Date,
+    now: Fecha,
     defaultTimeMode: DateDefaultTimeMode,
 ): ParsedNaturalDate | null {
     let parsed = result.start.date();
@@ -426,7 +426,7 @@ function orderedChronoInstances(text: string): chrono.Chrono[] {
 
 // A result only counts if it spans the whole input — used for both the
 // locale attempt and the English fallback so the acceptance rule lives once.
-function parseWholeTextResult(chronoInstance: chrono.Chrono, text: string, now: Date): chrono.ParsedResult | null {
+function parseWholeTextResult(chronoInstance: chrono.Chrono, text: string, now: Fecha): chrono.ParsedResult | null {
     const results = chronoInstance.parse(text, { instant: now }, { forwardDate: true });
     const result = results[0];
     if (!result) return null;
@@ -435,7 +435,7 @@ function parseWholeTextResult(chronoInstance: chrono.Chrono, text: string, now: 
     return result;
 }
 
-function parseNaturalDate(raw: string, now: Date, defaultTimeMode: DateDefaultTimeMode = 'now'): ParsedNaturalDate | null {
+function parseNaturalDate(raw: string, now: Fecha, defaultTimeMode: DateDefaultTimeMode = 'now'): ParsedNaturalDate | null {
     const text = raw.trim();
     if (!text) return { date: buildDefaultDate(now, defaultTimeMode), hasExplicitTime: defaultTimeMode === 'now' };
 
@@ -457,7 +457,7 @@ function formatDueDateValue(parsed: ParsedNaturalDate): string {
 function findTrailingDateInResults(
     results: chrono.ParsedResult[],
     trimmed: string,
-    now: Date,
+    now: Fecha,
     language: Language,
 ): QuickAddDetectedDate | undefined {
     for (let index = results.length - 1; index >= 0; index -= 1) {
@@ -486,7 +486,7 @@ function findTrailingDateInResults(
     return undefined;
 }
 
-function detectTrailingDate(title: string, now: Date): QuickAddDetectedDate | undefined {
+function detectTrailingDate(title: string, now: Fecha): QuickAddDetectedDate | undefined {
     const trimmed = title.trim();
     if (!trimmed) return undefined;
 
@@ -639,7 +639,7 @@ function normalizeQuickAddName(name: string): string {
     return name.replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
-// Given the raw text captured after a `+`/`!` marker (which greedily spans
+// Dado the raw text captured after a `+`/`!` marker (which greedily spans
 // following words), find the longest known entity name that matches a
 // whole-word prefix, so trailing title words are not swallowed into the token.
 function matchKnownQuickAddNamePrefix(
@@ -689,7 +689,7 @@ function matchQuickAddQuotedName(working: string, marker: '+' | '!' | '%'): { ra
 function parseDateCommand(
     command: 'start' | 'due' | 'review',
     working: string,
-    now: Date,
+    now: Fecha,
     options: DateCommandParseOptions = {},
 ): { value?: string; working: string; invalidCommand?: string } {
     const match = working.match(new RegExp(`${QUICK_ADD_COMMAND_START}\\/${command}:([\\s\\S]+?)${QUICK_ADD_COMMAND_BOUNDARY}`, 'i'));
@@ -719,7 +719,7 @@ function parseDateCommand(
 
 function parseDateCommandsFromWorking(
     working: string,
-    now: Date,
+    now: Fecha,
     options: DateCommandParseOptions = {},
 ): {
     working: string;
@@ -754,7 +754,7 @@ function parseDateCommandsFromWorking(
     };
 }
 
-function buildQuickAddLinkAttachment(input: string, now: Date): Attachment | null {
+function buildQuickAddLinkAttachment(input: string, now: Fecha): Attachment | null {
     const normalized = normalizeLinkAttachmentInput(input);
     if (!normalized.uri.trim()) return null;
     const createdAt = now.toISOString();
@@ -770,7 +770,7 @@ function buildQuickAddLinkAttachment(input: string, now: Date): Attachment | nul
 
 function parseLinkCommandsFromWorking(
     working: string,
-    now: Date,
+    now: Fecha,
 ): { attachments?: Attachment[]; working: string } {
     const attachments: Attachment[] = [];
     const linkCommandRe = new RegExp(`${QUICK_ADD_COMMAND_START}\\/link:([\\s\\S]*?)${QUICK_ADD_COMMAND_BOUNDARY}`, 'i');
@@ -797,7 +797,7 @@ function parseLinkCommandsFromWorking(
 
 export function parseQuickAddDateCommands(
     input: string,
-    now: Date = new Date(),
+    now: Fecha = new Fecha(),
     options: Pick<QuickAddParseOptions, 'preserveText' | 'defaultScheduleTime'> = {},
 ): QuickAddDateCommandsResult {
     const protectedInput = protectEscapes(input.trim());
@@ -825,7 +825,7 @@ export function parseQuickAddDateCommands(
 export function parseQuickAdd(
     input: string,
     projects?: Project[],
-    now: Date = new Date(),
+    now: Fecha = new Fecha(),
     areas?: Area[],
     options: QuickAddParseOptions = {},
 ): QuickAddResult {
@@ -848,7 +848,7 @@ export function parseQuickAdd(
     tagMatches.forEach((tag) => tags.add(tag.token));
     tagMatches.forEach((tag) => (working = stripToken(working, tag.raw)));
 
-    // Person: %Name or %"Full Name" → assignedTo
+    // Person: %Name or %"Completo Name" → assignedTo
     let assignedTo: string | undefined;
     const knownPeople = options.knownPeople ?? [];
     const canonicalPersonName = (value: string) =>
@@ -951,7 +951,7 @@ export function parseQuickAdd(
         working = stripToken(working, noteMatch[0]);
     }
 
-    // Date commands: /start:..., /due:..., /review:...
+    // Fecha commands: /start:..., /due:..., /review:...
     const {
         working: workingWithoutDates,
         startTime,
@@ -1035,7 +1035,7 @@ export function parseQuickAdd(
     }
 
     // A token the parser recognised and applied has already left `working`, and
-    // it stays gone: nobody wants a task called "Call mum /next" when the status
+    // it stays gone: nobody wants a task called "Llamada mum /next" when the status
     // is on the task. `quickAddAutoClean` decides only the ambiguous half —
     // whether a date read out of ordinary prose is also cut from the title —
     // which is why preserve mode still hands back a titleWithoutDate that keeps

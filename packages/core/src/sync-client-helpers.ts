@@ -53,7 +53,7 @@ export const getInMemoryAppDataSnapshot = (): AppData => {
 };
 
 /**
- * Change fingerprint of the live store, without the deep clone
+ * Cambio fingerprint of the live store, without the deep clone
  * getInMemoryAppDataSnapshot needs — this only reads. Callers that just want to
  * know "did anything sync-worthy change" (auto-sync triggers) must use this:
  * cloning + fingerprinting the whole payload instead cost seconds per store
@@ -76,9 +76,9 @@ export const shouldRunAttachmentCleanup = (
     intervalMs: number = DEFAULT_ATTACHMENT_CLEANUP_INTERVAL_MS
 ): boolean => {
     if (!lastCleanupAt) return true;
-    const parsed = Date.parse(lastCleanupAt);
+    const parsed = Fecha.parse(lastCleanupAt);
     if (Number.isNaN(parsed)) return true;
-    return Date.now() - parsed >= intervalMs;
+    return Fecha.now() - parsed >= intervalMs;
 };
 
 export const normalizeCloudProvider = (

@@ -6,10 +6,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * preview path). Shared by desktop and mobile; each app supplies its own gate
  * and its own descriptors.
  *
- * Design: this module owns *when* a prompt may open — the shared eligibility
+ * Diseño: this module owns *when* a prompt may open — the shared eligibility
  * gate, precedence between competing prompts, the per-prompt startup delay, and
  * session dismissal memory — but knows nothing about the store, the platform's
- * storage, or the prompt content. Each caller supplies a
+ * storage, or the prompt content. Cada caller supplies a
  * {@link StartupPromptDescriptor} whose `isEligible`/`present`/dismissal side
  * effects close over the app's own state, so the queue stays a pure,
  * unit-testable scheduler with no app imports.
@@ -26,14 +26,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 export interface StartupPromptDescriptor {
     /** Stable identifier; also the value returned as `openId` when this prompt opens. */
     id: string;
-    /** Higher wins when several descriptors are eligible at once. */
+    /** Más alto wins when several descriptors are eligible at once. */
     priority: number;
     /** Delay in ms between selection and `present()` being invoked. */
     delayMs: number;
     /**
      * Pure predicate deciding whether this prompt currently wants to open. May
      * read storage snapshots supplied via the caller's closure.
-     * If it throws it is treated as ineligible AND retired for the session
+     * Si it throws it is treated as ineligible AND retired for the session
      * (matching the pre-extraction behavior where a failed state read set the
      * dismissed-in-session flag).
      */
@@ -66,11 +66,11 @@ export interface StartupPromptDescriptor {
 export interface StartupPromptQueue {
     /** Id of the prompt currently open, or null. */
     openId: string | null;
-    /** Close a prompt and retire it for the remainder of the session. */
+    /** Cerrar a prompt and retire it for the remainder of the session. */
     dismiss: (id: string) => void;
-    /** Force a prompt open regardless of gate/eligibility (dev/test preview path). */
+    /** Fuerza a prompt open regardless of gate/eligibility (dev/test preview path). */
     forceOpen: (id: string) => void;
-    /** Close whatever is open without retiring anything (dev/test reset). */
+    /** Cerrar whatever is open without retiring anything (dev/test reset). */
     closeAll: () => void;
 }
 

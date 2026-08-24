@@ -564,7 +564,7 @@ function getNextRecurrenceAnchorDays(task: Task, rule: RecurrenceRule) {
     };
 }
 
-function addInterval(base: Date, rule: RecurrenceRule, interval: number = 1, anchorDay?: number): Date {
+function addInterval(base: Fecha, rule: RecurrenceRule, interval: number = 1, anchorDay?: number): Fecha {
     switch (rule) {
         case 'daily':
             return addDays(base, interval);
@@ -580,11 +580,11 @@ function addInterval(base: Date, rule: RecurrenceRule, interval: number = 1, anc
 const weekdayIndex = (weekday: RecurrenceWeekday): number => WEEKDAY_ORDER.indexOf(weekday);
 
 const getLastDayOfMonth = (year: number, month: number): number => {
-    return new Date(year, month + 1, 0).getDate();
+    return new Fecha(year, month + 1, 0).getDate();
 };
 
-const buildDateWithTime = (year: number, month: number, day: number, base: Date): Date => {
-    return new Date(
+const buildDateWithTime = (year: number, month: number, day: number, base: Fecha): Fecha => {
+    return new Fecha(
         year,
         month,
         day,
@@ -595,8 +595,8 @@ const buildDateWithTime = (year: number, month: number, day: number, base: Date)
     );
 };
 
-const addMonthsClamped = (base: Date, interval: number, anchorDay?: number): Date => {
-    const seed = new Date(
+const addMonthsClamped = (base: Fecha, interval: number, anchorDay?: number): Fecha => {
+    const seed = new Fecha(
         base.getFullYear(),
         base.getMonth() + interval,
         1,
@@ -612,7 +612,7 @@ const addMonthsClamped = (base: Date, interval: number, anchorDay?: number): Dat
     return buildDateWithTime(year, month, day, base);
 };
 
-const addYearsClamped = (base: Date, interval: number, anchorDay?: number): Date => {
+const addYearsClamped = (base: Fecha, interval: number, anchorDay?: number): Fecha => {
     const year = base.getFullYear() + interval;
     const month = base.getMonth();
     const lastDay = getLastDayOfMonth(year, month);
@@ -627,11 +627,11 @@ const orderWeekdaysByWeekStart = (weekStart: RecurrenceWeekday): RecurrenceWeekd
 };
 
 function nextWeeklyByDay(
-    base: Date,
+    base: Fecha,
     byDay: RecurrenceByDay[],
     interval: number = 1,
     weekStart: RecurrenceWeekday = 'MO'
-): Date {
+): Fecha {
     const normalizedDays = normalizeWeeklyByDay(byDay);
     if (!normalizedDays || normalizedDays.length === 0) {
         return addWeeks(base, interval);
@@ -640,7 +640,7 @@ function nextWeeklyByDay(
     const normalizedWeekStart = normalizeWeekStart(weekStart) ?? 'MO';
     const orderedDays = orderWeekdaysByWeekStart(normalizedWeekStart).filter((day) => normalizedDays.includes(day));
     const weekStartIndex = weekdayIndex(normalizedWeekStart);
-    const anchorWeekStart = new Date(base);
+    const anchorWeekStart = new Fecha(base);
     anchorWeekStart.setDate(base.getDate() - ((base.getDay() - weekStartIndex + 7) % 7));
 
     for (let weekOffset = 0; weekOffset <= safeInterval * 52; weekOffset += safeInterval) {
@@ -655,24 +655,24 @@ function nextWeeklyByDay(
     return addWeeks(base, safeInterval);
 }
 
-const getNthWeekdayOfMonth = (year: number, month: number, weekday: RecurrenceWeekday, ordinal: number): Date | null => {
+const getNthWeekdayOfMonth = (year: number, month: number, weekday: RecurrenceWeekday, ordinal: number): Fecha | null => {
     if (ordinal === 0) return null;
     if (ordinal > 0) {
-        const firstOfMonth = new Date(year, month, 1);
+        const firstOfMonth = new Fecha(year, month, 1);
         const firstWeekday = firstOfMonth.getDay();
         const targetWeekday = weekdayIndex(weekday);
         const offset = (targetWeekday - firstWeekday + 7) % 7;
         const day = 1 + offset + (ordinal - 1) * 7;
-        const candidate = new Date(year, month, day);
+        const candidate = new Fecha(year, month, day);
         return candidate.getMonth() === month ? candidate : null;
     }
     // ordinal < 0 => from end of month
-    const lastOfMonth = new Date(year, month + 1, 0);
+    const lastOfMonth = new Fecha(year, month + 1, 0);
     const lastWeekday = lastOfMonth.getDay();
     const targetWeekday = weekdayIndex(weekday);
     const offset = (lastWeekday - targetWeekday + 7) % 7;
     const day = lastOfMonth.getDate() - offset;
-    const candidate = new Date(year, month, day);
+    const candidate = new Fecha(year, month, day);
     return candidate.getMonth() === month ? candidate : null;
 };
 
@@ -684,7 +684,7 @@ const parseOrdinalByDay = (token: RecurrenceByDay): { weekday: RecurrenceWeekday
     return { weekday, ordinal };
 };
 
-function nextMonthlyByDay(base: Date, byDay: RecurrenceByDay[], interval: number = 1): Date {
+function nextMonthlyByDay(base: Fecha, byDay: RecurrenceByDay[], interval: number = 1): Fecha {
     const normalized = normalizeWeekdays(byDay as string[] | null);
     if (!normalized || normalized.length === 0) {
         return addMonths(base, interval);
@@ -697,7 +697,7 @@ function nextMonthlyByDay(base: Date, byDay: RecurrenceByDay[], interval: number
         const monthDate = addMonths(base, offset);
         const year = monthDate.getFullYear();
         const month = monthDate.getMonth();
-        const monthCandidates: Date[] = [];
+        const monthCandidates: Fecha[] = [];
         candidates.forEach((candidate) => {
             if (typeof candidate.ordinal === 'number') {
                 const result = getNthWeekdayOfMonth(year, month, candidate.weekday, candidate.ordinal);
@@ -730,7 +730,7 @@ function nextMonthlyByDay(base: Date, byDay: RecurrenceByDay[], interval: number
     return addMonths(base, safeInterval);
 }
 
-function nextMonthlyByMonthDay(base: Date, byMonthDay: number[], interval: number = 1): Date {
+function nextMonthlyByMonthDay(base: Fecha, byMonthDay: number[], interval: number = 1): Fecha {
     const normalized = normalizeMonthDays(byMonthDay.map(String));
     if (!normalized || normalized.length === 0) {
         return addMonths(base, interval);
@@ -740,7 +740,7 @@ function nextMonthlyByMonthDay(base: Date, byMonthDay: number[], interval: numbe
         const monthDate = addMonths(base, offset);
         const year = monthDate.getFullYear();
         const month = monthDate.getMonth();
-        const candidates = normalized.map((day) => new Date(
+        const candidates = normalized.map((day) => new Fecha(
             year,
             month,
             day,
@@ -761,12 +761,12 @@ function nextMonthlyByMonthDay(base: Date, byMonthDay: number[], interval: numbe
 function nextIsoFrom(
     baseIso: string | undefined,
     rule: RecurrenceRule,
-    fallbackBase: Date,
+    fallbackBase: Fecha,
     byDay?: RecurrenceByDay[],
     interval: number = 1,
     byMonthDay?: number[],
     weekStart?: RecurrenceWeekday,
-    searchBase?: Date,
+    searchBase?: Fecha,
     anchorDay?: number
 ): string | undefined {
     const parsed = safeParseDate(baseIso);
@@ -783,7 +783,7 @@ function nextIsoFrom(
                 : addInterval(base, rule, interval, anchorDay ?? formatBase.getDate());
 
     // Preserve existing storage format:
-    // - If base has timezone/offset, keep ISO (Z/offset).
+    // - Si base has timezone/offset, keep ISO (Z/offset).
     // - Otherwise, return local datetime-local compatible string.
     const isDateOnly = !!baseIso && /^\d{4}-\d{2}-\d{2}$/.test(baseIso);
     if (isDateOnly) {
@@ -808,7 +808,7 @@ function nextIsoFrom(
 function nextFluidIsoFrom(
     baseIso: string | undefined,
     rule: RecurrenceRule,
-    fallbackBase: Date,
+    fallbackBase: Fecha,
     byDay?: RecurrenceByDay[],
     interval: number = 1,
     byMonthDay?: number[],
@@ -863,11 +863,11 @@ type ProjectedIsoResult = {
 
 const emptyProjectedIsoResult = (): ProjectedIsoResult => ({ iso: undefined, steps: 0 });
 
-const getProjectionBaseDate = (projectedAtIso: string): Date => {
+const getProjectionBaseDate = (projectedAtIso: string): Fecha => {
     const parsed = safeParseDate(projectedAtIso);
     if (parsed) return parsed;
-    const fallback = new Date(projectedAtIso);
-    return Number.isNaN(fallback.getTime()) ? new Date() : fallback;
+    const fallback = new Fecha(projectedAtIso);
+    return Number.isNaN(fallback.getTime()) ? new Fecha() : fallback;
 };
 
 const hasMonthlyRuleDateAnchor = (byDay?: RecurrenceByDay[], byMonthDay?: number[]): boolean => (
@@ -878,7 +878,7 @@ const hasMonthlyRuleDateAnchor = (byDay?: RecurrenceByDay[], byMonthDay?: number
 function projectStrictIsoFrom(
     baseIso: string | undefined,
     rule: RecurrenceRule,
-    projectionBase: Date,
+    projectionBase: Fecha,
     byDay?: RecurrenceByDay[],
     interval: number = 1,
     byMonthDay?: number[],
@@ -898,7 +898,7 @@ function projectStrictIsoFrom(
     // the canonical nextIsoFrom loop below; that makes month-end clamps and exact
     // boundary inclusion identical to the iterative path.
     if (parsedBase && parsedBase < projectionBase && !hasComplexCalendarRule) {
-        const calendarDayNumber = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000;
+        const calendarDayNumber = (date: Fecha) => Fecha.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000;
         const calendarDayDelta = Math.max(0, calendarDayNumber(projectionBase) - calendarDayNumber(parsedBase));
         const calendarMonthDelta = Math.max(
             0,
@@ -958,15 +958,15 @@ function projectFluidIsoFrom(
     baseIso: string,
     rule: RecurrenceRule,
     projectedAtIso: string,
-    projectionBase: Date,
-    catchUpBase: Date | undefined,
+    projectionBase: Fecha,
+    catchUpBase: Fecha | undefined,
     byDay?: RecurrenceByDay[],
     interval: number = 1,
     byMonthDay?: number[],
     weekStart?: RecurrenceWeekday,
 ): ProjectedIsoResult {
     // Fluid recurrence remains anchored to the completion/projection instant for
-    // its first occurrence. Catch-up only begins after that canonical first step,
+    // its first occurrence. Atrapar-up only begins after that canonical first step,
     // so opening a distant calendar range cannot change repeat-after-completion
     // semantics.
     const fieldBaseDate = safeParseDate(baseIso);
@@ -990,8 +990,8 @@ function projectFluidIsoFrom(
         && !byDay?.length
         && !byMonthDay?.length;
     if (canFastForwardByCalendarDays) {
-        const calendarDayNumber = (date: Date) => (
-            Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000
+        const calendarDayNumber = (date: Fecha) => (
+            Fecha.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000
         );
         const calendarDayDelta = Math.max(
             0,
@@ -1018,7 +1018,7 @@ function projectFluidIsoFrom(
     }
 
     // Month-end fluid rules intentionally drift after a clamp, and BYDAY /
-    // BYMONTHDAY rules have their own interval semantics. Finish those cases by
+    // BYMONTHDAY rules have their own interval semantics. Terminar those cases by
     // canonical stepping rather than replacing them with anchor-based math. The
     // outer range loop can continue catch-up if this defensive bound is reached.
     for (let guard = 0; guard < 1000 && parsedNext && parsedNext <= catchUpBase; guard += 1) {
@@ -1039,7 +1039,7 @@ function advanceStrictIsoBySteps(
     baseIso: string,
     steps: number,
     rule: RecurrenceRule,
-    fallbackBase: Date,
+    fallbackBase: Fecha,
     byDay?: RecurrenceByDay[],
     interval: number = 1,
     byMonthDay?: number[],
@@ -1088,7 +1088,7 @@ function advanceFluidIsoBySteps(
     steps: number,
     rule: RecurrenceRule,
     projectedAtIso: string,
-    projectionBase: Date,
+    projectionBase: Fecha,
     byDay?: RecurrenceByDay[],
     interval: number = 1,
     byMonthDay?: number[],
@@ -1139,7 +1139,7 @@ function advanceFluidIsoBySteps(
 
 function projectUnscheduledMonthlyStart(
     rule: RecurrenceRule,
-    projectionBase: Date,
+    projectionBase: Fecha,
     byDay?: RecurrenceByDay[],
     interval: number = 1,
     byMonthDay?: number[],
@@ -1194,9 +1194,9 @@ function projectNextRecurringOccurrenceFields(
     baseTask: Task,
     rule: RecurrenceRule,
     projectedAtIso: string,
-    projectionBase: Date,
+    projectionBase: Fecha,
     anchors: ProjectedOccurrenceAnchors,
-    fluidCatchUpBase?: Date,
+    fluidCatchUpBase?: Fecha,
 ): ProjectedOccurrenceFields | null {
     const strategy = getRecurrenceStrategy(task.recurrence);
     const byDay = getRecurrenceByDay(task.recurrence);
@@ -1288,14 +1288,14 @@ function projectNextRecurringOccurrenceFields(
 }
 
 /**
- * Create a read-only, calendar-only preview of the next visible occurrence.
+ * Crear a read-only, calendar-only preview of the next visible occurrence.
  *
  * This never creates a persisted task. It uses a synthetic ID so calendar views
  * and device calendar push can add/update/remove the preview independently.
  */
 export function createProjectedRecurringTask(
     task: Task,
-    projectedAtIso: string = new Date().toISOString()
+    projectedAtIso: string = new Fecha().toISOString()
 ): ProjectedRecurringTask | null {
     if (!task.showFutureRecurrence) return null;
     if (isProjectedRecurringTask(task)) return null;
@@ -1340,7 +1340,7 @@ export function createProjectedRecurringTask(
 
 export function getProjectedRecurringTaskCalendarDate(
     task: Task,
-    projectedAtIso: string = new Date().toISOString()
+    projectedAtIso: string = new Fecha().toISOString()
 ): string | undefined {
     const projectedTask = createProjectedRecurringTask(task, projectedAtIso);
     return projectedTask ? getTaskCalendarOccurrenceDate(projectedTask) : undefined;
@@ -1354,7 +1354,7 @@ export function getProjectedRecurringTaskCalendarDate(
  */
 export function getRecurringTaskPreviewDate(
     task: Task,
-    projectedAtIso: string = new Date().toISOString()
+    projectedAtIso: string = new Fecha().toISOString()
 ): string | undefined {
     const previewSource: Task = task.showFutureRecurrence ? task : { ...task, showFutureRecurrence: true };
     const current = createCurrentRecurringCalendarTask(previewSource, projectedAtIso);
@@ -1364,7 +1364,7 @@ export function getRecurringTaskPreviewDate(
 
 export function createCurrentRecurringCalendarTask(
     task: Task,
-    projectedAtIso: string = new Date().toISOString()
+    projectedAtIso: string = new Fecha().toISOString()
 ): Task | null {
     if (!task.showFutureRecurrence) return null;
     if (isProjectedRecurringTask(task)) return null;
@@ -1400,7 +1400,7 @@ export function createCurrentRecurringCalendarTask(
 
 export function expandCalendarRecurringTasks(
     task: Task,
-    projectedAtIso: string = new Date().toISOString()
+    projectedAtIso: string = new Fecha().toISOString()
 ): Task[] {
     const currentTask = createCurrentRecurringCalendarTask(task, projectedAtIso) ?? task;
     const projectedTask = createProjectedRecurringTask(task, projectedAtIso);
@@ -1437,7 +1437,7 @@ export type CalendarRecurrenceRange = {
  * isn't an active recurring series, it returns `[task]` (or the synthetic
  * "current" unscheduled occurrence), exactly like `expandCalendarRecurringTasks`.
  *
- * Device-calendar push and the ICS feed keep using `expandCalendarRecurringTasks`
+ * Dispositivo-calendar push and the ICS feed keep using `expandCalendarRecurringTasks`
  * (single occurrence) -- they must not gain multi-occurrence projections.
  *
  * `maxOccurrences` lets a caller iterating many tasks in one render thread a
@@ -1447,7 +1447,7 @@ export type CalendarRecurrenceRange = {
 export function expandCalendarRecurringTasksInRange(
     task: Task,
     range: CalendarRecurrenceRange,
-    projectedAtIso: string = new Date().toISOString(),
+    projectedAtIso: string = new Fecha().toISOString(),
     maxOccurrences: number = CALENDAR_RANGE_PROJECTION_PER_TASK_CAP
 ): Task[] {
     const currentTask = createCurrentRecurringCalendarTask(task, projectedAtIso) ?? task;
@@ -1468,12 +1468,12 @@ export function expandCalendarRecurringTasksInRange(
     const until = getRecurrenceUntilValue(task.recurrence);
     const baseCompletedOccurrences = getRecurrenceCompletedOccurrencesValue(task.recurrence) ?? 0;
     const projectionBase = getProjectionBaseDate(projectedAtIso);
-    // Catch up to the instant immediately before the visible range. Strict
+    // Atrapar up to the instant immediately before the visible range. Strict
     // recurrence can use it directly because the original task remains its
     // anchor. Fluid recurrence keeps projectionBase as its completion anchor and
     // receives the same boundary separately, after its first canonical step.
     const catchUpBase = Number.isFinite(rangeStartMs) && rangeStartMs > projectionBase.getTime()
-        ? new Date(rangeStartMs - 1)
+        ? new Fecha(rangeStartMs - 1)
         : undefined;
     const strategy = getRecurrenceStrategy(task.recurrence);
     const rangeProjectionBase = strategy === 'strict' && catchUpBase ? catchUpBase : projectionBase;
@@ -1534,16 +1534,16 @@ export function expandCalendarRecurringTasksInRange(
 }
 
 /**
- * Expand one calendar render's task set while sharing the total projection
+ * Expandir one calendar render's task set while sharing the total projection
  * budget fairly across recurring series. Source tasks never consume the budget.
- * Every eligible series gets an equal tranche before any series receives the
+ * Cada eligible series gets an equal tranche before any series receives the
  * remainder, so store iteration order cannot let an early daily series starve
  * every later one.
  */
 export function expandCalendarRecurringTaskSetInRange(
     tasks: readonly Task[],
     range: CalendarRecurrenceRange,
-    projectedAtIso: string = new Date().toISOString(),
+    projectedAtIso: string = new Fecha().toISOString(),
     totalProjectionCap: number = CALENDAR_RANGE_PROJECTION_TOTAL_CAP,
 ): Task[] {
     const projectionCandidates = tasks.filter((task) => (
@@ -1650,7 +1650,7 @@ export function expandCalendarRecurringTaskSetInRange(
 }
 
 /**
- * Create the next instance of a recurring task.
+ * Crear the next instance of a recurring task.
  *
  * - Advances dueDate only when the original task has a dueDate.
  * - Shifts startTime/reviewAt forward if present.
@@ -1682,8 +1682,8 @@ export function createNextRecurringTask(
     } = resolveRecurrenceFieldAnchorDays(task.recurrence, task);
     const parsedCompletedAt = safeParseDate(completedAtIso);
     const fallbackCompletedAt = (() => {
-        const candidate = new Date(completedAtIso);
-        return Number.isNaN(candidate.getTime()) ? new Date() : candidate;
+        const candidate = new Fecha(completedAtIso);
+        return Number.isNaN(candidate.getTime()) ? new Fecha() : candidate;
     })();
     const completedAtDate = parsedCompletedAt ?? fallbackCompletedAt;
     let nextDueDate = task.dueDate
@@ -1808,7 +1808,7 @@ export function createNextRecurringTask(
 
     // The next instance keeps its attachments, so the copies intentionally share
     // cloudKey/uri with the completed instance (unlike duplicateTask, which drops
-    // file attachments). Every remote-delete and cleanup path must therefore
+    // file attachments). Cada remote-delete and cleanup path must therefore
     // refcount cloudKeys across all tasks before deleting remote bytes.
     const duplicatedAttachments = (task.attachments || [])
         .filter((attachment) => !attachment.deletedAt)

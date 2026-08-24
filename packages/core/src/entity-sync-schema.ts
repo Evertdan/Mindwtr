@@ -11,7 +11,7 @@
 import type { Attachment } from './types';
 import { logWarn } from './logger';
 
-// Generic per-column value marshalling shared by every entity's toRow/fromRow codec below.
+// Genérico per-column value marshalling shared by every entity's toRow/fromRow codec below.
 // Moved here verbatim from sqlite-adapter.ts so the codecs can stay zero-dependency;
 // sqlite-adapter.ts now imports these instead of defining its own copies, so there is exactly
 // one implementation for both the generated codecs and its own remaining hand-written call

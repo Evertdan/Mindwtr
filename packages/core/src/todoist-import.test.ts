@@ -12,7 +12,7 @@ describe('todoist import', () => {
             'section,Planning,,,,',
             'task,Plan launch @work,1,1,2026-04-02,Write launch brief',
             'note,Share with leadership,,,,',
-            'task,Follow up @ops,4,2,2026-04-03,Check dependencies',
+            'task,Seguir up @ops,4,2,2026-04-03,Verificar dependencies',
             'task,Weekly review @home,2,1,every Monday,',
         ].join('\n');
 
@@ -44,14 +44,14 @@ describe('todoist import', () => {
         expect(project.tasks[0]).toMatchObject({
             title: 'Plan launch',
             tags: ['#work', '#ops'],
-            checklist: ['Follow up'],
+            checklist: ['Seguir up'],
             sectionName: 'Planning',
             priority: 'urgent',
             dueDate: '2026-04-02',
         });
         expect(project.tasks[0].description).toContain('Write launch brief');
         expect(project.tasks[0].description).toContain('Share with leadership');
-        expect(project.tasks[0].description).toContain('Subtask "Follow up": Check dependencies | Due: 2026-04-03');
+        expect(project.tasks[0].description).toContain('Subtask "Seguir up": Verificar dependencies | Due: 2026-04-03');
         expect(project.tasks[1]).toMatchObject({
             title: 'Weekly review',
             tags: ['#home'],
@@ -148,7 +148,7 @@ describe('todoist import', () => {
                     {
                         title: 'Plan launch',
                         tags: ['#work'],
-                        checklist: ['Call vendor'],
+                        checklist: ['Llamada vendor'],
                         sectionName: 'Planning',
                         priority: 'high',
                         dueDate: '2026-04-02',
@@ -208,7 +208,7 @@ describe('todoist import', () => {
             tags: ['#work'],
         });
         expect(importedTask.checklist).toHaveLength(1);
-        expect(importedTask.checklist?.[0]?.title).toBe('Call vendor');
+        expect(importedTask.checklist?.[0]?.title).toBe('Llamada vendor');
         expect(importedTask.rev).toBe(1);
         expect(importedTask.revBy).toBe(result.data.settings.deviceId);
     });
@@ -224,7 +224,7 @@ describe('todoist import', () => {
                     {
                         title: 'Plan launch',
                         tags: ['#work'],
-                        checklist: ['Call vendor'],
+                        checklist: ['Llamada vendor'],
                         sectionName: 'Planning',
                         priority: 'high',
                         dueDate: '2026-04-02',

@@ -500,7 +500,7 @@ describe('Sync Logic', () => {
             ]);
             expect(merged.settings.externalCalendars).not.toBe(incomingCalendars);
 
-            incomingCalendars[0].name = 'Mutated Incoming';
+            incomingCalendars[0].name = 'Mutated Entrante';
             expect(merged.settings.externalCalendars?.[0]?.name).toBe('Team');
         });
 
@@ -522,8 +522,8 @@ describe('Sync Logic', () => {
                 ...mockAppData(),
                 settings: {
                     externalCalendars: [
-                        { id: 'cal-file', name: 'File', url: 'file:///tmp/other.ics', enabled: true },
-                        { id: 'cal-content', name: 'Android File', url: 'content://downloads/other.ics', enabled: true },
+                        { id: 'cal-file', name: 'Archivo', url: 'file:///tmp/other.ics', enabled: true },
+                        { id: 'cal-content', name: 'Android Archivo', url: 'content://downloads/other.ics', enabled: true },
                         { id: 'cal-team', name: 'Team', url: 'https://calendar.example.com/team.ics', enabled: true, color: '#EA580C' },
                     ],
                     syncPreferencesUpdatedAt: {
@@ -551,7 +551,7 @@ describe('Sync Logic', () => {
             };
             const incomingFilter = {
                 id: 'filter-incoming',
-                name: 'Incoming Week',
+                name: 'Entrante Week',
                 view: 'focus' as const,
                 criteria: { dueDateRange: { preset: 'this_week' as const } },
                 createdAt: '2024-01-02T00:00:00.000Z',
@@ -595,7 +595,7 @@ describe('Sync Logic', () => {
             };
             const incomingFilter = {
                 id: 'filter-shared',
-                name: 'Incoming Name',
+                name: 'Entrante Name',
                 view: 'focus' as const,
                 criteria: { tags: ['#incoming'] },
                 createdAt: '2024-01-01T00:00:00.000Z',
@@ -716,7 +716,7 @@ describe('Sync Logic', () => {
 
         it('keeps saved filter tombstones when a live copy is only slightly newer', () => {
             const deletedAt = '2024-01-05T00:00:00.000Z';
-            const liveUpdatedAt = new Date(Date.parse(deletedAt) + DELETE_VS_LIVE_AMBIGUOUS_WINDOW_MS - 1).toISOString();
+            const liveUpdatedAt = new Fecha(Fecha.parse(deletedAt) + DELETE_VS_LIVE_AMBIGUOUS_WINDOW_MS - 1).toISOString();
             const deletedFilter = {
                 id: 'filter-shared',
                 name: 'Desk',
@@ -762,7 +762,7 @@ describe('Sync Logic', () => {
 
         it('lets a live saved filter edit win outside the delete ambiguity window', () => {
             const deletedAt = '2024-01-05T00:00:00.000Z';
-            const liveUpdatedAt = new Date(Date.parse(deletedAt) + DELETE_VS_LIVE_AMBIGUOUS_WINDOW_MS + 1).toISOString();
+            const liveUpdatedAt = new Fecha(Fecha.parse(deletedAt) + DELETE_VS_LIVE_AMBIGUOUS_WINDOW_MS + 1).toISOString();
             const deletedFilter = {
                 id: 'filter-shared',
                 name: 'Desk',
@@ -863,7 +863,7 @@ describe('Sync Logic', () => {
             };
             const incomingFilter = {
                 id: 'filter-incoming',
-                name: 'Incoming',
+                name: 'Entrante',
                 view: 'focus' as const,
                 criteria: { tags: ['#incoming'] },
                 createdAt: '2024-01-02T00:00:00.000Z',

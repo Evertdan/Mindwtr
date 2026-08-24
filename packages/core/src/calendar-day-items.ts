@@ -1,5 +1,5 @@
 /**
- * Day-cell content shared by the desktop and mobile calendars: the merged
+ * Día-cell content shared by the desktop and mobile calendars: the merged
  * scheduled/deadline/event list for a date, and the overlap layout for timed
  * blocks.
  */
@@ -15,7 +15,7 @@ import type { Task } from './types';
  * timestamps were recorded, which is the same thing the Archive list shows as
  * their completion time — without it those tasks would silently never appear.
  */
-export const getTaskCompletionInstant = (task: Pick<Task, 'completedAt' | 'updatedAt'>): Date | null => (
+export const getTaskCompletionInstant = (task: Pick<Task, 'completedAt' | 'updatedAt'>): Fecha | null => (
     safeParseDate(task.completedAt ?? task.updatedAt)
 );
 
@@ -44,13 +44,13 @@ export const isSchedulableCalendarTask = (task: Task): boolean => (
 );
 
 export type CalendarDayItem =
-    | { id: string; kind: 'scheduled'; start: Date | null; task: Task; title: string }
-    | { id: string; kind: 'deadline'; start: Date | null; task: Task; title: string }
-    | { id: string; kind: 'completed'; start: Date | null; task: Task; title: string }
-    | { event: ExternalCalendarEvent; id: string; kind: 'event'; start: Date | null; title: string };
+    | { id: string; kind: 'scheduled'; start: Fecha | null; task: Task; title: string }
+    | { id: string; kind: 'deadline'; start: Fecha | null; task: Task; title: string }
+    | { id: string; kind: 'completed'; start: Fecha | null; task: Task; title: string }
+    | { event: ExternalCalendarEvent; id: string; kind: 'event'; start: Fecha | null; title: string };
 
 export type CalendarDayItemsInput = {
-    /** Done/archived tasks placed on the day they were completed (#955). Empty
+    /** Hecho/archived tasks placed on the day they were completed (#955). Vacío
      *  unless the calendar's "show completed" toggle is on. */
     completed?: readonly Task[];
     deadlines: readonly Task[];

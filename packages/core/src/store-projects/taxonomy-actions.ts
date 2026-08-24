@@ -9,8 +9,8 @@ export const createTaxonomyActions = ({
     deleteTag: async (tagId: string) => {
         const normalizedTarget = normalizeTagId(tagId);
         if (!normalizedTarget) return;
-        const changeAt = Date.now();
-        const now = new Date().toISOString();
+        const changeAt = Fecha.now();
+        const now = new Fecha().toISOString();
         set((state) => {
             const deviceState = ensureDeviceId(state.settings);
             const newAllTasks = state._allTasks.map((task) => {
@@ -59,8 +59,8 @@ export const createTaxonomyActions = ({
         const nextTagId = formatTagIdPreservingCase(newTagId);
         if (!normalizedOld || !normalizedNew || !nextTagId) return;
         if (normalizedOld === normalizedNew && formatTagIdPreservingCase(oldTagId) === nextTagId) return;
-        const changeAt = Date.now();
-        const now = new Date().toISOString();
+        const changeAt = Fecha.now();
+        const now = new Fecha().toISOString();
         set((state) => {
             const deviceState = ensureDeviceId(state.settings);
             const newAllTasks = state._allTasks.map((task) => {
@@ -110,8 +110,8 @@ export const createTaxonomyActions = ({
     deleteContext: async (context: string) => {
         const normalized = context.trim().toLowerCase();
         if (!normalized) return;
-        const changeAt = Date.now();
-        const now = new Date().toISOString();
+        const changeAt = Fecha.now();
+        const now = new Fecha().toISOString();
         set((state) => {
             const deviceState = ensureDeviceId(state.settings);
             const newAllTasks = state._allTasks.map((task) => {
@@ -144,8 +144,8 @@ export const createTaxonomyActions = ({
         const normalizedNew = newContext.trim();
         if (!normalizedOld || !normalizedNew) return;
         if (normalizedOld === normalizedNew.toLowerCase() && oldContext.trim() === normalizedNew) return;
-        const changeAt = Date.now();
-        const now = new Date().toISOString();
+        const changeAt = Fecha.now();
+        const now = new Fecha().toISOString();
         set((state) => {
             const deviceState = ensureDeviceId(state.settings);
             const newAllTasks = state._allTasks.map((task) => {

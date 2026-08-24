@@ -8,7 +8,7 @@ import type {
 } from './types';
 
 /**
- * Filter selections ⇄ criteria as one module: every filtering surface keeps
+ * Filtro selections ⇄ criteria as one module: every filtering surface keeps
  * its picker state as FilterSelections and converts through here, so the
  * token @/# split, the contextMatchMode rule, saved-filter validation, and
  * the active-filter count live in one place instead of one copy per view.
@@ -64,7 +64,7 @@ export function criteriaFromSelections(selections: Partial<FilterSelections>): F
 }
 
 /**
- * Derive picker selections from criteria (applying a saved filter). Criteria
+ * Derivar picker selections from criteria (applying a saved filter). Criteria
  * may come from another device or an older version, so they pass through
  * normalizeFilterCriteria: enum values are validated, custom time estimates
  * (no picker option) are dropped, and bare tokens gain their @/# prefix.

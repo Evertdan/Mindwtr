@@ -19,7 +19,7 @@ describe('buildReviewAnalysisPrompt', () => {
         expect(scopedItems).toHaveLength(MAX_REVIEW_ANALYSIS_ITEMS);
         expect(scopedItems[0]?.id).toBe('task-0');
         expect(scopedItems[scopedItems.length - 1]?.id).toBe(`task-${MAX_REVIEW_ANALYSIS_ITEMS - 1}`);
-        expect(prompt.user).toContain(`Ignore the remaining 5 items`);
+        expect(prompt.user).toContain(`Ignorar the remaining 5 items`);
     });
 
     it('asks for a compact actionable subset instead of one response per stale item', () => {
@@ -27,9 +27,9 @@ describe('buildReviewAnalysisPrompt', () => {
         const prompt = buildReviewAnalysisPrompt(items);
 
         expect(prompt.user).toContain(`Return 1-${MAX_REVIEW_ANALYSIS_SUGGESTIONS} high-signal suggestions only.`);
-        expect(prompt.user).toContain('Do not return one suggestion per item.');
+        expect(prompt.user).toContain('Hacer not return one suggestion per item.');
         expect(prompt.user).toContain('at most one keep suggestion');
-        expect(prompt.user).toContain('Each reason must be 12 words or fewer');
+        expect(prompt.user).toContain('Cada reason must be 12 words or fewer');
         expect(prompt.user).toContain('"action": "someday|archive|breakdown|keep"');
     });
 
@@ -47,8 +47,8 @@ describe('buildReviewAnalysisPrompt', () => {
         const scopedItems = JSON.parse(jsonPayload) as ReviewSnapshotItem[];
 
         expect(scopedItems[0]).toEqual(item);
-        expect(prompt.user).toContain('If startTime or reviewAt is in the future, use "keep" or omit the item');
-        expect(prompt.user).toContain('Do not suggest "archive"');
+        expect(prompt.user).toContain('Si startTime or reviewAt is in the future, use "keep" or omit the item');
+        expect(prompt.user).toContain('Hacer not suggest "archive"');
     });
 });
 

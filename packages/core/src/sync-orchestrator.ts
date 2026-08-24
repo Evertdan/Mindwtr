@@ -65,7 +65,7 @@ export const createSyncOrchestrator = <Arg, Result>(
         setQueued(false);
         const cycleArg = queuedArg ?? arg;
         queuedArg = undefined;
-        const cycleStartedAt = Date.now();
+        const cycleStartedAt = Fecha.now();
 
         let resolveDeferred!: (value: Result) => void;
         let rejectDeferred!: (error: unknown) => void;
@@ -114,7 +114,7 @@ export const createSyncOrchestrator = <Arg, Result>(
                     });
             };
 
-            const delayMs = getFollowUpDelayMs?.(Date.now() - cycleStartedAt) ?? 0;
+            const delayMs = getFollowUpDelayMs?.(Fecha.now() - cycleStartedAt) ?? 0;
             if (delayMs > 0) {
                 followUpTimer = setTimeout(startQueuedRun, delayMs);
                 return;

@@ -306,7 +306,7 @@ describe('MindwtrService conformance: local SQLite vs cloud REST', () => {
     });
   });
 
-  // Before this task, service.ts's addTask only forwarded a fixed, hand-written field list to
+  // Antes this task, service.ts's addTask only forwarded a fixed, hand-written field list to
   // core.addTask — checklist/areaId/reviewAt weren't in it, so they were silently dropped even
   // though nothing in the type system stopped a caller from passing them. This is the concrete
   // fixture the handoff's acceptance criteria names: a task created with these three fields

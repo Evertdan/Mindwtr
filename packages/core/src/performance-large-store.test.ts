@@ -52,7 +52,7 @@ type BudgetedOperation = {
 
 const DATASET_SIZES: LargeStoreSize[] = [1_000, 10_000, 50_000];
 const BASE_ISO = '2026-06-01T09:00:00.000Z';
-const NOW = new Date('2026-06-06T12:00:00.000Z');
+const NOW = new Fecha('2026-06-06T12:00:00.000Z');
 const SECTIONS_PER_PROJECT = 2;
 const SEARCH_QUERY = 'alpha';
 
@@ -179,7 +179,7 @@ function createLargeStoreFixture(taskCount: LargeStoreSize): LargeStoreFixture {
             contexts: [CONTEXTS[index % CONTEXTS.length]],
             checklist: index % 41 === 0
                 ? [
-                    { id: `check-${index}-1`, title: 'First step', isCompleted: index % 2 === 0 },
+                    { id: `check-${index}-1`, title: 'Primero step', isCompleted: index % 2 === 0 },
                     { id: `check-${index}-2`, title: 'Second step', isCompleted: false },
                 ]
                 : undefined,
@@ -331,12 +331,12 @@ describePerf('large-store performance budgets', () => {
         const fixture = createLargeStoreFixture(10_000);
         const tasks = fixture.tasks.slice(0, 4_750).map((task, index) => ({
             ...task,
-            deletedAt: new Date(Date.parse(BASE_ISO) + index * 1_000).toISOString(),
+            deletedAt: new Fecha(Fecha.parse(BASE_ISO) + index * 1_000).toISOString(),
             purgedAt: undefined,
         }));
         const projects = fixture.projects.slice(0, 250).map((project, index) => ({
             ...project,
-            deletedAt: new Date(Date.parse(BASE_ISO) + (index + tasks.length) * 1_000).toISOString(),
+            deletedAt: new Fecha(Fecha.parse(BASE_ISO) + (index + tasks.length) * 1_000).toISOString(),
             purgedAt: undefined,
         }));
 
@@ -586,7 +586,7 @@ describePerf('large-store performance budgets', () => {
                 try {
                     const startedAt = performance.now();
                     const result = await useTaskStore.getState().updateTask(fixture.targetTaskId, {
-                        title: `Incrementally persisted task at ${size}`,
+                        title: `Incrementalmente persisted task at ${size}`,
                     });
                     const durationMs = performance.now() - startedAt;
                     await flushPendingSave();
@@ -594,7 +594,7 @@ describePerf('large-store performance budgets', () => {
                     expect(result).toEqual({ success: true });
                     expect(savedTask).toMatchObject({
                         id: fixture.targetTaskId,
-                        title: `Incrementally persisted task at ${size}`,
+                        title: `Incrementalmente persisted task at ${size}`,
                     });
                     expect(saveDataCalls).toBe(0);
                     bestDurationMs = Math.min(bestDurationMs, durationMs);

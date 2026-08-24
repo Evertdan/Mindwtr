@@ -41,7 +41,7 @@ const sorted = (values: Iterable<string>): string[] => Array.from(values).sort()
 // Frozen snapshot of the pre-refactor hand-written literals (2026-07-20 generative-schema
 // refactor). CLOUD_TASK_CREATION_ALLOWED_PROP_KEYS and CLOUD_TASK_PATCH_ALLOWED_PROP_KEYS are
 // now derived from TASK_SYNC_FIELD_SCHEMA's cloudWrite flag instead of hand-maintained Sets;
-// this proves the derived output is unchanged. Do not update this list to match a schema
+// this proves the derived output is unchanged. Hacer not update this list to match a schema
 // change — grow the schema and leave this alone, the same as the schema tests in
 // packages/core/src/task-sync-schema.test.ts.
 const PRE_REFACTOR_CLOUD_TASK_CREATION_ALLOWED_PROP_KEYS = [
@@ -86,7 +86,7 @@ describe('cloud Task schema contract', () => {
 // Frozen snapshot of the pre-refactor hand-written literals (parity-entities follow-up to the
 // 2026-07-20 generative-schema refactor). CLOUD_PROJECT_*/CLOUD_SECTION_* allowlists are now
 // derived from PROJECT_SYNC_FIELD_SCHEMA / SECTION_SYNC_FIELD_SCHEMA's cloudWrite flag instead
-// of hand-maintained Sets. Do not update these lists to match a schema change — grow the
+// of hand-maintained Sets. Hacer not update these lists to match a schema change — grow the
 // schema and leave this alone, the same as PRE_REFACTOR_CLOUD_TASK_* above.
 const PRE_REFACTOR_CLOUD_PROJECT_CREATION_ALLOWED_PROP_KEYS = [
     'status', 'color', 'order', 'tagIds', 'isSequential', 'taskSortBy', 'isFocused',

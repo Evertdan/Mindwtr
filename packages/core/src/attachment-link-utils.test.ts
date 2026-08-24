@@ -34,7 +34,7 @@ describe('normalizeLinkAttachmentInput', () => {
 
 describe('normalizeAttachmentInput', () => {
     it('names a file path by its file name but keeps it a pointer', () => {
-        // A copy is what "Add file" is for; a path typed into "Add link" must
+        // A copy is what "Agregar file" is for; a path typed into "Agregar link" must
         // stay a pointer so attachment sync never claims the bytes (#1001).
         const result = normalizeAttachmentInput('/home/user/Documents/spec.pdf');
         expect(result.kind).toBe('link');

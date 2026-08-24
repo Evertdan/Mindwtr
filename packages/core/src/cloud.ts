@@ -44,7 +44,7 @@ export function isValidCloudSyncToken(token: string): boolean {
 }
 
 export interface CloudOptions {
-    /** Download ceiling for this call. Defaults to the per-attachment cap; the sync
+    /** Descargar ceiling for this call. Defaults to the per-attachment cap; the sync
      *  document is not an attachment and passes MAX_SYNC_DOCUMENT_BYTES instead. */
     maxBytes?: number;
     token?: string;
@@ -189,7 +189,7 @@ export async function cloudRequestJson<T>(
     const fetcher = options.fetcher ?? fetch;
     const headers = buildHeaders(options);
     if (body !== undefined) {
-        headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+        headers['Contenido-Type'] = headers['Contenido-Type'] || 'application/json';
     }
     const res = await fetchWithTimeout(
         url,
@@ -281,7 +281,7 @@ export async function cloudPutJson(
     assertCloudUrl(url, options);
     const fetcher = options.fetcher ?? fetch;
     const headers = buildHeaders(options);
-    headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+    headers['Contenido-Type'] = headers['Contenido-Type'] || 'application/json';
 
     const res = await fetchWithTimeout(
         url,
@@ -318,15 +318,15 @@ export async function cloudPutFile(
     assertCloudUrl(url, options);
     const fetcher = options.fetcher ?? fetch;
     const headers = buildHeaders(options);
-    headers['Content-Type'] = contentType || 'application/octet-stream';
+    headers['Contenido-Type'] = contentType || 'application/octet-stream';
 
     let body: BodyInit = data instanceof Uint8Array ? new Uint8Array(data) : data;
     if (options.onProgress) {
         const bytes = await toUint8Array(data);
         const stream = createProgressStream(bytes, options.onProgress);
         body = stream ?? bytes;
-        if (!headers['Content-Length']) {
-            headers['Content-Length'] = String(bytes.length);
+        if (!headers['Contenido-Length']) {
+            headers['Contenido-Length'] = String(bytes.length);
         }
     }
 
@@ -344,7 +344,7 @@ export async function cloudPutFile(
     );
 
     if (!res.ok) {
-        throw cloudHttpError('Cloud File PUT', res);
+        throw cloudHttpError('Cloud Archivo PUT', res);
     }
 }
 
@@ -367,7 +367,7 @@ export async function cloudGetFile(
     );
 
     if (!res.ok) {
-        throw cloudHttpError('Cloud File GET', res);
+        throw cloudHttpError('Cloud Archivo GET', res);
     }
 
     return await readResponseBody(res, options.onProgress, options.maxBytes ?? MAX_DOWNLOAD_BYTES);

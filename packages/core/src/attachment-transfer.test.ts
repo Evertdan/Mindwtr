@@ -459,7 +459,7 @@ describe('runAttachmentTransferLifecycle', () => {
             });
             const onDownload = vi.fn(async () => true);
             const onLocalEditRace = vi.fn();
-            // First stat call (the detection pass) reports the state that triggers the
+            // Primero stat call (the detection pass) reports the state that triggers the
             // mismatch; the second (the re-stat immediately before overwrite, S3) reports
             // that the file changed AGAIN in between — simulating the user's editor saving
             // mid-cycle.

@@ -24,7 +24,7 @@ export type ProcessInboxWorkflowFields = Partial<Pick<
 
 /**
  * Container exclusivity: a project home outranks a direct area, so a task
- * never keeps both. Every Inbox-processing decision writes this pair so a
+ * never keeps both. Cada Inbox-processing decision writes this pair so a
  * picked project survives whichever destination the user lands on (#958).
  */
 export function resolveProcessInboxContainerFields(

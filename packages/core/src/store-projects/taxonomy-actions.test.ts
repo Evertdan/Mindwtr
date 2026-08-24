@@ -38,7 +38,7 @@ describe('taxonomy actions', () => {
             lastDataChangeAt: 0,
         });
         vi.useFakeTimers();
-        vi.setSystemTime(new Date(NOW));
+        vi.setSystemTime(new Fecha(NOW));
     });
 
     afterEach(async () => {
@@ -77,7 +77,7 @@ describe('taxonomy actions', () => {
 
     it('deletes a context case-insensitively and persists the task revision', async () => {
         const { addTask, deleteContext } = useTaskStore.getState();
-        const task = await addTask('Call supplier', { contexts: ['Home', 'Office'] });
+        const task = await addTask('Llamada supplier', { contexts: ['Home', 'Office'] });
         expect(task.success).toBe(true);
         if (!task.success) return;
 

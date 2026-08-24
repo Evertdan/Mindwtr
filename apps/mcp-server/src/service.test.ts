@@ -416,7 +416,7 @@ describe('mcp service', () => {
     const service = createService({ readonly: false }, deps as any);
 
     await expect(service.addTask({ title: 'Task', contexts: ['   '] } as any)).rejects.toThrow(
-      'Context values must be non-empty strings'
+      'Contexto values must be non-empty strings'
     );
   });
 
@@ -628,7 +628,7 @@ describe('mcp service', () => {
   // between the two writes. The project assertion doubles as the harness control: an earlier
   // attempt spread `...queries` into deps and silently swapped in queries.ts's same-named
   // parseQuickAdd (it drops projectTitle), so no project was created at all and the run looked
-  // like a persistence bug. If the harness breaks capture again, projects is 0 and this fails.
+  // like a persistence bug. Si the harness breaks capture again, projects is 0 and this fails.
   //
   // ONE case on purpose: core-adapter holds module-level singletons (coreService/coreQueue),
   // so a second case in this process runs against the previous case's store and reports
@@ -718,7 +718,7 @@ describe('mcp service', () => {
       });
       const person = await service.addPerson({
         name: 'Alex',
-        note: 'Design lead',
+        note: 'Diseño lead',
       });
       const waitingTask = await service.addTask({
         title: 'Waiting on draft',

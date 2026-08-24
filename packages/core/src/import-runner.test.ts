@@ -142,8 +142,8 @@ describe('runImport', () => {
             createMockTask('deleted-locally', '2026-01-10T00:00:00.000Z', '2026-01-10T00:00:00.000Z'),
         ]);
         const backup = mockAppData([
-            { ...createMockTask('shared', '2026-01-20T00:00:00.000Z'), title: 'From backup' },
-            { ...createMockTask('newer-local', '2026-01-01T00:00:00.000Z'), title: 'From backup' },
+            { ...createMockTask('shared', '2026-01-20T00:00:00.000Z'), title: 'Desde backup' },
+            { ...createMockTask('newer-local', '2026-01-01T00:00:00.000Z'), title: 'Desde backup' },
             createMockTask('deleted-locally', '2026-02-01T00:00:00.000Z'),
             createMockTask('backup-only', '2026-01-15T00:00:00.000Z'),
         ]);
@@ -160,7 +160,7 @@ describe('runImport', () => {
         const byId = new Map(persisted[0].tasks.map((task) => [task.id, task]));
         expect(byId.get('local-only')).toBeDefined();
         expect(byId.get('backup-only')).toBeDefined();
-        expect(byId.get('shared')?.title).toBe('From backup');
+        expect(byId.get('shared')?.title).toBe('Desde backup');
         expect(byId.get('newer-local')?.title).toBe('Task newer-local');
         // The whole point of additive merge mode: a task this device deleted stays deleted
         // even when the backup holds a newer live copy of it.
@@ -309,7 +309,7 @@ describe('runImport', () => {
 
         const byId = new Map(persisted[0].tasks.map((task) => [task.id, task]));
         expect(byId.get('deleted-locally')?.deletedAt).toBeUndefined();
-        expect(byId.get('newer-local')?.title).toBe('From backup');
+        expect(byId.get('newer-local')?.title).toBe('Desde backup');
         expect(byId.get('backup-only')?.revBy).toBe(SYNC_BACKUP_RESTORE_REV_BY);
     });
 

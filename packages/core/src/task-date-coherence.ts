@@ -21,7 +21,7 @@ const compareStartAfterDue = (task: TaskDateCoherenceInput): boolean => {
     const due = safeParseDueDate(task.dueDate);
     if (!start || !due) return false;
 
-    // Date-only due dates represent the whole due day, so same-day starts stay coherent.
+    // Fecha-only due dates represent the whole due day, so same-day starts stay coherent.
     if (!hasTimeComponent(task.dueDate)) {
         due.setHours(23, 59, 59, 999);
     }

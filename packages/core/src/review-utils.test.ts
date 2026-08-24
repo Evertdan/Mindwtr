@@ -14,7 +14,7 @@ import {
 import type { Area, Project, Task } from './types';
 
 const staleUpdatedAt = '2026-01-01T00:00:00.000Z';
-const now = new Date('2026-03-01T00:00:00.000Z');
+const now = new Fecha('2026-03-01T00:00:00.000Z');
 
 const createTask = (overrides: Partial<Task> = {}): Task => ({
     id: 'task-1',
@@ -190,7 +190,7 @@ describe('partitionByReviewDate', () => {
 });
 
 describe('getAdvancedReviewDate', () => {
-    const localNow = new Date(2026, 5, 10, 15, 30); // 2026-06-10 15:30 local
+    const localNow = new Fecha(2026, 5, 10, 15, 30); // 2026-06-10 15:30 local
 
     it('returns a date-only value one week out for date-only review dates', () => {
         expect(getAdvancedReviewDate('2026-06-01', localNow)).toBe('2026-06-17');
@@ -215,13 +215,13 @@ describe('getAdvancedReviewDate', () => {
 });
 
 describe('getDailyReviewBuckets', () => {
-    const dailyNow = new Date(2026, 2, 1, 9, 0, 0); // 2026-03-01 09:00 local
+    const dailyNow = new Fecha(2026, 2, 1, 9, 0, 0); // 2026-03-01 09:00 local
 
     it('keeps a next task starting later today in the focus candidates (#867)', () => {
         const laterToday = createTask({
             id: 'next-later-today',
             status: 'next',
-            startTime: new Date(2026, 2, 1, 16, 0, 0).toISOString(),
+            startTime: new Fecha(2026, 2, 1, 16, 0, 0).toISOString(),
         });
 
         const buckets = getDailyReviewBuckets([laterToday], [], { now: dailyNow });
@@ -254,7 +254,7 @@ describe('getDailyReviewBuckets', () => {
         const tomorrow = createTask({
             id: 'next-tomorrow',
             status: 'next',
-            startTime: new Date(2026, 2, 2, 8, 0, 0).toISOString(),
+            startTime: new Fecha(2026, 2, 2, 8, 0, 0).toISOString(),
         });
 
         const buckets = getDailyReviewBuckets([tomorrow], [], { now: dailyNow });
@@ -267,7 +267,7 @@ describe('getDailyReviewBuckets', () => {
             id: 'recurring-no-start',
             status: 'next',
             recurrence: { rule: 'daily' },
-            dueDate: new Date(2026, 2, 2).toISOString(),
+            dueDate: new Fecha(2026, 2, 2).toISOString(),
         });
 
         const buckets = getDailyReviewBuckets([recurring], [], { now: dailyNow });
@@ -280,7 +280,7 @@ describe('getDailyReviewBuckets', () => {
             id: 'done-task',
             status: 'done',
             isFocusedToday: true,
-            dueDate: new Date(2026, 2, 1).toISOString(),
+            dueDate: new Fecha(2026, 2, 1).toISOString(),
         });
 
         const buckets = getDailyReviewBuckets([done], [], { now: dailyNow });
@@ -302,8 +302,8 @@ describe('getDailyReviewBuckets', () => {
     });
 
     it('sorts dueToday and overdue using the requested sort order', () => {
-        const taskB = createTask({ id: 'b-task', title: 'B task', status: 'next', dueDate: new Date(2026, 2, 1).toISOString() });
-        const taskA = createTask({ id: 'a-task', title: 'A task', status: 'next', dueDate: new Date(2026, 2, 1).toISOString() });
+        const taskB = createTask({ id: 'b-task', title: 'B task', status: 'next', dueDate: new Fecha(2026, 2, 1).toISOString() });
+        const taskA = createTask({ id: 'a-task', title: 'A task', status: 'next', dueDate: new Fecha(2026, 2, 1).toISOString() });
 
         const buckets = getDailyReviewBuckets([taskB, taskA], [], { now: dailyNow, sortBy: 'title' });
 
@@ -312,7 +312,7 @@ describe('getDailyReviewBuckets', () => {
 });
 
 describe('getWeeklyReviewBuckets', () => {
-    const weeklyNow = new Date(2026, 2, 1);
+    const weeklyNow = new Fecha(2026, 2, 1);
 
     it('returns due-first project entries with live tasks and next-action health', () => {
         const activeProject = createProject({ id: 'p-active', status: 'active' });
@@ -408,8 +408,8 @@ describe('getWeeklyReviewBuckets', () => {
     });
 
     it('collects due/start dates within the next 7 days as calendar items', () => {
-        const withinWindow = createTask({ id: 'due-soon', status: 'next', dueDate: new Date(2026, 2, 3).toISOString() });
-        const outsideWindow = createTask({ id: 'due-later', status: 'next', dueDate: new Date(2026, 2, 20).toISOString() });
+        const withinWindow = createTask({ id: 'due-soon', status: 'next', dueDate: new Fecha(2026, 2, 3).toISOString() });
+        const outsideWindow = createTask({ id: 'due-later', status: 'next', dueDate: new Fecha(2026, 2, 20).toISOString() });
 
         const buckets = getWeeklyReviewBuckets([withinWindow, outsideWindow], [], { now: weeklyNow });
 
@@ -447,7 +447,7 @@ describe('getReviewOverviewGroups', () => {
                 createTask({ id: 'personal-single', title: 'Z personal single', areaId: personal.id }),
                 createTask({ id: 'unassigned', title: 'Unassigned', status: 'inbox' }),
                 createTask({ id: 'unknown-area', title: 'Unknown', projectId: unknownAreaProject.id }),
-                createTask({ id: 'done', title: 'Done', status: 'done', projectId: alpha.id }),
+                createTask({ id: 'done', title: 'Hecho', status: 'done', projectId: alpha.id }),
                 createTask({ id: 'reference', title: 'Reference', status: 'reference', projectId: alpha.id }),
             ],
             projects: [zeta, alpha, personalProject, unknownAreaProject],
@@ -513,14 +513,14 @@ describe('getReviewOverviewGroups', () => {
 });
 
 describe('getExternalCalendarDaySummaries', () => {
-    const now = new Date(2026, 2, 1);
+    const now = new Fecha(2026, 2, 1);
 
     it('groups events by day over the window, dropping empty days', () => {
         const events = [
             {
                 id: 'e1', sourceId: 'cal', title: 'Standup', allDay: false,
-                start: new Date(2026, 2, 2, 9, 0).toISOString(),
-                end: new Date(2026, 2, 2, 9, 30).toISOString(),
+                start: new Fecha(2026, 2, 2, 9, 0).toISOString(),
+                end: new Fecha(2026, 2, 2, 9, 30).toISOString(),
             },
         ];
 
@@ -535,9 +535,9 @@ describe('getExternalCalendarDaySummaries', () => {
 describe('buildReviewSteps', () => {
     it('marks the daily today step as having work when a task is due today, and hides focus when disabled', () => {
         const buckets = getDailyReviewBuckets(
-            [createTask({ id: 'due-today', status: 'next', dueDate: new Date(2026, 2, 1).toISOString() })],
+            [createTask({ id: 'due-today', status: 'next', dueDate: new Fecha(2026, 2, 1).toISOString() })],
             [],
-            { now: new Date(2026, 2, 1, 9, 0) },
+            { now: new Fecha(2026, 2, 1, 9, 0) },
         );
 
         const steps = buildReviewSteps(buckets, { kind: 'daily', includeFocusStep: false });
@@ -550,7 +550,7 @@ describe('buildReviewSteps', () => {
         const buckets = getWeeklyReviewBuckets(
             [createTask({ id: 'waiting-later', status: 'waiting', reviewAt: '2026-11-01' })],
             [],
-            { now: new Date(2026, 2, 1) },
+            { now: new Fecha(2026, 2, 1) },
         );
 
         const steps = buildReviewSteps(buckets, { kind: 'weekly', includeContextStep: false });

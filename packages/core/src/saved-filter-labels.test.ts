@@ -26,8 +26,8 @@ describe('saved filter labels', () => {
             { id: 'status:waiting', label: 'Status: Waiting' },
             { id: 'assigned:Alex', label: 'Assigned To: Alex' },
             { id: 'location:Office', label: 'Location: Office' },
-            { id: 'dueDateRange', label: 'Due Date: This week' },
-            { id: 'startDateRange', label: 'Start Date: date:2026-05-10 - date:2026-05-12' },
+            { id: 'dueDateRange', label: 'Due Fecha: This week' },
+            { id: 'startDateRange', label: 'Start Fecha: date:2026-05-10 - date:2026-05-12' },
             { id: 'timeEstimateRange', label: 'Time estimate: 30m - 1h 30m' },
             { id: 'hasDescription', label: 'Has description' },
             { id: 'isStarred', label: 'Not starred' },
@@ -45,8 +45,8 @@ describe('saved filter labels', () => {
         });
 
         expect(chips.map((chip) => chip.label)).toEqual([
-            'Due Date: Before 2026-05-10',
-            'Start Date: After 2026-05-11',
+            'Due Fecha: Antes 2026-05-10',
+            'Start Fecha: Después 2026-05-11',
             'Time estimate: >= 2h',
         ]);
     });

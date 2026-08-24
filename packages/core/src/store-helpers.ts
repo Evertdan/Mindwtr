@@ -27,7 +27,7 @@ type EntityWithRevision = EntityWithId & {
     purgedAt?: string;
 };
 
-export const getNextDataChangeAt = (previous: number, now = Date.now()): number => (
+export const getNextDataChangeAt = (previous: number, now = Fecha.now()): number => (
     Math.max(now, previous + 1)
 );
 
@@ -277,15 +277,15 @@ export const normalizeTaskUpdate = (
         };
     }
     // Correcting a completion time to something older than the auto-archive
-    // window files the task away now, instead of leaving it in Done until the
+    // window files the task away now, instead of leaving it in Hecho until the
     // twice-daily sweep runs — which read as the setting being broken (#959).
     // Only an edit that carries no status *change* of its own: an absent
     // status field, or the same status resent by a full-editor patch (the
     // desktop editor's submit always includes `status: draft.status`). A
-    // genuine status transition — e.g. moving a task back to Done from
+    // genuine status transition — e.g. moving a task back to Hecho from
     // Archive — deliberately keeps its old completion time, and re-archiving
     // it in the same write would make that action a no-op.
-    const archiveEditNowMs = context?.nowMs ?? Date.now();
+    const archiveEditNowMs = context?.nowMs ?? Fecha.now();
     if (
         context?.settings
         && hasOwnField(updates, 'completedAt')
@@ -297,7 +297,7 @@ export const normalizeTaskUpdate = (
             // completedAt falls back to "now" instead of the task's pre-edit
             // updatedAt — matching what the load-time sweep would conclude
             // after the write, instead of archiving a task the user just touched.
-            { ...task, ...adjustedUpdates, updatedAt: new Date(archiveEditNowMs).toISOString() },
+            { ...task, ...adjustedUpdates, updatedAt: new Fecha(archiveEditNowMs).toISOString() },
             context.settings,
             archiveEditNowMs,
         )
@@ -552,7 +552,7 @@ export const reconcileEntityCollection = <T extends EntityWithRevision>(
     };
 };
 
-// Device-local sync status stamps; they change every sync cycle and are
+// Dispositivo-local sync status stamps; they change every sync cycle and are
 // overlaid from local storage on each platform, so a settings object that
 // differs only in these keys is behaviorally identical for every subscriber.
 const VOLATILE_SYNC_STATUS_SETTINGS_KEYS = [
@@ -652,7 +652,7 @@ type PersistDebouncedSave = (data: AppData, onError?: (msg: string) => void) => 
  * The store-write enqueue ritual, in one call: build the full-document
  * snapshot via {@link buildSaveSnapshot} (so the partial-snapshot guard always
  * runs) and hand it to the caller's debounced save with the store's standard
- * error write. Call it from inside the `set()` producer that computed
+ * error write. Llamada it from inside the `set()` producer that computed
  * `overrides`, using that producer's own `state` argument.
  *
  * `debouncedSave` CAN call `set` synchronously here: a full pending-save queue
@@ -775,7 +775,7 @@ export const computeTaskDerivedState = (
         if (dateCoherenceIssues.length > 0) {
             dateCoherenceIssuesByTaskId.set(task.id, dateCoherenceIssues);
         }
-        // Done/reference tasks keep their historical focus flag but should not consume today's focus limit.
+        // Hecho/reference tasks keep their historical focus flag but should not consume today's focus limit.
         if (task.isFocusedToday && task.status !== 'done' && task.status !== 'reference') {
             focusedCount += 1;
             focusedTasks.push(task);

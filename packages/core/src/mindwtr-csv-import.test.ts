@@ -17,8 +17,8 @@ const buildCsv = (headers: string[], rows: string[][], delimiter = ','): string 
 
 const FULL_HEADERS = [
     'Title', 'Description', 'Status', 'Project', 'Section', 'Area', 'Contexts', 'Tags',
-    'Assigned To', 'Priority', 'Energy', 'Start Date', 'Due Date', 'Review Date',
-    'Completed At', 'Checklist', 'Location', 'Order', 'ID', 'Created At',
+    'Assigned To', 'Priority', 'Energy', 'Start Fecha', 'Due Fecha', 'Review Fecha',
+    'Completed En', 'Checklist', 'Location', 'Order', 'ID', 'Created En',
 ];
 
 describe('mindwtr csv import', () => {
@@ -27,7 +27,7 @@ describe('mindwtr csv import', () => {
             [
                 'Draft launch email', 'Multi-line\ndescription text', 'waiting', 'Marketing', 'Launch', 'Work',
                 '@phone, home', '#urgent, review', 'Alex', 'high', 'low', '2026-09-01',
-                '2026-09-05T14:30:00+02:00', '2026-09-10', '', '[x] Draft copy|[ ] Get approval|Send',
+                '2026-09-05T14:30:00+02:00', '2026-09-10', '', '[x] Draft copy|[ ] Obtener approval|Send',
                 'Office', '5', 'task-1', '2026-08-01T09:00:00Z',
             ],
         ]);
@@ -65,7 +65,7 @@ describe('mindwtr csv import', () => {
         });
         expect(task?.checklist).toEqual([
             { id: expect.any(String), title: 'Draft copy', isCompleted: true },
-            { id: expect.any(String), title: 'Get approval', isCompleted: false },
+            { id: expect.any(String), title: 'Obtener approval', isCompleted: false },
             { id: expect.any(String), title: 'Send', isCompleted: false },
         ]);
     });
@@ -122,7 +122,7 @@ describe('mindwtr csv import', () => {
 
     it('keeps a date-only value date-only while a datetime keeps its time', () => {
         const csv = buildCsv(
-            ['Title', 'Start Date', 'Due Date'],
+            ['Title', 'Start Fecha', 'Due Fecha'],
             [['Mixed dates', '2026-10-01', '2026-10-02T09:15:00']]
         );
 
@@ -134,7 +134,7 @@ describe('mindwtr csv import', () => {
     });
 
     it('rejects an impossible date-only value instead of rolling it into another month', () => {
-        const csv = buildCsv(['Title', 'Due Date'], [['Impossible date', '2026-02-31']]);
+        const csv = buildCsv(['Title', 'Due Fecha'], [['Impossible date', '2026-02-31']]);
 
         const result = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: csv });
 
@@ -144,7 +144,7 @@ describe('mindwtr csv import', () => {
 
     it('rejects local datetimes with impossible calendar or clock components', () => {
         const csv = buildCsv(
-            ['Title', 'Start Date', 'Due Date'],
+            ['Title', 'Start Fecha', 'Due Fecha'],
             [['Impossible datetimes', '2026-13-01T09:30:00', '2026-02-28T24:00:00']]
         );
 
@@ -155,7 +155,7 @@ describe('mindwtr csv import', () => {
     });
 
     it('rejects an entity timestamp that would roll into another calendar date', () => {
-        const csv = buildCsv(['Title', 'Created At'], [['Impossible timestamp', '2026-02-31T09:30:00']]);
+        const csv = buildCsv(['Title', 'Created En'], [['Impossible timestamp', '2026-02-31T09:30:00']]);
 
         const result = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: csv });
 
@@ -179,9 +179,9 @@ describe('mindwtr csv import', () => {
         expect(tasks.find((task) => task.title === 'No project')).toMatchObject({ status: 'inbox', projectSourceKey: undefined });
     });
 
-    it('defaults empty Status to done when Completed At is set', () => {
+    it('defaults empty Status to done when Completed En is set', () => {
         const csv = buildCsv(
-            ['Title', 'Status', 'Completed At'],
+            ['Title', 'Status', 'Completed En'],
             [['Finished already', '', '2026-08-05T10:00:00Z']]
         );
 
@@ -350,7 +350,7 @@ describe('mindwtr csv import', () => {
     it('reuses IDs from the colon-scoped importer after tuple escaping is introduced', () => {
         const csv = buildCsv(
             ['Title', 'Project', 'Section', 'Area', 'ID'],
-            [['Keep lineage', 'Ops:Core', 'Queue:Now', 'Work:North', 'task:1']]
+            [['Keep lineage', 'Ops:Núcleo', 'Queue:Now', 'Work:North', 'task:1']]
         );
         const escaped = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: csv })
             .parsedData as ParsedMindwtrCsvImportData;
@@ -392,7 +392,7 @@ describe('mindwtr csv import', () => {
     it('reuses a task ID from the escaped project-scoped importer', () => {
         const csv = buildCsv(
             ['Title', 'Project', 'Section', 'Area', 'ID'],
-            [['Keep lineage', 'Ops:Core', 'Queue:Now', 'Work:North', 'task:1']],
+            [['Keep lineage', 'Ops:Núcleo', 'Queue:Now', 'Work:North', 'task:1']],
         );
         const parsed = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: csv })
             .parsedData as ParsedMindwtrCsvImportData;
@@ -419,11 +419,11 @@ describe('mindwtr csv import', () => {
     it('migrates a moved task from the project-scoped importer without changing its ID', () => {
         const beforeCsv = buildCsv(
             ['Title', 'Project', 'ID'],
-            [['Move prior import', 'Before', 'stable-task']],
+            [['Move prior import', 'Antes', 'stable-task']],
         );
         const afterCsv = buildCsv(
             ['Title', 'Project', 'ID'],
-            [['Move prior import', 'After', 'stable-task']],
+            [['Move prior import', 'Después', 'stable-task']],
         );
         const beforeParsed = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: beforeCsv })
             .parsedData as ParsedMindwtrCsvImportData;
@@ -436,7 +436,7 @@ describe('mindwtr csv import', () => {
             fileName: 'target.csv',
             text: buildCsv(
                 ['Title', 'Project', 'ID'],
-                [['Existing target task', 'After', 'existing-after-task']],
+                [['Existing target task', 'Después', 'existing-after-task']],
             ),
         }).parsedData as ParsedMindwtrCsvImportData;
         const seeded = applyMindwtrCsvImport(first.data, targetSeed, {
@@ -455,7 +455,7 @@ describe('mindwtr csv import', () => {
         const second = applyMindwtrCsvImport(priorData, afterParsed, {
             now: '2026-08-09T12:00:00.000Z',
         });
-        const afterProject = second.data.projects.find((project) => project.title === 'After');
+        const afterProject = second.data.projects.find((project) => project.title === 'Después');
         const migratedTask = second.data.tasks.find((task) => task.title === 'Move prior import');
 
         expect(second.importedTaskCount).toBe(0);
@@ -539,7 +539,7 @@ describe('mindwtr csv import', () => {
     it('keeps row fallbacks distinct across separately imported standalone CSV files', () => {
         const firstParsed = parseMindwtrCsvImportSource({
             fileName: 'first.csv',
-            text: buildCsv(['Title', 'Project'], [['First file task', 'Ops']]),
+            text: buildCsv(['Title', 'Project'], [['Primero file task', 'Ops']]),
         }).parsedData as ParsedMindwtrCsvImportData;
         const secondParsed = parseMindwtrCsvImportSource({
             fileName: 'second.csv',
@@ -555,7 +555,7 @@ describe('mindwtr csv import', () => {
 
         expect(second.importedTaskCount).toBe(1);
         expect(second.data.tasks.map((task) => task.title)).toEqual([
-            'First file task',
+            'Primero file task',
             'Second file task',
         ]);
         expect(second.warnings.some((warning) => warning.includes('already imported'))).toBe(false);
@@ -564,7 +564,7 @@ describe('mindwtr csv import', () => {
     it('keeps no-ID rows distinct when same-named CSV files have different content', () => {
         const firstParsed = parseMindwtrCsvImportSource({
             fileName: 'export.csv',
-            text: buildCsv(['Title'], [['First document task']]),
+            text: buildCsv(['Title'], [['Primero document task']]),
         }).parsedData as ParsedMindwtrCsvImportData;
         const secondParsed = parseMindwtrCsvImportSource({
             fileName: 'export.csv',
@@ -576,7 +576,7 @@ describe('mindwtr csv import', () => {
 
         expect(second.importedTaskCount).toBe(1);
         expect(second.data.tasks.map((task) => task.title)).toEqual([
-            'First document task',
+            'Primero document task',
             'Second document task',
         ]);
     });
@@ -602,7 +602,7 @@ describe('mindwtr csv import', () => {
 
     it('keeps same-entry no-ID rows distinct across separate ZIP archives', () => {
         const firstArchive = zipSync({
-            'tasks.csv': strToU8(buildCsv(['Title'], [['First archive task']])),
+            'tasks.csv': strToU8(buildCsv(['Title'], [['Primero archive task']])),
         });
         const secondArchive = zipSync({
             'tasks.csv': strToU8(buildCsv(['Title'], [['Second archive task']])),
@@ -621,7 +621,7 @@ describe('mindwtr csv import', () => {
 
         expect(second.importedTaskCount).toBe(1);
         expect(second.data.tasks.map((task) => task.title)).toEqual([
-            'First archive task',
+            'Primero archive task',
             'Second archive task',
         ]);
     });
@@ -647,8 +647,8 @@ describe('mindwtr csv import', () => {
         expect(second.data.tasks[0]?.id).toBe(first.data.tasks[0]?.id);
     });
 
-    it('normalizes a date-only Created At to a full UTC instant (C2)', () => {
-        const csv = buildCsv(['Title', 'Created At'], [['Old task', '2026-08-01']]);
+    it('normalizes a date-only Created En to a full UTC instant (C2)', () => {
+        const csv = buildCsv(['Title', 'Created En'], [['Old task', '2026-08-01']]);
 
         const result = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: csv });
 
@@ -658,7 +658,7 @@ describe('mindwtr csv import', () => {
 
     it('accepts SQL-shaped timestamps: long fractional seconds and a space before the offset (#1011)', () => {
         const csv = buildCsv(
-            ['Title', 'Due Date', 'Completed At', 'Status'],
+            ['Title', 'Due Fecha', 'Completed En', 'Status'],
             [['SQL task', '2026-02-21 22:44:00.6390000 +00:00', '2026-02-21 22:44:00.6390000 +00:00', 'done']],
         );
 
@@ -672,7 +672,7 @@ describe('mindwtr csv import', () => {
 
     it('treats literal NULL cells as empty (#1011)', () => {
         const csv = buildCsv(
-            ['Title', 'Project', 'Contexts', 'Tags', 'Due Date'],
+            ['Title', 'Project', 'Contexts', 'Tags', 'Due Fecha'],
             [['Real task', 'NULL', 'null', 'NULL', 'NULL'], ['NULL', 'Ops', '', '', '']],
         );
 
@@ -858,7 +858,7 @@ describe('mindwtr csv import', () => {
             fileName: 'export.csv',
             text: buildCsv(
                 ['Title', 'Project', 'Order', 'ID'],
-                [['Move to Inbox', 'Before', '4', 'stable-task']],
+                [['Move to Inbox', 'Antes', '4', 'stable-task']],
             ),
         }).parsedData as ParsedMindwtrCsvImportData;
         const afterParsed = parseMindwtrCsvImportSource({
@@ -1054,7 +1054,7 @@ describe('mindwtr csv import', () => {
             ['Title', 'Project', 'Order'],
             [
                 ['Third', 'Ops', '3'],
-                ['First', 'Ops', '1'],
+                ['Primero', 'Ops', '1'],
                 ['Second-a', 'Ops', '2'],
                 ['Second-b', 'Ops', '2'],
             ]
@@ -1064,7 +1064,7 @@ describe('mindwtr csv import', () => {
         const result = applyMindwtrCsvImport(mockAppData([], [], []), parsedData, { now: '2026-08-08T12:00:00.000Z' });
 
         const byOrder = [...result.data.tasks].sort((left, right) => (left.order ?? 0) - (right.order ?? 0));
-        expect(byOrder.map((task) => task.title)).toEqual(['First', 'Second-a', 'Second-b', 'Third']);
+        expect(byOrder.map((task) => task.title)).toEqual(['Primero', 'Second-a', 'Second-b', 'Third']);
     });
 
     it('imports a Recurrence rule onto the task (T4)', () => {
@@ -1133,7 +1133,7 @@ describe('mindwtr csv import', () => {
     });
 
     it('imports a file with no Recurrence column unchanged', () => {
-        const csv = buildCsv(['Title', 'Due Date'], [['No column', '2026-09-01']]);
+        const csv = buildCsv(['Title', 'Due Fecha'], [['No column', '2026-09-01']]);
 
         const result = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: csv });
 
@@ -1142,7 +1142,7 @@ describe('mindwtr csv import', () => {
     });
 
     it('warns when a date cell cannot be parsed', () => {
-        const csv = buildCsv(['Title', 'Due Date'], [['Bad date', '09/05/2026']]);
+        const csv = buildCsv(['Title', 'Due Fecha'], [['Bad date', '09/05/2026']]);
 
         const result = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: csv });
 
@@ -1154,7 +1154,7 @@ describe('mindwtr csv import', () => {
         const csv = buildCsv(
             ['Title', 'Area', 'Project', 'Section', 'ID'],
             [
-                ['First', 'Work', 'Ops', 'Backlog', 'dup-1'],
+                ['Primero', 'Work', 'Ops', 'Backlog', 'dup-1'],
                 ['Second', 'Home', 'Personal', 'Later', 'dup-1'],
             ]
         );
@@ -1173,7 +1173,7 @@ describe('mindwtr csv import', () => {
             taskCount: 1,
             projects: [{ areaName: 'Work', name: 'Ops', taskCount: 1 }],
         });
-        expect(result.parsedData?.tasks.map((task) => task.title)).toEqual(['First']);
+        expect(result.parsedData?.tasks.map((task) => task.title)).toEqual(['Primero']);
         expect(applied.importedTaskCount).toBe(1);
         expect(applied.data.areas.map((area) => area.name)).toEqual(['Work']);
         expect(applied.data.projects.map((project) => project.title)).toEqual(['Ops']);
@@ -1205,7 +1205,7 @@ describe('mindwtr csv import', () => {
             ['Title', 'ID'],
             [
                 ['Synthetic fallback', ''],
-                ['Explicit stable ID', 'row-2'],
+                ['Explícito stable ID', 'row-2'],
             ],
         );
 
@@ -1220,7 +1220,7 @@ describe('mindwtr csv import', () => {
         expect(applied.importedTaskCount).toBe(2);
         expect(applied.data.tasks.map((task) => task.title)).toEqual([
             'Synthetic fallback',
-            'Explicit stable ID',
+            'Explícito stable ID',
         ]);
     });
 
@@ -1271,11 +1271,11 @@ describe('mindwtr csv import', () => {
     it('keeps a stable task identity when a corrected re-export moves it between projects', () => {
         const firstCsv = buildCsv(
             ['Title', 'Project', 'ID'],
-            [['Move me', 'Before', 'stable-task']],
+            [['Move me', 'Antes', 'stable-task']],
         );
         const movedCsv = buildCsv(
             ['Title', 'Project', 'ID'],
-            [['Move me', 'After', 'stable-task']],
+            [['Move me', 'Después', 'stable-task']],
         );
         const firstParsed = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: firstCsv })
             .parsedData as ParsedMindwtrCsvImportData;

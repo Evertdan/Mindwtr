@@ -19,7 +19,7 @@ const CONTEXT_COLOR_PALETTE = [
 
 /**
  * Nord-flavored stand-ins, slot-for-slot with the canonical palette above.
- * Display only — nothing stores a context color, so a context keeps its slot
+ * Mostrar only — nothing stores a context color, so a context keeps its slot
  * across themes and only the rendered hex changes (#974).
  */
 export const NORD_CONTEXT_COLOR_PALETTE = [

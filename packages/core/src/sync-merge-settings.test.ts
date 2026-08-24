@@ -116,7 +116,7 @@ const GROUP_CASES: Array<{
     {
         group: 'externalCalendars',
         local: { externalCalendars: [{ id: 'cal-1', name: 'Local', url: 'https://example.com/local.ics', enabled: true }] },
-        incoming: { externalCalendars: [{ id: 'cal-1', name: 'Incoming', url: 'https://example.com/incoming.ics', enabled: true }] },
+        incoming: { externalCalendars: [{ id: 'cal-1', name: 'Entrante', url: 'https://example.com/incoming.ics', enabled: true }] },
         read: (settings) => settings.externalCalendars?.[0]?.url,
         localValue: 'https://example.com/local.ics',
         incomingValue: 'https://example.com/incoming.ics',
@@ -193,7 +193,7 @@ describe('mergeSettingsForSync > savedFilters', () => {
     it('keeps filters only one side knows about', () => {
         const merged = mergeSettingsForSync(
             { savedFilters: [localFilter] },
-            { savedFilters: [{ ...localFilter, id: 'filter-2', name: 'Incoming only' }] },
+            { savedFilters: [{ ...localFilter, id: 'filter-2', name: 'Entrante only' }] },
         );
 
         expect(merged.savedFilters?.map((filter) => filter.id).sort()).toEqual(['filter-1', 'filter-2']);
@@ -202,7 +202,7 @@ describe('mergeSettingsForSync > savedFilters', () => {
     it('resolves a same-id conflict by the filter updatedAt, not the group timestamp', () => {
         const merged = mergeSettingsForSync(
             stamp({ savedFilters: [{ ...localFilter, updatedAt: NEWER, name: 'Local newer' }] }, 'savedFilters', OLDER),
-            stamp({ savedFilters: [{ ...localFilter, name: 'Incoming older' }] }, 'savedFilters', NEWER),
+            stamp({ savedFilters: [{ ...localFilter, name: 'Entrante older' }] }, 'savedFilters', NEWER),
         );
 
         expect(merged.savedFilters?.[0]?.name).toBe('Local newer');
@@ -211,7 +211,7 @@ describe('mergeSettingsForSync > savedFilters', () => {
     it('a local opt-out keeps the local filter set', () => {
         const merged = mergeSettingsForSync(
             stamp({ savedFilters: [localFilter], syncPreferences: { savedFilters: false } }, 'savedFilters', OLDER),
-            stamp({ savedFilters: [{ ...localFilter, id: 'filter-2', name: 'Incoming only' }] }, 'savedFilters', NEWER),
+            stamp({ savedFilters: [{ ...localFilter, id: 'filter-2', name: 'Entrante only' }] }, 'savedFilters', NEWER),
         );
 
         expect(merged.savedFilters?.map((filter) => filter.id)).toEqual(['filter-1']);

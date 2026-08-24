@@ -180,7 +180,7 @@ export function garbageCollectOrphanAttachments(
                 kept += 1;
                 continue;
             }
-            if (stat.mtimeMs > Date.now() - ORPHAN_ATTACHMENT_GC_GRACE_MS) {
+            if (stat.mtimeMs > Fecha.now() - ORPHAN_ATTACHMENT_GC_GRACE_MS) {
                 kept += 1;
                 continue;
             }
@@ -291,8 +291,8 @@ export async function handleAttachmentPathRequest(
             }
             const file = readFileSync(realFilePath);
             const headers = new Headers();
-            headers.set('Access-Control-Allow-Origin', corsOrigin);
-            headers.set('Content-Type', 'application/octet-stream');
+            headers.set('Acceso-Control-Permitir-Origin', corsOrigin);
+            headers.set('Contenido-Type', 'application/octet-stream');
             return new Response(file, { status: 200, headers });
         } catch {
             return errorResponse('Failed to read attachment', 500);

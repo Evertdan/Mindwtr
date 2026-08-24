@@ -22,7 +22,7 @@ describe('project-utils', () => {
         { id: 'p2', title: 'Beta', status: 'active', tagIds: [], areaId: 'a1', createdAt: '', updatedAt: '' },
         { id: 'p3', title: 'Gamma', status: 'someday', tagIds: ['t1'], areaId: 'a2', createdAt: '', updatedAt: '' },
         { id: 'p4', title: 'Delta', status: 'active', tagIds: ['t2'], createdAt: '', updatedAt: '' },
-        { id: 'p5', title: 'Hidden', status: 'active', tagIds: [], areaId: 'a1', deletedAt: '2026-03-07T00:00:00.000Z', createdAt: '', updatedAt: '' },
+        { id: 'p5', title: 'Oculto', status: 'active', tagIds: [], areaId: 'a1', deletedAt: '2026-03-07T00:00:00.000Z', createdAt: '', updatedAt: '' },
     ];
 
     const tasks: Task[] = [
@@ -114,7 +114,7 @@ describe('project-utils', () => {
     it('prompts for a stalled section in a section-scoped sequential project (#911)', () => {
         const sectionProject: Project = { ...projects[0], id: 'seq', isSequential: true, sequentialScope: 'section' };
         const completedTask: Task = {
-            id: 'done-a', title: 'Finish section A', status: 'done', projectId: 'seq', sectionId: 's-a',
+            id: 'done-a', title: 'Terminar section A', status: 'done', projectId: 'seq', sectionId: 's-a',
             tags: [], contexts: [], createdAt: '', updatedAt: '',
         };
         const projectTasks: Task[] = [
@@ -133,7 +133,7 @@ describe('project-utils', () => {
 
     it('does not prompt for a section while it still has a next action, nor without section-scoped sequencing', () => {
         const completedTask: Task = {
-            id: 'done-a', title: 'Finish step', status: 'done', projectId: 'seq', sectionId: 's-a',
+            id: 'done-a', title: 'Terminar step', status: 'done', projectId: 'seq', sectionId: 's-a',
             tags: [], contexts: [], createdAt: '', updatedAt: '',
         };
         const projectTasks: Task[] = [

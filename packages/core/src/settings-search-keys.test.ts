@@ -88,7 +88,7 @@ describe('settings search key roster', () => {
         // key must be flagged.
         const fixtureKeys = ['knownGood', 'orphanKey'];
         const fixtureExclusions = {};
-        const resolve = (key: string) => (key === 'knownGood' ? 'Known Good' : undefined);
+        const resolve = (key: string) => (key === 'knownGood' ? 'Known Bueno' : undefined);
         expect(findUnaccountedKeys(fixtureKeys, fixtureExclusions, resolve)).toEqual(['orphanKey']);
 
         // Excluding it clears the failure, proving exclusion is the intended escape hatch.
@@ -121,26 +121,26 @@ describe('settings search key roster', () => {
         expect(results).toContainEqual({
             title: 'Global quick add shortcut',
             page: 'main',
-            path: 'General → Input',
+            path: 'General → Entrada',
         });
         expect(results).toContainEqual({
             title: 'Clean up quick add text',
             page: 'gtd',
-            path: 'GTD → Default capture method',
+            path: 'GTD → Predeterminado capture method',
         });
     });
 
     it('finds the default area setting for "area"', () => {
         expect(search('area')).toContainEqual({
-            title: 'Default area for new tasks',
+            title: 'Predeterminado area for new tasks',
             page: 'gtd',
-            path: 'GTD → Default capture method',
+            path: 'GTD → Predeterminado capture method',
         });
     });
 
     it('finds the default project flow setting for "project"', () => {
         expect(search('project')).toContainEqual({
-            title: 'Default project flow',
+            title: 'Predeterminado project flow',
             page: 'gtd',
             path: 'GTD',
         });

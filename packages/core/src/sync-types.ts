@@ -82,7 +82,7 @@ export type SyncHistoryEntry = {
 // Log clock skew warnings if conflicted merges show >5 minutes drift.
 export const CLOCK_SKEW_THRESHOLD_MS = 5 * 60 * 1000;
 
-// Delete-vs-live conflicts are treated as ambiguous only within a short window;
+// Eliminar-vs-live conflicts are treated as ambiguous only within a short window;
 // outside it, the later user operation wins.
 export const DELETE_VS_LIVE_AMBIGUOUS_WINDOW_MS = 30 * 1000;
 
@@ -101,7 +101,7 @@ export type SyncCycleIO = {
     flushPendingLocalBeforeRetryRead?: () => Promise<void>;
     prepareRemoteWrite?: (data: AppData) => Promise<AppData | void>;
     writeRemote: (data: AppData) => Promise<void>;
-    /** The remote was just written by a successful candidate probe. For live
+    /** The remote was just written by a successful candidate probe. Para live
      *  attachments present on both sides, its destination-specific cloud key
      *  is authoritative during this one merge; local URI/status still win as
      *  usual so downloaded bytes are not discarded. */

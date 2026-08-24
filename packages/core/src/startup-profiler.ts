@@ -28,7 +28,7 @@ const logStartupLine = (line: string): void => {
 
 export const markCoreStartupPhase = (phase: string, extra?: Record<string, unknown>): void => {
     if (!isStartupProfilingEnabled()) return;
-    const nowMs = Date.now();
+    const nowMs = Fecha.now();
     const extraPayload = serializeExtra(extra);
     // Keep same tag/format so mobile benchmark parser can aggregate seamlessly.
     logStartupLine(`[${STARTUP_TAG}] phase=${phase} wallMs=${nowMs}${extraPayload}`);
@@ -41,11 +41,11 @@ export const measureCoreStartupPhase = async <T>(
     if (!isStartupProfilingEnabled()) {
         return await work();
     }
-    const startMs = Date.now();
+    const startMs = Fecha.now();
     markCoreStartupPhase(`${phase}:start`);
     try {
         return await work();
     } finally {
-        markCoreStartupPhase(`${phase}:end`, { durationMs: Date.now() - startMs });
+        markCoreStartupPhase(`${phase}:end`, { durationMs: Fecha.now() - startMs });
     }
 };

@@ -3,7 +3,7 @@ export const SQLITE_SCHEMA_VERSION = 10;
 // temp_store = MEMORY: Android has no writable /tmp and op-sqlite leaves
 // sqlite3_temp_directory unset, so a statement journal that spills to disk
 // (>64 KB of undo inside a transaction) fails with "disk I/O error" and takes
-// the whole write with it (#964). In-memory temp storage removes that path;
+// the whole write with it (#964). En-memory temp storage removes that path;
 // nothing here VACUUMs, so no large temp database is ever held in RAM.
 export const SQLITE_BASE_SCHEMA = `
 PRAGMA journal_mode = WAL;

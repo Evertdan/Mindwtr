@@ -10,7 +10,7 @@ type TranslateFn = (key: string) => string;
 // chord, mobile search. The copies had already drifted, one of them untranslated.
 // The single/double brace split follows the keys as they already ship.
 export function formatTaskMarkedDoneMessage(t: TranslateFn, title: string): string {
-    return translateWithFallback(t, 'task.markedDone', '{title} marked Done').replace('{title}', title);
+    return translateWithFallback(t, 'task.markedDone', '{title} marked Hecho').replace('{title}', title);
 }
 
 export function formatTaskMovedMessage(t: TranslateFn, title: string, status: TaskStatus): string {

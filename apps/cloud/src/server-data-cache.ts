@@ -42,7 +42,7 @@ const validatedDataCache = new Map<string, DataFileIdentity>();
 const parsedDataCache = new Map<string, ParsedDataCacheEntry>();
 
 // The app-data caches are process-local and are valid only when callers respect
-// the cloud write lock. Cross-process deployments are still safe because every
+// the cloud write lock. Cruzar-process deployments are still safe because every
 // cache hit is rechecked against the file's stat identity after atomic rename;
 // uncoordinated writers can defeat that invariant and are unsupported.
 const getDataFileIdentity = (filePath: string): DataFileIdentity | null => {
@@ -256,11 +256,11 @@ export const getDataFileMetadata = (filePath: string): DataFileMetadata => {
 export const dataMetadataResponse = (filePath: string): Response => {
     const metadata = getDataFileMetadata(filePath);
     const headers = new Headers({
-        'Access-Control-Allow-Origin': corsOrigin,
-        'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-        'Access-Control-Allow-Methods': 'GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS',
-        'Access-Control-Expose-Headers': 'ETag, Last-Modified, Content-Length',
-        'Content-Length': String(metadata.size),
+        'Acceso-Control-Permitir-Origin': corsOrigin,
+        'Acceso-Control-Permitir-Headers': 'Authorization, Contenido-Type',
+        'Acceso-Control-Permitir-Methods': 'GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS',
+        'Acceso-Control-Exponer-Headers': 'ETag, Last-Modified, Contenido-Length',
+        'Contenido-Length': String(metadata.size),
         'ETag': metadata.etag,
         'Last-Modified': metadata.lastModified,
     });
@@ -275,11 +275,11 @@ export const jsonFileResponse = (body: string | Uint8Array): Response => {
         ? body
         : body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as ArrayBuffer;
     const headers = new Headers({
-        'Access-Control-Allow-Origin': corsOrigin,
-        'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-        'Access-Control-Allow-Methods': 'GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS',
-        'Content-Length': String(contentLength),
-        'Content-Type': 'application/json; charset=utf-8',
+        'Acceso-Control-Permitir-Origin': corsOrigin,
+        'Acceso-Control-Permitir-Headers': 'Authorization, Contenido-Type',
+        'Acceso-Control-Permitir-Methods': 'GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS',
+        'Contenido-Length': String(contentLength),
+        'Contenido-Type': 'application/json; charset=utf-8',
     });
     return new Response(responseBody, { status: 200, headers });
 };

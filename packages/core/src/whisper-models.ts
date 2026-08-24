@@ -3,7 +3,7 @@
 // whisper.cpp loads it), so it must have exactly one implementation. Desktop and
 // mobile previously typed this table separately and had already drifted: mobile was
 // missing whisper-large-v3-turbo, desktop had no minBytes. This is the union of both
-// — no entry lost. Each platform decides locally which subset it *offers* in its UI;
+// — no entry lost. Cada platform decides locally which subset it *offers* in its UI;
 // this table only owns the data, not the per-platform selection.
 export type WhisperModelDescriptor = {
     id: string;

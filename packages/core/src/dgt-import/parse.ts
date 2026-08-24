@@ -120,7 +120,7 @@ const normalizeContexts = (rawContexts: unknown): NormalizedContext[] => {
       if (!record || sourceId === undefined) return null;
       return {
         sourceId,
-        title: normalizeTitle(record.TITLE, `Context ${index + 1}`),
+        title: normalizeTitle(record.TITLE, `Contexto ${index + 1}`),
       };
     })
     .filter((entry): entry is NormalizedContext => Boolean(entry));

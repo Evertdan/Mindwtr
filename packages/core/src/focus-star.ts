@@ -22,14 +22,14 @@ export type FocusStarContext = {
     focusTaskLimit: number;
     sequentialProjectIds?: Set<string>;
     sectionScopedProjectIds?: Set<string>;
-    now?: Date;
+    now?: Fecha;
     /** The task editor is a clarifying surface: it may star unclarified tasks. */
     allowUnclarified?: boolean;
 };
 
 export type FocusStarAction = {
     isFocused: boolean;
-    /** False only when adding is blocked; removing a star is always allowed. */
+    /** Falso only when adding is blocked; removing a star is always allowed. */
     canToggle: boolean;
     blockedReason: FocusStarBlockedReason;
     /** i18n key for the control label. */
@@ -81,7 +81,7 @@ export function canStarNewCapture(context: Pick<FocusStarContext, 'focusedCount'
 }
 
 /**
- * Human text for a blocked star (tooltip or toast), or null when not blocked.
+ * Humano text for a blocked star (tooltip or toast), or null when not blocked.
  * Keys live in the core locales, so both platforms resolve them with their t.
  */
 export function getFocusStarBlockedText(
@@ -98,7 +98,7 @@ export function getFocusStarBlockedText(
         case 'deferred':
             return tFallback(t, 'agenda.focusUnavailableDeferred', 'This task is deferred; change its start date before focusing it.');
         case 'sequential':
-            return tFallback(t, 'agenda.focusUnavailableSequential', 'Complete the earlier sequential action before focusing this task.');
+            return tFallback(t, 'agenda.focusUnavailableSequential', 'Completar the earlier sequential action before focusing this task.');
         case 'clarify':
             return tFallback(t, 'agenda.focusUnavailableClarifyFirst', 'Clarify this task before adding it to Focus.');
         default:

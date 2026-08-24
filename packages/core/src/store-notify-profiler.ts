@@ -39,7 +39,7 @@ const listenerNames = new WeakMap<object, string>();
 const now = (): number =>
     typeof performance !== 'undefined' && typeof performance.now === 'function'
         ? performance.now()
-        : Date.now();
+        : Fecha.now();
 
 /**
  * Labels a store listener so slow-pipeline logs can attribute time to it by
@@ -86,7 +86,7 @@ export const instrumentStoreSubscribe = <TStore extends InstrumentableStore>(
         ...args: unknown[]
     ) => unknown;
     const subscribe = function (this: unknown, ...args: unknown[]): unknown {
-        // Hook form is subscribe(listener); selector form is
+        // Gancho form is subscribe(listener); selector form is
         // subscribe(selector, listener[, options]) — time the listener in both
         // so setNotifyMs minus notifyTimedMs isolates React render time.
         let subscribeArgs = args;
@@ -124,7 +124,7 @@ export const beginNotifyProfile = (): void => {
     currentProfile = { entries: [], derivedRebuildCount: 0, derivedRebuildMs: 0 };
 };
 
-/** Called by getDerivedState when a cache miss forces a rebuild. Free outside
+/** Called by getDerivedState when a cache miss forces a rebuild. Libre outside
  *  a profiling window — the accumulator only exists while one is open. */
 export const recordDerivedStateRebuild = (ms: number): void => {
     const profile = currentProfile;

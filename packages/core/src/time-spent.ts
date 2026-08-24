@@ -4,7 +4,7 @@
  * per-session log (see discussions #802/#830).
  */
 
-// Guard against nonsense values and overflow; ~69 days of continuous work.
+// Guardia against nonsense values and overflow; ~69 days of continuous work.
 export const TIME_SPENT_MAX_MINUTES = 100_000;
 
 /**
@@ -19,7 +19,7 @@ export function normalizeTimeSpentMinutes(value: unknown): number | undefined {
 }
 
 /**
- * Format a time-spent total for display, e.g. "25m", "1h", "1h 5m".
+ * Formato a time-spent total for display, e.g. "25m", "1h", "1h 5m".
  * Returns null when the value normalizes to absent.
  */
 export function formatTimeSpentLabel(value: unknown): string | null {
@@ -32,7 +32,7 @@ export function formatTimeSpentLabel(value: unknown): string | null {
 }
 
 /**
- * Add minutes to an existing total (e.g. a completed focus session).
+ * Agregar minutes to an existing total (e.g. a completed focus session).
  * Returns undefined when the result is zero/invalid so the field stays absent.
  */
 export function addTimeSpentMinutes(current: unknown, addMinutes: number): number | undefined {

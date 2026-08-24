@@ -17,7 +17,7 @@ describe('Sync Logic', () => {
             const incoming = mockAppData([
                 {
                     ...createMockTask('1', '2023-01-01'),
-                    title: 'Incoming title',
+                    title: 'Entrante title',
                 },
                 createMockTask('3', '2023-01-01'),
             ]);
@@ -48,13 +48,13 @@ describe('Sync Logic', () => {
             const incoming = mockAppData([
                 {
                     ...createMockTask('content-conflict', now),
-                    title: 'Incoming title',
+                    title: 'Entrante title',
                 },
                 {
                     ...createMockTask('revision-conflict', now),
                     rev: 1,
                     revBy: 'device-remote',
-                    title: 'Incoming title',
+                    title: 'Entrante title',
                 },
             ]);
 
@@ -88,7 +88,7 @@ describe('Sync Logic', () => {
         it('does not count normal revision-forward updates as conflicts or clock skew', () => {
             const localTask = {
                 ...createMockTask('task-1', '2026-04-24T11:22:00.000Z'),
-                title: 'Before sync',
+                title: 'Antes sync',
                 rev: 1,
                 revBy: 'desktop',
             } satisfies Task;

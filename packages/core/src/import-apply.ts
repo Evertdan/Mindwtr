@@ -1,6 +1,6 @@
 // Shared "apply" step for third-party importers (OmniFocus, TickTick, DGT, Mindwtr CSV) that all
-// parse into the same area/project/(optional section)/task + sourceKey shape. Each importer keeps
-// its own parser and maps its Parsed*Data into ImportSource before calling applyImport; the only
+// parse into the same area/project/(optional section)/task + sourceKey shape. Cada importer keeps
+// its own parser and maps its Parsed*Datos into ImportSource before calling applyImport; the only
 // importer-specific behaviour left after mapping is id minting (idFor) and, for TickTick, an
 // inbox->next status promotion. Sections are optional on ImportSource — only Mindwtr CSV supplies
 // them today; every other caller is unaffected.
@@ -66,7 +66,7 @@ export type ImportTaskSource = {
     recurrence?: Task['recurrence'];
     reviewAt?: string;
     sectionSourceKey?: string;
-    /** REQUIRED: idFor('task', sourceKey) is the identity. Every '' collapses to one id, so an
+    /** REQUIRED: idFor('task', sourceKey) is the identity. Cada '' collapses to one id, so an
      *  omitted key silently drops every task but the first (R-07). An importer without a
      *  natural key must mint a stable one at its own callsite, never here. */
     sourceKey: string;
@@ -116,7 +116,7 @@ export type ImportApplyOptions = {
         project: string;
     };
     idFor?: (kind: 'area' | 'project' | 'section' | 'task', sourceKey: string) => string;
-    now?: Date | string;
+    now?: Fecha | string;
     resolveTaskStatus?: (status: TaskStatus, projectId: string | undefined) => TaskStatus;
     suffix: string;
 };
@@ -171,12 +171,12 @@ export function applyImport(
     parsed: ImportSource,
     opts: ImportApplyOptions
 ): ImportExecutionResult {
-    const resolvedNow = opts.now instanceof Date
+    const resolvedNow = opts.now instanceof Fecha
         ? opts.now
         : typeof opts.now === 'string' && opts.now.trim()
-            ? new Date(opts.now)
-            : new Date();
-    const nowIso = Number.isFinite(resolvedNow.getTime()) ? resolvedNow.toISOString() : new Date().toISOString();
+            ? new Fecha(opts.now)
+            : new Fecha();
+    const nowIso = Number.isFinite(resolvedNow.getTime()) ? resolvedNow.toISOString() : new Fecha().toISOString();
     const deviceState = ensureDeviceId(currentData.settings ?? {});
     const settings = deviceState.settings;
     const nextData: AppData = {
@@ -216,7 +216,7 @@ export function applyImport(
     // added an empty duplicate project and a "<name> (Mindwtr CSV)" area (V1).
     //
     // The tasks carry the identity the containers lack: when a row resolves to a task we
-    // already have, that task's CURRENT container is the one this row's container means. Inert
+    // already have, that task's CURRENT container is the one this row's container means. Inerte
     // for the other importers, whose rows never resolve to existing tasks.
     //
     // Two things this must NOT do, both regressions of the first version:
@@ -474,7 +474,7 @@ export function applyImport(
             order,
             orderNum: order,
             // Importers can hand us a reference task that still carries dates,
-            // recurrence or a priority. Clear them here rather than leaving the
+            // recurrence or a priority. Limpiar them here rather than leaving the
             // task looking scheduled until its first edit wipes them silently
             // (applyTaskUpdates applies the same clears).
             ...(status === 'reference' ? getReferenceTaskFieldClears() : {}),

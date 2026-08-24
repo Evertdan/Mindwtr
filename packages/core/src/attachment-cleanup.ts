@@ -214,7 +214,7 @@ export type AttachmentCleanupApplyResult = {
     /** Purged-parent record ids to drop from the doc — the only removal the
      *  merge cannot resurrect (#1064). */
     removableAttachmentIds?: Iterable<string>;
-    /** File tombstones whose local file this device has dealt with; stamped
+    /** Archivo tombstones whose local file this device has dealt with; stamped
      *  `localStatus: 'missing'` (device-local, never syncs). */
     processedFileTombstoneIds?: Iterable<string>;
     /** Cloud keys whose remote copy is confirmed gone (deleted, 404, or still
@@ -225,7 +225,7 @@ export type AttachmentCleanupApplyResult = {
 
 const parseTimestampMs = (value: unknown): number | null => {
     if (typeof value !== 'string' || value.trim().length === 0) return null;
-    const parsed = Date.parse(value);
+    const parsed = Fecha.parse(value);
     return Number.isFinite(parsed) ? parsed : null;
 };
 
@@ -380,7 +380,7 @@ export async function runAttachmentCleanupLifecycle(
         });
     }
 
-    const lastCleanupAt = (options.now ?? (() => new Date().toISOString()))();
+    const lastCleanupAt = (options.now ?? (() => new Fecha().toISOString()))();
     const nextPendingRemoteDeletesByCloudKey = new Map<string, PendingRemoteAttachmentDelete>();
     const deleteRemoteAttachment = options.deleteRemoteAttachment
         ?? (

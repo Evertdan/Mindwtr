@@ -15,7 +15,7 @@ import type { AppData, Task } from './types';
  * the user deleted. Structural, not a preference.
  */
 export interface MindwtrCsvExportOptions {
-    /** Field separator. The importer sniffs `,`/`;`/tab; comma is its default. */
+    /** Campo separator. The importer sniffs `,`/`;`/tab; comma is its default. */
     delimiter?: string;
 }
 
@@ -81,15 +81,15 @@ export function serializeMindwtrCsv(data: AppData, options: MindwtrCsvExportOpti
             'Assigned To': task.assignedTo ?? '',
             'Priority': task.priority ?? '',
             'Energy': task.energyLevel ?? '',
-            'Start Date': task.startTime ?? '',
-            'Due Date': task.dueDate ?? '',
-            'Review Date': task.reviewAt ?? '',
-            'Completed At': task.completedAt ?? '',
+            'Start Fecha': task.startTime ?? '',
+            'Due Fecha': task.dueDate ?? '',
+            'Review Fecha': task.reviewAt ?? '',
+            'Completed En': task.completedAt ?? '',
             'Checklist': formatChecklist(task),
             'Location': task.location ?? '',
             'Order': String(task.order ?? 0),
             'ID': task.id,
-            'Created At': task.createdAt,
+            'Created En': task.createdAt,
             'Recurrence': formatRecurrence(task),
         };
     };

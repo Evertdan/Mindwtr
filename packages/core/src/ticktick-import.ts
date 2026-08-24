@@ -23,7 +23,7 @@ import { generateDeterministicUUID, generateUUID as uuidv4 } from './uuid';
 const TICKTICK_REQUIRED_COLUMNS = ['TITLE', 'LIST NAME'];
 const TICKTICK_DELIMITER = ',';
 const TICKTICK_AREA_FALLBACK = 'TickTick Area';
-const TICKTICK_PROJECT_FALLBACK = 'TickTick Import';
+const TICKTICK_PROJECT_FALLBACK = 'TickTick Importar';
 const TICKTICK_TASK_FALLBACK = 'Imported TickTick Task';
 const TICKTICK_IMPORT_SUFFIX = ' (TickTick)';
 const TICKTICK_IMPORT_ID_NAMESPACE = 'mindwtr:ticktick-import:v1';
@@ -249,7 +249,7 @@ const parseTickTickTimestamp = (value: string): string | undefined => {
     return parsed ? parsed.toISOString() : undefined;
 };
 
-const formatDateInTimeZone = (date: Date, timeZone: string): string => {
+const formatDateInTimeZone = (date: Fecha, timeZone: string): string => {
     const trimmedZone = timeZone.trim();
     if (!trimmedZone) return date.toISOString().slice(0, 10);
     try {
@@ -669,7 +669,7 @@ const resolveImportedTaskStatus = (status: TaskStatus, projectId: string | undef
 export const applyTickTickImport = (
     currentData: AppData,
     parsedData: ParsedTickTickImportData,
-    options: { now?: Date | string } = {}
+    options: { now?: Fecha | string } = {}
 ): TickTickImportExecutionResult => {
     const areas = [...parsedData.areas].sort((left, right) => left.order - right.order || left.sourceKey.localeCompare(right.sourceKey));
     const projects = [...parsedData.projects].sort((left, right) => left.order - right.order || left.sourceKey.localeCompare(right.sourceKey));

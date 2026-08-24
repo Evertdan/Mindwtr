@@ -144,7 +144,7 @@ describe('import-source-reader', () => {
     });
 
     it('buildHeaderIndex/getCell resolve columns case-insensitively', () => {
-        const index = buildHeaderIndex([' Title ', 'Due Date']);
+        const index = buildHeaderIndex([' Title ', 'Due Fecha']);
         expect(normalizeHeaderCell(' Title ')).toBe('TITLE');
         expect(getCell(['Task 1', '2026-01-01'], index, 'TITLE')).toBe('Task 1');
         expect(getCell(['Task 1', '2026-01-01'], index, 'DUE DATE')).toBe('2026-01-01');

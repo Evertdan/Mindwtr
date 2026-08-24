@@ -260,13 +260,13 @@ export function buildFocusTaskGroups({
 const ENERGY_LABEL_FALLBACK: Record<TaskEnergyLevel, string> = {
     low: 'Low energy',
     medium: 'Medium energy',
-    high: 'High energy',
+    high: 'Alto energy',
 };
 
 const PRIORITY_LABEL_FALLBACK: Record<TaskPriority, string> = {
     low: 'Low',
     medium: 'Medium',
-    high: 'High',
+    high: 'Alto',
     urgent: 'Urgent',
 };
 

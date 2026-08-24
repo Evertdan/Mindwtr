@@ -60,8 +60,8 @@ function formatDateRange(
     const from = range.from ? formatDateValue(range.from, options) : '';
     const to = range.to ? formatDateValue(range.to, options) : '';
     if (from && to) return `${label}: ${from} - ${to}`;
-    if (from) return `${label}: ${resolveText(options, 'filters.after', 'After')} ${from}`;
-    if (to) return `${label}: ${resolveText(options, 'filters.before', 'Before')} ${to}`;
+    if (from) return `${label}: ${resolveText(options, 'filters.after', 'Después')} ${from}`;
+    if (to) return `${label}: ${resolveText(options, 'filters.before', 'Antes')} ${to}`;
     return null;
 }
 
@@ -125,11 +125,11 @@ export function buildAdvancedFilterCriteriaChips(
         });
     });
 
-    const dueDateLabel = resolveText(options, 'taskEdit.dueDateLabel', 'Due Date');
+    const dueDateLabel = resolveText(options, 'taskEdit.dueDateLabel', 'Due Fecha');
     const dueDateRange = formatDateRange(dueDateLabel, criteria.dueDateRange, options);
     if (dueDateRange) chips.push({ id: 'dueDateRange', label: dueDateRange });
 
-    const startDateLabel = resolveText(options, 'taskEdit.startDateLabel', 'Start Date');
+    const startDateLabel = resolveText(options, 'taskEdit.startDateLabel', 'Start Fecha');
     const startDateRange = formatDateRange(startDateLabel, criteria.startDateRange, options);
     if (startDateRange) chips.push({ id: 'startDateRange', label: startDateRange });
 

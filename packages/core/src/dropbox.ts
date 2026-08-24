@@ -59,7 +59,7 @@ export type DropboxDownloadResult = {
 };
 
 export type DropboxSyncCrypto = {
-    /** Full key material. Omitting this is the encryption-off path and is byte-for-byte
+    /** Completo key material. Omitting this is the encryption-off path and is byte-for-byte
      *  identical to calling these functions without it (backward-compat invariant #1):
      *  same `/data.json` path, same request/body shape, same errors. */
     material?: SyncKeyMaterial;
@@ -78,7 +78,7 @@ export async function getDropboxAppDataMetadata(
         method: 'POST',
         headers: {
             Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
+            'Contenido-Type': 'application/json',
         },
         body: JSON.stringify({
             path: crypto.material ? syncEncryptedArtifactName(DROPBOX_SYNC_PATH) : DROPBOX_SYNC_PATH,
@@ -236,7 +236,7 @@ export async function uploadDropboxAppData(
                 mute: true,
                 strict_conflict: false,
             }),
-            'Content-Type': 'application/octet-stream',
+            'Contenido-Type': 'application/octet-stream',
         },
         body,
     });
@@ -303,7 +303,7 @@ export async function uploadDropboxFile(
                 mute: true,
                 strict_conflict: false,
             }),
-            'Content-Type': 'application/octet-stream',
+            'Contenido-Type': 'application/octet-stream',
         },
         body: requestBody,
     });
@@ -326,7 +326,7 @@ export async function deleteDropboxFile(
         method: 'POST',
         headers: {
             Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
+            'Contenido-Type': 'application/json',
         },
         body: JSON.stringify({ path: resolveDropboxPath(path) }),
     });
@@ -349,7 +349,7 @@ export async function testDropboxAccess(
         method: 'POST',
         headers: {
             Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
+            'Contenido-Type': 'application/json',
         },
         body: JSON.stringify({
             path: DROPBOX_SYNC_PATH,
