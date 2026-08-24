@@ -61,7 +61,7 @@ export function SyncSelfHostedBackendPanel({
     }, [initialToken]);
 
     const urlError = url.trim() ? !isValidHttpUrl(url.trim()) : false;
-    // An empty token is valid here (self-hosted servers may run without auth);
+    // Un
     // only a non-empty token that fails the shape check is rejected.
     const tokenError = token.trim() ? !isValidCloudSyncToken(token.trim()) : false;
     const settings = { allowInsecureHttp, token, url };

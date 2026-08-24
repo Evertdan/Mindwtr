@@ -58,7 +58,7 @@ function TransferActionButton({
     );
 }
 
-// Backup and migration are both rare errands, so each card stays folded until
+// Backup and migración are both rare errands, so each card stays folded until
 // asked for. Search reveals a row by clicking its card's header (see
 // expandSettingsSection); nothing persists the choice.
 export function BackupSection({
@@ -154,7 +154,7 @@ export function ImportSection({
             onToggle={() => setOpen((prev) => !prev)}
         >
             <a
-                href="https://docs.mindwtr.app/import/"
+                href="https://docs.mindwtr.app/importar/"
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center gap-1 px-4 py-3 text-sm font-medium text-primary hover:underline"

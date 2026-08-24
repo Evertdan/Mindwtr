@@ -70,7 +70,7 @@ export function saveStoredWebviewZoom(value: number, storage?: StorageLike | nul
         }
         storage.setItem(WEBVIEW_ZOOM_STORAGE_KEY, JSON.stringify(zoom));
     } catch {
-        // Zoom level is local view state; storage failures should not block shortcuts.
+        // Zoom level is local view estado; storage failures no debería block shortcuts.
     }
     return zoom;
 }

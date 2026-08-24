@@ -9,7 +9,7 @@ export type ImportPickedFileResult =
     | { errorKey: 'attachments.fileTooLarge' | 'attachments.fileNotReadable' };
 
 // Browse for a file to LINK to (pointer, no copy) — fills the link prompt
-// with the picked path instead of importing the bytes.
+// with the picked ruta en lugar de importing the bytes.
 export async function browseForLinkTarget(dialogTitle: string): Promise<string | null> {
     const { open } = await import('@tauri-apps/plugin-dialog');
     const selected = await open({
@@ -22,7 +22,7 @@ export async function browseForLinkTarget(dialogTitle: string): Promise<string |
 
 // Copies the picked file into the app-managed attachments dir (via the Rust
 // side, which is not bound by the webview fs scope) so the attachment owns its
-// bytes and never depends on the original path again.
+// bytes and nunca depends on the original ruta again.
 export async function importPickedFileAttachment(selectedPath: string): Promise<ImportPickedFileResult> {
     const title = selectedPath.split(/[/\\]/).pop() || selectedPath;
     const id = generateUUID();
@@ -59,7 +59,7 @@ export async function importPickedFileAttachment(selectedPath: string): Promise<
     }
 }
 
-// A dropped file arrives as bytes with no OS path, so it can't go through
+// A dropped file arrives as bytes with no OS ruta, so it puede't go through
 // the Rust copier (import_attachment_file). Write it into the same
 // managed attachments dir directly from the webview instead.
 export async function importDroppedFileAttachment(file: File): Promise<ImportPickedFileResult> {

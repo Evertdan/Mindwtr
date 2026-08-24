@@ -1,40 +1,40 @@
-# ADR 0009: SQLite as Primary Store, JSON as Sync Snapshot Bridge
+# ADR 0009: SQLite como almacén principal, JSON como puente de instantánea de sincronización
 
-Date: 2026-04-16
-Status: Accepted
+Fecha: 2026-04-16
+Estado: Aceptado
 
-## Context
+## Contexto
 
-Mindwtr persists structured data in SQLite on desktop and mobile, while sync backends exchange a JSON snapshot (`data.json`) plus attachments.
+Mindwtr persiste datos estructurados en SQLite en escritorio y móvil, mientras que los backends de sincronización intercambian una instantánea JSON (`data.json`) más archivos adjuntos.
 
-That dual representation is intentional, but the contract was only implied by code and wiki text:
+Esa representación dual es intencional, pero el contrato solo estaba implícito por texto de código y wiki:
 
-- SQLite handles local reads, queries, and app startup.
-- Sync backends read and write JSON snapshots.
-- Sync services flush pending local saves before reading for sync.
-- Desktop and mobile allow editing during sync, so they must avoid overwriting fresher local state.
+- SQLite maneja lecturas locales, consultas e inicio de aplicación.
+- Los backends de sincronización leen y escriben instantáneas JSON.
+- Los servicios de sincronización vaciaban guardados locales pendientes antes de leer para sincronización.
+- El escritorio y el móvil permiten ediciones durante la sincronización, por lo que deben evitar sobrescribir el estado local más fresco.
 
-Without an explicit ADR, the risk is accidental drift in future work: treating SQLite and JSON as equal peers, syncing device-local diagnostics remotely, or adding write paths that bypass the bridge invariants.
+Sin un ADR explícito, el riesgo es una desviación accidental en el trabajo futuro: tratar SQLite y JSON como pares iguales, sincronizar diagnósticos locales del dispositivo de forma remota o agregar rutas de escritura que eviten los invariantes del puente.
 
-## Decision
+## Decisión
 
-Mindwtr keeps SQLite and JSON, but with an asymmetric contract:
+Mindwtr mantiene SQLite y JSON, pero con un contrato asimétrico:
 
-1. SQLite is the primary local store.
-   - Cold start, queries, and normal app reads come from SQLite-backed storage.
-   - JSON is not a second local source of truth during ordinary runtime.
-2. `data.json` is a transport and backup snapshot.
-   - Outgoing sync exports the current app snapshot from local storage after pending local saves are flushed.
-   - Incoming sync validates and normalizes external JSON, merges it with local data, then persists the merged result back into SQLite-backed storage.
-3. Sync diagnostics remain device-local.
-   - Settings like `lastSyncStats`, `lastSyncHistory`, and pending-remote-write recovery flags are useful locally, but are stripped from remote payloads.
-4. Sync does not take a UI edit lock.
-   - Desktop and mobile detect local snapshot changes during sync writes.
-   - If local data changes mid-cycle, the current sync aborts and a fresh run is queued instead of overwriting the newer local state.
+1. SQLite es el almacén local principal.
+   - El arranque en frío, consultas y lecturas normales de la aplicación provienen del almacenamiento respaldado por SQLite.
+   - JSON no es una segunda fuente de verdad local durante el tiempo de ejecución ordinario.
+2. `data.json` es una instantánea de transporte y copia de seguridad.
+   - La sincronización saliente exporta la instantánea de aplicación actual desde almacenamiento local después de que se vacíen los guardados locales pendientes.
+   - La sincronización entrante valida y normaliza JSON externo, lo fusiona con datos locales y luego persiste el resultado fusionado de nuevo en almacenamiento respaldado por SQLite.
+3. Los diagnósticos de sincronización permanecen locales del dispositivo.
+   - Configuraciones como `lastSyncStats`, `lastSyncHistory` e indicadores de recuperación de escritura remota pendiente son útiles localmente, pero se eliminan de cargas útiles remotas.
+4. La sincronización no toma un bloqueo de edición de interfaz de usuario.
+   - El escritorio y el móvil detectan cambios de instantánea locales durante escrituras de sincronización.
+   - Si los datos locales cambian a mitad de ciclo, la sincronización actual se aborta y se pone en cola una ejecución nueva en lugar de sobrescribir el estado local más nuevo.
 
-## Consequences
+## Consecuencias
 
-- The bridge is easier to reason about: SQLite is authoritative locally, JSON is the sync/backup representation.
-- Future sync or storage changes must preserve the flush -> read -> merge -> persist contract or update this ADR.
-- Device-local sync diagnostics stay useful without creating cross-device churn.
-- Users can keep editing during sync, but may see a sync retry/requeue instead of a hard edit lock.
+- El puente es más fácil de razonar: SQLite es autoritativo localmente, JSON es la representación de sincronización/copia de seguridad.
+- Los cambios futuros de sincronización o almacenamiento deben preservar el contrato de descarga -> lectura -> fusión -> persistencia o actualizar este ADR.
+- Los diagnósticos de sincronización locales del dispositivo permanecen útiles sin crear churn entre dispositivos.
+- Los usuarios pueden seguir editando durante la sincronización, pero pueden ver un reintento/requeue de sincronización en lugar de un bloqueo de edición duro.

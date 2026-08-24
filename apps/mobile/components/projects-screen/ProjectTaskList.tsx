@@ -65,8 +65,8 @@ export function ProjectTaskList({
     sortBy,
     tasks,
 }: ProjectTaskListProps) {
-    // TaskList is React.memo'd on the hottest render path, so this is the one
-    // place the grouped prop gets its identity — see the note on TaskListProps.
+    // TaskList is React.memo'd on the hottest Renderizar path, so Esto es the one
+    // place the grouped prop gets its identity — see the NOTA on TaskListProps.
     const projectOptions = React.useMemo<TaskListProjectOptions>(() => {
         const options = getProjectDetailTaskListOptions(project, showCompletedTasks);
         return {
@@ -107,7 +107,7 @@ export function ProjectTaskList({
             listRef={listRef}
             onFilterStateChange={onFilterStateChange}
             onListScroll={onListScroll}
-            // Header, sort and filter controls all live in the workspace toolbar.
+            // Header, sort and Filtra controls all live in the workspace toolbar.
             showHeader={false}
             showFilterButton={false}
             showSort={false}

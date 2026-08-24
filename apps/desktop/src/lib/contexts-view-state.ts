@@ -8,7 +8,7 @@ export const CONTEXTS_TOKEN_SELECTION_EVENT = 'mindwtr:contexts-token-selection'
 const CONTEXT_STATUS_VALUES: TaskStatus[] = ['inbox', 'next', 'waiting', 'someday', 'reference', 'done'];
 const LEGACY_CONTEXT_STATUS_VALUES: Array<TaskStatus | 'all'> = ['all', ...CONTEXT_STATUS_VALUES];
 
-// The dropdown this sanitizer has to agree with is CONTEXTS_AXES, so read that
+// The dropdown esto sanitizer has to agree with is CONTEXTS_AXES, so read that
 // array rather than keeping a second copy of it here.
 export type ContextsViewGroupBy = ContextsGroupBy;
 
@@ -81,7 +81,7 @@ export function persistContextsViewSelection(selectedContext: string | null): Co
         try {
             window.localStorage.setItem(CONTEXTS_VIEW_STATE_STORAGE_KEY, JSON.stringify(nextState));
         } catch {
-            // View state is non-critical; navigation should still proceed.
+            // View estado is non-crítico; navigation debería still proceed.
         }
     }
     return nextState;

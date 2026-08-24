@@ -172,8 +172,8 @@ export function ArchiveView() {
     const setListOptions = useUiStore((state) => state.setListOptions);
     // Archive is completed work, so it reads Done's sort roster (which is the
     // only one carrying 'completed') and lands on Done's completion-recency
-    // default rather than the global task sort, which orders by due date and
-    // priority — neither of which means anything once a task is finished.
+    // default rather than the global tarea sort, which orders by due date and
+    // priority — neither of which means anything once a tarea is finished.
     const sortBy = resolveDoneTaskSortBy(settings?.taskSortBy, archivedSortBy);
     const { areaById, projectById, resolvedAreaFilter } = useAreaVisibility();
 
@@ -187,11 +187,11 @@ export function ArchiveView() {
 
     // Everything in the archive, before the toolbar narrows it. The filter
     // chips, their counts and the priority/estimate section visibility all read
-    // this, so a selection never hides the control that would undo it.
+    // esto, so a selection nunca hides the control that sería undo it.
     //
     // The area filter applies here as it does on every other list and on
     // mobile's Archive — but `isTaskVisibleInArea` does not fit: archived work
-    // usually sits in archived projects, which that predicate parks.
+    // generalmente sits in archived projects, which that predicate parks.
     const archivedBaseTasks = useMemo(
         () => _allTasks.filter((task) => (
             task.status === 'archived'
@@ -223,8 +223,8 @@ export function ArchiveView() {
             }
         }
         // Criteria are shared across every desktop list (#956), so a token
-        // picked in Next can be active here while matching nothing archived.
-        // Union it in or the panel would offer no way to switch it back off.
+        // picked in Next puede be active here while matching nothing archived.
+        // Union it in or the panel sería offer no way to switch it back off.
         return {
             allTokens: [...new Set([...Object.keys(counts), ...selectedTokens, ...excludedTokens])].sort(),
             tokenCounts: counts,
@@ -271,7 +271,7 @@ export function ArchiveView() {
         getSectionDomId,
         toggleGroup,
         virtualRows: groupedVirtualRows,
-        // Grouped rows render in section order, so keyboard navigation and
+        // Grouped rows renderizar in section order, so keyboard navigation and
         // "select all" have to walk that order rather than the flat sorted one.
         // A collapsed group contributes no rows, so it contributes no tasks.
         visibleTasks: orderedTasks,
@@ -305,12 +305,12 @@ export function ArchiveView() {
     });
     const virtualRowCount = groupedVirtualRows?.length ?? archivedTasks.length;
     const shouldVirtualize = virtualRowCount > LIST_VIRTUALIZATION_THRESHOLD;
-    // Keep the Projects segment's layout behavior tied to the old flat-task
-    // condition. Grouping only changes how the task segment renders.
+    // Keep the Projects segment's layout behavior tied to the old flat-tarea
+    // condition. Grouping only changes how the tarea segment renders.
     const shouldVirtualizeFlatTasks = !isGrouping && archivedTasks.length > LIST_VIRTUALIZATION_THRESHOLD;
     const shouldFillAvailableHeight = segment === 'tasks' ? shouldVirtualize : shouldVirtualizeFlatTasks;
     // One engine for both shapes, as in ListView: grouped rows carry headers,
-    // flat rows are the sorted tasks. Row heights are measured, never assumed
+    // flat rows are the sorted tasks. Row heights are measured, nunca assumed
     // — a fabricated offset scrolls past the content and blanks the list (#916).
     const rowVirtualizer = useVirtualizer({
         count: shouldVirtualize ? virtualRowCount : 0,
@@ -333,8 +333,8 @@ export function ArchiveView() {
 
     const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
     useTaskListScope({
-        // The projects segment renders no task rows, so the keyboard must not
-        // act on archived tasks the user cannot see.
+        // The projects segment renders no tarea rows, so the keyboard no debe
+        // act on archived tasks the user no puede see.
         getTasks: () => (segment === 'tasks' ? orderedTasks : []),
         getSelectedIndex: () => selectedTaskIndex,
         setSelectedIndex: setSelectedTaskIndex,
@@ -372,10 +372,10 @@ export function ArchiveView() {
         await deleteProject(project.id);
     }, [deleteProject, requestConfirmation, t]);
 
-    // The same read-only row Done uses, so an archived task's notes, checklist and
-    // attachments are readable without restoring it first (#968). Restore, Delete
+    // The same read-only row Done uses, so an archived tarea's notes, checklist and
+    // attachments are readable without restoring it first (#968). restaurar, eliminar
     // and the completion-time correction all come from TaskItem's read-only
-    // actions; Archive no longer hand-rolls a row, a delete confirm or a
+    // actions; Archive no longer hand-rolls a row, a eliminar confirm or a
     // completion-time prompt of its own.
     const renderArchiveRow = useCallback((task: Task) => (
         <StoreTaskItem
@@ -413,8 +413,8 @@ export function ArchiveView() {
         });
     }, [exitSelectionMode]);
 
-    // One flash per highlight, owned here rather than by the reveal effect below:
-    // that effect re-runs every time a row measures, which would keep sliding the
+    // One flash per highlight, owned here rather than by the reveal efecto below:
+    // that efecto re-runs every time a row measures, which sería keep sliding the
     // 4s window forward for as long as the user scrolls.
     useEffect(() => {
         if (!highlightTaskId) {
@@ -425,11 +425,11 @@ export function ArchiveView() {
         return () => window.clearTimeout(flashTimer);
     }, [highlightTaskId, setHighlightTask]);
 
-    // Global search sets the shared highlight before navigating here (#916), and
-    // Archive is the view that has to honour it — a task landing in a list that
-    // is not showing it looks like the search result went nowhere. Whatever is
-    // hiding the row is undone one step at a time (each step re-runs this
-    // effect): the Projects segment, then the filters, then a collapsed group.
+    // global search sets the shared highlight before navigating here (#916), and
+    // Archive is the view that has to honour it — a tarea landing in a list that
+    // is not showing it looks like the search result went en ningún lugar. Whatever is
+    // hiding the row is undone one step at a time (each step re-runs esto
+    // efecto): the Projects segment, then the filters, then a collapsed group.
     // The flash itself is TaskItem's, so it needs nothing beyond a mounted row.
     useEffect(() => {
         if (!highlightTaskId) return;
@@ -441,7 +441,7 @@ export function ArchiveView() {
         }
 
         if (!archivedTasks.some((task) => task.id === highlightTaskId)) {
-            // Landing on a list that cannot show the result is worse than losing
+            // Landing on a list that no puede show the result is worse than losing
             // a filter, so drop the filter and say so — the same trade global
             // search already makes for the area filter.
             if (!hasActiveFilterCriteria(activeFilterCriteria) && !searchQuery.trim()) return;
@@ -456,9 +456,9 @@ export function ArchiveView() {
         }
 
         if (isGrouping) {
-            // A multi-tag/context task may belong to several groups. If one copy
-            // is already rendered, do not consume the user's other collapse
-            // preferences while the highlight effect re-runs.
+            // A multi-tag/contexto tarea puede belong to several groups. If one copy
+            // is already rendered, no consume the user's other collapse
+            // preferences while the highlight efecto re-runs.
             if (!orderedTasks.some((task) => task.id === highlightTaskId)) {
                 const collapsedGroup = groupedTasks.find((group) => (
                     collapsedGroupIds.has(group.id) && group.tasks.some((task) => task.id === highlightTaskId)
@@ -471,9 +471,9 @@ export function ArchiveView() {
         }
 
         // The obstacle steps above are idempotent, but scrolling is not: without
-        // this guard a re-render mid-flash yanks the list back to the highlighted
-        // row under the user. The ref is set where a scroll actually lands, so an
-        // attempt cut short by a re-render still gets to retry.
+        // esto guard a re-renderizar mid-flash yanks the list back to the highlighted
+        // row under the user. The ref is establecer where a scroll actually lands, so an
+        // attempt cut short by a re-renderizar still gets to reintentar.
         if (scrolledHighlightIdRef.current === highlightTaskId) return;
 
         if (shouldVirtualize) {
@@ -499,7 +499,7 @@ export function ArchiveView() {
                 focusTaskRowWhenMounted(highlightTaskId);
                 return;
             }
-            // A row can be a frame behind the state change that revealed it.
+            // A row puede be a frame behind the estado change that revealed it.
             if (attempts >= 8) return;
             attempts += 1;
             retryTimer = window.setTimeout(scrollHighlightedTask, 50);

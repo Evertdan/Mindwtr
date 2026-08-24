@@ -51,8 +51,8 @@ export function useListFilterControls() {
         const excludeKey = isTag ? 'excludedTags' : 'excludedContexts';
         const included = criteria[includeKey] ?? [];
         const excluded = criteria[excludeKey] ?? [];
-        // Tri-state cycle: neutral → included → excluded → neutral, same as
-        // Focus and mobile. A token is only ever on one side, so each
+        // Tri-estado cycle: neutral → included → excluded → neutral, igual que
+        // enfoque and mobile. A token is only ever on one side, so each
         // transition clears the other.
         let next = criteria;
         if (included.includes(token)) {

@@ -131,7 +131,7 @@ function TaskEditModalInner({
         };
     }, shallow);
     const { t, language } = useLanguage();
-    // Already identity-stable: resolveThemeTokens caches its result on the theme,
+    // Un
     // so this only changes when a colour actually does (#766).
     const tc = useThemeColors();
     const resolvedFeatureFlags = resolveFeatureFlags(settings);

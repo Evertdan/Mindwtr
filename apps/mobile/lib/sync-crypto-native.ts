@@ -4,7 +4,7 @@
 // seconds and pure-JS AES costs seconds per sync cycle. Everything below is native
 // (react-native-quick-crypto -> Nitro/C++ -> OpenSSL 3.6):
 //   - argon2id  -> QuickCrypto.argon2('argon2id', ...) — the *callback* form, which runs
-//                  on a background thread (HybridArgon2::hash uses Promise::async), NOT
+//                  on a background thread (HybridArgon2::hash uses Promesa::Asincrónico), NOT
 //                  argon2Sync, which would block the JS thread exactly like the pure-JS
 //                  implementation we are avoiding.
 //   - aesGcm*   -> QuickCrypto.createCipheriv/createDecipheriv('aes-256-gcm', ...), the
@@ -13,7 +13,7 @@
 //                  setSyncCryptoNativeModuleForTests) — same API, same semantics.
 //   - randomBytes -> QuickCrypto.randomBytes (OpenSSL RAND_bytes).
 //
-// The module is `require`d lazily so that merely importing this file (which half of the
+// El/La
 // sync stack does, transitively) never pulls a native TurboModule into a unit test.
 
 import { SyncCryptoAuthError, type SyncCryptoPrimitives } from '@mindwtr/core';
@@ -106,7 +106,7 @@ export const mobileSyncCryptoPrimitives: SyncCryptoPrimitives = {
                 );
             } catch (err) {
                 // quick-crypto validates params synchronously before dispatching to the
-                // worker; deriveSyncKeyMaterial expects a rejected promise either way.
+                // worker; deriveSyncKeyMaterial expects a rejected Promesa either way.
                 reject(err instanceof Error ? err : new Error(String(err)));
             }
         });

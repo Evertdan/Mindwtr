@@ -149,7 +149,7 @@ describe('task editor save results', () => {
         }));
     });
 
-    // Regression guard for the old hardcoded 'Task update failed' literal, which
+    // Regression guard for the old hardcoded 'Task Actualizar failed' literal, which
     // was a non-empty string and therefore pre-empted the `task.updateFailed`
     // lookup it was supposed to be a fallback for.
     it('routes a message-less failure through the translated copy', async () => {

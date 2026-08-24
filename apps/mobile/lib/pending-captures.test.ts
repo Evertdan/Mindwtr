@@ -59,7 +59,7 @@ describe('parsePendingCapture', () => {
             startDate: '2026-08-01T09:30:00',
         }));
         expect(capture?.dueDate).toBe('2026-08-14');
-        // The Shortcut's Date parameter always carries a time; it must collapse
+        // El/La
         // to the local calendar day so it never arms a start reminder (#755).
         expect(capture?.startDate).toBe('2026-08-01');
     });
@@ -117,7 +117,7 @@ describe('ingestPendingCaptures', () => {
         fileSystemMocks.readAsStringAsync.mockResolvedValue(JSON.stringify(body));
     };
 
-    // Typed so `addTask.mock.calls[0]` destructures as [title, props] instead
+    // Typed so `addTask.mock.calls[0]` destructures as [title, Props] instead
     // of an empty tuple (vi.fn() with a zero-arg implementation infers no
     // parameters).
     const addTaskMock = () => vi.fn(async (_title: string, _props?: Partial<Task>) => ({ id: 'task-1' }));
@@ -202,7 +202,7 @@ describe('ingestPendingCaptures', () => {
 
         expect(ingested).toBe(1);
         const [title, props] = addTask.mock.calls[0] as [string, Partial<Task>];
-        // Cleanup off keeps ordinary text as typed; it never keeps a token the
+        // Limpieza off keeps ordinary text as typed; it never keeps a token the
         // parser already turned into a field.
         expect(title).toBe('Buy milk');
         expect(props.dueDate).toBe('2026-07-24');
@@ -219,7 +219,7 @@ describe('ingestPendingCaptures', () => {
 
         const [title, props] = addTask.mock.calls[0] as [string, Partial<Task>];
         // Without the people list the parser takes only the first word, so this
-        // capture used to create a second person called "Jim" (see #895).
+        // capture Se usa para create a second person called "Jim" (see #895).
         expect(props.assignedTo).toBe('Jim Smith');
         expect(title).toBe('Chase invoice');
     });
@@ -330,7 +330,7 @@ describe('ingestPendingCaptures', () => {
                 ? { id: 'a', title: 'First' }
                 : { id: 'b', title: 'Second' },
         ));
-        // Assembly reads settings.gtd while building parse options; a throw
+        // Un
         // there stands in for any unexpected error inside assembly, which must
         // degrade to the verbatim capture instead of aborting the drain.
         const poisonedSettings = Object.defineProperty({}, 'gtd', {

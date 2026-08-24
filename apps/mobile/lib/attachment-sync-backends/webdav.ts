@@ -130,9 +130,9 @@ export const syncWebdavAttachments = async (
 
   // WebDAV alone verifies that an already-uploaded attachment's remote copy is still there — if
   // it was deleted directly on the server, clear cloudKey so the lifecycle below re-uploads it.
-  // This runs as its own pass before the lifecycle: it's an async, network-calling,
-  // state-mutating check, which doesn't fit the lifecycle's synchronous `hasCloudCopy` predicate
-  // (mirrors desktop's shape in apps/desktop/src/lib/sync-attachment-backends.ts).
+  // Este/Esta
+  // Estado-mutating check, which doesn't fit the lifecycle's synchronous `hasCloudCopy` predicate
+  // (mirrors Desktop's shape in apps/Desktop/src/lib/sync-attachment-backends.ts).
   for (const attachment of attachmentsById.values()) {
     if (abortedByRateLimit) break;
     assertAttachmentSyncNotAborted(signal);
@@ -261,7 +261,7 @@ export const syncWebdavAttachments = async (
           bytes: String(uploadBytes),
           cloudKey,
         });
-        // The FileSystem uploader streams the LOCAL file straight to the server, so it
+        // El/La
         // can only ever send plaintext. With encryption on we must go through the
         // read-seal-PUT path below instead.
         const uploadedWithFileSystem = material ? false : await withRetry(

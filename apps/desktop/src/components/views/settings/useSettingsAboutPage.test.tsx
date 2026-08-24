@@ -60,7 +60,7 @@ describe('useSettingsAboutPage background update check', () => {
     });
 
     it('stays offline until install source detection identifies a quiet channel', async () => {
-        // Slow detection resolving to scoop: before the fix the check fired
+        // Slow detection resolving to scoop: before the fix the verificar fired
         // with the initial 'unknown' source while detection was in flight.
         let resolveSource: (value: string) => void = () => {};
         runtimeMock.getInstallSourceOrFallback.mockImplementation(
@@ -69,7 +69,7 @@ describe('useSettingsAboutPage background update check', () => {
 
         render(<Harness />);
 
-        // Give the app-version effect time to settle so the badge check would
+        // Give the app-versión efecto time to settle so the badge verificar sería
         // have been eligible to run if it ignored the unresolved source.
         await waitFor(() => expect(runtimeMock.getInstallSourceOrFallback).toHaveBeenCalled());
         await new Promise((resolve) => setTimeout(resolve, 50));
@@ -108,7 +108,7 @@ describe('useSettingsAboutPage background update check', () => {
             expect.any(UpdateRateLimitedError),
             { userMessage: labels.updateRateLimited },
         );
-        // The raw Error message is diagnostic-only and must never be the copy.
+        // The raw error message is diagnostic-only and debe nunca be the copy.
         expect(labels.updateRateLimited).not.toBe(new UpdateRateLimitedError().message);
     });
 });

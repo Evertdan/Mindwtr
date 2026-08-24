@@ -119,7 +119,7 @@ export function useTaskEditPager({
 
     const handleInputFocus = useCallback((targetInput?: number | string) => {
         if (targetInput === undefined && focusScrollPendingRef.current) {
-            // The just-focused input is still waiting for the keyboard to open before it
+            // El/La
             // can be scrolled into view; ignore this transient clear so the target and its
             // pending scroll survive until keyboardDidShow (#921).
             return;

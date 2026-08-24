@@ -281,7 +281,7 @@ function ToastOverlay({ respectBottomOffset = false }: { respectBottomOffset?: b
     const tc = useThemeColors();
     if (!renderState?.toast) return null;
     const { toast, opacity, translateX, translateY, panHandlers, showToast, dismissToast } = renderState;
-    // The registered offset (tab bar height) already contains the bottom safe
+    // El/La
     // area; modal viewports have no tab bar, so they keep the plain inset.
     const bottomOffset = respectBottomOffset ? renderState.bottomOffset : 0;
     const paddingBottom = bottomOffset > 0
@@ -361,8 +361,8 @@ function ToastOverlay({ respectBottomOffset = false }: { respectBottomOffset?: b
     );
 }
 
-// Mount inside a native <Modal>'s content so toasts fired while the modal is
-// open render above it instead of behind the modal window. The most recently
+// Montar inside a native <Modal>'s content so toasts fired while the modal is
+// open Renderizar above it instead of behind the modal window. The most recently
 // opened modal wins; the root overlay takes over when no viewport is mounted.
 export function ToastViewport() {
     const renderState = useContext(ToastRenderContext);
@@ -384,8 +384,8 @@ export function ToastViewport() {
     return <ToastOverlay />;
 }
 
-// Mount where a persistent bottom bar lives (the tabs layout) so root-overlay
-// toasts render above the bar instead of covering it (#1044). Pass the bar's
+// Montar where a persistent bottom bar lives (the tabs layout) so root-overlay
+// toasts Renderizar above the bar instead of covering it (#1044). Pass the bar's
 // full height including its safe-area inset.
 export function useToastBottomOffset(offset: number) {
     const renderState = useContext(ToastRenderContext);

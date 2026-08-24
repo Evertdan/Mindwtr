@@ -169,8 +169,8 @@ export function ChecklistField({
         lastChecklistPairSelectionRefs.current = [];
     }, [taskId]);
 
-    // Adopt external checklist changes, but never clobber in-progress typing:
-    // a dirty draft only resets when switching to a different task.
+    // Adopt external checklist changes, but nunca clobber in-progress typing:
+    // a dirty draft only resets when switching to a different tarea.
     useEffect(() => {
         const taskChanged = lastTaskIdRef.current !== taskId;
         lastTaskIdRef.current = taskId;
@@ -203,7 +203,7 @@ export function ChecklistField({
 
     // Blank rows are a typing convenience (Enter mints the next row before it
     // has text), not content — they are dropped when editing moves on, so a
-    // saved task never keeps a trailing empty item (#1045).
+    // saved tarea nunca keeps a trailing empty item (#1045).
     const dropEmptyChecklistItems = useCallback(() => {
         const list = checklistDraftRef.current || [];
         const filtered = list.filter((item) => item.title.trim() !== '');
@@ -217,9 +217,9 @@ export function ChecklistField({
         return true;
     }, [commitChecklistUpdate]);
 
-    // True unmount-only flush (deps intentionally empty, latest committer kept
-    // in a ref): keying this on commitChecklistUpdate would re-run the cleanup
-    // on every parent re-render and strip the blank row mid-typing.
+    // True desmontar-only flush (deps intentionally empty, latest committer kept
+    // in a ref): keying esto on commitChecklistUpdate sería re-run the limpieza
+    // on every parent re-renderizar and strip the blank row mid-typing.
     const commitChecklistUpdateRef = useRef(commitChecklistUpdate);
     commitChecklistUpdateRef.current = commitChecklistUpdate;
     useEffect(() => () => {
@@ -307,7 +307,7 @@ export function ChecklistField({
         const firstSegment = normalized.slice(0, newlineIndex);
         const restItems = parsePastedChecklistItems(normalized.slice(newlineIndex + 1));
         const replacingWholeTitle = selection.start === 0 && selection.end === current.title.length;
-        // Replacing the whole title is a list import (markers stripped); a
+        // Replacing the whole title is a list importar (markers stripped); a
         // mid-text paste splices the raw first segment like a plain text edit.
         const firstParsed = parsePastedChecklistItems(firstSegment)[0];
         const updatedCurrent = replacingWholeTitle
@@ -357,8 +357,8 @@ export function ChecklistField({
         <div
             className="flex flex-col gap-2 w-full pt-2 border-t border-border/50"
             onBlur={(event) => {
-                // Only when focus leaves the checklist entirely — moving between
-                // rows (Enter, Tab, clicks) must keep the just-minted blank row.
+                // Only when enfoque leaves the checklist entirely — moving between
+                // rows (Enter, Tab, clicks) debe keep the just-minted blank row.
                 if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
                 if (!dropEmptyChecklistItems()) {
                     commitChecklistDraft();

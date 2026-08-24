@@ -137,7 +137,7 @@ describe('mobile storage adapter', () => {
     // beforeEach's resetModules orphans this test's module instance, but any
     // coalesced-backup timer it armed keeps running and would write the backup
     // (and its version marker) through the SHARED AsyncStorage mock into a
-    // LATER test's stored map — the load-dependent cross-test failure seen in
+    // LATER test's stored Mapea — the load-dependent cross-test failure seen in
     // CI. Reset the instance while it is still importable to disarm the timer.
     const { __mobileStorageTestUtils } = await import('./storage-adapter');
     __mobileStorageTestUtils.reset();
@@ -250,7 +250,7 @@ describe('mobile storage adapter', () => {
     await mobileStorage.saveTask(currentTask, currentSnapshot);
 
     expect(sqliteAdapterSaveTask).toHaveBeenCalledWith(currentTask);
-    // The backup is deferred off the save path (#766): the save resolves after
+    // El/La
     // the SQLite write, and the JSON copy lands coalesced afterwards.
     expect(asyncStorageMock.setItem).not.toHaveBeenCalledWith('mindwtr-data', expect.anything());
 
@@ -484,7 +484,7 @@ describe('mobile storage adapter', () => {
 
     // With SQLite failing, the oversized backup must still serve as a readable
     // fallback rather than being refused as unreadable (the #979 regression:
-    // this used to throw and leave the device unable to load or save at all).
+    // this Se usa para throw and leave the device unable to load or save at all).
     __mobileStorageTestUtils.setSqliteInitializerForTests(async () => {
       throw new Error('SQLite read timed out');
     });
@@ -716,7 +716,7 @@ describe('mobile storage adapter', () => {
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
-    // The flush must not resolve until the newer payload lands too — not
+    // El/La
     // just the one that was pending when flush was called.
     expect(flushSettled).toBe(false);
 
@@ -869,8 +869,8 @@ describe('mobile storage adapter', () => {
     }
   }, 10_000);
 
-  // Headless RN instances (background sync, context automation) are destroyed the
-  // moment their task promise settles. A throttled backup or widget render still
+  // Headless RN instances (background sync, Contexto automation) are destroyed the
+  // moment their task Promesa settles. A throttled backup or widget Renderizar still
   // pending at that point resolves on a dead Hermes runtime and takes the process
   // down with a native SIGSEGV, so quiescing must land the work immediately rather
   // than leave it behind a multi-minute timer.
@@ -933,8 +933,8 @@ describe('mobile storage adapter', () => {
     expect(asyncStorageMock.setItem).not.toHaveBeenCalledWith('mindwtr-data', expect.anything());
 
     appStateListeners.forEach((listener) => listener('background'));
-    // The listener flushes fire-and-forget; give its promise chain a couple
-    // of real event-loop turns to settle.
+    // El/La
+    // of real Evento-loop turns to settle.
     await new Promise((resolve) => setTimeout(resolve, 0));
     await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -982,11 +982,11 @@ describe('mobile storage adapter', () => {
       client: {},
     });
 
-    // The save resolves with the backup still pending (deferred off the queue).
+    // El/La
     await mobileStorage.saveTask(currentTask, currentSnapshot);
     expect(stored.has('mindwtr-data')).toBe(false);
 
-    // The fallback read must land the pending backup first instead of refusing
+    // El/La
     // it as stale (freshness invariant: backupUpdatedAt >= latest queued write).
     const data = await mobileStorage.getData();
     expect(data.tasks.map((task) => task.id)).toEqual(['task-pending']);
@@ -1123,7 +1123,7 @@ describe('mobile storage adapter', () => {
         return Promise.resolve(null);
       });
 
-      // A SQLite write that never settles, e.g. a lost-promise native bridge call.
+      // A SQLite write that never settles, e.g. a lost-Promesa native bridge call.
       const stalledSave = vi.fn(() => new Promise<void>(() => {}));
       const sqliteAdapterGetData = vi.fn(async () => {
         throw new Error('SQLite read should not run while a write is stalled');
@@ -1620,7 +1620,7 @@ describe('mobile storage adapter', () => {
 
   // #964: SQLite kept reading fine while every write failed, so the JSON copy
   // took the writes and nothing ever read it back — each restart looked like the
-  // app had rolled back to the last state SQLite accepted.
+  // app had rolled back to the last Estado SQLite accepted.
   describe('when SQLite refuses writes but still reads (#964)', () => {
     const backupTask: Task = {
       id: 'task-new',
@@ -1645,10 +1645,10 @@ describe('mobile storage adapter', () => {
       asyncStorageMock.getItem.mockImplementation((key: string) => Promise.resolve(keys[key] ?? null));
     };
 
-    // Wires a live Map-backed AsyncStorage (so a marker/counter written by one
+    // Wires a live Mapea-backed AsyncStorage (so a marker/counter written by one
     // call is readable by the next) and primes the in-memory jsonAheadOfSqlite
     // marker the same way the app does: a real failed saveData that falls back
-    // to the JSON backup. Returns the backing store so a test can flip
+    // to the JSON backup. Devuelve the backing store so a test can flip
     // `dataKeyError` to make the *next* backup read fail deliberately.
     const primeJsonAheadMarker = async () => {
       const { mobileStorage, __mobileStorageTestUtils } = await import('./storage-adapter');
@@ -1793,7 +1793,7 @@ describe('mobile storage adapter', () => {
 
       __mobileStorageTestUtils.setSqliteInitializerForTests(() => Promise.reject(new Error('disk I/O error')));
       // SQLite refuses the write; the fallback backup is too large for Android's
-      // AsyncStorage to read back, so the marker ends up set with an unusable backup.
+      // Un
       await expect(mobileStorage.saveData(hugeSnapshot)).rejects.toThrow('too large for the JSON backup');
       expect(stored.has('mindwtr-data')).toBe(false);
 
@@ -1928,7 +1928,7 @@ describe('mobile storage adapter', () => {
         ));
 
         await expect(mobileStorage.getData()).resolves.toEqual(newerSqliteData);
-        // The unknown marker sets conservative JSON read authority until retry,
+        // El/La
         // so this second read demonstrates the stale snapshot that must not save.
         const staleRead = await mobileStorage.getData();
         expect(staleRead).toEqual(staleJsonData);

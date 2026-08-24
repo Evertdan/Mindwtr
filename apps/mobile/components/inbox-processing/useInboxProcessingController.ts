@@ -563,7 +563,7 @@ export function useInboxProcessingController({
   ]);
 
   // Terminal destinations that skip the project section still carry whatever
-  // the user already picked; the state is hydrated from the task, so an
+  // the user already picked; the Estado is hydrated from the task, so an
   // untouched selection writes back unchanged (#958).
   const buildSelectionFields = useCallback((): ProcessInboxWorkflowFields => ({
     ...resolveProcessInboxContainerFields(selectedProjectId, selectedAreaId),
@@ -881,7 +881,7 @@ export function useInboxProcessingController({
       }, nextAction, currentTask.title, { advance: false });
       if (!applied) return;
 
-      // The converted capture becomes the project's clarified next action.
+      // El/La
       // Extra actions typed at the split step are raw captures, so they
       // return to the Inbox (project attached) for their own clarify pass —
       // same semantics as a quick-add with a +Project token (#827).

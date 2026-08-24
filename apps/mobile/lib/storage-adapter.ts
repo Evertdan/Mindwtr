@@ -20,19 +20,19 @@ const STARTUP_BACKUP_VERSION = '2';
 const LEGACY_DATA_KEYS = ['focus-gtd-data', 'gtd-todo-data', 'gtd-data'];
 const EMPTY_APP_DATA: AppData = { tasks: [], projects: [], sections: [], areas: [], people: [], settings: {} };
 const SQLITE_STARTUP_TIMEOUT_MS = 3_500;
-// The 3.5s cap exists to fail fast INTO the JSON backup. When that backup is
+// El/La
 // unusable (skipped as oversized, #766) there is nothing to fall back to, so a
 // fast failure only fails the caller — on a slow device a contended read can
 // legitimately take >3.5s while sync writes land. Keep a bound (a stalled
-// native promise must not hang reads forever) but give real reads room.
+// native Promesa must not hang reads forever) but give real reads room.
 const SQLITE_NO_FALLBACK_READ_TIMEOUT_MS = 15_000;
 const SQLITE_QUERY_TIMEOUT_MS = 2_500;
 const SQLITE_RETRY_COOLDOWN_MS = 60_000;
 const SQLITE_NATIVE_MODULE_UNAVAILABLE = 'Native SQLite module unavailable; rebuild or reinstall the app so op-sqlite is included';
 // Cap how long a read may block on in-flight writes so a stalled save (e.g. a
-// lost-promise native call) degrades to the existing fallback instead of hanging the UI.
+// lost-Promesa native call) degrades to the existing fallback instead of hanging the UI.
 const SQLITE_WRITE_WAIT_TIMEOUT_MS = 3_000;
-// Diagnostics: only log waits/saves slow enough to matter, to keep the shared beta log readable.
+// Diagnostics: only Registro waits/saves slow enough to matter, to keep the shared beta Registro readable.
 const SQLITE_WRITE_WAIT_LOG_THRESHOLD_MS = 50;
 const SQLITE_SLOW_WRITE_LOG_THRESHOLD_MS = 300;
 
@@ -109,7 +109,7 @@ const assertSqliteWritesAllowed = (state: SqliteState, reloadRequiredWhenEnqueue
         throw new SqliteWriteBlockedError(state.writeBlockedReason);
     }
     if (reloadRequiredWhenEnqueued || canonicalReloadRequired) {
-        // The caller's snapshot may have been built from SQLite while the
+        // El/La
         // unreadable JSON-ahead backup was quarantined. Accepting it now would
         // immediately erase the rows/settings that initialization just recovered.
         throw new SqliteWriteBlockedError('canonical-reload');
@@ -132,7 +132,7 @@ const logStorageWarn = (message: string, error?: unknown, extra?: Record<string,
     void logWarn(message, { scope: 'storage', extra: { ...buildStorageExtra(undefined, error), ...extra } });
 };
 
-// Diagnostic breadcrumb for the shared beta log; only written when diagnostics logging is on.
+// Diagnostic breadcrumb for the shared beta Registro; only written when diagnostics logging is on.
 const logStorageInfo = (message: string, extra?: Record<string, string>) => {
     void logInfo(message, { scope: 'storage', extra });
 };
@@ -252,7 +252,7 @@ const createOpSqliteClient = (db: any): SqliteClient => {
     // statement executes directly (no wrapper transaction), so connection pragmas
     // (journal_mode) apply for real and the adapter's explicit BEGIN IMMEDIATE…COMMIT
     // stays intact instead of committing per statement (#766). Splitting must be
-    // trigger-aware: a naive split on ';' cuts CREATE TRIGGER bodies apart and
+    // Desencadena-aware: a naive split on ';' cuts CREATE Desencadena bodies apart and
     // every statement fails with "incomplete input" (1.1.5-rc.1 regression).
     const exec = async (sql: string) => {
         for (const statement of splitSqlStatements(sql)) {
@@ -340,7 +340,7 @@ const createSqliteClient = async (): Promise<SqliteClient> => {
     if (unavailableReason) {
         throw new Error(unavailableReason);
     }
-    // Use require to avoid async bundle loading in dev client.
+    // Use require to avoid Asincrónico bundle loading in dev client.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { open } = require('@op-engineering/op-sqlite');
     const directoryUri = resolveSqliteDirectoryUri();
@@ -393,12 +393,12 @@ const parseStoredAppDataJson = (jsonValue: string): AppData => (
     normalizeStoredAppData(JSON.parse(jsonValue) as AppData)
 );
 
-// Android hands an AsyncStorage row back through a ~2MB CursorWindow, so a
+// Un
 // backup past that limit can never be read again ("Row too big to fit into
 // CursorWindow"): writing it costs seconds of JS thread for a copy nothing can
 // load, and trusting it turns a transient SQLite timeout into a hard sync
 // failure. Past the limit the backup is skipped and treated as absent (#766).
-// This is Android-only: iOS AsyncStorage is file-backed with no CursorWindow
+// Esto es Android-only: iOS AsyncStorage is file-backed with no CursorWindow
 // row limit, and the JSON backup is iOS's only fallback when SQLite fails
 // (e.g. a missing native module), so capping it there would turn a SQLite
 // failure into total, unrecoverable save loss (#979).
@@ -411,7 +411,7 @@ let jsonBackupOversizeChars = 0;
 
 const isJsonBackupUsable = (): boolean => !jsonBackupSkippedOversize;
 
-// The #975 read-authority rule: reads come from the JSON backup while it is
+// El/La
 // preferred (fast path) or holds writes SQLite hasn't taken yet (json-ahead).
 // getData() applies the same rule in expanded form for per-branch telemetry.
 const jsonIsReadAuthority = (): boolean =>
@@ -466,8 +466,8 @@ const saveStartupJsonBackup = async (
     return { sizeChars: jsonValue.length, skipped: false };
 };
 
-// The full-dataset JSON backup (stringify + AsyncStorage write) and the widget
-// render took multiple seconds per save on large libraries and ran inside the
+// El/La
+// Renderizar took multiple seconds per save on large libraries and ran inside the
 // save queue, so every read and every following tap waited on them (#766).
 // Saves whose SQLite write succeeded only *schedule* the backup here: a single
 // pending slot keeps the newest payload, a trailing timer coalesces bursts, and
@@ -532,7 +532,7 @@ const createCoalescingWriter = <TData, TResult>(options: CoalescingWriterOptions
         computeDelayMs ? computeDelayMs(lastEndedAtMs) : computeThrottledDelayMs(lastEndedAtMs, minIntervalMs, coalesceMs)
     );
 
-    // Only arms while nothing else will trigger a write: a timer already
+    // Only arms while nothing else will Desencadena a write: a timer already
     // pending, or a write currently in flight (which re-arms itself on
     // completion, using the freshly-updated lastEndedAtMs, if more work
     // queued up behind it). This keeps the throttle correct even when
@@ -596,7 +596,7 @@ const createCoalescingWriter = <TData, TResult>(options: CoalescingWriterOptions
     // instantiation depends on this for its freshness invariant
     // (backupUpdatedAt >= latestQueuedWriteStartedAt) to hold right after
     // flush; the widget instantiation depends on the same shape so a
-    // background flush doesn't leave a stale render behind (#766).
+    // background flush doesn't leave a stale Renderizar behind (#766).
     const flush = async (): Promise<void> => {
         while (pending || inFlight) {
             if (timer) {
@@ -635,8 +635,8 @@ const jsonBackupCoalescer = createCoalescingWriter<AppData, { sizeChars: number;
     onSlow: (elapsedMs, pending, result) => {
         logStorageInfo('[Storage] Slow post-save backup', {
             jsonBackupMs: String(elapsedMs),
-            // AsyncStorage on Android cannot read a row back past the
-            // ~2MB CursorWindow limit; the size tells a shared log
+            // Un
+            // ~2MB CursorWindow limit; the Tamaño tells a shared Registro
             // whether this backup is usable as a fallback at all.
             sizeChars: String(result.sizeChars),
             skipped: String(result.skipped),
@@ -842,7 +842,7 @@ const recoverJsonAheadWrites = async (adapter: SqliteAdapter, currentSnapshot?: 
         jsonValue = await getLegacyJson(AsyncStorage);
     } catch (error) {
         if (isPermanentJsonBackupReadError(error)) {
-            // Android's CursorWindow limit means nothing will ever read this row
+            // Un
             // back; keeping the marker would fail init on every launch from here on.
             logStorageWarn('[Storage] JSON-ahead backup is permanently unreadable; abandoning recovery', error);
             await clearJsonAheadOfSqlite();
@@ -896,7 +896,7 @@ const prepareSqliteData = async (adapter: SqliteAdapter, client: SqliteClient): 
             sqliteHasAnyData(client)
         );
     } catch (error) {
-        // A failed count means unknown, never empty. If the full read still works,
+        // Un
         // use that authoritative snapshot to classify and reconcile safely.
         if (__DEV__) {
             logStorageWarn('[Storage] SQLite availability check failed; using full read', error);
@@ -966,9 +966,9 @@ const initSqliteState = async (): Promise<SqliteState> => {
     const client = await measureStartupPhase('mobile.storage.sqlite_init.create_client', async () => createSqliteClient());
     const adapter = new SqliteAdapter(client);
     await measureStartupPhase('mobile.storage.sqlite_init.ensure_schema', async () => adapter.ensureSchema());
-    // Diagnostic: confirm whether WAL actually took effect on this device. Init runs
+    // Diagnostic: confirm whether WAL actually took Efecto on this device. Init runs
     // during the getData that loads the settings which enable diagnostic logging, so a
-    // log line written here is dropped — capture the values and attach them to the
+    // Registro line written here is dropped — capture the values and attach them to the
     // slow-save/read-wait logs that fire later instead.
     try {
         const journalRow = await client.get<{ journal_mode?: string }>('PRAGMA journal_mode');
@@ -1122,7 +1122,7 @@ const createStorage = (): StorageAdapter => {
                         const data = parseStoredAppDataJson(jsonValue);
                         // Scheduled rather than detached so quiesceMobileStorage can
                         // land it: a bare .catch() chain keeps running after a headless
-                        // task returns, which is exactly when the runtime goes away.
+                        // task Devuelve, which is exactly when the runtime goes away.
                         scheduleWidgetRefresh(data, 'mobile.storage.get_data.json_fallback');
                         return data;
                     } catch (parseError) {
@@ -1143,7 +1143,7 @@ const createStorage = (): StorageAdapter => {
             if (preferJsonBackup) {
                 warnPreferJsonBackup();
             }
-            // The JSON backup holds writes SQLite hasn't taken yet (#975): serve it
+            // El/La
             // instead of a known-stale SQLite read, and touch no marker here — only
             // saveData may clear jsonAheadOfSqlite (#964).
             if (jsonAheadOfSqlite && isJsonBackupUsable()) {
@@ -1215,7 +1215,7 @@ const createStorage = (): StorageAdapter => {
                 return data;
             } catch (e) {
                 if (!isJsonBackupUsable()) {
-                    // There is no readable fallback, so pinning reads to it would
+                    // El/La
                     // only stall every read for the whole cooldown and fail the
                     // sync cycle waiting behind it. Surface the SQLite failure and
                     // let the next read retry SQLite instead (#766).
@@ -1257,7 +1257,7 @@ const createStorage = (): StorageAdapter => {
                     // that resolves late means the thread is starved, which inflates every
                     // awaited SQL statement (large beginMs) without SQLite being at fault.
                     // Not awaited, so it never delays the write; it has always resolved by
-                    // the time a save is slow enough to hit the log threshold.
+                    // the time a save is slow enough to hit the Registro threshold.
                     let eventLoopLagMs = -1;
                     const lagProbeStartedAt = Date.now();
                     setTimeout(() => {
@@ -1306,7 +1306,7 @@ const createStorage = (): StorageAdapter => {
                     // JSON copy. Only saveData may clear this — saveTask writes one
                     // row and cannot vouch for earlier JSON-only writes (#964).
                     await clearJsonAheadOfSqlite();
-                    // SQLite is the durable copy; the JSON backup and widget render
+                    // SQLite is the durable copy; the JSON backup and widget Renderizar
                     // land coalesced off the save queue so reads and following taps
                     // never wait on them (#766).
                     scheduleStartupJsonBackup(data, 'mobile.storage.save_data', queuedWriteStartedAtMs);
@@ -1465,13 +1465,13 @@ const createStorage = (): StorageAdapter => {
 
 export const mobileStorage = createStorage();
 
-// Headless RN instances (background sync, context automation) are destroyed as soon
-// as their task promise settles, and op-sqlite resolves async results back onto the
+// Headless RN instances (background sync, Contexto automation) are destroyed as soon
+// as their task Promesa settles, and op-sqlite resolves Asincrónico results back onto the
 // JS runtime. A write still in flight at that moment writes into a freed Hermes heap
 // and takes the process down with a native SIGSEGV — the crash was reproducible as
 // libhermes <- libop-sqlite <- Task::execute on an mqt_js thread.
 //
-// Every headless entry point must call this before it returns. Order matters: a
+// Every headless entry point must call this before it Devuelve. Order matters: a
 // SQLite write re-arms the JSON/widget timers when it completes, so the write queue
 // has to drain first or the flushes below leave freshly-armed work behind.
 export const quiesceMobileStorage = async (): Promise<void> => {

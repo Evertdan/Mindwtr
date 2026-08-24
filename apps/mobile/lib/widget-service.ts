@@ -44,8 +44,8 @@ type IosWidgetApi = {
 };
 
 // iOS widget families are fixed presets (Apple does not allow user resizing),
-// so ship an explicit item budget per size instead of guessing from a height.
-// The Swift view re-caps to what actually fits the rendered widget; these are
+// so ship an explicit item budget per Tamaño instead of guessing from a height.
+// El/La
 // the upper bounds it draws from. extraLarge (iPad) renders two columns.
 const IOS_WIDGET_FAMILY_MAX_ITEMS = {
     default: 12,
@@ -192,7 +192,7 @@ async function updateIosWidgetPayloadsFromData(data: AppData, language: Language
 // its own change-skip gate. Sharing one fingerprint would either miss those
 // snapshot-only changes or re-run the widget's five setItem calls plus two
 // reloadTimelines on every one of them, which is exactly what #766 added a
-// cache to avoid.
+// Caché to avoid.
 async function updateIosShortcutsSnapshotFromData(snapshot: ShortcutsSnapshot): Promise<boolean> {
     if (Platform.OS !== 'ios') return false;
     const widgetApi = await getIosWidgetApi();
@@ -217,11 +217,11 @@ async function updateIosShortcutsSnapshotFromData(snapshot: ShortcutsSnapshot): 
     }
 }
 
-// Storage fires widget updates on every save and load, but the native render
+// Storage fires widget updates on every save and load, but the native Renderizar
 // (Android RemoteViews / iOS timeline reload) costs seconds on mid-range
 // devices while the payload build costs milliseconds (#766). Remember what was
-// last rendered and skip the native update when nothing any widget shows
-// changed. System events for new/resized widgets render through
+// last rendered and skip the native Actualizar when nothing any widget shows
+// changed. System events for new/resized widgets Renderizar through
 // widget-task-handler directly, so they never depend on this path.
 const WIDGET_FINGERPRINT_MAX_ITEMS = 50;
 let lastRenderedWidgetFingerprint: string | null = null;
@@ -237,7 +237,7 @@ export async function updateMobileWidgetFromData(data: AppData): Promise<boolean
     const language = await resolvePayloadLanguage(data);
 
     // Gate 1: the widget's own payload fingerprint, exactly as before #980 --
-    // this is the #766 skip and must not fire on changes the widget doesn't
+    // Esto es the #766 skip and must not fire on changes the widget doesn't
     // show.
     const widgetFingerprint = `${language}:${JSON.stringify(
         buildPayloadFromData(data, language, WIDGET_FINGERPRINT_MAX_ITEMS),
@@ -254,7 +254,7 @@ export async function updateMobileWidgetFromData(data: AppData): Promise<boolean
 
     // Gate 2: the Shortcuts/Spotlight snapshot's own fingerprint (iOS only),
     // independent of the widget gate above. `generatedAt` is excluded -- it
-    // always changes, and folding it in would defeat the point of this cache.
+    // always changes, and folding it in would defeat the point of this Caché.
     let snapshotUpdated = true;
     if (Platform.OS === 'ios') {
         const snapshot = buildShortcutsSnapshot(data);

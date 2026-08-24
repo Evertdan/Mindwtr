@@ -75,7 +75,7 @@ export const pruneSnapshots = (directory: Directory): void => {
                 file.delete();
             }
         } catch {
-            // Ignore best-effort cleanup failures.
+            // Ignorar los fallos de Limpieza de mejor esfuerzo.
         }
     });
 };
@@ -125,7 +125,7 @@ export const saveCurrentDataSnapshot = async (data: AppData): Promise<string> =>
                 pending.delete();
             }
         } catch {
-            // Ignore best-effort cleanup failures.
+            // Ignorar los fallos de Limpieza de mejor esfuerzo.
         }
         throw error;
     }

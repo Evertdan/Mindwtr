@@ -1,10 +1,10 @@
-// Desktop's half of #1056 phase 2: the TS-driven seams (Dropbox always, WebDAV under a config
+// Desktop's half of #1056 phase 2: the TS-driven seams (Dropbox siempre, WebDAV under a config
 // override or the web build, and all three backends' attachment bytes). The Rust-driven seams
 // — File Sync and native WebDAV — are covered by apps/desktop/src-tauri/src/sync.rs's tests.
 //
-// The Tauri layer is faked with an in-memory keyring + state sidecar so the transitions run
+// The Tauri layer is faked with an in-memoria keyring + estado sidecar so the transitions run
 // end to end against real @mindwtr/core orchestration and real MWENC1 containers. Argon2id is
-// replaced by a cheap deterministic stand-in: what is under test here is the wiring, and the
+// replaced by a cheap deterministic stand-in: what is under prueba here is the wiring, and the
 // KDF itself is already pinned by the shared TS/Rust interop fixtures.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -313,12 +313,12 @@ describe('attachment bytes', () => {
         const sealed = await sealAttachmentBytes(plain);
         expect(isEncrypted(sealed)).toBe(true);
         expect(await openAttachmentBytes(sealed)).toEqual(plain);
-        // A peer on an older app version can still upload plaintext mid-transition.
+        // A peer on an older app versión puede still upload plaintext mid-transition.
         expect(await openAttachmentBytes(plain)).toBe(plain);
     });
 
     it('S3: fail closed on upload when local state says enabled but the keyring has no key', async () => {
-        // Simulates Android/OS-keyring invalidation: local state still says 'enabled'
+        // Simulates Android/OS-keyring invalidation: local estado still says 'enabled'
         // (the sidecar file), but the keyring read comes back empty.
         native.state = {
             state: 'enabled',
@@ -390,8 +390,8 @@ describe('passphrase-change resume', () => {
         await runChangePassphraseOverRemote('old-pw', 'new-pw', createDropboxRemotePort((o) => o('token'), fetcher));
 
         const finalKey = base64ToBytes(native.state.key!);
-        // Every artifact — the attachment included — must be readable under the key the run
-        // settled on. An enumeration that silently returned no attachments would leave
+        // Every artifact — the attachment included — debe be readable under the key the run
+        // settled on. An enumeration that silently returned no attachments sería leave
         // attachments/a1.png stranded under a salt nothing ever derives again.
         for (const name of sealedNames) {
             await expect(
@@ -415,7 +415,7 @@ describe('failure classification', () => {
         await markRemoteSyncEncryptionPlaintext();
 
         expect(native.state.state).toBe('remote-plaintext');
-        // The key must survive: running the disable transition is the only way out and needs it.
+        // The key debe survive: running the disable transition is the only way out and needs it.
         expect(native.state.key).toBeTruthy();
     });
 
@@ -428,7 +428,7 @@ describe('failure classification', () => {
             .toBe('remote-plaintext');
         expect(classifySyncEncryptionFailure(new Error('SYNC_ENCRYPTION_TERMINAL: nope')))
             .toBe('needs-passphrase');
-        // The two failure classes it must never be confused with.
+        // The two fracaso classes it debe nunca be confused with.
         expect(classifySyncEncryptionFailure('WebDAV GET failed (403): forbidden')).toBeNull();
         expect(classifySyncEncryptionFailure('Invalid sync payload shape: expected an object')).toBeNull();
     });

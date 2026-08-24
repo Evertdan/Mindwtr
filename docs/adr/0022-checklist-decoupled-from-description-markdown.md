@@ -1,32 +1,32 @@
-# 22. Checklist decoupled from description markdown
+# 22. Lista de verificación desacoplada del markdown de descripción
 
-Date: 2026-07-03
+Fecha: 2026-07-03
 
-## Status
+## Estado
 
-Accepted
+Aceptado
 
-## Context
+## Contexto
 
-The task checklist and markdown checkbox lines (`- [ ]`) in the task description were maintained as two mirrored representations of one list: editing the checklist rewrote the description's task-list lines, and saving a task rebuilt the checklist from the description's markdown whenever any checkbox line was present.
+La lista de verificación de tareas y las líneas de casilla de verificación markdown (`- [ ]`) en la descripción de la tarea se mantenían como dos representaciones espejadas de una lista: editar la lista de verificación reescribía las líneas de lista de tareas de la descripción, y guardar una tarea reconstruía la lista de verificación desde el markdown de la descripción siempre que había una línea de casilla de verificación.
 
-This coupling was the root cause of a data-loss bug class: each side was synchronized by overwriting the other wholesale from potentially stale state. Checklist items built in the UI were silently deleted when a markdown checkbox appeared in the notes; typed markdown lines were deleted by checklist interactions; a fix required stale-state reconciliation machinery (`reconcileChecklistWithMarkdown`, `absorbMarkdownChecklistItems`) whose invariants every future editor feature would have had to preserve. The coupling was also invisible to users — a bug report described checklist items "simply disappearing" with no hint that the notes field was involved.
+Este acoplamiento fue la causa raíz de una clase de error de pérdida de datos: cada lado se sincronizaba sobrescribiendo al otro por mayoría desde un estado potencialmente obsoleto. Los elementos de la lista de verificación construidos en la interfaz de usuario fueron eliminados silenciosamente cuando apareció una casilla de verificación markdown en las notas; las líneas markdown mecanografiadas fueron eliminadas por interacciones de lista de verificación; una corrección requería maquinaria de reconciliación de estado obsoleto (`reconcileChecklistWithMarkdown`, `absorbMarkdownChecklistItems`) cuyas invariantes cada característica de editor futuro habría tenido que preservar. El acoplamiento también era invisible para los usuarios — un informe de error describía elementos de la lista de verificación que "simplemente desaparecen" sin insinuación de que el campo de notas estaba implicado.
 
-The original value of the coupling — bulk-entering checklist items by typing a markdown list — is now covered directly by multi-line paste into the checklist field (one item per line, bullet/numbered/`[x]` markers recognized).
+El valor original del acoplamiento — entrada en masa de elementos de lista de verificación escribiendo una lista markdown — ahora se cubre directamente por pegado de varias líneas en el campo de lista de verificación (un elemento por línea, marcadores de viñeta/numerados/`[x]` reconocidos).
 
-## Decision
+## Decisión
 
-The task checklist and the description are fully independent:
+La lista de verificación de tareas y la descripción son completamente independientes:
 
-- Markdown checkbox lines in a description are plain rendered text. They never populate, update, or delete checklist items.
-- Checklist edits (toggle, retitle, add, delete, reorder, reset) never modify the description.
-- The reconciliation/mirroring machinery is removed from core and both apps (`extractChecklistFromMarkdown`, `syncMarkdownChecklistCompletion`, `syncMarkdownChecklistWithCanonical`, `reconcileChecklistWithMarkdown`, `absorbMarkdownChecklistItems`).
-- Bulk entry is served by multi-line paste into a checklist item (`parsePastedChecklistItems` in core).
+- Las líneas de casilla de verificación markdown en una descripción son texto renderizado simple. Nunca populan, actualizan o eliminan elementos de lista de verificación.
+- Las ediciones de lista de verificación (alternar, cambiar título, agregar, eliminar, reordenar, restablecer) nunca modifican la descripción.
+- La maquinaria de reconciliación/espejo fue eliminada del núcleo y ambas aplicaciones (`extractChecklistFromMarkdown`, `syncMarkdownChecklistCompletion`, `syncMarkdownChecklistWithCanonical`, `reconcileChecklistWithMarkdown`, `absorbMarkdownChecklistItems`).
+- La entrada en masa se sirve mediante pegado de varias líneas en un elemento de lista de verificación (`parsePastedChecklistItems` en core).
 
-Existing tasks that carry both mirrored copies keep both; the copies simply stop tracking each other. No automatic migration: guessing which copy to delete risks exactly the data loss this decision removes.
+Las tareas existentes que tienen ambas copias espejadas guardan ambas; las copias simplemente dejan de rastrearse mutuamente. Sin migración automática: adivinar qué copia eliminar riesgo exactamente la pérdida de datos que esta decisión elimina.
 
-## Consequences
+## Consecuencias
 
-- One writer per surface: the checklist is only edited through the checklist UI, the description only through the text editor. The stale-overwrite bug class is structurally gone.
-- Users who relied on typing markdown checkboxes to build checklists must paste the lines into the checklist field instead (documented in the release notes and user guides).
-- Tasks with previously mirrored lists display the list twice (notes text plus checklist) until the user deletes one side manually.
+- Un escritor por superficie: la lista de verificación solo se edita a través de la interfaz de usuario de lista de verificación, la descripción solo a través del editor de texto. La clase de error de sobrescritura obsoleta se ha ido estructuralmente.
+- Los usuarios que confiaban en escribir casillas de verificación markdown para construir listas de verificación deben pegar las líneas en el campo de lista de verificación (documentado en las notas de lanzamiento y guías de usuario).
+- Las tareas con listas previamente espejadas muestran la lista dos veces (texto de notas más lista de verificación) hasta que el usuario elimina manualmente un lado.

@@ -38,7 +38,7 @@ export default function InboxScreen() {
   const [groupBy, setGroupBy] = useState<TaskListGroupBy>('none');
   const { visibleTasks } = useVisibleTaskContext();
 
-  // The same base set TaskList narrows below, so the Process count and the list
+  // El/La
   // can only ever differ by the user's own filter chips.
   const inboxTasks = useMemo(
     () => visibleTasks.filter((task) => task.status === 'inbox'),
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
     gap: 8,
     paddingHorizontal: 16,
-    // The toolbar row above ends at 6dp of padding; 6 more here separates the
+    // El/La
     // process action from the list controls without orphaning it (#grouping).
     paddingTop: 6,
     paddingBottom: 10,

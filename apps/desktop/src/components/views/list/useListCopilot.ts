@@ -78,8 +78,8 @@ export function useListCopilot({ settings, newTaskTitle, allContexts, allTags }:
         };
     }, [aiEnabled, aiKey, allContexts, allTags, keyRequired, newTaskTitle, settings]);
 
-    // Per-part apply (#1022). This row has no time estimate to suggest, so the
-    // parts are the context and one per tag.
+    // Per-part apply (#1022). esto row has no time estimate to suggest, so the
+    // parts are the contexto and one per tag.
     const pendingCopilotParts = useMemo<CopilotPart[]>(() => {
         if (!copilotSuggestion) return [];
         const parts: CopilotPart[] = [];

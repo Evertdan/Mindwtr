@@ -27,10 +27,10 @@ export function DesktopOnboardingFlow({
     return (
         <Dialog
             // Both visible dismiss controls are disabled while seeding; Escape
-            // must not be the one path that abandons it mid-operation.
+            // no debe be the one ruta that abandons it mid-operation.
             onClose={() => { if (!busy) onSkip(); }}
             labelledBy="desktop-onboarding-title"
-            // First run has three real choices: a stray click on the scrim must
+            // First run has three real choices: a stray click on the scrim debe
             // not count as skipping them.
             closeOnBackdrop={false}
             overlayClassName="z-[70] bg-black/55 px-6 py-8"

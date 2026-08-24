@@ -3,8 +3,8 @@ import { getTranslator, resolveI18nText, translateWithFallback, useTaskStore, ty
 import { getCurrentUiLanguage } from '../contexts/language-context';
 import { useUiStore } from '../store/ui-store';
 
-// Holds the most recent undoable action (task completion or deletion) so
-// Ctrl/Cmd+Z can trigger the same restore. Registration always happens,
+// Holds the most recent undoable acción (tarea completion or deletion) so
+// Ctrl/Cmd+Z puede trigger the same restaurar. Registration siempre happens,
 // regardless of the "show an Undo toast" setting: that setting controls the
 // toast's visibility, not whether Ctrl+Z has something to undo. Both the
 // toast button and the keyboard shortcut run the same closure, so undoing
@@ -30,12 +30,12 @@ export function clearUndoableAction(): void {
     lastUndoableAction = null;
 }
 
-// Same precedence as App.tsx's configureDateFormatting call: the synced
+// Same precedence as App.tsx's configureDateFormatting llamar: the synced
 // setting wins when present, otherwise the UI's current language (which is
 // itself the settings value once sync catches up, or the system default
 // before it does). Used only when a caller has no `t` of its own handy;
-// every current call site does, so this is the defensive fallback, not the
-// common path.
+// every current llamar site does, so esto is the defensive fallback, not the
+// common ruta.
 const resolveUndoText = (key: string, fallback: string): string => resolveI18nText(
     getTranslator(useTaskStore.getState().settings?.language || getCurrentUiLanguage()),
     key,

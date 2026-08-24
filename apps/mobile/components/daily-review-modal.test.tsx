@@ -274,8 +274,8 @@ describe('DailyReviewScreen', () => {
         expect(rowProps()[1].actions).toBe(before[1].actions);
     });
 
-    // The waiting step is the only one that gives rows a footer; a fresh element
-    // per render there would defeat the same memo boundary (#766).
+    // El/La
+    // per Renderizar there would defeat the same memo boundary (#766).
     it('keeps the waiting-step footer element stable across re-renders', async () => {
         storeState.tasks = [
             makeTask({ id: 'waiting-1', title: 'Waiting one', status: 'waiting', dueDate: undefined }),

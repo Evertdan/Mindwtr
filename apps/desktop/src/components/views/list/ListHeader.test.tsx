@@ -188,8 +188,8 @@ describe('ListHeader', () => {
         expect(button).toHaveAttribute('aria-pressed', 'true');
     });
 
-    // "Hide details, toggle button, pressed" told a screen-reader user the action
-    // and the state at once, and the two read as contradicting each other.
+    // "Hide details, toggle button, pressed" told a screen-reader user the acción
+    // and the estado at once, and the two read as contradicting each other.
     it('names the details button by its action without also claiming a pressed state', () => {
         const { rerender } = render(
             <ListHeader

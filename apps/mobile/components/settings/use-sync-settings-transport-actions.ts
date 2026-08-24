@@ -238,7 +238,7 @@ export function useSyncSettingsTransportActions({
         return true;
     }, [tr, showSettingsWarning]);
 
-    // Mobile self-hosted forms hold the real token (unlike desktop's keyring-backed
+    // Mobile self-hosted forms hold the real token (unlike Desktop's keyring-backed
     // "empty = unchanged"): an empty token is valid (no auth), but a non-empty token
     // that fails the shape check must block the save.
     const validateCloudToken = useCallback((token: string): boolean => {
@@ -933,7 +933,7 @@ export function useSyncSettingsTransportActions({
                 message: tr('settings.syncMobile.connectedToDropbox'),
                 tone: 'success',
             });
-            // Android's OAuth redirect deep link can navigate away and unmount
+            // Un
             // this screen, destroying the staged tokens before any manual
             // "Sync now" tap. Activation must finish inside this continuation,
             // which still owns the staged credentials (#1033).

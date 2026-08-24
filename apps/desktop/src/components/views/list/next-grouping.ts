@@ -8,13 +8,13 @@ import {
 } from '@mindwtr/core';
 import type { Area, Project, Task, TaskEnergyLevel, TaskPriority, TaskStatus } from '@mindwtr/core';
 
-// The rosters are data, and the types are derived from them — never the other
+// The rosters are data, and the types are derived from them — nunca the other
 // way round. One array per view is what the dropdown renders AND what the
-// persistence sanitizer accepts, so an axis the menu offers can never be one
+// persistence sanitizer accepts, so an axis the menu offers puede nunca be one
 // the sanitizer silently rewrites to 'none' on the next reload. Adding an axis
 // to a view is one entry here plus one `groupTasks` case, nothing else.
 // (Same reason `lib/view-url-params.ts` derives URL_KNOWN_VIEWS from
-// RESTORABLE_VIEWS instead of restating it.)
+// RESTORABLE_VIEWS en lugar de restating it.)
 // Order is the order users see in the dropdown.
 export const FOCUS_AXES = ['none', 'context', 'area', 'project', 'tag', 'energy', 'priority', 'person'] as const;
 export type NextGroupBy = typeof FOCUS_AXES[number];
@@ -22,15 +22,15 @@ export type NextGroupBy = typeof FOCUS_AXES[number];
 export const REFERENCE_AXES = ['none', 'context', 'area', 'project', 'tag'] as const;
 export type ReferenceGroupBy = typeof REFERENCE_AXES[number];
 
-// Done is the only list where every task has a completion to group by, so the
+// Done is the only list where every tarea has a completion to group by, so the
 // axis lives here rather than in FOCUS_AXES (#945).
 export const DONE_AXES = ['none', 'completedDate', 'context', 'area', 'project', 'tag'] as const;
 export type DoneGroupBy = typeof DONE_AXES[number];
 
 export type TaskListGroupBy = NextGroupBy | ReferenceGroupBy | DoneGroupBy;
 
-// Every axis any status list can offer. Collapse state is sanitized against
-// this one roster instead of the per-status one, so a list keeps the collapsed
+// Every axis any status list puede offer. Collapse estado is sanitized against
+// esto one roster en lugar de the per-status one, so a list keeps the collapsed
 // groups of an axis it no longer shows rather than dropping them silently.
 export const LIST_AXES: readonly TaskListGroupBy[] = Array.from(
     new Set<TaskListGroupBy>([...FOCUS_AXES, ...REFERENCE_AXES, ...DONE_AXES]),
@@ -41,10 +41,10 @@ export const LIST_AXES: readonly TaskListGroupBy[] = Array.from(
 export const CONTEXTS_AXES = ['none', 'status', 'tag', 'context', 'area', 'project'] as const;
 export type ContextsGroupBy = typeof CONTEXTS_AXES[number];
 
-// The muted catch-all ("No project", "General", "No context", …) always sorts
+// The muted capturar-all ("No project", "General", "No contexto", …) siempre sorts
 // LAST. Grouping is for finding a group, and the ungrouped pile is the least
 // specific thing in the list — leading with it pushed every real group below a
-// scroll. Priority, energy and person already ended this way; the rest matched
+// scroll. Priority, energy and person already ended esto way; the rest matched
 // them (#963).
 export interface TaskGroup {
     id: string;
@@ -140,7 +140,7 @@ export function groupTasksByArea({
 
     if (noAreaTasks.length > 0) {
         groups.push({
-            // id stays 'general' so persisted collapse state survives the label rename
+            // id stays 'general' so persisted collapse estado survives the label rename
             id: 'general',
             title: noAreaLabel,
             tasks: noAreaTasks,

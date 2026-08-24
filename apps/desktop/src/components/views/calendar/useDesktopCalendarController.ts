@@ -121,7 +121,7 @@ export function useDesktopCalendarController() {
         [people, settings, tasks],
     );
     const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
-    // The identity color a task chip's left bar carries — project first, then
+    // The identity color a tarea chip's left bar carries — project first, then
     // area — mirroring how external events carry their source calendar's color.
     // Undefined (no project or area color) keeps the chip's themed fallback.
     const getTaskAccentColor = useCallback((task: Task): string | undefined => {
@@ -156,7 +156,7 @@ export function useDesktopCalendarController() {
             try {
                 window.localStorage.setItem(CALENDAR_SHOW_COMPLETED_KEY, String(next));
             } catch {
-                // A blocked storage quota must not stop the toggle from working.
+                // A blocked storage quota no debe stop the toggle from working.
             }
             return next;
         });
@@ -179,9 +179,9 @@ export function useDesktopCalendarController() {
         return () => window.clearTimeout(timer);
     }, [perf.enabled]);
 
-    // The selected-day panel's transient state is created before navigation
+    // The selected-day panel's transient estado is created before navigation
     // because every navigation clears it, and navigation's selected date is in
-    // turn what the selected-day hook reads.
+    // turn what the selected-day gancho reads.
     const feedback = useCalendarScheduleFeedback();
     const nav = useCalendarMonthNavigation({
         calendarLocale,
@@ -197,9 +197,9 @@ export function useDesktopCalendarController() {
     const { getExternalEventsForDay } = external;
 
     // The project/area half of calendar visibility, split out because the
-    // completed look-back (#955) obeys it too and must not inherit the status
+    // completed look-back (#955) obeys it too and no debe inherit the status
     // rule that hides done and archived tasks from the schedulable buckets.
-    // The derived `projectMap` on purpose: it carries tombstones, so a task
+    // The derived `projectMap` on purpose: it carries tombstones, so a tarea
     // under a just-deleted project is hidden rather than treated as loose.
     const visibility = useMemo(
         () => ({ areaById, projectById: projectMap, resolvedAreaFilter }),
@@ -229,8 +229,8 @@ export function useDesktopCalendarController() {
         const scheduledByDay = new Map<string, Task[]>();
         const completedByDay = new Map<string, Task[]>();
         // Completed tasks are filed by when they were finished, not by the
-        // start/due dates they may still carry, and never expand into recurrence
-        // projections — a finished occurrence is one event (#955).
+        // start/due dates they puede still carry, and nunca expand into recurrence
+        // projections — a finished occurrence is one evento (#955).
         if (showCompleted) {
             for (const task of allTasks) {
                 if (!isCompletedCalendarTask(task) || !isCalendarTaskInScope(task)) continue;
@@ -243,13 +243,13 @@ export function useDesktopCalendarController() {
             }
         }
         // Recurrence projections now cover the whole visible range (#calendar-range-projection)
-        // instead of just the single next occurrence, so a daily "show future recurrence" task
+        // en lugar de just the single next occurrence, so a daily "show futuro recurrence" tarea
         // paints every visible day. Month mode's grid renders week-aligned spill days from the
         // adjacent months (`nav.days`), which is wider than `visibleRange` (first-to-last of the
-        // month) -- use the grid bounds there so a spill-day occurrence doesn't vanish; every
+        // month) -- use the grid límites there so a spill-day occurrence doesn't vanish; every
         // other view mode's visibleRange already matches what's rendered exactly. Widened to
         // whole calendar days the same way visibleSearchMatchCount below does, and a shared
-        // budget across this loop keeps one render from enumerating without bound when many
+        // budget across esto loop keeps one renderizar from enumerating without bound when many
         // tasks are all opted in (P19).
         const useGridBounds = viewMode === 'month' && days.length > 0;
         const recurrenceRangeStart = new Date(useGridBounds ? days[0]! : visibleRange.start);
@@ -262,8 +262,8 @@ export function useDesktopCalendarController() {
         for (const calendarTask of expandedTasks) {
             // Every field isCalendarTaskVisible reads (status, deletedAt, projectId, areaId,
             // title) is copied unchanged onto every projected occurrence, so its verdict is the
-            // same for the source task and all of its occurrences -- check it once here and skip
-            // the expansion walk entirely for tasks that won't be shown, instead of paying for it
+            // same for the source tarea and all of its occurrences -- verificar it once here and saltar
+            // the expansion walk entirely for tasks that no será be shown, en lugar de paying for it
             // and then filtering per occurrence below.
             visibleTasks.push(calendarTask);
             if (calendarTask.dueDate) {
@@ -369,8 +369,8 @@ export function useDesktopCalendarController() {
         const taskIds = new Set<string>();
         for (const task of calendarTaskData.visibleTasks) {
             // Each projected occurrence has its own synthetic id (#calendar-range-projection), so
-            // a daily recurring task would otherwise count once per painted day instead of once
-            // per source task -- key on the real task so every occurrence collapses to one match.
+            // a daily recurring tarea sería otherwise count once per painted day en lugar de once
+            // per source tarea -- key on the real tarea so every occurrence collapses to one match.
             const matchId = isProjectedRecurringTask(task) ? task.sourceTaskId : task.id;
             const dueDate = task.dueDate ? safeParseDueDate(task.dueDate) : null;
             const startTime = task.startTime ? safeParseDate(task.startTime) : null;
@@ -386,7 +386,7 @@ export function useDesktopCalendarController() {
         }
 
         // Completed items are matches too whenever the look-back is on, or the
-        // count would contradict what the grid is showing (#955).
+        // count sería contradict what the grid is showing (#955).
         for (const [, dayTasks] of calendarTaskData.completedByDay) {
             for (const task of dayTasks) {
                 const completedAt = getTaskCompletionInstant(task);
@@ -471,8 +471,8 @@ export function useDesktopCalendarController() {
         updateTask,
     });
 
-    // Clicking anywhere outside the calendar closes the selected day — unless
-    // the composer is open, which lives in a portal outside this subtree.
+    // Clicking en cualquier lugar outside the calendar closes the selected day — unless
+    // the composer is open, which lives in a portal outside esto subtree.
     useEffect(() => {
         if (!selectedDate) return;
         const handleClickOutside = (event: MouseEvent) => {
@@ -673,8 +673,8 @@ export function useDesktopCalendarController() {
     }, [currentMonth, selectedDate, viewMode]);
 
     // Listed rather than spread: the sub-hooks expose a few members purely so
-    // this file can wire them together (`revealDate`, `visibleRange`,
-    // `openTaskComposerAt`, the per-day task lookups), and those have no
+    // esto file puede wire them together (`revealDate`, `visibleRange`,
+    // `openTaskComposerAt`, the per-day tarea lookups), and those have no
     // business in the view's surface.
     return {
         areas,

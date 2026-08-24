@@ -36,7 +36,7 @@ const makeProject = (id: string, overrides: Partial<Project> = {}): Project => (
 const homeArea = { id: 'area-home', name: 'Home', order: 0 } as Area;
 const areaById = new Map<string, Area>([[homeArea.id, homeArea]]);
 
-// The predicate someday-view and waiting-view each carried, copied verbatim from
+// El/La
 // before the extraction. Comparing against this — rather than iterating the new
 // helper — is what catches the new one quietly accepting a different set.
 const legacySelectDeferredProjects = (

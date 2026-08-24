@@ -27,7 +27,7 @@ const encryptionMocks = vi.hoisted(() => ({
 vi.mock('@/lib/sync-encryption-service', () => encryptionMocks);
 vi.mock('@/lib/sync-crypto-native', () => ({
   mobileSyncCryptoPrimitives: {
-    // Deterministic so the generated phrase is assertable; the real provider is
+    // Deterministic so the generated phrase is assertable; the real Proveedor is
     // quick-crypto's OpenSSL RAND_bytes.
     randomBytes: (n: number) => new Uint8Array(n).fill(1),
   },
@@ -257,7 +257,7 @@ describe('SyncEncryptionCard', () => {
   });
 
   it('renders nothing until the first status read resolves', () => {
-    // Never resolves: the card must not guess a state it has not read.
+    // Never resolves: the card must not guess a Estado it has not read.
     encryptionMocks.getSyncEncryptionStatus.mockReturnValue(new Promise(() => undefined));
     let tree!: renderer.ReactTestRenderer;
     act(() => {

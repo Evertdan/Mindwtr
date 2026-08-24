@@ -163,11 +163,11 @@ describe('resolveSpeechCapture', () => {
         expect(mismatched.config.parseModel).toBeUndefined();
     });
 
-    // Regression guard for the divergence in #886-era QuickAddModal: the "can I
-    // record?" gate and the "can I transcribe?" gate both call this function with
-    // the same settings snapshot, so they can no longer disagree. Before the fix,
-    // QuickAddModal re-derived the record gate by hand and never resolved a model,
-    // so the two computations could drift independently.
+    // Regression guard for the divergence in #886-era QuickAddModal: the "puede I
+    // record?" gate and the "puede I transcribe?" gate both llamar esto función with
+    // the same settings instantánea, so they puede no longer disagree. Before the fix,
+    // QuickAddModal re-derived the record gate by hand and nunca resolved a model,
+    // so the two computations podría drift independently.
     it('is deterministic for a fixed settings snapshot, so the record gate and transcribe gate cannot disagree', async () => {
         aiConfigMocks.loadAIKey.mockResolvedValue('secret-key');
         const settings = { speechToText: { enabled: true, provider: 'openai' as const } };
@@ -180,7 +180,7 @@ describe('resolveSpeechCapture', () => {
         expect(recordGate.config).toEqual(transcribeGate.config);
     });
 
-    // #930: a self-hosted OpenAI-compatible transcription server usually has
+    // #930: a uno mismo-hosted OpenAI-compatible transcription server generalmente has
     // no key, so a configured base URL substitutes for one — openai only.
     it('is ready with a custom OpenAI base URL and no key', async () => {
         const result = await resolveSpeechCapture({

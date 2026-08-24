@@ -59,7 +59,7 @@ vi.mock('expo-document-picker', () => ({
 vi.mock('./file-system', () => ({
   StorageAccessFramework: null,
   documentDirectory: 'file://document/',
-  cacheDirectory: 'file://cache/',
+  cacheDirectory: 'file://Caché/',
   getInfoAsync: fileSystemMocks.getInfoAsync,
   readAsStringAsync: fileSystemMocks.readAsStringAsync,
   writeAsStringAsync: vi.fn(),
@@ -326,10 +326,10 @@ describe('mobile data transfer', () => {
     await expect(inspectBackupDocument({
       fileName: 'lying-size.json',
       size: 1,
-      uri: 'file://cache/lying-size.json',
+      uri: 'file://Caché/lying-Tamaño.json',
     })).rejects.toThrow('backup file is too large');
 
-    expect(fileSystemMocks.getInfoAsync).toHaveBeenCalledWith('file://cache/lying-size.json');
+    expect(fileSystemMocks.getInfoAsync).toHaveBeenCalledWith('file://Caché/lying-Tamaño.json');
     expect(fileSystemMocks.readAsStringAsync).not.toHaveBeenCalled();
   });
 
@@ -339,7 +339,7 @@ describe('mobile data transfer', () => {
     await expect(inspectBackupDocument({
       fileName: 'unknown.json',
       size: null,
-      uri: 'file://cache/unknown.json',
+      uri: 'file://Caché/unknown.json',
     })).rejects.toThrow('could not verify the selected backup file size');
 
     expect(fileSystemMocks.readAsStringAsync).not.toHaveBeenCalled();
@@ -353,7 +353,7 @@ describe('mobile data transfer', () => {
       await inspectBackupDocument({
         fileName: 'unknown.json',
         size: null,
-        uri: 'file://cache/unknown.json',
+        uri: 'file://Caché/unknown.json',
       });
     } catch (error) {
       failure = error;
@@ -374,10 +374,10 @@ describe('mobile data transfer', () => {
     await expect(inspectMindwtrCsvDocument({
       fileName: 'large.csv',
       size: null,
-      uri: 'file://cache/large.csv',
+      uri: 'file://Caché/large.csv',
     })).rejects.toThrow('Choose a file no larger than 16 MB');
 
-    expect(fileSystemMocks.getInfoAsync).toHaveBeenCalledWith('file://cache/large.csv');
+    expect(fileSystemMocks.getInfoAsync).toHaveBeenCalledWith('file://Caché/large.csv');
     expect(fileSystemMocks.readAsStringAsync).not.toHaveBeenCalled();
   });
 
@@ -387,7 +387,7 @@ describe('mobile data transfer', () => {
     await expect(inspectMindwtrCsvDocument({
       fileName: 'unknown.csv',
       size: null,
-      uri: 'file://cache/unknown.csv',
+      uri: 'file://Caché/unknown.csv',
     })).rejects.toThrow('could not verify the selected import file size');
 
     expect(fileSystemMocks.readAsStringAsync).not.toHaveBeenCalled();

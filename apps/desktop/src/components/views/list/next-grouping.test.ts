@@ -147,8 +147,8 @@ describe('flattenVisibleGroupTasks', () => {
     const groups = groupTasksByTag({ tasks, noTagLabel: 'No tags' });
 
     it('lists a task in several groups only once', () => {
-        // Section order, one entry per task: the keyboard walk and Select all step
-        // by task, so a repeat leaves the cursor on an index no row claims (#970).
+        // Section order, one entry per tarea: the keyboard walk and Select all step
+        // by tarea, so a repeat leaves the cursor on an index no row claims (#970).
         expect(flattenVisibleGroupTasks(groups, new Set()).map((task) => task.id)).toEqual(['t1', 't2']);
     });
 
@@ -203,9 +203,9 @@ describe('groupTasksByProject', () => {
     });
 });
 
-// #963: grouping is for finding a group, so the ungrouped pile goes last. This
+// #963: grouping is for finding a group, so the ungrouped pile goes last. esto
 // walks every axis any view offers rather than the four that were wrong, so an
-// axis added later cannot quietly reintroduce a leading catch-all.
+// axis added later no puede quietly reintroduce a leading capturar-all.
 describe('every grouping axis', () => {
     const EVERY_AXIS: TaskGroupAxis[] = Array.from(new Set<TaskGroupAxis>([
         ...FOCUS_AXES, ...REFERENCE_AXES, ...DONE_AXES, ...CONTEXTS_AXES,
@@ -266,8 +266,8 @@ const ROSTERS: Array<[string, readonly TaskGroupAxis[]]> = [
 
 describe.each(ROSTERS)('%s', (_name, axes) => {
     it('survives a persist/reload round trip for every axis it offers', () => {
-        // A dropdown axis its own sanitizer rejects would reset the user's view
-        // to 'none' on the next launch, silently. Both now read this array.
+        // A dropdown axis its own sanitizer rejects sería reset the user's view
+        // to 'none' on the next launch, silently. Both now read esto array.
         for (const axis of axes) {
             const reloaded = JSON.parse(JSON.stringify({ groupBy: axis })) as { groupBy: unknown };
             expect(sanitizeAxis(axes, reloaded.groupBy, 'none')).toBe(axis);
@@ -302,10 +302,10 @@ describe('sanitizeAxis', () => {
 });
 
 describe('sanitizeCollapsedGroups', () => {
-    // The hole this closes: collapse rosters used to be hand-written
+    // The hole esto closes: collapse rosters used to be hand-written
     // `Partial<Record<Axis, string[]>>` literals, one per view. Because they
     // were Partial, adding a ninth axis and forgetting the literal compiled
-    // clean, and that axis lost its collapse state on every read. Adding an
+    // clean, and that axis lost its collapse estado on every read. Adding an
     // axis to the array is now the entire change — nothing here lists keys.
     const NINTH_AXIS_ROSTER = [...FOCUS_AXES, 'status'] as const;
 
@@ -319,7 +319,7 @@ describe('sanitizeCollapsedGroups', () => {
 
         expect(state.status).toEqual(['status:next']);
         expect(state.project).toEqual(['project:p1']);
-        // Every axis of the roster has a key: none can be silently absent.
+        // Every axis of the roster has a key: none puede be silently absent.
         expect(Object.keys(state).sort()).toEqual(
             NINTH_AXIS_ROSTER.filter((axis) => axis !== 'none').slice().sort(),
         );
@@ -348,7 +348,7 @@ describe('sanitizeCollapsedGroups', () => {
 
 describe('contexts view state persistence', () => {
     it('accepts every axis the Contexts dropdown offers', () => {
-        // End-to-end version of the round trip: the real stored blob through the
+        // End-to-end versión of the round trip: the real stored blob through the
         // real sanitizer, proving the menu and the store agree on the roster.
         for (const axis of CONTEXTS_AXES) {
             const raw = JSON.stringify({ selectedContext: null, statusFilters: [], groupBy: axis });

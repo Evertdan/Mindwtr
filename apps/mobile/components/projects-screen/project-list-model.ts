@@ -15,7 +15,7 @@ export type ProjectListRow =
     }
   | { type: 'project'; key: string; project: Project; sectionKind: 'active' | 'deferred' | 'archived' };
 
-// Matches core's projectTaskSummaryById value shape (store-types.ts DerivedState);
+// Matches core's projectTaskSummaryById value shape (store-types.ts projectTaskSummaryById);
 // core owns the computation (store-helpers.ts computeTaskDerivedState). See #927.
 export type ProjectTaskSummary = {
   activeTaskCount: number;

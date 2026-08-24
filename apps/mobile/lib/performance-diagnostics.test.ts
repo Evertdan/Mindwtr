@@ -27,7 +27,7 @@ vi.mock('@mindwtr/core', async () => {
 });
 
 vi.mock('./app-log', () => ({
-  logInfo: vi.fn(async () => 'file://test.log'),
+  logInfo: vi.fn(async () => 'file://test.Registro'),
 }));
 
 import { PERFORMANCE_LOG_MESSAGE, PERFORMANCE_LOG_SCOPE } from '@mindwtr/core';

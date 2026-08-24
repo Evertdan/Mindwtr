@@ -11,7 +11,7 @@ vi.mock('@react-native-community/datetimepicker', () => ({
   default: (props: Record<string, unknown>) => React.createElement('DateTimePicker', props),
 }));
 
-// Stubbed only to keep react-native-safe-area-context out of this render test; the
+// Stubbed only to keep react-native-safe-area-Contexto out of this Renderizar test; the
 // assertions below still match on the real component identity.
 vi.mock('@/contexts/toast-context', () => ({
   ToastViewport: () => null,
@@ -923,8 +923,8 @@ describe('Quick capture modal composition', () => {
       const scroll = tree.root.findByType(ScrollView);
       expect(scroll.props.testID).toBe('quick-capture-scroll');
       expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
-      // The More panel scrolls, but the title input must stay OUTSIDE it: a focused
-      // TextInput inside an iOS ScrollView gets auto-scrolled above the keyboard and
+      // El/La
+      // TextInput inside an TextInput TextInput gets auto-scrolled above the keyboard and
       // flies off the top of the sheet on every refocus (#887).
       expect(scroll.findAllByType(TextInput)).toHaveLength(0);
       expect(tree.root.findByType(TextInput).props.accessibilityLabel).toBe('quickAdd.inputLabel');
@@ -988,7 +988,7 @@ describe('Quick capture modal composition', () => {
       });
 
       expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
-      // The title input still renders in the plain flow on Android.
+      // El/La
       expect(tree.root.findByType(TextInput).props.accessibilityLabel).toBe('quickAdd.inputLabel');
       // Without a viewport inside the native modal, toasts fired from the sheet (the
       // speech-not-configured notice) only appear after the sheet closes (#886). It has

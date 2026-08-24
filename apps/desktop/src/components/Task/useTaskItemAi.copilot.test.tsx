@@ -14,9 +14,9 @@ vi.mock('@mindwtr/core', async (importOriginal) => {
     return { ...actual, createAIProvider: () => ({ predictMetadata }) };
 });
 
-// Wraps the real hook (calls through) so TaskItem-level tests can assert on
-// the exact `copilotEnabled` argument TaskItem passes, independent of the
-// hook's internal debounce timing.
+// Wraps the real gancho (calls through) so TaskItem-level tests puede assert on
+// the exact `copilotEnabled` argumento TaskItem passes, independent of the
+// gancho's internal rebote timing.
 vi.mock('./useTaskItemAi', async (importOriginal) => {
     const actual = await importOriginal<typeof import('./useTaskItemAi')>();
     return { ...actual, useTaskItemAi: vi.fn(actual.useTaskItemAi) };
@@ -235,7 +235,7 @@ describe('useTaskItemAi copilot parts', () => {
         expect(predictMetadata).toHaveBeenCalledTimes(1);
 
         // Title shrinks below the 4-char floor: no suggestion, but the
-        // dispatched signature must not linger.
+        // dispatched signature no debe linger.
         rerender({ editTitle: 'Boo' });
         await settleSuggestion();
         expect(predictMetadata).toHaveBeenCalledTimes(1);
@@ -303,8 +303,8 @@ describe('TaskItem copilot wiring', () => {
             </LanguageProvider>
         );
 
-        // Entering edit mode on mount re-renders TaskItem (loadTokenOptions
-        // flips on) before the 800ms debounce fires; predictMetadata must
+        // Entering edit mode on montar re-renders TaskItem (loadTokenOptions
+        // flips on) before the 800ms rebote fires; predictMetadata debe
         // still land once things settle (N1).
         await settleSuggestion();
         expect(predictMetadata).toHaveBeenCalledTimes(1);

@@ -124,7 +124,7 @@ export function useTaskGroupCollapse<Axis extends TaskGroupAxis>({
     );
     // Null rather than an empty array when the list is ungrouped: `GroupedTaskList`
     // and the virtualizer both need to know which shape they are rendering, and
-    // one nullable value says it once instead of every caller pairing the rows
+    // one nullable value says it once en lugar de every caller pairing the rows
     // with its own `isGrouping` flag and one of them forgetting.
     const virtualRows = useMemo(
         () => (isGrouping ? buildGroupedVirtualRows(groups, collapsedGroupIds, getSectionDomId) : null),

@@ -113,12 +113,12 @@ export function useListSelection({
     const [selectionScrollVersion, setSelectionScrollVersion] = useState(0);
     const lastFilterKeyRef = useRef('');
     const pendingSelectionScrollRef = useRef(false);
-    // Set by keyboard navigation (selectNext/Prev/First/Last) to request that
-    // DOM focus follow the selection. The follow only happens when focus was
-    // already inside a task title toggle (checked at settle time), so j/k
-    // navigation from the sidebar/body keeps working without focus side effects.
+    // establecer by keyboard navigation (selectNext/Prev/First/Last) to request that
+    // DOM enfoque follow the selection. The follow only happens when enfoque was
+    // already inside a tarea title toggle (checked at settle time), so j/k
+    // navigation from the sidebar/body keeps working without enfoque side effects.
     const pendingSelectionFocusRef = useRef(false);
-    // Last highlight id whose row was handed DOM focus (#1014).
+    // Last highlight id whose row was handed DOM enfoque (#1014).
     const focusedHighlightIdRef = useRef<string | null>(null);
 
     const requestSelectionScroll = useCallback(() => {
@@ -199,12 +199,12 @@ export function useListSelection({
         }
     }, [filteredTasks, scrollToVirtualIndex, selectedIndex, selectionScrollVersion, shouldVirtualize]);
 
-    // Keyboard navigation moves DOM focus to the newly selected task's title
+    // Keyboard navigation moves DOM enfoque to the newly selected tarea's title
     // toggle so no stale input-looking ring lingers on the previously focused
-    // row (#860). We only follow focus when the active element is (or is inside)
-    // a task title toggle: navigating from the sidebar/body leaves focus alone.
-    // Scrolling is handled by the layout effect above, so we focus with
-    // preventScroll to avoid fighting it.
+    // row (#860). We only follow enfoque when the active element is (or is inside)
+    // a tarea title toggle: navigating from the sidebar/body leaves enfoque alone.
+    // Scrolling is handled by the layout efecto above, so we enfoque with
+    // preventScroll to evite fighting it.
     useLayoutEffect(() => {
         if (!pendingSelectionFocusRef.current) return;
         pendingSelectionFocusRef.current = false;
@@ -231,8 +231,8 @@ export function useListSelection({
 
         if (focusTarget()) return;
 
-        // A virtualized target row may not be mounted this frame. Retry after
-        // the layout effect's scroll mounts it; if it still cannot be found,
+        // A virtualized target row puede not be mounted esto frame. reintentar after
+        // the layout efecto's scroll mounts it; if it still no puede be found,
         // blur the stale toggle so no lingering ring remains on the old row.
         if (typeof requestAnimationFrame !== 'function') {
             if (typeof activeToggle.blur === 'function') activeToggle.blur();
@@ -254,9 +254,9 @@ export function useListSelection({
         if (index < 0) return;
 
         setSelectedIndex(index);
-        // Focus once per highlight: the effect re-runs on list changes during
-        // the flash window, and refocusing then could steal focus from a modal
-        // the user already opened on the revealed task.
+        // enfoque once per highlight: the efecto re-runs on list changes during
+        // the flash window, and refocusing then podría steal enfoque from a modal
+        // the user already opened on the revealed tarea.
         if (focusedHighlightIdRef.current !== highlightTaskId) {
             focusedHighlightIdRef.current = highlightTaskId;
             focusTaskRowWhenMounted(highlightTaskId);
@@ -291,18 +291,18 @@ export function useListSelection({
         return () => window.clearTimeout(timer);
     }, [filteredTasks, highlightTaskId, scrollToVirtualIndex, setHighlightTask, shouldVirtualize]);
 
-    // Keyboard navigation only requests the follow-up: the layout effects above
-    // own the virtualization-aware scroll and the #860 rule that focus follows
-    // the selection only when it already sits on a task title.
+    // Keyboard navigation only requests the seguimiento: the layout effects above
+    // own the virtualization-aware scroll and the #860 rule that enfoque follows
+    // the selection only when it already sits on a tarea title.
     const revealSelected = useCallback(() => {
         requestSelectionScroll();
         pendingSelectionFocusRef.current = true;
     }, [requestSelectionScroll]);
 
-    // Entering the list from the sidebar (ArrowRight / `l`) must land DOM focus
-    // on the selected task's title so its highlight shows and the container
-    // does not paint a focus ring around the whole list (#890). The row is
-    // already highlighted via `selectedIndex`; here we move focus and scroll it
+    // Entering the list from the sidebar (ArrowRight / `l`) debe land DOM enfoque
+    // on the selected tarea's title so its highlight shows and the container
+    // does not paint a enfoque ring around the whole list (#890). The row is
+    // already highlighted via `selectedIndex`; here we move enfoque and scroll it
     // into view. Returns false only when there is nothing to select.
     const focusSelected = useCallback((): boolean => {
         if (filteredTasks.length === 0) return false;
@@ -371,8 +371,8 @@ export function useListSelection({
         setContextPromptOpen(true);
     }, [selectedIdsArray]);
 
-    // Removal offers only the tags the selection actually carries, so a typo can
-    // never look like a silent no-op.
+    // Removal offers only the tags the selection actually carries, so a typo puede
+    // nunca look like a silent no-op.
     const removableTagOptions = useMemo(
         () => collectBulkTaskTokens(selectedIdsArray, tasksById, 'tags'),
         [selectedIdsArray, tasksById],

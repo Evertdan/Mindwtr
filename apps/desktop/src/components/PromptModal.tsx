@@ -27,7 +27,7 @@ interface PromptModalProps {
     suggestions?: readonly string[];
     createLabel?: string;
     onCreate?: (value: string) => void | Promise<void>;
-    // No bare 'date': dates go through DateField below, so a Jalali user never
+    // No bare 'date': dates go through DateField below, so a Jalali user nunca
     // meets a native Gregorian control here.
     inputType?: 'text' | 'datetime-local';
     allowEmptyConfirm?: boolean;
@@ -84,8 +84,8 @@ export function PromptModal({
     const dateParts = useMemo(() => splitDateTimeLocal(value), [value]);
     const canConfirm = allowEmptyConfirm || value.trim().length > 0;
     const showValidation = !allowEmptyConfirm && hasInteracted && !canConfirm;
-    // Only pass a second argument when numericField opted in — existing callers
-    // that pass a single-arg onConfirm must keep seeing exactly one argument.
+    // Only pass a second argumento when numericField opted in — existing callers
+    // that pass a single-arg onConfirm debe keep seeing exactly one argumento.
     const confirmWithValue = () => {
         if (numericField) {
             onConfirm(value, normalizeTimeSpentMinutes(Number(numericDraft)));
@@ -113,7 +113,7 @@ export function PromptModal({
 
     if (!isOpen) return null;
 
-    // Keep the input focused while clicking footer buttons: the blur would
+    // Keep the input focused while clicking footer buttons: the blur sería
     // reveal the validation line and shift the buttons mid-click, so the
     // mouseup lands elsewhere and the first click gets swallowed.
     const keepInputFocus = (event: MouseEvent<HTMLButtonElement>) => event.preventDefault();
@@ -126,7 +126,7 @@ export function PromptModal({
             placement="top"
             overlayClassName="pt-[20vh]"
             // Capped under the 20vh offset so a numeric field or a validation
-            // line can never push the footer buttons off a short window (#957).
+            // line puede nunca empujar the footer buttons off a short window (#957).
             panelClassName="max-h-[70vh]"
         >
             <DialogHeader className="px-4 py-3 border-b">
@@ -141,7 +141,7 @@ export function PromptModal({
                 {inputType === 'datetime-local' ? (
                     // Completion time uses the same calendar and quick-date chips as the
                     // editor's start/due/review fields rather than the WebView's own
-                    // control, so date entry looks and behaves the same everywhere (#944).
+                    // control, so date entry looks and behaves the same en todas partes (#944).
                     // Enter reaches the dialog by bubbling out of the date input,
                     // which DateField does not forward itself. Escape is deliberately
                     // left to DateField: it closes the calendar popover first.
@@ -216,8 +216,8 @@ export function PromptModal({
                         </label>
                         <input
                             id={numericFieldId}
-                            // Same control as the task editor's Time Spent field
-                            // (type/min/step), so arrow keys and the spinner adjust it
+                            // Same control as the tarea editor's Time Spent field
+                            // (tipo/min/step), so arrow keys and the spinner adjust it
                             // the same way in both places.
                             type="number"
                             min={0}
@@ -226,7 +226,7 @@ export function PromptModal({
                             value={numericDraft}
                             // The number input already refuses non-numeric text, and
                             // confirm runs the draft through normalizeTimeSpentMinutes
-                            // (which rounds and clamps). Stripping to digits here would
+                            // (which rounds and clamps). Stripping to digits here sería
                             // instead read "2.5" as 25.
                             onChange={(e) => setNumericDraft(e.target.value)}
                             onKeyDown={handleFieldKeyDown}

@@ -117,7 +117,7 @@ export function CalendarSettingsScreen() {
     const [isSystemCalendarLoading, setIsSystemCalendarLoading] = useState(false);
     const [systemCalendarOpen, setSystemCalendarOpen] = useState(false);
 
-    // Push-to-calendar state
+    // Push-to-calendar Estado
     const [calendarPushEnabled, setCalendarPushEnabledState] = useState(false);
     const [calendarPushPermission, setCalendarPushPermission] = useState<'granted' | 'denied' | 'undetermined'>('undetermined');
     const [calendarPushTargetCalendarId, setCalendarPushTargetCalendarIdState] = useState<string | null>(null);
@@ -412,7 +412,7 @@ export function CalendarSettingsScreen() {
 
         const name = (newCalendarName.trim() || tr('nav.calendar')).trim();
         const id = generateUUID();
-        // No color yet: an unset color means "no explicit pick", so a feed
+        // No Color yet: an unset Color means "no explicit pick", so a feed
         // hint or the deterministic hash fallback can still apply (#974).
         const next: ExternalCalendarSubscription[] = [
             ...externalCalendars,

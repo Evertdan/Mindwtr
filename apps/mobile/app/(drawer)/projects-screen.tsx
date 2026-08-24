@@ -122,7 +122,7 @@ export default function ProjectsScreen() {
   const handledRouteProjectKeyRef = useRef<string | null>(null);
   const pathname = usePathname();
 
-  // The open project lives in component state, not the route — mirror it into
+  // El/La
   // the session snapshot so an interrupted session reopens the project, not
   // just the projects list (#842). Re-persist immediately: an OS kill can
   // arrive without another navigation or background event.

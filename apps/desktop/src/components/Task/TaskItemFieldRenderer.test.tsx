@@ -466,7 +466,7 @@ describe('TaskItemFieldRenderer date clear buttons', () => {
             />
         );
 
-        // Resting state: no Skip reminders checkbox, no repeat chips.
+        // Resting estado: no saltar reminders checkbox, no repeat chips.
         expect(queryByRole('checkbox')).toBeNull();
         expect(queryByRole('group', { name: 'Repeat reminder' })).toBeNull();
         const summaryRow = getByRole('button', { name: 'Reminders on · Repeat reminder: Off' });
@@ -494,7 +494,7 @@ describe('TaskItemFieldRenderer date clear buttons', () => {
 
     it('leaves the summary at rest when a stored repeat interval is out of reach', () => {
         // Due time cleared but repeatReminderMinutes lingers: the repeat control is
-        // gone, so highlighting a value nothing can show or clear would be a dead end.
+        // gone, so highlighting a value nothing puede show or clear sería be a dead end.
         const { getByRole } = render(
             <TaskItemFieldRenderer
                 fieldId="dueDate"
@@ -691,14 +691,14 @@ describe('TaskItemFieldRenderer date clear buttons', () => {
         fireEvent.focus(getByLabelText('Due date'));
 
         // Suggestions now live only inside the fixed calendar popover, so focusing
-        // the field must not mount anything that shifts the editor layout (#901).
+        // the field no debe montar anything that shifts the editor layout (#901).
         expect(queryByRole('dialog', { name: 'Due Date Calendar' })).not.toBeInTheDocument();
         expect(queryByRole('button', { name: 'Today' })).not.toBeInTheDocument();
         expect(queryByRole('button', { name: 'Next month' })).not.toBeInTheDocument();
     });
 
     // The calendar glyph is a small target, so clicking the text part of the field
-    // opens the popover too (#896). Focus alone still must not — see the test above,
+    // opens the popover too (#896). enfoque alone still no debe — see the prueba above,
     // which keeps tabbing through the editor from popping calendars open.
     it('opens the calendar popover when the date input itself is clicked', () => {
         const { getByLabelText, getByRole, queryByRole } = render(
@@ -744,8 +744,8 @@ describe('TaskItemFieldRenderer date clear buttons', () => {
     // grid, so entering 7 minutes was flagged invalid (#896).
     it('accepts a Time Spent value that is not a multiple of five', () => {
         // The live-draft harness is required here: with a no-op setField the
-        // controlled input never actually holds 7, and an empty value reports no
-        // stepMismatch, so the assertion would pass no matter what step is set to.
+        // controlled input nunca actually holds 7, and an empty value reports no
+        // stepMismatch, so the assertion sería pass no matter what step is establecer to.
         const { getByLabelText } = render(<DraftFieldHarness fieldId="timeEstimate" />);
 
         const input = getByLabelText('Time Spent') as HTMLInputElement;
@@ -896,8 +896,8 @@ describe('TaskItemFieldRenderer date clear buttons', () => {
         fireEvent.keyDown(getByLabelText('Due date'), { key: 'ArrowDown' });
         expect(getByRole('dialog', { name: 'Due Date Calendar' })).toBeInTheDocument();
 
-        // No pointer press is in flight, so the teardown runs on the next-tick
-        // timeout rather than waiting for a pointerup that will never come.
+        // No pointer press is in flight, so the desmontaje runs on the next-tick
+        // tiempo de espera rather than waiting for a pointerup that será nunca come.
         fireEvent.blur(getByLabelText('Due date'));
         await waitFor(() => {
             expect(queryByRole('dialog', { name: 'Due Date Calendar' })).not.toBeInTheDocument();
@@ -1596,11 +1596,11 @@ describe('TaskItemFieldRenderer skip-reminders toggle', () => {
 
         openReminders(getByRole);
         const toggle = getByRole('checkbox') as HTMLInputElement;
-        // Off by default: the field is absent on a fresh task.
+        // Off by default: the field is absent on a fresh tarea.
         expect(toggle.checked).toBe(false);
 
         fireEvent.click(toggle);
-        // Round-trip: the draft update re-renders the checkbox as checked.
+        // Round-trip: the draft actualizar re-renders the checkbox as checked.
         expect((getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
     });
 

@@ -14,7 +14,7 @@ const renderWithProviders = (ui: React.ReactElement) => {
     );
 };
 
-// Keep review calendar stages genuinely empty unless a test seeds calendar work.
+// Keep review calendar stages genuinely empty unless a prueba seeds calendar work.
 vi.mock('../../lib/external-calendar-events', () => ({
     fetchExternalCalendarEvents: vi.fn(async () => ({ events: [], warnings: [] })),
     summarizeExternalCalendarWarnings: vi.fn((warnings: string[]) => warnings[0] ?? null),

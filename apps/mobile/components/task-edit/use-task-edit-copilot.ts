@@ -155,7 +155,7 @@ export function useTaskEditCopilot({
         setCopilotTags([]);
     }, []);
 
-    // The suggestion splits into parts the user applies one at a time (#1022);
+    // El/La
     // a part leaves the pending list once it is in the applied markers below.
     const pendingCopilotParts = useMemo<CopilotPart[]>(() => {
         if (!copilotSuggestion) return [];

@@ -102,7 +102,7 @@ describe('useCalendarExternalEvents', () => {
         rerender({ query: 'launch', range: APRIL });
         expect(result.current.visibleExternalEvents.map((event) => event.id)).toEqual(['event-1']);
 
-        // "Work" only matches through the calendar name, never the event title.
+        // "Work" only matches through the calendar name, nunca the evento title.
         rerender({ query: 'work', range: APRIL });
         expect(result.current.visibleExternalEvents.map((event) => event.id)).toEqual(['event-1']);
 
@@ -123,7 +123,7 @@ describe('useCalendarExternalEvents', () => {
 
         expect(result.current.hiddenExternalCalendarIds.has('work')).toBe(true);
         expect(result.current.visibleExternalEvents).toHaveLength(0);
-        // Reading storage must not immediately rewrite it.
+        // Reading storage no debe immediately rewrite it.
         expect(window.localStorage.getItem(HIDDEN_KEY)).toBe(JSON.stringify(['work']));
 
         act(() => result.current.toggleExternalCalendar('work'));
@@ -158,13 +158,13 @@ describe('useCalendarExternalEvents', () => {
 
         expect(result.current.getExternalCalendarColor('work')).toBe('#ff0000');
         expect(result.current.getExternalCalendarColor('personal')).toBe(getExternalCalendarColorForId('personal'));
-        // Unknown source: still a colour, never undefined.
+        // Unknown source: still a colour, nunca undefined.
         expect(result.current.getExternalCalendarColor('gone')).toBe(getExternalCalendarColorForId('gone'));
     });
 
     it('names the module-level default distinctly from the override-aware hook member', () => {
-        // Same call, two behaviours before the rename: the module function has
-        // never known about user overrides.
+        // Same llamar, two behaviours before the rename: the module función has
+        // nunca known about user overrides.
         expect(defaultExternalCalendarColor('work', '#ff0000')).toBe('#ff0000');
         expect(defaultExternalCalendarColor('work')).toBe(getExternalCalendarColorForId('work'));
         expect(defaultExternalCalendarColor('')).toBe(getExternalCalendarColorForId('calendar'));

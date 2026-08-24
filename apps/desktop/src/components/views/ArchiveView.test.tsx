@@ -36,7 +36,7 @@ const archivedProject: Project = {
 describe('ArchiveView', () => {
     beforeEach(() => {
         // The list filter criteria and the group/sort axes live in the shared UI
-        // store, so a test that picks one would otherwise narrow every test after it.
+        // store, so a prueba that picks one sería otherwise narrow every prueba after it.
         useUiStore.setState(initialUiState, true);
         useTaskStore.setState(initialTaskState, true);
         window.localStorage.removeItem('mindwtr:view:archive:v1');
@@ -73,8 +73,8 @@ describe('ArchiveView', () => {
         expect(getByText(`Completed: ${completionLabel}`)).toBeInTheDocument();
     });
 
-    // The whole point of #968: an archived task's notes and checklist are readable
-    // in place, so nobody has to restore a task just to read what it said.
+    // The whole point of #968: an archived tarea's notes and checklist are readable
+    // in place, so nobody has to restaurar a tarea just to read what it said.
     it('opens an archived task read-only, without restoring it', () => {
         const taskWithNotes: Task = {
             ...archivedTask,
@@ -201,7 +201,7 @@ describe('ArchiveView', () => {
         expect(screen.getByText('Archived project')).toBeInTheDocument();
     });
 
-    // The area filter is app-wide, and mobile's Archive has always honoured it.
+    // The area filter is app-wide, and mobile's Archive has siempre honoured it.
     // Desktop's Archive read status alone, so excluding Work still showed Work.
     it('honours the app-wide area filter for archived tasks and projects', () => {
         const homeTask: Task = { ...archivedTask, id: 'task-2', title: 'Home archived task', areaId: 'area-home' };
@@ -291,7 +291,7 @@ describe('ArchiveView', () => {
         });
     });
 
-    // Archive registered no task-list scope at all, so every key that works in
+    // Archive registered no tarea-list scope at all, so every key that works in
     // the seven other lists silently did nothing here.
     describe('keyboard scope', () => {
         const secondTask: Task = { ...archivedTask, id: 'task-2', title: 'Second archived task' };
@@ -404,7 +404,7 @@ describe('ArchiveView', () => {
             renderWithBoth();
 
             fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
-            // Rows carry their own clickable context chips now, so anchor the
+            // Rows carry their own clickable contexto chips now, so anchor the
             // match to the panel's chip, whose name starts with the token.
             fireEvent.click(screen.getByRole('button', { name: /^@home/ }));
 
@@ -414,10 +414,10 @@ describe('ArchiveView', () => {
         });
 
         // The criteria are one selection shared by every desktop list (#956), so
-        // a token picked in Next can be active here while matching nothing
-        // archived. Without the union the panel would list no chip to switch it
-        // back off and the archive would look empty for no visible reason. That
-        // holds for both sides of the tri-state cycle (#982).
+        // a token picked in Next puede be active here while matching nothing
+        // archived. Without the union the panel sería list no chip to switch it
+        // back off and the archive sería look empty for no visible reason. That
+        // holds for both sides of the tri-estado cycle (#982).
         it('offers a token set in another view even when nothing archived matches it', () => {
             useUiStore.setState((state) => ({
                 listFilters: { ...state.listFilters, criteria: { contexts: ['@office'] } },
@@ -429,7 +429,7 @@ describe('ArchiveView', () => {
             fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
             // Included → excluded: nothing archived carries @office, so both
             // rows come back, and the chip is still listed under its excluded
-            // name so the last click can clear it.
+            // name so the last click puede clear it.
             fireEvent.click(screen.getByRole('button', { name: /@office/ }));
             expect(rowTitles()).toHaveLength(2);
             expect(useUiStore.getState().listFilters.criteria.excludedContexts).toEqual(['@office']);
@@ -495,7 +495,7 @@ describe('ArchiveView', () => {
             fireEvent.click(screen.getByRole('button', { name: /Select all/i }));
             fireEvent.click(screen.getByRole('button', { name: 'Restore to Inbox' }));
 
-            // Rows the list is not showing must not be acted on.
+            // Rows the list is not showing no debe be acted on.
             await waitFor(() => {
                 expect(useTaskStore.getState()._tasksById.get(archivedTask.id)?.status).toBe('inbox');
             });
@@ -547,9 +547,9 @@ describe('ArchiveView', () => {
         });
     });
 
-    // Global search sets the shared highlight and navigates here (#916). Before
-    // #991 Archive consumed it nowhere, so a result that the view was hiding —
-    // by filter or by collapsed group — looked like the search went nowhere.
+    // global search sets the shared highlight and navigates here (#916). Before
+    // #991 Archive consumed it en ningún lugar, so a result that the view was hiding —
+    // by filter or by collapsed group — looked like the search went en ningún lugar.
     describe('revealing a task sent here by global search', () => {
         const homeTask: Task = {
             ...archivedTask,
@@ -665,8 +665,8 @@ describe('ArchiveView', () => {
             expect(rowTitles()).toContain('Archived task');
         });
 
-        // The highlight is app-wide: a task headed for another list must not
-        // make Archive throw the user's filters away.
+        // The highlight is app-wide: a tarea headed for another list no debe
+        // make Archive lanzar the user's filters away.
         it('ignores a highlight for a task that is not archived', () => {
             const showToast = vi.fn();
             useUiStore.setState((state) => ({
@@ -688,7 +688,7 @@ describe('ArchiveView', () => {
         it('scrolls the virtualized row into view once and lets the user scroll away', () => {
             const originalRect = Element.prototype.getBoundingClientRect;
             // Without a height nothing virtualizes meaningfully in jsdom, so no
-            // row ever measures and the bug cannot show itself.
+            // row ever measures and the error no puede show itself.
             Element.prototype.getBoundingClientRect = function fakeRect() {
                 return { height: 120, width: 0, top: 0, left: 0, right: 0, bottom: 120, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
             };

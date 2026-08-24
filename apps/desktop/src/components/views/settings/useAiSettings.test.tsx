@@ -88,7 +88,7 @@ describe('useAiSettings speech provider changes', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         languageMocks.t.mockImplementation((key: string) => key);
-        // The model downloads go through the shared native-invoke adapter, which
+        // The model downloads go through the shared native-invocar adapter, which
         // refuses outside the desktop shell.
         (window as typeof window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {};
         fsMocks.exists.mockResolvedValue(false);
@@ -433,8 +433,8 @@ describe('useAiSettings speech provider changes', () => {
 });
 
 describe('useAiSettings live model lists', () => {
-    // A base URL is the credential-free trigger (self-hosted servers, #930), so
-    // these render without waiting for the async key load.
+    // A base URL is the credential-free trigger (uno mismo-hosted servers, #930), so
+    // these renderizar without waiting for the asincrónico key load.
     const localOpenAiSettings = (
         extra: Partial<NonNullable<AppData['settings']['ai']>> = {}
     ): AppData['settings'] => ({
@@ -466,9 +466,9 @@ describe('useAiSettings live model lists', () => {
 
     const read = () => JSON.parse(screen.getByTestId('options').textContent ?? '{}');
 
-    // The fetch effects debounce, so nothing is in flight until the timer runs —
+    // The traer effects rebote, so nothing is in flight until the timer runs —
     // and a key that arrives asynchronously only schedules its timer on the
-    // render after it lands, hence two passes.
+    // renderizar after it lands, hence two passes.
     const settle = async () => {
         for (let pass = 0; pass < 2; pass += 1) {
             await act(async () => {
@@ -586,8 +586,8 @@ describe('useAiSettings live model lists', () => {
 
     it('waits for the new provider key instead of reusing the previous one', async () => {
         aiConfigMocks.loadAIKey.mockImplementation(async (provider: string) => {
-            // Gemini's key never arrives, so a stale OpenAI key is the only one
-            // the fetch could possibly reach for.
+            // Gemini's key nunca arrives, so a stale OpenAI key is the only one
+            // the traer podría possibly reach for.
             if (provider !== 'openai') return await new Promise<string>(() => {});
             return 'sk-openai';
         });

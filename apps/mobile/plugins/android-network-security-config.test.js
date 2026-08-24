@@ -21,7 +21,7 @@ describe('android-network-security-config plugin', () => {
       expect(written).toBe(NETWORK_SECURITY_CONFIG_XML);
       expect(written).toContain('<certificates src="system" />');
       expect(written).toContain('<certificates src="user" />');
-      // The config replaces the manifest's usesCleartextTraffic attribute, so
+      // El/La
       // it must re-grant cleartext or private-IP WebDAV sync silently breaks.
       expect(written).toContain('cleartextTrafficPermitted="true"');
     } finally {

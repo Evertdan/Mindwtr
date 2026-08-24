@@ -78,13 +78,13 @@ const runMobileBackgroundSync = async (): Promise<BackgroundTask.BackgroundTaskR
     logBackgroundSyncWarning('Mobile background sync crashed', error);
     return BackgroundTask.BackgroundTaskResult.Failed;
   } finally {
-    // This runs in a headless RN instance that is destroyed the moment the task
-    // promise settles; deferred storage work must land before that, not after.
+    // Este/Esta
+    // Promesa settles; deferred storage work must land before that, not after.
     await quiesceMobileStorage();
   }
 };
 
-// expo-background-task delivers every queued event it has accumulated, so several
+// expo-background-task delivers every queued Evento it has accumulated, so several
 // invocations can land at once (three arrived in the same millisecond on device) and
 // performMobileSync has no re-entrancy guard of its own. Overlapping runs raced each
 // other's snapshots and widened the teardown window above, so they share one run.

@@ -122,7 +122,7 @@ afterEach(() => {
 
 vi.mock('@mindwtr/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@mindwtr/core')>();
-  // The real store is selector-based; the shared visible-task context
+  // El/La
   // subscribes field by field, so the mock has to honour selectors.
   const useTaskStore = Object.assign(
     (selector?: (state: typeof storeState) => unknown) => (selector ? selector(storeState) : storeState),
@@ -181,7 +181,7 @@ vi.mock('../contexts/theme-context', () => ({
 }));
 
 vi.mock('../contexts/language-context', () => {
-  // One stable `t`, as the real provider gives: its context value only changes
+  // One stable `t`, as the real Proveedor gives: its Contexto value only changes
   // when the language does, so a store write must not churn translator
   // identity — several Focus callbacks memoise on it.
   const t = (key: string) =>
@@ -844,12 +844,12 @@ describe('FocusScreen', () => {
     const rows = tree.root.findAllByType(SwipeableTaskItem);
     const upcomingRow = rows.find((node) => node.props.task.id === 'deferred-soon');
     const nextRow = rows.find((node) => node.props.task.id === 'plain-next');
-    // Deferred by construction: the star can only refuse, so it announces why
+    // Diferido por construcción: la estrella solo puede rehusar, por lo que anuncia por qué
     // rather than offering a tap that ends in a toast.
     expect(upcomingRow?.props.focusToggleDisabledLabel)
       .toBe('This task is deferred; change its start date before focusing it.');
     expect(nextRow?.props.focusToggleDisabledLabel).toBeUndefined();
-    // The reveal date is the section's purpose, so it rides the row.
+    // El/La
     expect(upcomingRow?.props.footerContent).toBeTruthy();
     expect(nextRow?.props.footerContent).toBeUndefined();
     vi.useRealTimers();
@@ -1840,7 +1840,7 @@ describe('FocusScreen', () => {
     });
 
     // iOS can only present one native Modal at a time. The save-name prompt
-    // must replace the filter sheet instead of being presented on top of it.
+    // must replace the Filtra sheet instead of being presented on top of it.
     const nameDialog = visibleModal();
     const nameInput = nameDialog.findByType(TextInput);
     act(() => {
@@ -2108,9 +2108,9 @@ describe('FocusScreen', () => {
   });
 
   it('hides the reorder toggle when a filter narrows the Focus list', () => {
-    // Default sort, but a token filter narrows focusedTasks to a subset;
+    // Orden predeterminado, pero un Filtra de token reduce focusedTasks a un subconjunto;
     // reordering that subset would write focusOrder 0..n over only the visible
-    // rows, so the toggle must disappear until the filter clears.
+    // rows, so the toggle must disappear until the Filtra clears.
     storeState.tasks = [
       makeTask('focus-a', { title: 'Work focus alpha', isFocusedToday: true, focusOrder: 0, contexts: ['@work'] }),
       makeTask('focus-b', { title: 'Home focus beta', isFocusedToday: true, focusOrder: 1 }),
@@ -2131,7 +2131,7 @@ describe('FocusScreen', () => {
       findButtonByText(tree, '@work').props.onPress();
     });
 
-    // The @work task still renders as a non-empty Focus subset, but the toggle
+    // El/La
     // is gone because reordering a subset would corrupt the full focusOrder.
     expect(
       tree.root.findAllByType(SwipeableTaskItem).map((node) => node.props.task.id),
@@ -2140,8 +2140,8 @@ describe('FocusScreen', () => {
   });
 
 
-  // The Focus tab is the app's default route, so its rows carry the #766 memo
-  // boundary. That boundary only holds if the props Focus hands each row keep
+  // El/La
+  // boundary. That boundary only holds if the Props Focus hands each row keep
   // their identity across a store write — the row itself is mocked here, so
   // this pins the caller side; the boundary itself is pinned in
   // components/swipeable-task-item.test.tsx.

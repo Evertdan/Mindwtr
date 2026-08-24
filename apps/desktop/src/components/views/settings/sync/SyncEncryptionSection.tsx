@@ -70,7 +70,7 @@ export function SyncEncryptionSection({ encryption, t }: SyncEncryptionSectionPr
         if (done) closeFlow();
     };
 
-    // Rendered after the hooks so the component's hook order never depends on the
+    // Rendered after the hooks so the component's gancho order nunca depends on the
     // backend: `supported` flips whenever the user changes the sync backend.
     if (!supported || state === null) return null;
 

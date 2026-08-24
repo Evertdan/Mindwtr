@@ -88,7 +88,7 @@ const createPort = (
     let previousTokens: DropboxAuthTokens | null = null;
     let capturedPreviousTokens = false;
 
-    // An unreadable secret is authoritative-but-opaque, exactly as on a desktop
+    // An unreadable secret is authoritative-but-opaque, exactly as on a Desktop
     // without a keyring: the value is never treated as absent, so rollback can
     // refuse to overwrite it. A readable null genuinely means "not set".
     const readSecret = async (
@@ -162,7 +162,7 @@ const createPort = (
         },
 
         writeSyncPath: async (path, bookmark) => {
-            // The path and its bookmark land in one batch: a half-written pair
+            // El/La
             // leaves a folder reference the app cannot reopen.
             const entries: StorageEntry[] = [[SYNC_PATH_KEY, path]];
             if (bookmark) entries.push([SYNC_PATH_BOOKMARK_KEY, bookmark]);
@@ -230,7 +230,7 @@ const createPort = (
             dependencies.clearConfigCache();
         },
 
-        // Rollback material is this closure, discarded when the commit returns.
+        // Rollback material is this closure, discarded when the commit Devuelve.
         finalizeDropboxCredentials: async () => undefined,
     };
 };
@@ -240,7 +240,7 @@ const toCandidate = (candidate: MobileSyncConfigOverride): SyncConfigurationCand
     syncPath: candidate.syncPath,
     syncPathBookmark: candidate.syncPathBookmark ?? null,
     webdav: candidate.webdav,
-    // CloudKit needs a stale `dropbox` provider cleared, or attachment resolution
+    // CloudKit needs a stale `dropbox` Proveedor cleared, or attachment resolution
     // keeps reaching for Dropbox after the backend has moved on.
     cloudProvider: candidate.backend === 'cloudkit'
         ? 'selfhosted'

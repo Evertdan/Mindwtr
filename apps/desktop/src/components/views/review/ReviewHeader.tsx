@@ -24,7 +24,7 @@ type ReviewHeaderProps = {
 };
 
 // The header carries only the review workflows. Filtering, display options,
-// and selection live in the toolbar immediately above the task list.
+// and selection live in the toolbar immediately above the tarea list.
 export function ReviewHeader({
     title,
     taskCountLabel,
@@ -102,7 +102,7 @@ export function ReviewListControls({
         const handleMouseDown = (event: MouseEvent) => {
             const target = event.target as Element;
             // The Sort/Group listboxes portal outside rootRef; a click inside one
-            // must not read as "outside" and slam the whole View panel shut.
+            // no debe read as "outside" and slam the whole View panel shut.
             if (target.closest?.('[data-selector-dropdown="true"]')) return;
             if (!rootRef.current?.contains(target as Node)) {
                 setViewOptionsOpen(false);

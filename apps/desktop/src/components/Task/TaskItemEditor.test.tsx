@@ -6,8 +6,8 @@ import { TaskItemEditor } from './TaskItemEditor';
 
 type EditorAi = Parameters<typeof TaskItemEditor>[0]['ai'];
 
-// The editor takes the AI hook's result whole, so a panel test is a small
-// object literal instead of two dozen props.
+// The editor takes the AI gancho's result whole, so a panel prueba is a small
+// object literal en lugar de two dozen propiedades.
 const createAi = (overrides: Partial<EditorAi> = {}): EditorAi => ({
     aiEnabled: true,
     isAIWorking: false,
@@ -87,7 +87,7 @@ const translations: Record<string, string> = {
 
 const t = (key: string) => translations[key] ?? key;
 
-// jsdom has no scrollIntoView; the reveal effect calls it after expanding
+// jsdom has no scrollIntoView; the reveal efecto calls it after expanding
 // the section holding Attachments.
 Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
     configurable: true,

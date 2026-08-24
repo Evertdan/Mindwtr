@@ -819,7 +819,7 @@ describe('TaskItemDisplay', () => {
             </LanguageProvider>
         );
 
-        // A real anchor since #1048 — checklist links used to render as dead
+        // A real anchor since #1048 — checklist links used to renderizar as dead
         // text because the whole row was one toggle button.
         expect(queryByRole('link', { name: 'spec' })).toBeInTheDocument();
         expect(container.textContent).toContain('Draft spec');
@@ -1384,7 +1384,7 @@ describe('TaskItemDisplay', () => {
                 </LanguageProvider>
             );
             const label = safeFormatDate(dueDate, hasTimeComponent(dueDate) ? 'Pp' : 'P');
-            // The urgency class lands on the badge wrapper, not the label span.
+            // The urgency clase lands on the badge wrapper, not the label span.
             const className = getByText(label).closest('.metadata-badge')?.className ?? '';
             unmount();
             return className;

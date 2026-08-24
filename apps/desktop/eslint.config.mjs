@@ -7,12 +7,12 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default [
   {
-    // ESLint's core file-discovery always walks recognized JS extensions
-    // regardless of any config's `files:` scoping, so every non-ts/tsx one
-    // must be ignored explicitly to match the old `--ext ts,tsx` restriction
-    // exactly - otherwise coverage/ report artifacts, tailwind/postcss
-    // configs, public/sw.js, and this config file itself end up "linted"
-    // with zero applicable rules.
+    // El descubrimiento de archivos central de ESLint siempre recorre las extensiones JS reconocidas
+    // independientemente del alcance `files:` de cualquier config, por lo que cada una que no sea ts/tsx
+    // debe ignorarse explícitamente para coincidir con la restricción antigua `--ext ts,tsx`
+    // exactamente - de lo contrario, artefactos de coverage/, tailwind/postcss
+    // configs, public/sw.js, y el propio archivo de config terminan "linted"
+    // con cero reglas aplicables.
     ignores: ['dist/**', 'src-tauri/**', 'node_modules/**', '**/*.js', '**/*.mjs', '**/*.cjs'],
   },
   {
@@ -37,16 +37,16 @@ export default [
     },
     rules: {
       ...js.configs.recommended.rules,
-      // Turns off core rules TypeScript already checks better (no-undef,
-      // no-redeclare, ...) for ts/tsx - the eslintrc-style 'plugin:@typescript-
-      // eslint/recommended' extends chain applied this automatically; flat
-      // config does not, so it must be spread in explicitly or ambient DOM/
-      // lib types (EventListener, FrameRequestCallback, ...) and the JSX
-      // pragma read as undefined globals.
+      // Desactiva reglas centrales que TypeScript ya verifica mejor (no-undef,
+      // no-redeclare, ...) para ts/tsx - la cadena de extensiones del estilo eslintrc 'plugin:@typescript-
+      // eslint/recommended' aplicó esto automáticamente; la config plana
+      // no lo hace, por lo que debe incluirse explícitamente o tipos DOM/
+      // lib ambientes (EventListener, FrameRequestCallback, ...) y el pragma JSX
+      // se leen como globals indefinidas.
       ...tsPlugin.configs['flat/eslint-recommended'].rules,
       ...tsPlugin.configs.recommended.rules,
       ...reactHooks.configs['recommended-latest'].rules,
-      // We run with `--max-warnings 0`, so avoid warning-level rules by default.
+      // Ejecutamos con `--max-warnings 0`, así que evitamos reglas a nivel de advertencia de forma predeterminada.
       'no-mixed-spaces-and-tabs': 'off',
       'react-hooks/exhaustive-deps': 'off',
       'react-refresh/only-export-components': 'off',

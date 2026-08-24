@@ -137,8 +137,8 @@ export function useSettingsAdvancedPage({
         }
         await updateSettings({
             network: {
-                // Empty string is an explicit clear; undefined would read as
-                // "never configured" and skip the native mirror on startup.
+                // Empty string is an explicit clear; undefined sería read as
+                // "nunca configured" and saltar the native mirror on inicio.
                 proxyUrl: trimmedProxyUrl,
             },
         });

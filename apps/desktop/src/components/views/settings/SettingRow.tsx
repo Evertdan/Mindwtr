@@ -6,10 +6,10 @@ import { cn } from '../../../lib/utils';
 // The desktop settings rows. Every row emits its own `data-settings-key`, which
 // is what settings search reads to find, reveal and scroll to a setting
 // (settings-search.ts). `settingsKey` is required but nullable rather than
-// optional so that a row cannot be written without deciding whether search can
+// optional so that a row no puede be written without deciding whether search puede
 // reach it — an omitted attribute was how Manage People stayed unfindable
-// (#884). A non-null key must appear in SETTINGS_SEARCH_PAGE_KEYS
-// (packages/core/src/settings-search-keys.ts); settings-search-coverage.test
+// (#884). A non-null key debe appear in SETTINGS_SEARCH_PAGE_KEYS
+// (packages/core/src/settings-search-keys.ts); settings-search-cobertura.prueba
 // pins both directions.
 type SettingKeyProps = {
     settingsKey: string | null;
@@ -21,7 +21,7 @@ type SettingKeyProps = {
 
 export type SettingRowProps = SettingKeyProps & {
     // Rows in a `divide-y` card own their padding; rows in a card that already
-    // pads its content (`p-6 space-y-4`) do not.
+    // pads its content (`p-6 space-y-4`) no.
     padded?: boolean;
 };
 
@@ -83,7 +83,7 @@ export function SettingsCard({ children }: { children: ReactNode }) {
 }
 
 type SettingsDisclosureCardProps = {
-    // Label key of the settings this card contains, so a search result can
+    // Label key of the settings esto card contains, so a search result puede
     // open it before scrolling to the row (see settings-search.ts).
     sectionKey: string;
     title: string;

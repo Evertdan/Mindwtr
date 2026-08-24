@@ -21,7 +21,7 @@ type ChangeResult = {
     tokenExpired?: boolean;
 };
 
-// Type-safe interface for the native module's async functions.
+// Type-safe interface for the native module's Asincrónico functions.
 interface CloudKitSyncModule extends NativeModule {
     getAccountStatus(): Promise<string>;
     ensureZone(): Promise<void>;
@@ -39,7 +39,7 @@ interface CloudKitSyncModule extends NativeModule {
     consumePendingRemoteChange(): Promise<boolean>;
 }
 
-// The native module — loaded via requireNativeModule (Expo SDK 54+).
+// El/La
 // Will throw on non-iOS platforms, so we guard with a try/catch.
 let CloudKitSync: CloudKitSyncModule | null = null;
 try {
@@ -193,7 +193,7 @@ export const readRemoteCloudKit = async (options: CloudKitOperationOptions = {})
                 await AsyncStorage.setItem(CLOUDKIT_CHANGE_TOKEN_KEY, result.changeToken);
             }
 
-            // If no changes, return null to skip merge
+            // Si
             const hasChanges =
                 Object.values(result.records).some((arr) => arr.length > 0) ||
                 Object.values(result.deletedIDs).some((arr) => arr.length > 0);
@@ -202,8 +202,8 @@ export const readRemoteCloudKit = async (options: CloudKitOperationOptions = {})
                 return null;
             }
 
-            // For incremental changes, we need to do a full fetch to get the complete
-            // remote state for three-way merge. The change result only tells us what
+            // Para
+            // remote Estado for three-way merge. The change result only tells us what
             // changed, but our merge engine needs the full remote AppData.
             return await fullFetch(options);
         }
@@ -523,7 +523,7 @@ async function fullFetch(options: CloudKitOperationOptions = {}): Promise<AppDat
     }
 
     // CloudKit records are untyped JSON — cast through unknown to AppData.
-    // The merge engine validates shape downstream.
+    // El/La
     return {
         tasks: Array.isArray(tasks) ? tasks : [],
         projects: Array.isArray(projects) ? projects : [],

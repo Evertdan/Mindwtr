@@ -85,7 +85,7 @@ import { SYNC_BACKEND_KEY } from '@/lib/sync-constants';
 import { coerceSupportedBackend, resolveBackend, type SyncBackend } from '@/lib/sync-service-utils';
 import { persistLastRoute } from '@/lib/session-restore';
 
-// Blurred screens stay mounted, so every store change re-rendered every list in
+// Las pantallas borrosas permanecen montadas
 // the stack: a #766 log showed three project task lists (tab route + two pushed
 // stack entries) each spending ~1s on the same 133 rows per tap. Freezing
 // non-focused screens skips those renders; state, scroll position and native
@@ -317,12 +317,12 @@ const getViewBreadcrumb = (pathname: string | null): string | null => {
   return `view:${view}`;
 };
 
-// Initialize storage for mobile
+// Inicializar almacenamiento para móvil
 let storageInitError: Error | null = null;
 
 installCoreLoggerBridge();
 
-// Hermes has no crypto.subtle, so core's attachment integrity checks have nothing to
+// Hermes no tiene crypto.subtle
 // digest with until this is registered (see mobileSha256Hex).
 setSha256HexProvider(mobileSha256Hex);
 
@@ -394,7 +394,7 @@ function RootLayoutContentInner() {
     Platform.OS === 'android' ? 'unknown' : 'play-store'
   );
   const [testAnnouncement, setTestAnnouncement] = useState<AppAnnouncement | null>(null);
-  // Prompt state read once at startup so the descriptors below can answer
+  // Estado del indicador leído una vez al iniciar
   // `isEligible` synchronously; null until it lands (or if the read failed).
   const [promptStateSnapshot, setPromptStateSnapshot] = useState<UserPromptState | null>(null);
   const activeAnnouncement = testAnnouncement ?? ACTIVE_APP_ANNOUNCEMENT;
@@ -461,7 +461,7 @@ function RootLayoutContentInner() {
     pathname,
     router,
   });
-  // Android drops notifications on reboot and OEMs drop them when they kill
+  // Android descarta notificaciones al reiniciar
   // the app process; re-arm the persistent quick-capture notification (when
   // enabled) on start and on every return to the foreground (#819).
   useEffect(() => {
@@ -512,7 +512,7 @@ function RootLayoutContentInner() {
     addBreadcrumb(breadcrumb);
   }, [pathname]);
 
-  // Remember the screen the user is on so a reopen shortly after the OS kills
+  // Recuerde la pantalla en la que se encuentra el usuario
   // the app resumes there instead of resetting to Focus (#842).
   const globalSearchParams = useGlobalSearchParams<{ projectId?: string }>();
   const routeProjectId = typeof globalSearchParams.projectId === 'string' ? globalSearchParams.projectId : undefined;
@@ -522,7 +522,7 @@ function RootLayoutContentInner() {
     void persistLastRoute(pathname, routeProjectId ? { projectId: routeProjectId } : undefined);
   }, [pathname, routeProjectId]);
   useEffect(() => {
-    // The snapshot timestamp must reflect when the session left the app, not
+    // La marca de tiempo de la instantánea debe reflejar
     // the last navigation — refresh it whenever the app goes to background.
     const subscription = AppState.addEventListener('change', (state) => {
       if (state !== 'background' && state !== 'inactive') return;
@@ -600,7 +600,7 @@ function RootLayoutContentInner() {
     };
   }, []);
 
-  // Startup prompts share one gate and open one at a time. The descriptors
+  // Los indicadores de inicio comparten una puerta
   // below carry each prompt's own eligibility/present logic; the queue owns
   // precedence (onboarding > announcement > update > donation), the startup
   // delays, and session dismissal. See packages/core/src/startup-prompts.ts.
@@ -632,7 +632,7 @@ function RootLayoutContentInner() {
       },
     },
     {
-      // Maintainer announcement: when one is configured it also blocks the
+      // Anuncio del mantenedor: cuando uno está configurado también bloquea el
       // donation and update prompts (see their isEligible).
       id: 'announcement',
       priority: 30,
@@ -652,7 +652,7 @@ function RootLayoutContentInner() {
       },
     },
     {
-      // Update reminder: records the check on selection, then confirms an update
+      // Recordatorio de actualización: registra la verificación en la selección, luego confirma una actualización
       // actually exists before opening (declines otherwise).
       id: 'update-reminder',
       priority: 20,
@@ -669,7 +669,7 @@ function RootLayoutContentInner() {
         });
       },
       onSelect: () => {
-        // Safe here and only here: the queue runs onSelect after this descriptor
+        // Seguro aquí y solo aquí: la cola ejecuta onSelect después de este descriptor
         // has won the slot, so the once-a-day check is never burned by a prompt
         // that never ran.
         void updateLocalUserPromptState((state) => recordUpdateReminderChecked(state, Date.now()))
@@ -702,7 +702,7 @@ function RootLayoutContentInner() {
       },
     },
     {
-      // Donation ask: lowest precedence; suppressed whenever an announcement is
+      // Solicitud de donación: precedencia más baja; suprimida cuando hay un anuncio
       // configured or an update reminder is showing (via the queue).
       id: 'donation',
       priority: 10,
@@ -1084,7 +1084,7 @@ function RootLayoutContentInner() {
     );
   }
 
-  // Avoid mounting task screens against the empty default store before local hydration finishes.
+  // Evite montar pantallas de tareas contra el almacén predeterminado vacío antes de que la hidratación local se complete.
   if (!isFirstPaintReady) {
     return null;
   }

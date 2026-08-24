@@ -57,10 +57,10 @@ export function ListHeader({
     onToggleDensity,
     t,
 }: ListHeaderProps) {
-    // The button names what clicking it does, not the current state — "Details off"
+    // The button names what clicking it does, not the current estado — "Details off"
     // read as a disabled control rather than a way to show the dates and project.
-    // A flipping name IS the state for a screen reader, so it carries no
-    // aria-pressed: "Hide details, pressed" announced the action and the state at
+    // A flipping name IS the estado for a screen reader, so it carries no
+    // aria-pressed: "Hide details, pressed" announced the acción and the estado at
     // once and they contradict each other.
     const detailsLabel = showListDetails
         ? tFallback(t, 'list.hideDetails', 'Hide details')

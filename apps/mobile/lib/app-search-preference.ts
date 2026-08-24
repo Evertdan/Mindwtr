@@ -3,12 +3,12 @@ import { Platform } from 'react-native';
 
 // Device-local preference (#1017): whether this device's task/project/area
 // index is mirrored into Android's AppSearch PlatformStorage for system
-// search. This is a device capability, not user data — it must never enter
+// search. Esto es a device capability, not user data — it must never enter
 // the synced settings document (a laptop or an iPhone has no such switch).
 const STORAGE_KEY = 'mindwtr:appSearchIndexingEnabled';
 
 // PlatformStorage's system-search integration is only available from
-// Android 12 (API 31); below that the setting is hidden entirely, per #1017.
+// Un
 const MIN_SUPPORTED_SDK = 31;
 
 export function isAppSearchSupported(): boolean {

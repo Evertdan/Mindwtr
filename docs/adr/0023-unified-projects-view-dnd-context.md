@@ -1,42 +1,42 @@
-# 23. Unified Projects-view DndContext
+# 23. DndContext unificado de vista de proyectos
 
-Date: 2026-07-04
+Fecha: 2026-07-04
 
-## Status
+## Estado
 
-Accepted
+Aceptado
 
-## Context
+## Contexto
 
-The desktop Projects view accumulated four separate dnd-kit `DndContext`s: one in the
-workspace for task reordering, and one per sidebar project group (active, deferred,
-archived) for project reordering and project→area moves (#812). dnd-kit drags cannot
-cross context boundaries, so a task row could never reach a sidebar project — the
-remaining half of #812 (moving tasks between projects by drag) was structurally
-impossible. Alternatives considered: native HTML5 drag from the row body reusing the
-calendar-drag pipeline (two competing drag gestures per row, and it re-introduces the
-text-selection conflict fixed in #815), and manual `elementFromPoint` hit-testing on
-top of the existing workspace context (bypasses dnd-kit's collision model with
-hand-rolled glue).
+La vista de Proyectos de escritorio acumuló cuatro `DndContext`s de dnd-kit separados: uno en el
+espacio de trabajo para reordenamiento de tareas, y uno por grupo de proyecto de barra lateral (activo, diferido,
+archivado) para reordenamiento de proyecto y movimientos de proyecto→área (#812). Los arrastradores de dnd-kit no pueden
+cruzar límites de contexto, por lo que una fila de tarea nunca pudo alcanzar un proyecto de barra lateral — la
+mitad restante de #812 (mover tareas entre proyectos por arrastrar) era estructuralmente
+imposible. Alternativas consideradas: arrastrar nativo HTML5 desde el cuerpo de la fila reutilizando el
+canalización de arrastrar de calendario (dos gestos de arrastrar competidores por fila e introduce nuevamente el
+conflicto de selección de texto corregido en #815) y prueba de impacto manual `elementFromPoint`
+en la parte superior del contexto del espacio de trabajo existente (omite el modelo de colisión de dnd-kit con
+pegamento hecho a mano).
 
-## Decision
+## Decisión
 
-The Projects view hosts a single `DndContext` spanning sidebar and workspace. Every
-draggable declares typed data (`{ type: 'task', sortable }` or
-`{ type: 'project', section }`), and a single collision-detection function branches on
-the active drag's type: project drags only see containers of their own sidebar
-section (preserving the old per-section boundaries), task drags see the task list
-(only in manual-order mode) plus non-archived sidebar project rows and area zones.
-Area drop-zone ids are namespaced by section (`project-area:<section>:<areaId>`)
-because the same area can render a zone in several sections under one context. A
-`DragOverlay` carries the task chip across panel scroll containers; drops on sidebar
-targets write through the existing core container-assignment path in `updateTask`.
+La vista de Proyectos aloja un solo `DndContext` que abarca la barra lateral y el espacio de trabajo. Cada
+elemento arrastreable declara datos tipados (`{ type: 'task', sortable }` o
+`{ type: 'project', section }`), y una sola función de detección de colisión se ramifica en
+el tipo de arrastrador activo: los arrastradores de proyecto solo ven contenedores de su propia
+sección de barra lateral (preservando los límites antiguos por sección), los arrastradores de tareas ven la lista de tareas
+(solo en modo de orden manual) más filas de proyecto de barra lateral no archivadas y zonas de área.
+Las identificaciones de zona de caída de área se espacian por nombre de sección (`project-area:<section>:<areaId>`)
+porque la misma área puede renderizar una zona en varias secciones bajo un contexto. Un
+`DragOverlay` lleva el chip de tarea a través de contenedores de desplazamiento de panel; las caídas en objetivos de barra lateral
+escriben a través de la ruta de asignación de contenedor central existente en `updateTask`.
 
-## Consequences
+## Consecuencias
 
-One drag gesture (the grip handle) now serves in-list reorder and cross-panel moves,
-and new drop targets only need a droppable with typed data plus a branch in the
-drag-end dispatcher. The cost is that all Projects-view drag interactions share one
-sensor configuration and collision function, so changes there must consider every
-drag type; the typed-data filters are the guard rails that keep the old behaviors
-(project reorder, project→area, task reorder) isolated from each other.
+Un gesto de arrastrado (la manija de agarre) ahora sirve para reordenamiento en lista y movimientos entre paneles,
+y los nuevos objetivos de caída solo necesitan un droppable con datos tipados más una rama en el
+despachador de final de arrastre. El costo es que todas las interacciones de arrastrado de vista de Proyectos comparten uno
+configuración de sensor y función de colisión, por lo que los cambios allí deben considerar cada
+tipo de arrastre; los filtros de datos tipados son los guardagujas que mantienen los comportamientos antiguos
+(reordenamiento de proyecto, proyecto→área, reordenamiento de tareas) aislados entre sí.

@@ -353,7 +353,7 @@ async function fetchIcsCalendarEvents(rangeStart: Date, rangeEnd: Date, signal?:
     // left on it. `contributed` also carries the parent's `feedColor` when
     // the feed wasn't split — it must win over the raw persisted entry
     // (which never carries `feedColor`), so it's merged in as a later
-    // source rather than dropped, the same way desktop does it.
+    // source rather than dropped, the same way Desktop does it.
     const splitCalendarIds = new Set<string>();
     const icsSources: ExternalCalendarSourceResult[] = [];
     for (const [index, result] of results.entries()) {
@@ -427,7 +427,7 @@ async function fetchSystemCalendarEvents(rangeStart: Date, rangeEnd: Date, signa
         name: getCalendarDisplayName(calendar),
         url: `system://${encodeURIComponent(calendar.id)}`,
         enabled: true,
-        // The OS calendar's own color, resolved as a feed hint (#974) — never
+        // El/La
         // an explicit pick, so it never gets written into synced settings.
         feedColor: typeof calendar.color === 'string' && calendar.color.trim().length > 0 ? calendar.color : undefined,
     }));

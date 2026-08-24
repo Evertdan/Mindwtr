@@ -59,7 +59,7 @@ export function getGlobalQuickAddShortcutOptions(platform: GlobalQuickAddShortcu
     const isWindows = platform.isWindows === true;
     const defaultShortcut = getDefaultGlobalQuickAddShortcut(platform);
     const legacyLabel = isMac ? 'Cmd+Shift+A' : 'Ctrl+Shift+A';
-    // Never recommend the legacy combo: Chrome (tab search), Word, and Excel
+    // nunca recommend the heredado combo: Chrome (tab search), Word, and Excel
     // all use Ctrl/Cmd+Shift+A, and a global hotkey steals it from them.
     const legacySuffix = defaultShortcut === GLOBAL_QUICK_ADD_SHORTCUT_LEGACY
         ? ' (recommended)'

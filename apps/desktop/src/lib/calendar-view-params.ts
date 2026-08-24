@@ -33,8 +33,8 @@ export function stageCalendarDropLanding(now: Date = new Date()): void {
         url.searchParams.set(CALENDAR_VIEW_PARAM, landingView);
     }
     url.searchParams.set(CALENDAR_MONTH_PARAM, format(now, 'yyyy-MM'));
-    // Month mode carries no selected date of its own; setting one would open the
-    // selected-day panel as a side effect of dropping.
+    // Month mode carries no selected date of its own; setting one sería open the
+    // selected-day panel as a efecto secundario of dropping.
     if (landingView && landingView !== 'month') {
         url.searchParams.set(CALENDAR_DATE_PARAM, format(now, 'yyyy-MM-dd'));
     } else {

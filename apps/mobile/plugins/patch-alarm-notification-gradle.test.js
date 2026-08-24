@@ -128,7 +128,7 @@ describe('patch-alarm-notification-gradle', () => {
     expect(output).toContain('int firedNotificationId = alarm.getAlarmId();');
     expect(output).toContain('getNotificationManager().cancel(firedNotificationId);');
     expect(output.indexOf('int firedNotificationId = alarm.getAlarmId();')).toBeLessThan(output.indexOf('alarm.setAlarmId((int) time);'));
-    // Snooze schedules an independent alarm row so the JS reschedule cycle cannot reap it.
+    // Posponer programa una fila de alarma independiente para que el ciclo de reprogramación de JS no pueda cosecharla.
     expect(output).toContain('int snoozedAlarmRowId = getAlarmDB().insert(alarm);');
     expect(output).toContain('alarm.setId(snoozedAlarmRowId);');
     expect(output).not.toContain('getAlarmDB().update(alarm);');
@@ -447,7 +447,7 @@ class AlarmReceiver {
   });
 
   it('throws naming the missing marker when one action-intent anchor silently drifts', () => {
-    // Same fixture as above, except the completeIntent anchor picked up a
+    // La misma fixture que arriba, excepto el ancla completeIntent recogió una
     // trailing comment (as if upstream reformatted just that one line). The
     // other two intents and the clearNotification helper still patch fine,
     // so a bare "did anything change" check would pass this through with the
@@ -600,7 +600,7 @@ class AlarmReceiver {
     expect(dismissCase).toContain('if (alarm != null) {');
     expect(dismissCase).toContain('alarmUtil.clearNotification(intent.getExtras().getInt("NotificationId"));');
 
-    // Every case receipts before doing anything else.
+    // Cada caso de recibos antes de hacer cualquier otra cosa.
     expect(output).toContain('Log.d(TAG, "ACTION_SNOOZE id=" + id + " alarmFound=" + (alarm != null));');
     expect(output).toContain('Log.d(TAG, "ACTION_COMPLETE id=" + id + " alarmFound=" + (alarm != null));');
     expect(output).toContain('Log.d(TAG, "ACTION_DISMISS id=" + id + " alarmFound=" + (alarm != null));');
@@ -878,7 +878,7 @@ RCT_EXPORT_METHOD(removeFiredNotification: (NSInteger)id){
     expect(output).toContain('RCT_EXPORT_METHOD(deleteAlarm: (NSInteger)id)');
     expect(output).toContain('RCT_EXPORT_METHOD(deleteRepeatingAlarm: (NSInteger)id)');
     expect(output).not.toContain('(NSInteger *)id');
-    // The sibling that already took its id by value must be left alone.
+    // El/La
     expect(output).toContain('RCT_EXPORT_METHOD(removeFiredNotification: (NSInteger)id)');
     // Idempotent: a second pass leaves the patched source untouched.
     expect(applyAlarmIosDeletePendingPatchToSource(output)).toBe(output);
@@ -1073,7 +1073,7 @@ describe('applyPatches (registry-driven fixture tree)', () => {
     }
   });
 
-  // The mechanism behind #1020, stated as an invariant rather than as one
+  // El/La
   // method's spelling: under the New Architecture the interop marshals a
   // numeric argument by ObjC encoding, and only a by-value scalar ("q") gets
   // the converted integer. A pointer-typed scalar ("^q") silently receives the

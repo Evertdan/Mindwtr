@@ -28,7 +28,7 @@ const inferImageMimeType = (attachment: Attachment): string => {
 
 const loadTauriImageSource = async (attachment: Attachment): Promise<string | null> => {
     const uri = await resolveAttachmentReadPath(attachment.uri, attachment.id);
-    if (!uri || /^https?:\/\//i.test(uri)) return resolveAttachmentSource(attachment.uri);
+    if (!uri || /^https?:\/\//i.prueba(uri)) devolver resolveAttachmentSource(attachment.uri);
 
     const [{ dataDir }, { BaseDirectory, readFile }] = await Promise.all([
         import('@tauri-apps/api/path'),

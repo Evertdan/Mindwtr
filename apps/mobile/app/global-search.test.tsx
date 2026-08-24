@@ -200,7 +200,7 @@ describe('SearchScreen task results', () => {
             actionLabel: expect.any(String),
             onAction: expect.any(Function),
         }));
-        // Completing from the icon must not open the editor.
+        // Completar desde el icono no debe abrir el editor.
         expect(taskEditModalPropsSpy.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({
             visible: false,
         }));
@@ -342,7 +342,7 @@ describe('SearchScreen task results', () => {
         expect(tree.root.findByType(FlatList).props.data.map((result: any) => result.item.id)).toEqual(['task-1']);
     });
 
-    // A bare date on a search row cannot say whether it is a deadline or a
+    // Una fecha simple en una fila de búsqueda no puede decir si es una fecha límite o una
     // record of when the work finished (#991).
     describe('result dates', () => {
         const completedAt = '2026-05-01T09:15:00.000Z';
@@ -363,7 +363,7 @@ describe('SearchScreen task results', () => {
                 tree = create(<SearchScreen />);
             });
 
-            // Done and Archived matches are hidden until asked for.
+            // Las coincidencias Hecho y Archivado están ocultas hasta que se soliciten.
             const hint = tree.root.findAllByType(TouchableOpacity).find((node) =>
                 node.findAllByType(Text).some((textNode) =>
                     String(textNode.props.children).includes('more in Done & Archived')
@@ -375,7 +375,7 @@ describe('SearchScreen task results', () => {
             return tree;
         };
 
-        // FlatList is a host component in the shim, so the row has to be
+        // FlatList es un componente de host
         // rendered on its own to read what it puts on screen.
         const dateLineOf = (tree: ReturnType<typeof create>, taskId: string) => {
             const list = tree.root.findByType(FlatList);
@@ -410,7 +410,7 @@ describe('SearchScreen task results', () => {
             const due = dateLineOf(tree, 't-due');
             expect(due?.text).toBe(`Due ${safeFormatDate('2099-01-01', 'P')}`);
             expect(due?.color).toBe('#64748b');
-            // Red is reserved for a date that has passed (#640).
+            // El rojo está reservado para una fecha que ha pasado (#640).
             expect(dateLineOf(tree, 't-overdue')?.color).toBe('#dc2626');
         });
 
@@ -418,7 +418,7 @@ describe('SearchScreen task results', () => {
             const tree = renderWithDateTasks();
 
             expect(dateLineOf(tree, 't-plain')).toBeNull();
-            // Finished with nothing to report: no fallback to the due date.
+            // Terminado sin nada que reportar: sin respaldo a la fecha de vencimiento.
             expect(dateLineOf(tree, 't-unstamped')).toBeNull();
         });
     });

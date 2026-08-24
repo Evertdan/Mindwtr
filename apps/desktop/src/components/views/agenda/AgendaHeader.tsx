@@ -36,7 +36,7 @@ export function AgendaHeader({
 }: AgendaHeaderProps) {
     const filtersActive = filtersOpen || filterCount > 0;
     const filtersLabel = resolveText('filters.label', 'Filters');
-    // Names the action, not the state, and carries no aria-pressed — see ListHeader.
+    // Names the acción, not the estado, and carries no aria-pressed — see ListHeader.
     const detailsLabel = showListDetails
         ? tFallback(t, 'list.hideDetails', 'Hide details')
         : tFallback(t, 'list.showDetails', 'Show details');

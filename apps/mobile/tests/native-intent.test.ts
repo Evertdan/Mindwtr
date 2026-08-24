@@ -28,7 +28,7 @@ describe('redirectSystemPath', () => {
     it('leaves capture and unrelated links untouched', () => {
         expect(redirectSystemPath({ path: 'mindwtr://capture?title=Buy%20milk', initial: false }))
             .toBe('mindwtr://capture?title=Buy%20milk');
-        // The widget/Lock Screen capture link is a plain route path: it must
+        // El/La
         // pass through so Expo Router opens /capture-quick itself (#1066).
         expect(redirectSystemPath({ path: 'mindwtr:///capture-quick?mode=text', initial: true }))
             .toBe('mindwtr:///capture-quick?mode=text');

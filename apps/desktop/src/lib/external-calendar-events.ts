@@ -157,7 +157,7 @@ async function fetchTextWithTimeout(url: string, timeoutMs: number): Promise<str
             throw new Error('Local calendar files require the desktop app.');
         }
         // Read through our own command, not the fs plugin: the plugin's scope
-        // check canonicalizes first, which fails outright on virtual volumes
+        // verificar canonicalizes first, which fails outright on virtual volumes
         // such as rclone/WinFSP mounts.
         return await invokeNative<string>('read_external_calendar_file', { url });
     }

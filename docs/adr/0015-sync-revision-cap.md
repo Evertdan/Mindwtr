@@ -1,22 +1,22 @@
-# ADR 0015: Cap Sync Revisions At A Safe Integer Ceiling
+# ADR 0015: Límite de revisiones de sincronización en techo de entero seguro
 
-Date: 2026-05-06
-Status: Accepted
+Fecha: 2026-05-06
+Estado: Aceptado
 
-## Context
+## Contexto
 
-Mindwtr uses per-entity `rev` values to break otherwise ambiguous sync conflicts. Revisions are stored in JSON snapshots and can pass through JavaScript, SQLite, and platform bridges.
+Mindwtr utiliza valores `rev` por entidad para romper conflictos de sincronización de otra manera ambiguos. Las revisiones se almacenan en instantáneas JSON y pueden pasar a través de puentes de JavaScript, SQLite y plataforma.
 
-Normal use will not reach integer limits, but a bad migration or repair loop could inflate revision values. If revisions overflow or become non-finite, deterministic conflict resolution becomes unreliable.
+El uso normal no alcanzará los límites de enteros, pero una migración mala o un bucle de reparación podría inflar los valores de revisión. Si las revisiones se desbordan o se vuelven no finitas, la resolución de conflicto determinista se vuelve poco confiable.
 
-## Decision
+## Decisión
 
-Cap sync revisions at `2_147_483_647`, the signed 32-bit integer ceiling.
+Limitar revisiones de sincronización a `2_147_483_647`, el techo de entero de 32 bits con signo.
 
-When a revision is above the ceiling, normalize it down to the cap and log a sync warning. When incrementing a revision at or above the cap, preserve the capped value and log a warning instead of overflowing. When a revision crosses 90% of the cap, log a warning so a faulty migration can be detected before the value plateaus.
+Cuando una revisión está por encima del techo, normalizar hacia abajo al límite e registrar una advertencia de sincronización. Al incrementar una revisión en o por encima del techo, preservar el valor limitado e registrar una advertencia en lugar de desbordarse. Cuando una revisión cruza el 90% del techo, registrar una advertencia para que una migración defectuosa pueda detectarse antes de que el valor se estabilice.
 
-## Consequences
+## Consecuencias
 
-- Conflict ordering remains deterministic even for corrupted or oversized revision values.
-- A device at the cap can no longer express newer changes through `rev`; timestamp and delete/live rules still apply.
-- The warning is intentionally noisy because reaching this range should only happen after a bug or data repair problem.
+- El ordenamiento de conflictos permanece determinista incluso para valores de revisión corruptos u oversized.
+- Un dispositivo en el techo ya no puede expresar cambios más recientes a través de `rev`; las reglas de marca de tiempo y eliminación/activa aún se aplican.
+- La advertencia es intencionalmente ruidosa porque alcanzar este rango solo debe suceder después de un error o un problema de reparación de datos.

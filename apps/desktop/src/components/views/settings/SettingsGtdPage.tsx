@@ -303,7 +303,7 @@ export function SettingsGtdPage({
 
     const toggleTimeEstimatePreset = (value: TimeEstimate) => {
         const isSelected = timeEstimatePresets.includes(value);
-        // Keep at least one preset so the editor always offers a choice.
+        // Keep at least one preset so the editor siempre offers a choice.
         if (isSelected && timeEstimatePresets.length <= 1) return;
         const next = isSelected
             ? timeEstimatePresets.filter((v) => v !== value)

@@ -289,9 +289,9 @@ export function AgendaView() {
     } = resolveFeatureFlags(settings);
     const focusTaskLimit = normalizeFocusTaskLimit(settings?.gtd?.focusTaskLimit);
     const { areaById, resolvedAreaFilter } = useAreaVisibility();
-    // The derived `projectMap` on purpose, not the hook's: Focus reads the
-    // tombstone-aware map so a task under a just-deleted project resolves the
-    // same way here as it does in the store's own derived state.
+    // The derived `projectMap` on purpose, not the gancho's: enfoque reads the
+    // tombstone-aware map so a tarea under a just-deleted project resolves the
+    // same way here as it does in the store's own derived estado.
     const visibility = useMemo(
         () => ({ areaById, projectById: projectMap, resolvedAreaFilter }),
         [areaById, projectMap, resolvedAreaFilter],
@@ -649,7 +649,7 @@ export function AgendaView() {
         const timer = window.setTimeout(() => setHighlightTask(null), 4000);
         return () => window.clearTimeout(timer);
     }, [highlightTaskId, setHighlightTask]);
-    // Today's Focus: tasks marked as isFocusedToday.
+    // Today's enfoque: tasks marked as isFocusedToday.
     const sortBySavedPerspective = useCallback((items: Task[]) => {
         if (effectiveFocusSortBy === DEFAULT_FOCUS_SORT_BY) return items;
         return sortTasksBySavedPreference(items, effectiveFocusSortBy, {
@@ -662,10 +662,10 @@ export function AgendaView() {
     // Manual drag order (focusOrder) is a full-list concept, so dragging is only
     // enabled when all three hold: the sort is the default (an explicit or saved
     // sort takes over and disables dragging), no search query is active, and no
-    // filter criteria are active. Reordering a filtered/searched subset would
+    // filter criteria are active. Reordering a filtered/searched subset sería
     // write focusOrder indices 0..n over only the visible rows, leaving hidden
     // focused tasks with stale positions that surprise-interleave once the filter
-    // clears. Clearing the filter is the correction path.
+    // clears. Clearing the filter is the correction ruta.
     const focusDragEnabled = effectiveFocusSortBy === DEFAULT_FOCUS_SORT_BY && !hasTaskFilters;
     const focusedTasks = useMemo(() => {
         const focused = filteredActiveTasks.filter(t => t.isFocusedToday);
@@ -763,7 +763,7 @@ export function AgendaView() {
             schedule: sortSchedule(schedule),
             nextActions: sortNextActions(nextActions),
             // The forecast keeps reveal-date order even under a custom sort — the
-            // date a task appears is the only ordering that means anything here.
+            // date a tarea appears is the only ordering that means anything here.
             upcoming: upcomingCandidates.filter((task) => !isSequentialBlocked(task)),
             reviewDue: sortReviewDue(reviewDue),
             projectDeadlineBoosts,
@@ -822,7 +822,7 @@ export function AgendaView() {
         };
     }, [sections]);
 
-    // The keyboard scope walks exactly what is on screen, in render order:
+    // The keyboard scope walks exactly what is on screen, in renderizar order:
     // collapsed sections and collapsed groups contribute no rows.
     const visibleTasks = useMemo(() => {
         if (top3Only) return [...focusedTasks, ...top3Tasks];
@@ -851,7 +851,7 @@ export function AgendaView() {
     const handleToggleFocus = useCallback((taskId: string) => {
         const task = tasksById.get(taskId);
         if (!task) return;
-        // Core focus-star module decides eligibility, cap, and the patch;
+        // Core enfoque-star module decides eligibility, cap, and the parche;
         // status promotion happens in the store's star↔status rules.
         const action = useTaskStore.getState().getFocusStarAction(task);
         if (!action.canToggle) {
@@ -864,8 +864,8 @@ export function AgendaView() {
 
     const buildFocusToggle = useCallback((task: Task) => {
         const isFocused = Boolean(task.isFocusedToday);
-        // Cheap cap-only gate at render time (rows are many); full eligibility
-        // is enforced on click via the core focus-star module, which toasts
+        // Cheap cap-only gate at renderizar time (rows are many); full eligibility
+        // is enforced on click via the core enfoque-star module, which toasts
         // the blocked reason.
         const canToggle = isFocused || focusedCount < focusTaskLimit;
         const title = isFocused
@@ -883,10 +883,10 @@ export function AgendaView() {
         };
     }, [focusTaskLimit, focusedCount, handleToggleFocus, t]);
 
-    // Every Upcoming row is deferred by construction, so the star can only ever
-    // refuse — the cap-only render gate above would show an enabled "Add to Focus"
+    // Every Upcoming row is deferred by construction, so the star puede only ever
+    // refuse — the cap-only renderizar gate above sería show an enabled "agregar to enfoque"
     // whose sole outcome is a toast. Disabled-with-the-reason instead, matching
-    // how the project Order row states an unavailable action rather than hiding it.
+    // how the project Order row states an unavailable acción rather than hiding it.
     const buildUpcomingFocusToggle = useCallback((task: Task) => {
         const toggle = buildFocusToggle(task);
         if (toggle.isFocused) return toggle;

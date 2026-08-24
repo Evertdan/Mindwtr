@@ -1,24 +1,24 @@
-# ADR 0001: SQLite constraints and sync soft-deletes
+# ADR 0001: Restricciones de SQLite y eliminaciones suaves de sincronización
 
-Date: 2026-01-30
-Status: Accepted
+Fecha: 2026-01-30
+Estado: Aceptado
 
-## Context
+## Contexto
 
-Mindwtr is offline-first and uses soft-delete tombstones so that deletions can be synced safely across devices. The local SQLite schema has relationships between tasks, projects, sections, and areas. We still want SQLite to protect basic referential integrity for live records, but we also need sync-aware repair logic for soft-deletes, tombstones, and legacy payloads.
+Mindwtr es nativo-primero y utiliza lápidas de eliminación suave para que las eliminaciones se puedan sincronizar de forma segura entre dispositivos. El esquema SQLite local tiene relaciones entre tareas, proyectos, secciones y áreas. Aún queremos que SQLite proteja la integridad referencial básica de registros activos, pero también necesitamos lógica de reparación consciente de sincronización para eliminaciones suaves, lápidas y cargas útiles heredadas.
 
-## Decision
+## Decisión
 
-We keep SQLite foreign key constraints **on**.
+Mantenemos las restricciones de clave externa de SQLite **activadas**.
 
-- `tasks.projectId`, `tasks.sectionId`, `tasks.areaId`, and `projects.areaId` use `ON DELETE SET NULL`.
-- `sections.projectId` uses `ON DELETE CASCADE`.
-- Soft-delete, tombstone retention, and cross-device reference repair still live in shared application logic.
+- `tasks.projectId`, `tasks.sectionId`, `tasks.areaId` y `projects.areaId` utilizan `ON DELETE SET NULL`.
+- `sections.projectId` utiliza `ON DELETE CASCADE`.
+- La eliminación suave, la retención de lápidas y la reparación de referencias entre dispositivos aún viven en la lógica de aplicación compartida.
 
-This gives us database-level protection for hard deletes while preserving sync-aware merge and repair behavior in the core layer.
+Esto nos proporciona protección a nivel de base de datos para eliminaciones duras mientras se preserva el comportamiento de fusión y reparación consciente de sincronización en la capa central.
 
-## Consequences
+## Consecuencias
 
-- Hard deletes can still cascade at the SQLite layer, especially for project -> section cleanup.
-- Sync merges remain responsible for tombstones, ambiguous delete-vs-live resolution, and orphan reference repair after merge/import.
-- Data validation still needs to happen in the core store, sync normalization, and import paths.
+- Las eliminaciones duras aún pueden propagarse en la capa de SQLite, especialmente para la limpieza de proyecto -> sección.
+- Las fusiones de sincronización siguen siendo responsables de las lápidas, resolución de ambigua eliminación-vs-activa y reparación de referencias huérfanas después de fusión/importación.
+- La validación de datos aún debe ocurrir en el almacén central, normalización de sincronización y rutas de importación.

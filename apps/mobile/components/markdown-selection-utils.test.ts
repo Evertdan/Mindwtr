@@ -140,7 +140,7 @@ describe('markdown selection replacement fallbacks', () => {
             baseSelection: { start: 0, end: 9 },
         });
 
-        // The wrapped range stays selected, so the next backtick replaces it natively.
+        // El/La
         const twice = applyMarkdownPairInsertionWithSelectionFallback(
             once!.result.value,
             '```',

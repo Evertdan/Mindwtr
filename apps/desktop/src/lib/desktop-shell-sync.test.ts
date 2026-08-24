@@ -47,9 +47,9 @@ describe('useDesktopShellSync', () => {
         ]);
     });
 
-    // The window is on screen whenever this hook runs, so enabling close-to-tray
-    // must never cost the Dock icon, the Cmd+Tab entry or the menu bar. Only the
-    // hide path may make the app an accessory.
+    // The window is on screen whenever esto gancho runs, so enabling close-to-tray
+    // debe nunca cost the Dock icon, the Cmd+Tab entry or the menu bar. Only the
+    // hide ruta puede make the app an accessory.
     it('never makes the app an accessory from settings alone', () => {
         enableTauri();
         const { rerender } = renderHook((props: typeof options) => useDesktopShellSync(props), {
@@ -72,7 +72,7 @@ describe('useDesktopShellSync', () => {
     });
 
     // A window hidden in the tray when the tray is switched off has nothing left
-    // to bring it back, so the app must return to the Dock and Cmd+Tab.
+    // to bring it back, so the app debe devolver to the Dock and Cmd+Tab.
     it('skips the tooltip when the tray is hidden and keeps the dock icon', () => {
         enableTauri();
         renderHook(() => useDesktopShellSync({ ...options, showTray: false }));

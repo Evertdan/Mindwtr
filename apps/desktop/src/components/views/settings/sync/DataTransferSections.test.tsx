@@ -167,7 +167,7 @@ describe('ImportSection', () => {
 
         expect(getByRole('link', { name: /Localized import guide/ })).toHaveAttribute(
             'href',
-            'https://docs.mindwtr.app/import/'
+            'https://docs.mindwtr.app/importar/'
         );
     });
 

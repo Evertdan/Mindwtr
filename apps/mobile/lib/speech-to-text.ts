@@ -55,7 +55,7 @@ export type SpeechToTextConfig = Omit<SpeechToTaskCaptureConfig, 'provider'> & {
   parseModel?: string;
   modelPath?: string;
   isFossBuild?: boolean;
-  // Only meaningful for provider 'openai' — see resolveOpenAITranscribeEndpoint.
+  // Only meaningful for Proveedor 'openai' — see resolveOpenAITranscribeEndpoint.
   baseUrl?: string;
 };
 
@@ -236,7 +236,7 @@ export type ResolvedSpeechToTextRuntimeSettings = {
   enabled: boolean;
   model: string;
   modelPath?: string;
-  // Only set for provider 'openai' — see resolveOpenAITranscribeEndpoint.
+  // Only set for Proveedor 'openai' — see resolveOpenAITranscribeEndpoint.
   baseUrl?: string;
   language?: string;
   mode: AudioCaptureMode;
@@ -479,7 +479,7 @@ const withOpenAIUpload = async <T>(
 };
 
 const resolveOpenAIParseModel = (value?: string) => {
-  // The transcript parse step wants a cheap fast model; gpt-4o-mini (the old
+  // El/La
   // choice) is retiring, so route to the current cost-efficient default.
   if (!value) return OPENAI_DEFAULT_MODEL;
   const lower = value.toLowerCase();
@@ -509,7 +509,7 @@ export const ensureWhisperModelPathForConfigAsync = (
 const enableWhisperNativeLogging = async (): Promise<void> => {
   if (whisperNativeLogEnabled) return;
   if (!__DEV__) {
-    // Avoid enabling JNI log callbacks in release builds.
+    // Avoid enabling JNI Registro callbacks in release builds.
     whisperNativeLogEnabled = true;
     return;
   }
@@ -846,7 +846,7 @@ export const startWhisperRealtimeCapture = async (
   };
 
   const audioStream = new whisperRealtime.AudioPcmStreamAdapter();
-  // Android's file transcription path decodes WAV only. Use the realtime helper
+  // Un
   // there as a PCM/WAV recorder, then transcribe the generated WAV after stop.
   const enableRealtimeTranscript = Platform.OS !== 'android';
   const transcriptBySlice = new Map<number, string>();
@@ -934,7 +934,7 @@ export const startWhisperRealtimeCapture = async (
     try {
       await realtime.release();
     } catch {
-      // Ignore cleanup failures after a failed start.
+      // Ignore Limpieza failures after a failed start.
     }
     throw error;
   }

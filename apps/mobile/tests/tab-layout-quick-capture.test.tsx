@@ -105,7 +105,7 @@ vi.mock('@react-navigation/elements', () => ({
 
 vi.mock('@mindwtr/core', async (importOriginal) => {
   const { mockCore } = await import('../test-support/mock-core');
-  // This suite drives the store hook itself, so it supplies its own.
+  // Este/Esta
   return mockCore(importOriginal, () => ({}), { useTaskStore: mockUseTaskStore });
 });
 
@@ -428,7 +428,7 @@ describe('mobile tab quick capture', () => {
   });
 
   it('routes a returnTo capture through the root capture screen instead of the tab sheet', () => {
-    // The tab sheet opens in place with no route change, so a caller that
+    // La hoja de pestaña se abre en su lugar
     // dismissed its own UI expecting a focus event on return (project quick
     // add, #938) would be stranded on its base screen.
     let tree!: ReturnType<typeof create>;
@@ -450,7 +450,7 @@ describe('mobile tab quick capture', () => {
     }));
     expect(getQuickCaptureSheets(tree)).toHaveLength(0);
 
-    // A plain capture still uses the in-place sheet.
+    // Una captura simple aún usa la hoja en su lugar.
     act(() => {
       tabProviderValue.current?.openQuickCapture();
     });
@@ -515,7 +515,7 @@ describe('mobile tab quick capture', () => {
   it('redirects root cold launch to Focus when no recent session is stored', async () => {
     let tree!: ReturnType<typeof create>;
 
-    // Session restore reads storage asynchronously before redirecting.
+    // La restauración de sesión lee el almacenamiento de forma asincrónica antes de redirigir.
     await act(async () => {
       tree = create(<Index />);
     });
@@ -581,7 +581,7 @@ describe('mobile tab quick capture', () => {
   });
 
   it('boosts the capture FAB to the high-emphasis M3 primary role under Material', () => {
-    // Capture is Mindwtr's most important action, so under M3 the FAB uses the
+    // Capturar es la acción más importante de Mindwtr, por lo que bajo M3 el FAB usa el
     // high-emphasis FAB role (primary/onPrimary), not the deliberately subdued
     // primaryContainer. Other primary buttons stay primaryContainer (canonical),
     // preserving M3's emphasis hierarchy with capture at the top.

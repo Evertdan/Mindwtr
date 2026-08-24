@@ -7,8 +7,8 @@ export const DEFAULT_EMAIL_CAPTURE_FOLDER = 'Mindwtr';
 
 const DEFAULT_POLL_INTERVAL_MS = 5 * 60 * 1000;
 const DEFAULT_INITIAL_POLL_DELAY_MS = 20_000;
-// A backlog (first setup with a full folder) is drained in bounded rounds per
-// cycle; anything left waits for the next interval.
+// A backlog (first configuración with a full folder) is drained in bounded rounds per
+// cycle; anything left waits for the next intervalo.
 const DEFAULT_MAX_ROUNDS_PER_CYCLE = 10;
 const EMAIL_TITLE_FROM_BODY_MAX_CHARS = 100;
 
@@ -49,7 +49,7 @@ export type EmailCaptureStatus = {
     lastImportCount: number;
     lastError: EmailCaptureErrorInfo | null;
     // Terminal errors (bad credentials, broken config) stop polling until the
-    // settings are saved again; retrying them on a timer cannot succeed.
+    // settings are saved again; retrying them on a timer no puede succeed.
     terminal: boolean;
 };
 
@@ -247,7 +247,7 @@ export const createEmailCaptureController = (
                     }
                     // The IMAP watermark only advances after the tasks are
                     // durably persisted; a crash in between re-imports mail
-                    // instead of silently dropping it.
+                    // en lugar de silently dropping it.
                     await options.flushPendingSave();
                     imported += result.messages.length;
                 }

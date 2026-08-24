@@ -1,107 +1,107 @@
-# Plans index
+# Índice de Planes
 
-Written by the 2026-08-13 improve audit (Phase 2 of the review-improve loop), stamped against `0e4021faa`. Selection was non-interactive: every high-confidence actionable finding became a plan; speculative/deferred items are recorded below instead of planned.
+Escrito por la auditoría de mejora del 2026-08-13 (Fase 2 del bucle de revisión-mejora), marcado contra `0e4021faa`. La selección fue no interactiva: cada hallazgo procesable de alta confianza se convirtió en un plan; los elementos especulativos/diferidos se registran a continuación en lugar de planearse.
 
-## Execution order and status
+## Orden de ejecución y estado
 
-| # | Plan | Findings | Effort | Status |
-|---|------|----------|--------|--------|
-| 001 | tauri-main-thread-commands | R-01, R-02 | S-M | DONE |
-| 002 | calendar-feed-revocation | R-03 | S | DONE |
-| 003 | local-api-hardening | R-04, R-05 | S-M | DONE |
-| 004 | mcp-hardening | R-06, R-08 | S | DONE |
-| 005 | import-sourcekey-identity | R-07 | S | DONE |
-| 006 | derived-state-hot-path | A-02, A-04 | S | DONE |
-| 007 | capture-import-chain | A-05 | S | DONE |
-| 008 | source-hygiene-pair | A-03, A-07 | S | DONE |
-| 009 | i18n-toast-leaks | Q-02 | S | DONE |
-| 010 | locale-coverage-label | Q-01 | S | DONE |
-| 011 | undo-import | Q-03 | S-M | DONE |
-| 012 | csv-export | DIR-01 | M | DONE |
-| 013 | automation-query-unification | DIR-02 | M | DONE |
-| 014 | dx-batch | DX-01/02/04/05 | S | DONE |
-| 015 | core-lint-ci | DX-03 | S | DONE |
-| 016 | desktop-flat-eslint | DX-06 | S-M | DONE |
-| 017 | adr-encryption-at-rest | DOCS-01 | S | DONE |
-| 018 | mobile-store-action-settlement | ARCH-01 | M | DONE |
+| # | Plan | Hallazgos | Esfuerzo | Estado |
+|---|------|----------|----------|--------|
+| 001 | tauri-main-thread-commands | R-01, R-02 | S-M | HECHO |
+| 002 | calendar-feed-revocation | R-03 | S | HECHO |
+| 003 | local-api-hardening | R-04, R-05 | S-M | HECHO |
+| 004 | mcp-hardening | R-06, R-08 | S | HECHO |
+| 005 | import-sourcekey-identity | R-07 | S | HECHO |
+| 006 | derived-state-hot-path | A-02, A-04 | S | HECHO |
+| 007 | capture-import-chain | A-05 | S | HECHO |
+| 008 | source-hygiene-pair | A-03, A-07 | S | HECHO |
+| 009 | i18n-toast-leaks | Q-02 | S | HECHO |
+| 010 | locale-coverage-label | Q-01 | S | HECHO |
+| 011 | undo-import | Q-03 | S-M | HECHO |
+| 012 | csv-export | DIR-01 | M | HECHO |
+| 013 | automation-query-unification | DIR-02 | M | HECHO |
+| 014 | dx-batch | DX-01/02/04/05 | S | HECHO |
+| 015 | core-lint-ci | DX-03 | S | HECHO |
+| 016 | desktop-flat-eslint | DX-06 | S-M | HECHO |
+| 017 | adr-encryption-at-rest | DOCS-01 | S | HECHO |
+| 018 | mobile-store-action-settlement | ARCH-01 | M | HECHO |
 
-Dependencies: 015 before 016 (both touch lint wiring; 015 is upstream in CI). 001's commit 2 depends on its commit 1. 006 commit 2 depends on commit 1 only for merge cleanliness. Everything else independent.
+Dependencias: 015 antes de 016 (ambas tocan el cableado de lint; 015 es ascendente en CI). El commit 2 de 001 depende de su commit 1. El commit 2 de 006 depende del commit 1 solo para limpieza de fusión. Todo lo demás independiente.
 
-## Deferred (recorded, deliberately not planned)
+## Diferido (registrado, deliberadamente no planeado)
 
-- **DEPS-01** desktop `file:` → `workspace:*` core dependency (138MB stale copy): defer until just after 1.2.0 stable — lockfile churn mid-RC-train is the hazard, not the change.
-- **DEPS-02** Expo SDK 54→57 migration: own release train post-stable, staged 54→55→56→57 with per-hop device rounds and patch re-validation; the `@fugood/react-native-audio-pcm-stream` New-Architecture question decides whether realtime transcription needs a new transport first.
-- **DEBT-03** attachment-backend 2×5 glue duplication: investigation verdict only — lifecycle + wire protocol already shared; diff WebDAV+Dropbox bodies before believing consolidation pays. Do not re-audit without that diff.
-- **DIR-03** publish the CLI (bin in mindwtr-mcp) vs. relabel docs as contributor script: maintainer product decision; both halves cheap once decided.
-- **DIR-04** web/PWA storage decision: spike (measure serialized 5k-task fixture vs localStorage quota) decides invest (IndexedDB adapter behind setStorageAdapter) vs demote (docs). Product call after the measurement.
-- **DIR-05** Obsidian on mobile: real parity hole, deliberately not now (SAF two-way writer risk). Recorded to stop re-derivation.
+- **DEPS-01** dependencia principal de escritorio `file:` → `workspace:*` (copia obsoleta de 138MB): diferir hasta poco después de 1.2.0 estable — la agitación del lockfile a mitad del tren RC es el peligro, no el cambio.
+- **DEPS-02** migración de Expo SDK 54→57: tren de versión propio post-estable, etapas 54→55→56→57 con rondas de dispositivo por salto y revalidación de parches; la pregunta de Nueva Arquitectura de `@fugood/react-native-audio-pcm-stream` decide si la transcripción en tiempo real necesita un nuevo transporte primero.
+- **DEBT-03** duplicación de pegamento de backend de adjuntos 2×5: solo veredicto de investigación — ciclo de vida + protocolo de cable ya compartido; diff WebDAV+Dropbox cuerpos antes de creer que la consolidación paga. No re-auditar sin ese diff.
+- **DIR-03** publicar la CLI (bin en mindwtr-mcp) vs. relabelar docs como script de colaborador: decisión de producto del mantenedor; ambas mitades baratas una vez decididas.
+- **DIR-04** decisión de almacenamiento web/PWA: pico (medir accesorio serializado de 5k tareas frente a cuota de localStorage) decide invertir (adaptador IndexedDB detrás de setStorageAdapter) vs degradar (docs). Llamada de producto después de la medición.
+- **DIR-05** Obsidian en móvil: brecha de paridad real, deliberadamente no ahora (riesgo de escritor bidireccional SAF). Registrado para detener re-derivación.
 
-## Considered and rejected
+## Considerado y rechazado
 
-- zustand v5 / lucide 1.x bumps: ride-along only, no standalone value.
-- Re-export shim deletion (attachment-utils, dropbox-sync pair): churn > value.
-- Rust storage.rs/sync.rs "god module" split: production halves are ~3k lines; tests inflate the counts.
-- native-schema job off macOS: needs xcrun swiftc, verified.
-- testing-strategy.md command additions: 6-locale parity cost for info one click away.
-- MCP/cloud auth helper sharing: deliberate workspace independence, recorded in file headers.
-- Global Android user-CA trust: deliberately restores OS trust-store parity for arbitrary self-hosted URLs; scoping it requires a separate native HTTP stack, and the device owner or administrator must explicitly install the CA. The low-leverage L/HIGH-risk migration is rejected unless the product threat model changes.
-- Mobile task-field renderer mega-interface: real coupling, but current performance gates are green and the refactor crosses keyboard, recurrence, attachment, audio, and progressive-disclosure behavior. Keep as Worth exploring until a measured regression or a narrower slice justifies it.
+- Golpes de zustand v5 / lucide 1.x: solo acompañamiento, sin valor independiente.
+- Eliminación de shim de reexportación (attachment-utils, par dropbox-sync): agitación > valor.
+- División de módulo Rust storage.rs/sync.rs "dios": las mitades de producción son ~3k líneas; las pruebas inflan los conteos.
+- Trabajo de native-schema fuera de macOS: necesita xcrun swiftc, verificado.
+- Adiciones de comando testing-strategy.md: costo de paridad de 6 locales para información a un clic de distancia.
+- Compartición de ayudante de autenticación MCP/cloud: independencia deliberada del espacio de trabajo, registrada en encabezados de archivo.
+- Confianza global de CA de usuario de Android: restaura deliberadamente la paridad de la tienda de confianza del SO para URL autohospedadas arbitrarias; alcanzarla requiere una pila HTTP nativa separada, y el propietario del dispositivo o administrador debe instalar explícitamente la CA. La migración de bajo apalancamiento L/ALTO riesgo se rechaza a menos que el modelo de amenaza del producto cambie.
+- Mega-interfaz de renderizador de campo de tarea móvil: acoplamiento real, pero las compuertas de rendimiento actual están verdes y la refactorización cruza teclado, recurrencia, accesorio, audio y comportamiento de divulgación progresiva. Mantener como Vale la pena explorar hasta que una regresión medida o un corte más estrecho lo justifique.
 
-## Legacy plans (2026-08-09 files, reconciled 2026-08-13)
+## Planes heredados (archivos 2026-08-09, reconciliados 2026-08-13)
 
-`2026-08-09-improve-product.md` and `2026-08-09-improve-architecture-performance.md` predate this run (base faea7edc3):
-- Persistence-failure surface with retry — **DONE** (645f376d7, PersistenceFailureBanner both platforms).
-- Watcher partial-failure lifecycle — **DONE** (watcher controller/generation commits + this loop's S6/S11/C2).
-- Localize desktop Settings feedback — **LARGELY DONE** (4b8c53a4c, 43fc66552, 06eb36bc9, 24ac122f2); the ratchet-test remainder is superseded by plan 009.
-- Mobile onboarding busy-guard — **LIKELY DONE** (8aad219ff); verify before re-planning.
-- SQLite warm-open cost, TS/Rust golden merge fixtures, exact transfer-operation IDs, mobile Data-row a11y — **STILL OPEN**, carried as future candidates (not selected this run; the first two are M-L with high care requirements, the latter two are UX polish batches).
+`2026-08-09-improve-product.md` y `2026-08-09-improve-architecture-performance.md` predate esta ejecución (base faea7edc3):
+- Superficie de falla de persistencia con reintento — **HECHO** (645f376d7, PersistenceFailureBanner ambas plataformas).
+- Ciclo de vida de falla parcial de vigilante — **HECHO** (vigilante controller/generación commits + este bucle S6/S11/C2).
+- Localizar retroalimentación de configuración de escritorio — **MAYORMENTE HECHO** (4b8c53a4c, 43fc66552, 06eb36bc9, 24ac122f2); el remanente de prueba de trinquete es superado por plan 009.
+- Guardia ocupada de incorporación móvil — **PROBABLEMENTE HECHO** (8aad219ff); verificar antes de re-planificar.
+- Costo de apertura cálida de SQLite, accesorios de fusión dorada TS/Rust, IDs exactos de operación de transferencia, a11y de fila de datos móvil — **AÚN ABIERTO**, llevado como candidatos futuros (no seleccionado en esta ejecución; los dos primeros son M-L con requisitos de cuidado alto, los dos últimos son lotes de pulido UX).
 
 ---
 
-# 2026-08-22 improve audit (Phase 2 of the review-improve loop), stamped against `b0a96ccc9`
+# Auditoría de mejora del 2026-08-22 (Fase 2 del bucle de revisión-mejora), marcada contra `b0a96ccc9`
 
-Selection non-interactive: every HIGH-confidence actionable finding became a plan; numbering continues from the 08-13 run. All 08-13 plans remain DONE. Executors: one commit per finding, red test first, honor STOP conditions, update this table.
+Selección no interactiva: cada hallazgo procesable de ALTA confianza se convirtió en un plan; la numeración continúa desde la ejecución del 08-13. Todos los planes 08-13 siguen siendo HECHO. Ejecutores: un commit por hallazgo, prueba roja primero, honrar condiciones de PARADA, actualizar esta tabla.
 
-## Execution order & status
+## Orden de ejecución y estado
 
-| Plan | Title | Priority | Effort | Depends on | Status |
-|------|-------|----------|--------|------------|--------|
-| 019 | cloud-server-integrity | P1 | S | — | DONE |
-| 020 | core-store-write-integrity | P1 | M | — | DONE |
-| 021 | delete-vs-live-revision | P1 | M | — | BLOCKED (ADR 0007 records the outside-window rule as deliberate; fixtures pinned; superseding ADR = maintainer decision) |
-| 022 | sync-orchestrator-rejections | P1 | S | — | DONE |
-| 023 | fts-search-quoting | P1 | S | — | DONE |
-| 024 | attachment-integrity | P1 | L | — | DONE (SEC-07 partial on mobile: migration pre-pass provenance is an open design decision) |
-| 025 | android-component-security | P1 | M | — | DONE (SEC-03 permission half declined: exported receiver is documented public API; rate limit shipped) |
-| 026 | network-policy | P2 | M | — | DONE (+ in-window fix: cloud attachment downloads decrypt before validating) |
-| 027 | mcp-hardening-2 | P1 | M | — | DONE (npm release owed for the fixes to reach users) |
-| 028 | desktop-native-hardening-2 | P1 | M | — | DONE |
-| 029 | core-input-hardening | P2 | M | — | DONE (BUG-12: real win needs an incremental hash API in uuid.ts — follow-up) |
-| 030 | batch-update-perf | P1 | S | — | DONE (50k-task batch move ~11s → ~0.6s) |
-| 031 | mobile-test-integrity | P2 | M | 024 (soft) | DONE |
-| 032 | dx-batch-2 | P2 | M | DX-01 lands first & alone | DONE |
-| 033 | docs-batch-2 | P2 | M | — | DONE |
-| 034 | csv-recurrence | P2 | M | — | DONE |
+| Plan | Título | Prioridad | Esfuerzo | Depende de | Estado |
+|------|--------|-----------|----------|------------|--------|
+| 019 | cloud-server-integrity | P1 | S | — | HECHO |
+| 020 | core-store-write-integrity | P1 | M | — | HECHO |
+| 021 | delete-vs-live-revision | P1 | M | — | BLOQUEADO (ADR 0007 registra la regla fuera de ventana como deliberada; accesorios fijados; superar ADR = decisión del mantenedor) |
+| 022 | sync-orchestrator-rejections | P1 | S | — | HECHO |
+| 023 | fts-search-quoting | P1 | S | — | HECHO |
+| 024 | attachment-integrity | P1 | L | — | HECHO (SEC-07 parcial en móvil: la procedencia de pre-paso de migración es una decisión de diseño abierta) |
+| 025 | android-component-security | P1 | M | — | HECHO (SEC-03 mitad de permiso rechazada: receptor exportado es API pública documentada; límite de velocidad enviado) |
+| 026 | network-policy | P2 | M | — | HECHO (+ corrección en ventana: descargas de adjuntos en la nube se descifran antes de validar) |
+| 027 | mcp-hardening-2 | P1 | M | — | HECHO (liberación npm deuda para que las correcciones lleguen a los usuarios) |
+| 028 | desktop-native-hardening-2 | P1 | M | — | HECHO |
+| 029 | core-input-hardening | P2 | M | — | HECHO (BUG-12: la ganancia real necesita una API de hash incremental en uuid.ts — seguimiento) |
+| 030 | batch-update-perf | P1 | S | — | HECHO (movimiento de lote de 50k tareas ~11s → ~0.6s) |
+| 031 | mobile-test-integrity | P2 | M | 024 (suave) | HECHO |
+| 032 | dx-batch-2 | P2 | M | DX-01 desembarques primero y solo | HECHO |
+| 033 | docs-batch-2 | P2 | M | — | HECHO |
+| 034 | csv-recurrence | P2 | M | — | HECHO |
 
-Dependency notes: 031 after 024 (shared vi.mock idiom for un-stubbing); 032's DX-01 (lockfile) lands as an isolated commit before other work touches node_modules; 024 items 1→5→8→9 are ordered internally.
+Notas de dependencia: 031 después de 024 (idioma vi.mock compartido para desarandelar); DX-01 de 032 (lockfile) desembarca como un commit aislado antes de que otro trabajo toque node_modules; los elementos 024 1→5→8→9 están ordenados internamente.
 
-## Deferred (recorded, deliberately not planned this run)
+## Diferido (registrado, deliberadamente no planeado en esta ejecución)
 
-- **DEPS-03** ~50 RN transitives pinned as direct root dependencies (from 7703fdee2, none imported by root code): removal is mechanical but requires a lockfile review + real Android build round — own maintenance window, alongside DEPS-02 (Expo 54→57).
-- **SEC-15b** any-token-mode IP rate limiting + true-LRU eviction on the cloud limiter: real but opt-in mode; an IP bucket changes behavior for proxied deployments — needs a deployment-model decision.
-- **SEC-12b** moving WebDAV URL userinfo into the keyring at config-save: real, M effort, follow-up to 026's redaction.
-- **SEC-10b** Android network-security-config domain scoping: REJECTED as planned — conflicts with settled #663 (base-config cleartext is load-bearing for arbitrary private-IP WebDAV); the JS-level `assertConnectionAllowed` guard (026) is the enforcement point.
-- **DIR-02** spreadsheet round-trip apply mode: DECIDED "no" this run — docs stance (skip on id match) stands; 033/DOCS-05 aligns the code comments. Revisit only with a rev-aware design.
-- **DIR-03** backup ZIP with attachment bytes: needs a mobile memory/threading measurement spike; DOCS-01 (033) captures the safety value now.
-- **BUG-26 caveat** — if investigation shows SyncRun re-checks freshness, 024 item 7 downgrades to early-abort only.
-- **DEBT-01** (AppTheme descriptor registry) and **DEBT-02** (sync-configuration transaction consolidation): routed to the architecture-deepening phase, not this plan set.
-- **DX-02** worktree pool: `git worktree prune` done operationally; deleting the 21 checkout dirs (53 GB) left to the maintainer (destructive).
+- **DEPS-03** ~50 transitorios RN fijados como dependencias directas raíz (desde 7703fdee2, ninguno importado por código raíz): la extirpación es mecánica pero requiere revisión de lockfile + ronda real de compilación de Android — ventana de mantenimiento propia, junto con DEPS-02 (Expo 54→57).
+- **SEC-15b** limitación de velocidad IP en modo cualquier token + evicción verdadera de LRU en el limitador de nube: real pero modo de activación; un cubo IP cambia comportamiento para despliegues proxy — necesita decisión de modelo de despliegue.
+- **SEC-12b** movimiento de información del usuario de URL WebDAV al llavero al guardar config: real, esfuerzo M, seguimiento a redacción de 026.
+- **SEC-10b** alcance de dominio de network-security-config de Android: RECHAZADO como planeado — entra en conflicto con #663 liquidado (el texto claro de base-config lleva carga para WebDAV privado arbitrario); la guardia `assertConnectionAllowed` a nivel de JS (026) es el punto de aplicación.
+- **DIR-02** modo de aplicación de viaje redondo de hoja de cálculo: DECIDIDO "no" en esta ejecución — postura de documentación (omitir en coincidencia de id) se mantiene; 033/DOCS-05 alinea los comentarios del código. Revisitar solo con un diseño consciente de rev.
+- **DIR-03** ZIP de copia de seguridad con bytes de adjuntos: necesita un pico de medición de memoria/threading móvil; DOCS-01 (033) captura el valor de seguridad ahora.
+- **BUG-26 advertencia** — si la investigación muestra que SyncRun re-comprueba la frescura, el elemento 024 7 se degrada a solo aborto temprano.
+- **DEBT-01** (registro de descriptor AppTheme) y **DEBT-02** (consolidación de transacción de configuración de sincronización): enrutado a la fase de profundización de arquitectura, no a este conjunto de planes.
+- **DX-02** grupo de espacio de trabajo: `git worktree prune` hecho operativamente; eliminación de los 21 directorios de checkout (53 GB) dejada al mantenedor (destructivo).
 
-## Findings considered and rejected (this run)
+## Hallazgos considerados y rechazados (esta ejecución)
 
-- MCP task-content-as-instructions sanitizer: inherent to a task-reading tool; client-side concern.
-- MCP auth-throttle FIFO eviction: bounded impact (401→429 only); comment-worthy at most.
-- window_state.rs non-atomic layout write: loss is monitor geometry; not scheduled.
-- `insertColumns` dead cache in queries.ts: one-line deletion, fold into any 027 commit touching the file.
-- Wholesale task-utils.ts split; big React-surface splits; SETTINGS_X_VALUES helper; wiki/Home.md link parity; CI caching: all re-confirmed not worth doing (see 08-13 rationale).
-- allTokens memoization (ListView.tsx:292): consumers re-render regardless; buys nothing.
+- Desinfectante de contenido de tarea como instrucciones MCP: inherente a una herramienta de lectura de tareas; problema del lado del cliente.
+- Evicción FIFO de aceleración de autenticación MCP: impacto limitado (401→429 solo); digno de comentario como máximo.
+- Escritura de diseño no atómica de window_state.rs: la pérdida es geometría del monitor; no programado.
+- Caché muerto de `insertColumns` en queries.ts: eliminación de una línea, doblar en cualquier commit 027 que toque el archivo.
+- División mayorista de task-utils.ts; grandes divisiones de superficie React; ayudante SETTINGS_X_VALUES; paridad de enlace Home.md de wiki; almacenamiento en caché CI: todo re-confirmado que no vale la pena hacer (ver razón 08-13).
+- Memoización de allTokens (ListView.tsx:292): los consumidores se re-procesan independientemente; no compra nada.

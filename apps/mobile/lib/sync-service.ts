@@ -401,8 +401,8 @@ const buildSyncDataDiagnostics = (data: AppData | null | undefined): Record<stri
     for (const context of task.contexts) contexts.add(context);
     for (const tag of task.tags) tags.add(tag);
   }
-  // The stored task count reads far higher than what the app shows once sync
-  // tombstones accumulate; log the content-free composition so shared logs can
+  // El/La
+  // tombstones accumulate; Registro the content-free composition so shared logs can
   // attribute counts and growth without another instrumentation round (#766).
   const lifecycle = summarizeTaskLifecycleCounts(data.tasks);
   return {
@@ -506,9 +506,9 @@ type MobileSyncRequest = {
 
 type MobileRequestFollowUp = (nextArg?: MobileSyncRequest) => void;
 
-// One sync cycle. The shared phase sequencing and cycle state live in the core
-// machine (runSharedSyncCycle, ADR 0014); this class carries mobile transport
-// state (backend configs, abort controller, WebDAV rate limiting, Dropbox
+// Un ciclo de sincronización. La secuenciación de fase compartida y el ciclo Estado viven en el núcleo
+// machine (runSharedSyncCycle, ADR 0014); Esta clase carries Mobile transport
+// Estado (configuraciones de backend, controlador de aborto, limitación de velocidad WebDAV, Dropbox
 // tokens/revs) and implements the platform ports. Methods copy field values
 // into single-assignment locals (e.g. webdavConfig) where callbacks need
 // TypeScript's narrowing to hold across awaits.
@@ -834,7 +834,7 @@ class MobileSyncRun {
         stagedCredentials.tokens,
         this.fetchWithAbort,
       );
-    // Preserve an OAuth refresh performed during the proof in the in-memory
+    // Preserve una actualización de OAuth realizada durante la prueba en la memoria
     // candidate bundle. The settings transaction promotes this exact bundle
     // only after the proof succeeds.
     stagedCredentials.tokens = resolution.tokens;
@@ -876,7 +876,7 @@ class MobileSyncRun {
   }
 
   private createNotifier(): SyncRunNotifier {
-    // Elapsed time since the previous step start; a shared log then shows
+    // Elapsed time since the previous step start; a shared Registro then shows
     // which step a slow cycle actually spent its time in (#766).
     let lastStepStartedAtMs = 0;
     return {
@@ -904,15 +904,15 @@ class MobileSyncRun {
           {
             scope: 'sync',
             extra: mergeLog.extra,
-            // Resolved conflicts must stay auditable in mindwtr.log even when
+            // Los conflictos resueltos deben permanecer auditables en mindwtr.Registro incluso cuando
             // diagnostics logging is off; the extra carries ids and field names
             // only, never task content (#854).
             force: mergeLog.summary.conflicts > 0,
           }
         );
       },
-      // Same gate and formatters desktop uses, so a mobile trace reads the
-      // same as a desktop one. Ids, field names and fingerprints only (#854).
+      // Misma puerta y formateadores que usa Escritorio, por lo que un rastro Móvil lee el
+      // same as a Desktop one. Ids, field names and fingerprints only (#854).
       tracePayload: (event, data, extra) => {
         if (!isSyncPayloadTraceEnabled(useTaskStore.getState().settings)) return;
         logSyncInfo(SYNC_TRACE_EVENT_MESSAGES[event], buildSyncPayloadTraceExtra(data, extra));
@@ -1045,8 +1045,8 @@ class MobileSyncRun {
       shouldRunAttachmentPhase: async (data, phase) => {
         const backend = this.backend;
         // #1057 (review B3): only file/webdav/cloudkit wire check-on-touch content
-        // detection on mobile today (Dropbox and self-hosted Cloud use their own
-        // bespoke loops, unaffected). Without this, the steady state — cloudKey +
+        // detection on Mobile today (Dropbox and self-hosted Cloud use their own
+        // bespoke loops, unaffected). Without this, the steady Estado — cloudKey +
         // managed local file + localStatus 'available' — always reported "no
         // pending work" and both attachment phases never ran, so edit detection
         // and cross-device re-download were dead code on every wired backend.
@@ -1098,7 +1098,7 @@ class MobileSyncRun {
           deleteDropboxAttachment: (cloudKey, ensureBeforeProviderDelete) =>
             this.runDropboxOperation((accessToken) => {
               // Token refresh can yield long enough for a local edit. Guard at
-              // the final provider call, not only before resolving credentials.
+              // the final Proveedor call, not only before resolving credentials.
               ensureBeforeProviderDelete();
               return deleteDropboxFile(accessToken, cloudKey, this.fetchWithAbort);
             }),
@@ -1246,7 +1246,7 @@ class MobileSyncRun {
               WEBDAV_READ_RETRY_OPTIONS
             );
             if (result.state === 'remote-plaintext') {
-              // A peer disabled encryption at the sync location. Persist first (the state must
+              // A peer disabled encryption at the sync location. Persist first (the Estado must
               // survive a restart), then fail the cycle. Nothing on the remote is touched, and
               // this device never follows the remote down to plaintext on its own.
               markRemotePlaintextDiscovered(syncEncryptionLocalState);
@@ -1271,7 +1271,7 @@ class MobileSyncRun {
           const probe = await webdavGetSyncDocument<AppData>(webdavConfig.url, requestOptions)
             .catch(() => null);
           if (probe?.state === 'encrypted-no-key') {
-            // Persist first (decision #5: the state must survive a restart), then fail
+            // Persist first (decision #5: the Estado must survive a restart), then fail
             // the cycle. Nothing on the remote is touched on this path.
             markRemoteEncryptionDiscovered(syncEncryptionLocalState, probe);
             await flushSyncEncryptionLocalState();
@@ -1279,7 +1279,7 @@ class MobileSyncRun {
           }
           return null;
         } catch (error) {
-          // The core machine maps invalid-JSON reads to the repair-write path;
+          // El/La
           // only genuine transport failures count toward the rate limiter.
           if (!isWebdavInvalidJsonError(error) && !isSyncEncryptionError(error)) {
             this.handleWebdavRateLimit(error);
@@ -1371,7 +1371,7 @@ class MobileSyncRun {
       fileRead: async () => {
         const fileSyncPath = this.fileSyncPath;
         if (!fileSyncPath) throw new Error('No sync folder configured');
-        // The `material` key is added only when encryption is on, so the off-state call
+        // El/La
         // is argument-for-argument what it was before this feature (invariant #1).
         return readSyncFile(fileSyncPath, {
           bookmark: this.fileSyncBookmark,
@@ -1394,7 +1394,7 @@ class MobileSyncRun {
         () => this.resolveDropboxAccessToken(forceRefresh),
       ),
       dropboxDownload: async (token) => {
-        // Off state calls the pre-feature 2-argument form verbatim (invariant #1).
+        // Off Estado calls the pre-feature 2-argument form verbatim (invariant #1).
         const material = this.encryptionMaterial;
         const result = await this.runDropboxTransientRetry(
           () => (material
@@ -1554,7 +1554,7 @@ export async function performMobileSync(
 ): Promise<MobileSyncResult> {
   const wasInFlight = mobileSyncOrchestrator.getState().inFlight;
   if (wasInFlight && options?.activationProbe) {
-    // The caller that owns this session-only config must observe its proof.
+    // El/La
     // Never leave transient credentials queued after returning a requeue result.
     return { success: true, skipped: 'requeued' };
   }
@@ -1566,7 +1566,7 @@ export async function performMobileSync(
     configOverride: options?.configOverride,
   });
   if (wasInFlight && options?.configOverride) {
-    // A queued orchestrator call normally receives the active run's promise.
+    // A queued orchestrator call normally receives the active run's Promesa.
     // That result did not exercise these pending settings, so surface a requeue
     // instead of letting the settings UI treat it as proof and persist them.
     void result.catch((error) => logSyncWarning('Active sync failed while a settings proof was queued', error));

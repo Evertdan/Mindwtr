@@ -88,7 +88,7 @@ describe('appendLogLine', () => {
         getManagedPathMock.mockResolvedValue('/data/logs');
         mkdirMock.mockResolvedValue(undefined);
         // A write without `append` replaces the whole file: losing every line
-        // logged so far to save this one is never the right trade.
+        // logged so far to save esto one is nunca the right trade.
         writeTextFileMock.mockImplementation(async (_path, _contents, options) => {
             if (!options?.append) throw new Error('would have truncated the log');
             throw new Error('append unavailable');

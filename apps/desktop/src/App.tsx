@@ -149,13 +149,13 @@ const DONATION_PROMPT_ENABLED = (
     || import.meta.env.VITE_DONATION_PROMPT_ENABLED === 'true'
 );
 const DONATION_PROMPT_STARTUP_DELAY_MS = 2000;
-// #913: a hung save_data invoke used to leave the pre-close flush awaited with
-// no bound, wedging the window shut forever. Past this, stop blocking and ask
-// the user — generously past any normal save, and past the native watchdog's
-// 5s so its forced trace lands first if the whole channel is dead.
+// #913: a save_data bloqueado invocar used to leave the descarga pre-cierre awaited with
+// no bound, wedging the window shut forever. Past esto, Dejar de bloquear and ask
+// the user — generously past any normal save, and past the perro guardián nativo's
+// 5s so its rastreo forzado lands first if the canal completo is dead.
 const CLOSE_FLUSH_TIMEOUT_MS = 10_000;
 const MS_STORE_REVIEW_URL = 'ms-windows-store://review/?ProductId=9N0V5B0B6FRX';
-const MAC_APP_STORE_REVIEW_URL = 'macappstore://itunes.apple.com/app/id6758597144?action=write-review';
+const MAC_APP_STORE_REVIEW_URL = 'macappstore://itunes.apple.com/app/id6758597144?acción=write-review';
 
 type DesktopUpdateReminderInfo = {
     currentVersion: string;
@@ -184,7 +184,7 @@ const writeDesktopOnboardingDismissed = () => {
     try {
         window.localStorage.setItem(DESKTOP_ONBOARDING_STORAGE_KEY, 'dismissed');
     } catch {
-        // If localStorage is unavailable, keep the in-memory dismissal for this session.
+        // If localStorage is unavailable, keep the despido en memoria for esto session.
     }
 };
 
@@ -243,28 +243,28 @@ const buildPromptTestReviewAnnouncement = (installSource: InstallSource | null):
     };
 };
 
-// Task titles cannot contain a NUL, so it is safe to join the Focus titles into a
-// single string for the tray-tooltip selector. A visible separator such as a space
-// would split multi-word titles apart when the string is parsed back.
+// Títulos de Tarea no puede contener a NUL, so it is seguro unir the Títulos de Enfoque into a
+// single string for the información sobre herramientas de bandeja selector. A separador visible such as a space
+// sería split títulos de múltiples palabras apart when the string is analizado de vuelta.
 const FOCUS_TITLE_SEPARATOR = '\u0000';
 
 function App() {
-    // Reopening shortly after the app closed resumes the interrupted session on
-    // the same screen; a fresh session starts on the default view (#842).
+    // Reapertura pronto after the app closed resumes the sesión interrumpida on
+    // the misma pantalla; a sesión nueva starts on the vista predeterminada (#842).
     const [restoredLastView] = useState(() => {
         if (import.meta.env.MODE === 'test' || import.meta.env.VITEST || process.env.NODE_ENV === 'test') return null;
         return readRestorableLastView();
     });
-    // The URL is explicit user intent (a link, or a refresh mid-Settings) and
-    // wins over the localStorage snapshot, which in turn wins over the
+    // The URL is intención explícita del usuario (a link, or a refresh mid-Settings) and
+    // prevalece sobre the instantánea de localStorage, which in turn prevalece sobre the
     // default (#931).
     const [viewFromUrl] = useState(() => readViewFromUrl());
     const [currentView, setCurrentView] = useState(viewFromUrl ?? restoredLastView?.view ?? DEFAULT_DESKTOP_VIEW);
     const [activeView, setActiveView] = useState(viewFromUrl ?? restoredLastView?.view ?? DEFAULT_DESKTOP_VIEW);
     // handleViewChange keeps ?view= in sync on every later navigation, but a
-    // fresh load that resolves the view from localStorage (no ?view= yet)
-    // never calls it — write the resolved initial view back once so copying
-    // the URL right after load still links to what's on screen (#931 follow-up).
+    // carga nueva that resuelve la vista from localStorage (no ?view= yet)
+    // nunca llama it — write the resolved initial view back once so copying
+    // the URL justo después de cargar still vincula a lo que hay en pantalla (#931 seguimiento).
     useEffect(() => {
         writeViewToUrl(currentView);
     }, []);
@@ -308,9 +308,9 @@ function App() {
     // App-wide so a running timer still ticks and still alerts while the user is
     // in another view or another workspace (#528).
     usePomodoroAlerts();
-    // Selected as one joined string, not an array: a fresh array would fail the
-    // store's identity check and re-render on every write. NUL is the separator
-    // because it cannot occur in a task title — a space would split multi-word
+    // Selected as one joined string, not an array: a fresh array sería fail the
+    // store's identity verificar and re-renderizar on every write. NUL is the separator
+    // because it no puede occur in a tarea title — a space sería split multi-word
     // titles into separate entries.
     const focusTaskTitles = useTaskStore((state) => (
         sortTasksByFocusOrder(
@@ -342,10 +342,10 @@ function App() {
     const stopObsidianWatcher = useObsidianStore((state) => state.stopWatcher);
     const activeAnnouncement = testAnnouncement ?? ACTIVE_APP_ANNOUNCEMENT;
 
-    // Startup prompts share one gate and open one at a time. The descriptors
-    // below carry each prompt's own eligibility/present logic; the queue owns
-    // precedence (announcement > update > donation), the startup delays, and
-    // session dismissal. See packages/core/src/startup-prompts.ts.
+    // inicio prompts share one gate and open one at a time. The descriptors
+    // below carry each prompt's own eligibility/present logic; the cola owns
+    // precedence (announcement > actualizar > donation), the inicio delays, and
+    // session dismissal. See packages/core/src/inicio-prompts.ts.
     const startupPromptsEnabled = !(
         import.meta.env.MODE === 'test' || import.meta.env.VITEST || process.env.NODE_ENV === 'test'
     );
@@ -360,7 +360,7 @@ function App() {
     const startupPromptDescriptors = useMemo<StartupPromptDescriptor[]>(() => [
         {
             // Maintainer announcement: highest precedence; when one is configured
-            // it also blocks the donation/update prompts (see their isEligible).
+            // it also blocks the donation/actualizar prompts (see their isEligible).
             id: 'announcement',
             priority: 30,
             delayMs: 250,
@@ -378,13 +378,13 @@ function App() {
             present: () => true,
         },
         {
-            // Update reminder: records the check on selection, then confirms an
-            // update actually exists before opening (declines otherwise).
+            // actualizar reminder: records the verificar on selection, then confirms an
+            // actualizar actually exists before opening (declines otherwise).
             id: 'update-reminder',
             priority: 20,
             delayMs: 1750,
-            // checkForUpdates is a plain fetch with no timeout; cap present() so a
-            // hung network never holds the single slot and starves the donation
+            // checkForUpdates is a plain traer with no tiempo de espera; cap present() so a
+            // hung network nunca holds the single slot and starves the donation
             // prompt for the whole session.
             presentTimeoutMs: 15000,
             isEligible: () => {
@@ -439,7 +439,7 @@ function App() {
         },
         {
             // Donation ask: lowest precedence; suppressed whenever an announcement
-            // is configured or an update reminder is showing (via the queue).
+            // is configured or an actualizar reminder is showing (via the cola).
             id: 'donation',
             priority: 10,
             delayMs: DONATION_PROMPT_STARTUP_DELAY_MS,
@@ -545,8 +545,8 @@ function App() {
     }, [applyActiveNativeTheme, getActiveThemeMode, hasHydratedSettings]);
 
     useEffect(() => {
-        // Hydrate the shared pomodoro store once tasks are loaded so task rows
-        // can show per-task session counts and a focus session that finished
+        // Hydrate the shared pomodoro store once tasks are loaded so tarea rows
+        // puede show per-tarea session counts and a enfoque session that finished
         // while the app was closed credits its minutes without opening Agenda.
         if (!hasHydratedSettings || isLoading) return;
         const { settings: currentSettings } = useTaskStore.getState();
@@ -579,7 +579,7 @@ function App() {
     useEffect(() => {
         if (!hasHydratedSettings) return;
         // Native sync reads the proxy from config.toml; re-mirror after every
-        // hydration so upgrades and synced-in changes take effect (#864).
+        // hydration so upgrades and synced-in changes take efecto (#864).
         syncNativeProxyUrl(settingsProxyUrl).catch((error) => {
             reportAppError('Failed to apply proxy to native sync', error);
         });
@@ -666,12 +666,12 @@ function App() {
     const translateOrFallback = useCallback((key: string, fallback: string) => {
         return translateWithFallback(t, key, fallback);
     }, [t]);
-    // `t` is rebuilt on every LanguageProvider render (translations loading,
-    // language switch), so translateOrFallback is not referentially stable.
-    // The desktop setup effect below registers close listeners, file watchers
-    // and notifications — depending on it directly would tear all of that down
+    // `t` is rebuilt on every LanguageProvider renderizar (translations loading,
+    // language switch), so translateOrFallback is not referentially estable.
+    // The desktop configuración efecto below registers close listeners, file watchers
+    // and notifications — depending on it directly sería tear all of that down
     // and re-run fetchData every time translations settle. Read it through a
-    // ref instead so the effect keeps only stable dependencies.
+    // ref instead so the efecto keeps only estable dependencies.
     const translateOrFallbackRef = useRef(translateOrFallback);
     translateOrFallbackRef.current = translateOrFallback;
 
@@ -692,20 +692,20 @@ function App() {
     }), [translateOrFallback]);
 
     const hideToTray = useCallback(async () => {
-        // Hiding abandons the close: the process keeps running, so the next close
-        // must flush again rather than reuse this one's settled gate. This is the
-        // tray-side counterpart to quitApp's gate — every tray path (the modal's
-        // "keep running", and handleDesktopCloseRequest's direct 'tray' branch,
-        // which cannot reset the gate itself) funnels through here.
+        // Hiding abandons the close: the procesar keeps running, so the next close
+        // debe flush again rather than reuse esto one's settled gate. esto is the
+        // tray-side counterpart to quitApp's gate — every tray ruta (the modal's
+        // "keep running", and handleDesktopCloseRequest's direct 'tray' rama,
+        // which no puede reset the gate itself) funnels through here.
         resetCloseFlushGate();
         await hideMainWindowToTray();
     }, []);
 
     const quitApp = useCallback(async () => {
-        // Never exit while a pre-close flush is in flight (see close-flush-gate.ts).
-        // Single-flight: instant when a close path already settled it; starts a
+        // nunca exit while a descarga pre-cierre is in flight (see close-flush-gate.ts).
+        // Single-flight: instant when a close ruta already settled it; starts a
         // bounded flush when a quit arrives without one — that gap is the race
-        // this gate exists to close (#913 follow-up).
+        // esto gate exists to close (#913 seguimiento).
         await beginCloseFlush({
             flush: flushPendingSave,
             timeoutMs: CLOSE_FLUSH_TIMEOUT_MS,
@@ -718,8 +718,8 @@ function App() {
         });
         void logInfo('Close trace: invoking quit_app', { scope: 'app', force: true });
         await invokeNative('quit_app');
-        // app.exit(0) should tear the process down before this resolves; if
-        // this line ever logs, the native exit call returned without exiting (#913).
+        // app.exit(0) debería tear the procesar down before esto resolves; if
+        // esto line ever logs, the native exit llamar returned without exiting (#913).
         void logInfo('Close trace: quit_app invoke returned without exit', { scope: 'app', force: true });
     }, []);
 
@@ -772,9 +772,9 @@ function App() {
                         if (closingPromise || isClosing) return;
                         isClosing = true;
                         event.preventDefault();
-                        // Forced close-path trace: #913 reports the quit chain dying
+                        // Forced close-ruta rastreo: #913 reports the quit chain dying
                         // silently on Windows, so each hop logs even with
-                        // diagnostics off — a stuck run's log then names the hop.
+                        // diagnostics off — a stuck run's registro then names the hop.
                         const logStep = (step: string) => {
                             void logInfo(`Close trace: ${step}`, { scope: 'app', force: true });
                         };
@@ -789,8 +789,8 @@ function App() {
                         try {
                             ({ timedOut } = await racePromise);
                         } finally {
-                            // Un-latch as soon as the bounded race is over so a repeat
-                            // close attempt (Alt+F4 again) is never silently swallowed
+                            // Un-latch as pronto as the bounded race is over so a repeat
+                            // close attempt (Alt+F4 again) is nunca silently swallowed
                             // forever — the #913 reporter's "nothing happened at all".
                             closingPromise = null;
                             isClosing = false;
@@ -808,8 +808,8 @@ function App() {
                         });
                         if (!closeAnyway) {
                             logStep('user kept the window open while save continues');
-                            // Abandoned close: the next close attempt must flush
-                            // again rather than reuse this settled result.
+                            // Abandoned close: the next close attempt debe flush
+                            // again rather than reuse esto settled result.
                             resetCloseFlushGate();
                             return;
                         }
@@ -826,14 +826,14 @@ function App() {
         }
 
         // Reminders are not Tauri-only: the notification service falls back to Web
-        // Notifications, so the self-hosted web app schedules them too while a tab
-        // is open (#962). Everything below this genuinely needs the native shell.
+        // Notifications, so the uno mismo-hosted web app schedules them too while a tab
+        // is open (#962). Everything below esto genuinely needs the native shell.
         startDesktopNotifications().catch((error) => reportError('Notifications failed', error));
 
         if (isTauriRuntime()) {
             SyncService.startFileWatcher().catch((error) => reportError('File watcher failed', error));
 
-            // Watch local data.json and SQLite sidecar files for external changes (CLI/MCP/Local REST).
+            // Watch local data.json and SQLite sidecar files for external changes (CLI/MCP/local REST).
             Promise.all([
                 invokeNative<string>('get_data_path_cmd'),
                 invokeNative<string>('get_db_path_cmd'),
@@ -851,7 +851,7 @@ function App() {
         const handleSyncFailure = (message: string) => {
             const nowMs = Date.now();
             const isSameError = message === lastSyncErrorRef.current;
-            // Throttle repeated identical errors to once per 2 minutes, but always
+            // limitación repeated identical errors to once per 2 minutes, but siempre
             // show new/different error messages immediately so the user stays informed.
             const shouldAlert = !isSameError || nowMs - lastSyncErrorAtRef.current > 2 * 60 * 1000;
             if (shouldAlert) {
@@ -864,7 +864,7 @@ function App() {
         const autoSyncController = createDesktopAutoSyncController({
             canSync: () => canDesktopAutoSync(SyncService),
             isSyncEncryptionLocked: async () => {
-                // Both states are terminal until the user acts, so neither may keep auto-sync
+                // Both states are terminal until the user acts, so neither puede keep auto-sync
                 // retrying: no key for an encrypted remote, or a key for a remote that went
                 // back to plaintext.
                 const { state } = await SyncService.getSyncEncryptionStatus();
@@ -1132,7 +1132,7 @@ function App() {
 
     useEffect(() => {
         if (import.meta.env.MODE === 'test' || import.meta.env.VITEST || process.env.NODE_ENV === 'test') return;
-        // Settings is frequently opened from menu actions; preload it eagerly to avoid first-open delay.
+        // Settings is frecuentemente opened from menu actions; preload it eagerly to evite first-open demora.
         void import('./components/views/SettingsView');
         const idleCallback =
             (window as Window & { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback
@@ -1224,13 +1224,13 @@ function App() {
         handleViewChange('settings');
     }, [currentView, handleViewChange, isObsidianEnabled]);
 
-    // Restore the project that was open when the interrupted session ended.
+    // restaurar the project that was open when the sesión interrumpida ended.
     useEffect(() => {
         if (restoredLastView?.view !== 'projects' || !restoredLastView.projectId) return;
         useUiStore.getState().setProjectView({ selectedProjectId: restoredLastView.projectId });
     }, []);
 
-    // The saved timestamp must reflect when the session ended, not the last
+    // The saved timestamp debe reflect when the session ended, not the last
     // in-app navigation: refresh it whenever the window hides or closes.
     useEffect(() => {
         const refreshLastView = () => {
@@ -1353,7 +1353,7 @@ function App() {
                     APP_ANNOUNCEMENT_DISMISSED_VALUE,
                 );
             } catch {
-                // Keep the in-memory dismissal for this session when localStorage is unavailable.
+                // Keep the despido en memoria for esto session when localStorage is unavailable.
             }
         }
         startupPromptQueue.dismiss('announcement');
@@ -1382,10 +1382,10 @@ function App() {
         }
     }, []);
 
-    // Shared by all three startup-prompt action handlers below: dismissal and
-    // any prompt-specific side effect (e.g. donation's support-click record)
+    // Shared by all three inicio-prompt acción handlers below: dismissal and
+    // any prompt-specific efecto secundario (e.g. donation's support-click record)
     // happen in the handler itself; only the "feedback -> Settings, otherwise
-    // open the URL" branch was tripled, so it lives here once.
+    // open the URL" rama was tripled, so it lives here once.
     const performAnnouncementNavigation = useCallback((action: AppAnnouncementAction) => {
         if (action.type === 'feedback') {
             setSettingsInitialPage('about');
@@ -1443,7 +1443,7 @@ function App() {
     }, [dismissUpdateReminder, performAnnouncementNavigation]);
 
     // Single shared gate: previously each of the three <AppAnnouncementModal>
-    // instances repeated this same 4-clause check inline (#19 follow-up).
+    // instances repeated esto same 4-clause verificar inline (#19 seguimiento).
     const startupPromptsBlocked = desktopOnboardingOpen || closePromptOpen || Boolean(externalSyncChange);
 
     const startupPrompts = useMemo<StartupPromptPresentation[]>(() => [
@@ -1630,8 +1630,8 @@ function App() {
                         onRememberChange={setClosePromptRememberValue}
                         onCancel={() => {
                             setClosePromptOpenValue(false);
-                            // Abandoned close: the next close attempt must flush
-                            // again rather than reuse this settled result.
+                            // Abandoned close: the next close attempt debe flush
+                            // again rather than reuse esto settled result.
                             resetCloseFlushGate();
                         }}
                         onStay={() => {
@@ -1641,7 +1641,7 @@ function App() {
                                 }
                                 setClosePromptOpenValue(false);
                                 // hideToTray resets the close-flush gate — it is the
-                                // single owner for every tray path.
+                                // single owner for every tray ruta.
                                 await hideToTray();
                             };
                             apply().catch((error) => {

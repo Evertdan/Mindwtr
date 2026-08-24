@@ -199,7 +199,7 @@ describe('createDesktopAutoSyncController', () => {
 
     it('waits exactly as long as CloudKit asked before retrying (#948)', async () => {
         const scheduler = createManualScheduler();
-        // CloudKit answers a throttle with the delay it wants. Retrying on the
+        // CloudKit answers a limitación with the demora it wants. Retrying on the
         // fixed 60s cooldown either hammers a limit that wanted longer, or sits
         // idle when it only wanted a few seconds.
         const performSync = vi.fn(async () => ({
@@ -226,8 +226,8 @@ describe('createDesktopAutoSyncController', () => {
             expect(performSync).toHaveBeenCalledTimes(1);
         });
 
-        // The failed cycle itself arms the retry; no later edit or lifecycle
-        // event is required.
+        // The failed cycle itself arms the reintentar; no later edit or lifecycle
+        // evento is required.
         await scheduler.advanceBy(179_999);
         expect(performSync).toHaveBeenCalledTimes(1);
 
@@ -269,7 +269,7 @@ describe('createDesktopAutoSyncController', () => {
             expect(performSync).toHaveBeenCalledTimes(2);
         });
 
-        // The second failure doubles the requested 10s delay to 20s.
+        // The second fracaso doubles the requested 10s demora to 20s.
         await scheduler.advanceBy(19_999);
         expect(performSync).toHaveBeenCalledTimes(2);
 

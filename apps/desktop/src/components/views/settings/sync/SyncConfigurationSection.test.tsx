@@ -94,7 +94,7 @@ const baseProps: Parameters<typeof SyncConfigurationSection>[0] = {
     dropboxConnected: true,
     dropboxBusy: false,
     dropboxAuthInProgress: false,
-    dropboxRedirectUri: 'http://127.0.0.1:53682/oauth/dropbox/callback',
+    dropboxRedirectUri: 'http://127.0.0.1:53682/oauth/dropbox/devolución de llamada',
     dropboxTestState: 'idle',
     onCloudUrlChange: vi.fn(),
     onCloudTokenChange: vi.fn(),

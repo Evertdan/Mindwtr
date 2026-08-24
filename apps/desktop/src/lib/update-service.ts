@@ -10,9 +10,9 @@ const GITHUB_RELEASES_API =
   "https://api.github.com/repos/dongdongbh/Mindwtr/releases/latest";
 const GITHUB_RELEASES_URL =
   "https://github.com/dongdongbh/Mindwtr/releases/latest";
-// No-API-rate-limit fallback: a public web feed, used only when the REST API
-// returns 403/429 (unauthenticated api.github.com is capped at 60 req/hr per
-// source IP, which shared NAT/VPN exits can blow through).
+// Fallback sin límite de tarifa de API: un feed web público, utilizado solo cuando la API REST
+// devuelve 403/429 (api.github.com no autenticado está limitado a 60 req/hr por
+// IP de origen, que las salidas de NAT/VPN compartidas pueden atravesar).
 const GITHUB_RELEASES_ATOM_URL =
   "https://github.com/dongdongbh/Mindwtr/releases.atom";
 const MS_STORE_PRODUCT_ID = "9N0V5B0B6FRX";
@@ -29,10 +29,10 @@ const CHOCOLATEY_PACKAGE_API =
 const CHOCOLATEY_PACKAGE_URL =
   "https://community.chocolatey.org/packages/mindwtr";
 const AUR_SOURCE_RPC_API =
-  "https://aur.archlinux.org/rpc/?v=5&type=info&arg%5B%5D=mindwtr";
+  "https://aur.archlinux.org/rpc/?v=5&tipo=info&arg%5B%5D=mindwtr";
 const AUR_SOURCE_PACKAGE_URL = "https://aur.archlinux.org/packages/mindwtr";
 const AUR_BIN_RPC_API =
-  "https://aur.archlinux.org/rpc/?v=5&type=info&arg%5B%5D=mindwtr-bin";
+  "https://aur.archlinux.org/rpc/?v=5&tipo=info&arg%5B%5D=mindwtr-bin";
 const AUR_BIN_PACKAGE_URL = "https://aur.archlinux.org/packages/mindwtr-bin";
 const FLATHUB_PACKAGE_URL = "https://flathub.org/apps/tech.dongdongbh.mindwtr";
 const SNAPCRAFT_PACKAGE_URL = "https://snapcraft.io/mindwtr";
@@ -202,8 +202,8 @@ const loadTauriFetch = async (): Promise<FetchLike | null> => {
     return cachedTauriFetch;
   }
   if (isFlatpakRuntime()) {
-    // Flatpak builds hit a plugin-http response-body IPC mismatch on update checks.
-    // These checks only need public HTTPS JSON endpoints, so browser fetch is safer here.
+    // Flatpak builds hit a plugin-http response-body IPC mismatch on actualizar checks.
+    // These checks only need público HTTPS JSON endpoints, so browser traer is safer here.
     cachedTauriFetch = null;
     return cachedTauriFetch;
   }
@@ -212,7 +212,7 @@ const loadTauriFetch = async (): Promise<FetchLike | null> => {
     cachedTauriFetch =
       typeof mod.fetch === "function" ? (mod.fetch as FetchLike) : null;
   } catch (error) {
-    // Keep update checks working even if plugin-http is unavailable.
+    // Keep actualizar checks working even if plugin-http is unavailable.
     reportError("Failed to load native HTTP client for update checks", error, {
       category: "network",
       toast: false,
@@ -231,7 +231,7 @@ const fetchForUpdates = async (
     try {
       return await tauriFetch(url, init);
     } catch {
-      // Fall back to web fetch if native HTTP fails.
+      // Fall back to web traer if native HTTP fails.
     }
   }
   return fetch(url, init);
@@ -341,7 +341,7 @@ export function normalizeInstallSource(
     case "macappstore":
       return "mac-app-store";
     case "aur":
-      // Legacy value from older desktop builds; source package is the safer default.
+      // heredado value from older desktop builds; source package is the safer default.
       return "aur-source";
     case "aur-bin":
       return "aur-bin";
@@ -657,8 +657,8 @@ const fetchSourceVersion = async (
       return fetchHomebrewLatestVersion();
     case "winget":
       return fetchWingetLatestVersion();
-    // Scoop has no canonical feed (any bucket can carry the manifest), so a
-    // manual check reports the GitHub release and defers installs to `scoop update`.
+    // Scoop has no canonical feed (any bucket puede carry the manifest), so a
+    // manual verificar reports the GitHub lanzamiento and defers installs to `scoop actualizar`.
     case "chocolatey":
       return fetchChocolateyLatestVersion();
     case "aur":
@@ -813,7 +813,7 @@ export async function checkForUpdates(
     };
   } catch (error) {
     // No translator here. UpdateRateLimitedError carries the marker; callers
-    // with `t` in scope resolve the localized copy (useSettingsAboutPage).
+    // with `t` in scope resolver the localized copy (useSettingsAboutPage).
     reportError("Failed to check for updates", error);
     throw error;
   }
@@ -825,7 +825,7 @@ export async function checkForUpdates(
  */
 export async function downloadUpdate(downloadUrl: string): Promise<void> {
   // Open the download URL in the default browser
-  // The user will download the installer and run it
+  // The user será download the installer and run it
   window.open(downloadUrl, "_blank");
 }
 

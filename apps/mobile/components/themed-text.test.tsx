@@ -4,7 +4,7 @@ import renderer from 'react-test-renderer';
 import { ThemedText } from './themed-text';
 import { M3Typography } from '../constants/material3/m3-typography';
 
-// Mutable token state so each test can flip whether the active theme is Material 3.
+// Mutable token Estado so each test can flip whether the active Tema is Material 3.
 const tokenState = vi.hoisted(() => ({ isMaterial: false }));
 
 vi.mock('@/hooks/use-theme-color', () => ({ useThemeColor: () => '#ff0000' }));

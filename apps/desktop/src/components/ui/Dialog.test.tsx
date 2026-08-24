@@ -48,7 +48,7 @@ describe.each(VARIANTS)('Dialog ($name)', ({ props }) => {
     it('has no accessibility violations', async () => {
         renderDialog(props);
         const results = await axe(screen.getByRole('dialog'), {
-            // jsdom cannot compute CSS variable/theme contrast reliably.
+            // jsdom no puede compute CSS variable/theme contrast reliably.
             rules: { 'color-contrast': { enabled: false } },
         });
         expect(results.violations).toHaveLength(0);
@@ -102,8 +102,8 @@ describe.each(VARIANTS)('Dialog ($name)', ({ props }) => {
         expect(screen.getByLabelText('Name')).toHaveFocus();
     });
 
-    // ConfirmModal and friends focus a control on a 50ms timer, i.e. after
-    // mount: the panel holds focus first, then the control takes it.
+    // ConfirmModal and friends enfoque a control on a 50ms timer, i.e. after
+    // montar: the panel holds enfoque first, then the control takes it.
     it('yields to a control focused after mount', () => {
         vi.useFakeTimers();
         try {
@@ -144,9 +144,9 @@ describe.each(VARIANTS)('Dialog ($name)', ({ props }) => {
         trigger.remove();
     });
 
-    // jsdom cannot measure geometry, so the classes that make the layout
-    // impossible to break ARE the test (#957): a capped panel whose body is the
-    // only scrolling region, with the action row outside it.
+    // jsdom no puede measure geometry, so the classes that make the layout
+    // impossible to break ARE the prueba (#957): a capped panel whose body is the
+    // only scrolling region, with the acción row outside it.
     it('caps the panel and scrolls only the body', () => {
         renderDialog(props);
         const dialog = screen.getByRole('dialog');
@@ -166,7 +166,7 @@ describe.each(VARIANTS)('Dialog ($name)', ({ props }) => {
 
 describe('Dialog', () => {
     // A sized or scrim-scrolling panel opts out of the cap with max-h-[none];
-    // plain `max-h-none` is NOT in tailwind-merge's scale, so it would leave the
+    // plain `max-h-none` is NOT in tailwind-fusionar's scale, so it sería leave the
     // default cap in place alongside it and quietly clip the panel.
     it('lets a panel drop the default cap', () => {
         render(
@@ -225,7 +225,7 @@ describe('Dialog', () => {
         expect(onClose).not.toHaveBeenCalled();
     });
 
-    // A nested confirm consumed the key; the dialog underneath must not also
+    // A nested confirm consumed the key; the dialog underneath no debe also
     // close. Portals bubble through the React tree, so the outer panel does see
     // the inner dialog's Escape.
     it('leaves the outer dialog open when a nested one handles Escape', () => {

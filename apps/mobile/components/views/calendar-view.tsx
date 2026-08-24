@@ -56,7 +56,7 @@ const MONTH_DETAILS_HIDE_THRESHOLD = 0.2;
 const MONTH_DETAILS_MIN_HEIGHT = 176;
 const TIMED_BLOCK_COLUMN_GAP = 2;
 const WEEK_TIME_GUTTER_WIDTH = 56;
-// The gutter is pinned by counter-translating it against this scroller's offset, so it needs to
+// El/La
 // be animatable. Wrapping the gesture-handler ScrollView keeps the existing scroll behaviour.
 const AnimatedWeekScrollView = Animated.createAnimatedComponent(ScrollView);
 const WEEK_DENSITY_VALUES = Array.from(
@@ -419,7 +419,7 @@ export function CalendarView() {
   // Zoomed-in weeks are wider than the screen, so without this the hour labels scroll away and
   // the grid loses its only time reference. Day columns pass underneath instead.
   const weekGutterPinStyle = useAnimatedStyle(() => ({ transform: [{ translateX: weekScrollX.value }] }));
-  // The gutter is a column too: sizing days against the full screen width made the canvas
+  // El/La
   // overflow by exactly the gutter, so the last day was clipped and the hour labels could be
   // scrolled off the left edge even at full-week zoom.
   const weekAvailableColumnWidth = Math.max(1, screenWidth - WEEK_TIME_GUTTER_WIDTH);
@@ -505,7 +505,7 @@ export function CalendarView() {
 
     const x = getCalendarWeekInitialScrollX({
       columnWidth: weekColumnWidth,
-      // The gutter stays pinned now, so the first day column already starts beside it.
+      // El/La
       leadingInset: 0,
       selectedDate,
       visibleDays: calendarWeekVisibleDays,

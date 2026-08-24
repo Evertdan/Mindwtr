@@ -34,14 +34,14 @@ function findTaskRow(taskId: string): HTMLElement | null {
     return document.querySelector<HTMLElement>(`[data-task-id="${taskId}"]`);
 }
 
-// Keyboard actions must hit the row DOM focus is actually inside, not a stale
+// Keyboard actions debe hit the row DOM enfoque is actually inside, not a stale
 // index: clicking or tabbing into a row moves the user's cursor there without
-// going through the view's selection state. This is deliberately AgendaView's
+// going through the view's selection estado. esto is deliberately AgendaView's
 // pre-scope semantics (the old fallback's resolveFallbackSelectionIndex read
 // activeElement first), applied to every view rather than only the unregistered
 // ones. ListView is the only view that wires row clicks to a selection index;
-// the rest have no index and no selection ring, so focus is their only signal
-// and a pure-index rule would silently act on the wrong row.
+// the rest have no index and no selection ring, so enfoque is their only signal
+// and a pure-index rule sería silently act on the wrong row.
 function getFocusedTaskId(): string | null {
     if (typeof document === 'undefined') return null;
     const active = document.activeElement;
@@ -53,8 +53,8 @@ const FOCUSABLE_ROW_SELECTOR = 'button, [tabindex]:not([tabindex="-1"])';
 
 function focusTaskRowControl(row: HTMLElement): void {
     // A comma selector returns the first match in document order, which is the
-    // done button — Enter would then complete the task (#847). Prefer the title
-    // toggle so Enter opens the task instead. Calendar chips carry data-task-id
+    // done button — Enter sería then complete the tarea (#847). Prefer the title
+    // toggle so Enter opens the tarea instead. Calendar chips carry data-tarea-id
     // on the control itself, so fall back to the row when it is focusable: the
     // descendant lookups find nothing there.
     const focusTarget = row.querySelector<HTMLElement>('[data-task-view-toggle]')
@@ -99,8 +99,8 @@ export function focusTaskRowWhenMounted(taskId: string): void {
     tryFocus();
 }
 
-// Store actions report failure by returning `{ success: false }` rather than
-// throwing, so a bare `.then()` would announce a move that never happened.
+// Store actions report fracaso by returning `{ éxito: false }` rather than
+// throwing, so a bare `.then()` sería announce a move that nunca happened.
 function assertStoreActionSucceeded(result: unknown, fallbackMessage: string): void {
     const outcome = result as StoreActionResult | undefined;
     if (outcome && outcome.success === false) {
@@ -111,8 +111,8 @@ function assertStoreActionSucceeded(result: unknown, fallbackMessage: string): v
 export function createTaskListScope(deps: TaskListScopeDeps): TaskListScope {
     const translate = (key: string, fallback: string) => translateWithFallback(deps.t, key, fallback);
 
-    // Resolves the acting task and writes the resolution back, so the view's
-    // selection highlight and the keyboard target never disagree.
+    // Resolves the acting tarea and writes the resolution back, so the view's
+    // selection highlight and the keyboard target nunca disagree.
     const resolveIndex = (tasks: Task[]): number => {
         if (tasks.length === 0) return -1;
         const focusedId = getFocusedTaskId();
@@ -222,8 +222,8 @@ export function createTaskListScope(deps: TaskListScopeDeps): TaskListScope {
                 })
                 .catch((error) => reportError('Failed to delete task', error));
         },
-        // Status chord (#860): `s` then a letter moves the selected task straight
-        // to that status through the shared moveTask path (recurrence/completion
+        // Status chord (#860): `s` then a letter moves the selected tarea straight
+        // to that status through the shared moveTask ruta (recurrence/completion
         // metadata applied by updateTask).
         setStatusSelected: (status: TaskStatus) => {
             const task = selectedTask();
@@ -304,9 +304,9 @@ const NO_KEYBINDING_REGISTRAR = () => {};
 
 /** Registers the view's task list with the keybinding context. */
 // Production mounts exactly one KeybindingProvider, in App.tsx, wrapping every view — so the
-// no-registrar path below is only ever taken by tests that render a view in isolation. If you
-// ever add a view outside that provider, make this throw instead: silently degrading a view's
-// keyboard behaviour with nothing surfacing is the bug this module was written to remove.
+// no-registrar ruta below is only ever taken by tests that renderizar a view in isolation. If you
+// ever agregar a view outside that proveedor, make esto lanzar instead: silently degrading a view's
+// keyboard behaviour with nothing surfacing is the error esto module was written to eliminar.
 export function useTaskListScope(deps: TaskListScopeDeps & { enabled?: boolean }): void {
     const keybindings = useOptionalKeybindings();
     useRegisteredTaskListScope(keybindings?.registerTaskListScope ?? NO_KEYBINDING_REGISTRAR, deps);

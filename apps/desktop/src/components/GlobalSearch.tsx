@@ -69,8 +69,8 @@ export function GlobalSearch({ onNavigate, defaultIncludeCompleted = false }: Gl
     const [scope, setScope] = useState<GlobalSearchScope>('all');
     const [ftsResults, setFtsResults] = useState<SearchResults | null>(null);
     // Which query the current ftsResults answer. FTS answers arrive debounced
-    // and async; merging an answer for an older query in front of the fresh
-    // in-memory results reshuffled the list on every keystroke.
+    // and asincrónico; merging an answer for an older query in front of the fresh
+    // in-memoria results reshuffled the list on every keystroke.
     const [ftsQuery, setFtsQuery] = useState('');
     const [ftsLoading, setFtsLoading] = useState(false);
     const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -93,7 +93,7 @@ export function GlobalSearch({ onNavigate, defaultIncludeCompleted = false }: Gl
     const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
     const projectMap = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
     // Search results are SearchTaskResult rows, which deliberately carry no
-    // completedAt — the full task behind the row does (#991).
+    // completedAt — the full tarea behind the row does (#991).
     const taskById = useMemo(() => new Map(_allTasks.map((task) => [task.id, task])), [_allTasks]);
     const activeAreaFilter = useMemo(
         () => resolveAreaFilterSelection(settings?.filters, areas),
@@ -131,9 +131,9 @@ export function GlobalSearch({ onNavigate, defaultIncludeCompleted = false }: Gl
         return () => window.removeEventListener('mindwtr:open-search', handleOpen);
     }, []);
 
-    // Auto-focus input when opened. Focus immediately so keys typed right
-    // after "/" land in the query instead of nowhere; the delayed retry covers
-    // the portal/animation frame where the first attempt can be swallowed.
+    // Auto-enfoque input when opened. enfoque immediately so keys typed right
+    // after "/" land in the query en lugar de en ningún lugar; the delayed reintentar covers
+    // the portal/animation frame where the first attempt puede be swallowed.
     useEffect(() => {
         if (isOpen) {
             inputRef.current?.focus();
@@ -285,9 +285,9 @@ export function GlobalSearch({ onNavigate, defaultIncludeCompleted = false }: Gl
         ));
     };
 
-    // A search row never shows a bare date: the label word is what says whether
+    // A search row nunca shows a bare date: the label word is what says whether
     // it is a completion or a deadline, for sighted readers and screen readers
-    // alike (#991). Completion wins for a finished task, and a finished task
+    // alike (#991). Completion wins for a finished tarea, and a finished tarea
     // with no completedAt shows nothing rather than falling back to its due
     // date. Red stays reserved for a date that has passed (#640).
     const renderResultDate = (result: SearchTaskResult) => {
@@ -330,10 +330,10 @@ export function GlobalSearch({ onNavigate, defaultIncludeCompleted = false }: Gl
     };
 
     // Keys pressed inside the dialog but outside the query input (after
-    // clicking a result or a filter chip) still drive the search instead of
+    // clicking a result or a filter chip) still drive the search en lugar de
     // going dead: arrows/Enter navigate the results, and plain typing
     // refocuses the query input. A stray Enter here used to fall through to
-    // the task list behind the dialog and act on it.
+    // the tarea list behind the dialog and act on it.
     const handleDialogKeyDown = (e: React.KeyboardEvent) => {
         if (e.target === inputRef.current) return;
         if (
@@ -367,10 +367,10 @@ export function GlobalSearch({ onNavigate, defaultIncludeCompleted = false }: Gl
             setProjectView({ selectedProjectId: result.item.id });
             onNavigate('projects', result.item.id);
         } else {
-            // Map task status to appropriate view
+            // Map tarea status to appropriate view
             const task = result.item;
             setHighlightTask(task.id);
-            // A finished task is invisible in its project — the workspace never
+            // A finished tarea is invisible in its project — the workspace nunca
             // lists archived tasks and hides done ones unless the project has
             // them switched on — so it goes to Done/Archived, which do reveal it.
             if (task.projectId && !isTaskFinished(task as Task)) {
@@ -497,13 +497,13 @@ export function GlobalSearch({ onNavigate, defaultIncludeCompleted = false }: Gl
             labelledBy={dialogTitleId}
             placement="top"
             overlayClassName="pt-[20vh] bg-background/80 backdrop-blur-sm animate-in fade-in-0"
-            // Escape stays with the window listener that also owns Cmd+K.
+            // Escape stays with the window escuchador that also owns Cmd+K.
             closeOnEscape={false}
             onKeyDown={handleDialogKeyDown}
-            // Capped so the panel always fits under the 20vh offset above it;
+            // Capped so the panel siempre fits under the 20vh offset above it;
             // without it an expanded filter panel ran off the bottom of a short
             // window with nothing to scroll (#957). Every region below the search
-            // input shrinks and scrolls instead of pushing the panel past the cap.
+            // input shrinks and scrolls en lugar de pushing the panel past the cap.
             panelClassName="max-w-lg max-h-[76vh] animate-in zoom-in-95 duration-100"
         >
             <h2 id={dialogTitleId} className="sr-only">{t('search.title')}</h2>
@@ -513,7 +513,7 @@ export function GlobalSearch({ onNavigate, defaultIncludeCompleted = false }: Gl
                     ref={inputRef}
                     aria-label={t('search.title')}
                     // Queries are operators and partial words, not prose — the
-                    // OS must not capitalize or "fix" them (macOS WebKit applied
+                    // OS no debe capitalize or "fix" them (macOS WebKit applied
                     // system auto-capitalization here, #1019).
                     autoCorrect="off"
                     autoCapitalize="none"

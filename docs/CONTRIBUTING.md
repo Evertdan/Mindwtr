@@ -1,321 +1,319 @@
-# Contributing to Mindwtr
+# Contribuir a Mindwtr
 
-Thanks for your interest in improving Mindwtr. This guide covers:
+Gracias por tu interés en mejorar Mindwtr. Esta guía cubre:
 
-- Before you begin
-- Code contribution process
-- Development setup and workflow
-- Testing and quality checks
-- Pull request guidelines
-- Documentation and translation contributions
+- Antes de comenzar
+- Proceso de contribución de código
+- Configuración y flujo de trabajo de desarrollo
+- Pruebas y verificaciones de calidad
+- Directrices de solicitud de extracción
+- Contribuciones de documentación y traducción
 
-Mindwtr is a Bun monorepo with:
+Mindwtr es un monorepo de Bun con:
 
-- Desktop app (`apps/desktop`): Tauri + React + Vite
-- Mobile app (`apps/mobile`): Expo + React Native
-- Shared core package (`packages/core`): state models, storage adapters, and shared logic
+- Aplicación de escritorio (`apps/desktop`): Tauri + React + Vite
+- Aplicación móvil (`apps/mobile`): Expo + React Native
+- Paquete central compartido (`packages/core`): modelos de estado, adaptadores de almacenamiento y lógica compartida
 
 
-## Before you begin
+## Antes de comenzar
 
-### 1) Follow our community standards
+### 1) Sigue nuestros estándares comunitarios
 
-- Read and follow the [Code of Conduct](https://github.com/dongdongbh/Mindwtr/blob/main/.github/CODE_OF_CONDUCT.md).
-- Be respectful in issues, discussions, reviews, and commits.
+- Lee y sigue el [Código de conducta](https://github.com/dongdongbh/Mindwtr/blob/main/.github/CODE_OF_CONDUCT.md).
+- Sé respetuoso en problemas, discusiones, revisiones y confirmaciones.
 
-### 2) Report security issues privately
+### 2) Reporta problemas de seguridad en privado
 
-- Do not open public issues for security vulnerabilities.
-- Use [SECURITY.md](https://github.com/dongdongbh/Mindwtr/blob/main/SECURITY.md) for responsible disclosure instructions.
+- No abras problemas públicos para vulnerabilidades de seguridad.
+- Utiliza [SECURITY.md](https://github.com/dongdongbh/Mindwtr/blob/main/SECURITY.md) para las instrucciones de divulgación responsable.
 
-### 3) Start with an issue for non-trivial changes
+### 3) Comienza con un problema para cambios no triviales
 
-For behavior changes, significant bug fixes, or new features, open (or confirm) an issue first.
-This helps avoid duplicated work and keeps changes aligned with project goals.
+Para cambios de comportamiento, correcciones de errores significativas o nuevas características, abre (o confirma) primero un problema.
+Esto ayuda a evitar trabajo duplicado y mantiene los cambios alineados con los objetivos del proyecto.
 
-When opening an issue, include:
+Al abrir un problema, incluye:
 
-- Platform and version (`desktop`, `mobile`, or both)
-- Reproduction steps and expected behavior
-- Actual behavior
-- Screenshots, screen recordings, and logs when relevant
+- Plataforma y versión (`desktop`, `mobile` o ambas)
+- Pasos de reproducción y comportamiento esperado
+- Comportamiento real
+- Capturas de pantalla, grabaciones de pantalla y registros cuando sea relevante
 
-### 4) Keep product fit in mind
+### 4) Ten en cuenta el ajuste del producto
 
-Mindwtr focuses on GTD and practical execution, and is built to be **simple by default and powerful when you need it**: progressive disclosure, less by default, no feature creep. *Don't show me a cockpit when I just want to ride a bike.* Contributions are most likely to be accepted when they:
+Mindwtr se enfoca en GTD y ejecución práctica, y está construido para ser **simple por defecto y poderoso cuando lo necesitas**: divulgación progresiva, menos por defecto, sin aumento de características. *No me muestres un panel cuando solo quiero andar en bicicleta.* Las contribuciones tienen más probabilidad de ser aceptadas cuando:
 
-- Keep workflows simple by default
-- Avoid unnecessary UI complexity
-- Prefer automatic over manual: if the right outcome can be inferred (platform, install channel, existing data, context), the app should just do it — no new setting, no prompt, no extra workflow step or UI control — and reuse an existing switch before minting a new one (for example, update checks adapt to the install channel instead of offering a toggle)
-- Preserve data safety and reliability
-- Work consistently across platforms when applicable
+- Mantienen los flujos de trabajo simples por defecto
+- Evitan la complejidad innecesaria de la interfaz de usuario
+- Prefieren lo automático sobre lo manual: si el resultado correcto puede ser inferido (plataforma, canal de instalación, datos existentes, contexto), la aplicación simplemente debe hacerlo — sin nueva configuración, sin mensaje, sin paso de flujo de trabajo adicional o control de interfaz de usuario — y reutilizar un interruptor existente antes de crear uno nuevo (por ejemplo, las comprobaciones de actualización se adaptan al canal de instalación en lugar de ofrecer un botón)
+- Preservan la seguridad y confiabilidad de los datos
+- Funcionan consistentemente entre plataformas cuando sea aplicable
 
-## Code contribution process
+## Proceso de contribución de código
 
-1. Find an issue to work on, or open one for discussion.
-2. Fork the repository and create a branch in your fork.
-3. Implement the change with focused scope.
-4. Run relevant checks locally.
-5. Open a pull request to `dongdongbh/Mindwtr:main`.
-6. Link the issue in the PR (example: `Fixes #123`).
+1. Encuentra un problema en el que trabajar, o abre uno para discusión.
+2. Bifurca el repositorio y crea una rama en tu bifurcación.
+3. Implementa el cambio con alcance enfocado.
+4. Ejecuta verificaciones relevantes localmente.
+5. Abre una solicitud de extracción a `dongdongbh/Mindwtr:main`.
+6. Vincula el problema en el PR (ejemplo: `Fixes #123`).
 
-Branch naming examples:
+Ejemplos de nombres de rama:
 
 - `fix/tray-preference-persistence`
 - `feature/date-format-setting`
 - `docs/contributing-update`
 
-## Development setup and workflow
+## Configuración y flujo de trabajo de desarrollo
 
-Run all commands from the repository root.
+Ejecuta todos los comandos desde la raíz del repositorio.
 
-### Prerequisites
+### Requisitos previos
 
-- Bun (workspace/package manager) — use the version in `.bun-version` (currently 1.3.5) or newer
-- Node.js 20 or newer — `apps/mcp-server` declares `"node": ">=20"` and is published to npm, so it must build and run on plain Node
+- Bun (gestor de espacio de trabajo/paquetes) — usa la versión en `.bun-version` (actualmente 1.3.5) o más nueva
+- Node.js 20 o más nuevo — `apps/mcp-server` declara `"node": ">=20"` y se publica en npm, por lo que debe construirse y ejecutarse en Node simple
 - Git
-- Rust toolchain (required for Tauri desktop build/dev)
-- System webview dependencies for Tauri on your OS
-- On Windows: the Visual Studio 2022 C++ build tools. The 2026 toolchain currently fails to link the `whisper-rs` transcription bindings (LNK1120 unresolved C-runtime externals), so pin the MSVC v143 toolset until that is fixed upstream.
-- Expo tooling for mobile development
-- Android SDK and/or Xcode if building mobile natively
+- Cadena de herramientas Rust (requerida para compilación/desarrollo de escritorio Tauri)
+- Dependencias de webview del sistema para Tauri en tu sistema operativo
+- En Windows: las herramientas de compilación de C++ de Visual Studio 2022. La cadena de herramientas de 2026 actualmente falla en vincular los enlaces de transcripción `whisper-rs` (LNK1120 elementos externos de tiempo de ejecución de C no resueltos), así que fija el conjunto de herramientas MSVC v143 hasta que se corrija en sentido ascendente.
+- Herramientas de Expo para desarrollo móvil
+- Android SDK y/o Xcode si construyes móvil de forma nativa
 
-### Install dependencies
+### Instalar dependencias
 
 ```bash
 bun install
 ```
 
-### Run the apps
+### Ejecutar las aplicaciones
 
-Desktop (Tauri):
+Escritorio (Tauri):
 
 ```bash
 bun desktop:dev
 ```
 
-Desktop UI only (browser/Vite):
+Solo interfaz de usuario de escritorio (navegador/Vite):
 
 ```bash
 bun desktop:web
 ```
 
-Mobile (Expo):
+Móvil (Expo):
 
 ```bash
 bun mobile:start
 ```
 
-Mobile on device/emulator:
+Móvil en dispositivo/emulador:
 
 ```bash
 bun mobile:android
 bun mobile:ios
 ```
 
-### Useful structure reference
+### Referencia de estructura útil
 
-- `apps/desktop/src`: desktop UI and desktop integrations
-- `apps/mobile`: mobile UI and native bridge code
-- `packages/core/src`: shared business logic, store, sync, and utilities
-- `scripts/`: release and utility scripts
-- `docs/`: markdown docs used by the project
+- `apps/desktop/src`: interfaz de usuario de escritorio e integraciones de escritorio
+- `apps/mobile`: interfaz de usuario móvil y código de puente nativo
+- `packages/core/src`: lógica comercial compartida, almacén, sincronización y utilidades
+- `scripts/`: scripts de lanzamiento y utilidad
+- `docs/`: documentación de markdown utilizada por el proyecto
 
-Desktop code must not import `invoke` from `@tauri-apps/api/core` directly. Call
-`invokeNative` (rejects when there is no Tauri runtime) or `invokeNativeOr(fallback, ...)`
-(resolves to the fallback) from `apps/desktop/src/lib/tauri-invoke.ts`, so each call site
-states what it should do in the browser dev build. A ratchet test in
-`tauri-invoke.test.ts` fails CI on a raw import.
+El código de escritorio no debe importar `invoke` de `@tauri-apps/api/core` directamente. Llama a
+`invokeNative` (rechaza cuando no hay tiempo de ejecución de Tauri) o `invokeNativeOr(fallback, ...)`
+(resuelve el respaldo) desde `apps/desktop/src/lib/tauri-invoke.ts`, para que cada sitio de llamada
+indique lo que debe hacer en la compilación web del navegador. Una prueba de trinquete en
+`tauri-invoke.test.ts` falla en CI en una importación sin procesar.
 
-## Testing and quality checks
+## Pruebas y verificaciones de calidad
 
-Before pushing, run the baseline local verification gate:
+Antes de presionar, ejecuta la puerta de verificación de verificación local de línea de base:
 
 ```bash
 bun run verify
 ```
 
-`bun run verify` chains typecheck (core, cloud, desktop, mobile, and mcp), lint
-for every workspace app, the five workspace unit-test suites, the Rust suite
-(`native:test`, a few seconds once the cargo cache is warm), governance and
-schema checks, locale parity, and README parity. CI also runs performance
-budgets, coverage thresholds, Expo Doctor, and store/workflow metadata checks.
+`bun run verify` encadena verificación de tipos (core, cloud, desktop, mobile y mcp), linting
+para cada aplicación del espacio de trabajo, los cinco conjuntos de pruebas unitarias del espacio de trabajo, la suite de Rust
+(`native:test`, unos pocos segundos una vez que la caché de carga está caliente), verificaciones de gobernanza y
+esquema, paridad de configuración regional y paridad de LÉAME. CI también ejecuta presupuestos de rendimiento, umbrales de cobertura, Expo Doctor y verificaciones de metadatos de almacén/flujo de trabajo.
 
-Run `bun run native:test` on its own while iterating on
-`apps/desktop/src-tauri/`, and run
-`bun run test:perf` for list, store, recurrence, or other hot-path changes.
-`bun run test:e2e` needs a browser and remains a separate optional gate.
+Ejecuta `bun run native:test` por sí solo mientras iteras en
+`apps/desktop/src-tauri/`, y ejecuta
+`bun run test:perf` para cambios de lista, almacén, recurrencia u otra ruta activa.
+`bun run test:e2e` necesita un navegador y sigue siendo una puerta opcional separada.
 
-While iterating, the per-area commands below are faster.
+Mientras iteras, los comandos por área a continuación son más rápidos.
 
-Desktop lint:
+Linting de escritorio:
 
 ```bash
 bun run --filter mindwtr lint
 ```
 
-Desktop tests (single pass, non-watch):
+Pruebas de escritorio (paso único, sin reloj):
 
 ```bash
 bun run --filter mindwtr test -- --run
 ```
 
-Core tests:
+Pruebas principales:
 
 ```bash
 bun run --filter @mindwtr/core test
 ```
 
-Mobile tests:
+Pruebas móviles:
 
 ```bash
 bun run --filter mobile test
 ```
 
-Optional e2e:
+E2E opcional:
 
 ```bash
 bun run test:e2e
 ```
 
-## Coding conventions
+## Convenciones de codificación
 
-- TypeScript first.
-- Prefer functional React components and hooks.
-- Keep imports grouped: external, workspace/internal, then relative.
-- Match file-local formatting conventions:
-  - desktop/core usually 4 spaces
-  - mobile usually 2 spaces
-- Keep code comments concise and only where logic is non-obvious.
-- Favor accessibility-oriented test queries (`getByRole`, `getByLabelText`).
-- Mobile popups: any transparent-modal popup that contains a `TextInput` must use the shared `useAndroidKeyboardInset` hook so it stays above the Android soft keyboard.
-- Markdown editor changes need regression tests for the historical failure modes (cursor jump on tap, scroll-into-view, keyboard-height padding, toolbar timing) — these have each shipped as production bugs before.
+- TypeScript primero.
+- Prefiere componentes de React funcionales y ganchos.
+- Mantén las importaciones agrupadas: externas, espacio de trabajo/internas, luego relativas.
+- Coincide con las convenciones de formato local de archivo:
+  - desktop/core generalmente 4 espacios
+  - móvil generalmente 2 espacios
+- Mantén los comentarios de código concisos y solo donde la lógica no es obvia.
+- Favorece consultas de prueba orientadas a la accesibilidad (`getByRole`, `getByLabelText`).
+- Elementos emergentes móviles: cualquier elemento emergente modal transparente que contenga un `TextInput` debe usar el gancho compartido `useAndroidKeyboardInset` para que permanezca encima del teclado suave de Android.
+- Los cambios del editor de descuento de rebajas necesitan pruebas de regresión para los modos de falla históricos (salto del cursor al tocar, desplazamiento a la vista, relleno de altura de teclado, sincronización de barra de herramientas) — estos se han enviado como errores de producción antes.
 
-Naming:
+Denominación:
 
-- Components/providers: `PascalCase`
-- Hooks: `useSomething`
-- Utility modules: kebab-case (example: `storage-adapter.ts`)
-- Tests: mirror source filename with `.test.ts`/`.test.tsx`
+- Componentes/proveedores: `PascalCase`
+- Ganchos: `useSomething`
+- Módulos de utilidad: kebab-case (ejemplo: `storage-adapter.ts`)
+- Pruebas: reflejar el nombre del archivo de origen con `.test.ts`/`.test.tsx`
 
-## LLM-assisted coding ("vibe coding")
+## Codificación asistida por LLM ("vibe coding")
 
-Mindwtr is not strictly against LLM-assisted coding. LLM tools are improving quickly and can be productive when used correctly.
+Mindwtr no es estrictamente contrario a la codificación asistida por LLM. Las herramientas de LLM están mejorando rápidamente y pueden ser productivas cuando se usan correctamente.
 
-If you use LLM/coding agents for contributions, follow these rules:
+Si utilizas agentes LLM/codificación para contribuciones, sigue estas reglas:
 
-1. Do not use web chat interfaces as your main coding tool.
-   Use coding agents in an IDE or CLI with repository indexing and full codebase context.
-2. Use coding-focused agents, not general chat models.
-   Example: use Codex or Claude Code agent for coding tasks, not generic chatbot mode.
-3. Start with a clear implementation goal.
-   Define the bug/feature, expected behavior, and intended implementation before prompting.
-4. Avoid over-engineering.
-   Prefer small, maintainable changes that match Mindwtr's "simple by default" philosophy.
-5. YOU review the output before opening a non-Draft PR.
-   Do not request review until you have read and understood every generated change, run relevant tests, and verified behavior on real devices/platforms. You are responsible for the code you submit, not the tool.
-6. Remove verbosity and blathering.
-   Strip filler from code comments, documentation, PR descriptions, and commit messages. All of these — including names — should be concise, clear, and contain useful information, nothing more.
-7. Remove and deduplicate redundant code, tests, and explanations.
-   Explicitness and clarity are good; verbosity, over-explanation, and redundancy are bad.
-8. Keep security in scope.
-   Do not introduce insecure defaults, unsafe parsing, token leaks, or new attack surfaces.
+1. No uses interfaces de chat web como tu herramienta de codificación principal.
+   Utiliza agentes de codificación en un IDE o CLI con indexación de repositorio y contexto completo de base de código.
+2. Usa agentes enfocados en codificación, no modelos de chat generales.
+   Ejemplo: usa Codex o el agente de Claude Code para tareas de codificación, no modo de chatbot genérico.
+3. Comienza con un objetivo de implementación claro.
+   Define el error/característica, comportamiento esperado e implementación prevista antes de solicitar.
+4. Evita la sobre-ingeniería.
+   Prefiere cambios pequeños y mantenibles que coincidan con la filosofía "simple por defecto" de Mindwtr.
+5. TÚ revisa el resultado antes de abrir un PR que no sea borrador.
+   No solicites revisión hasta que hayas leído y comprendido cada cambio generado, ejecutado pruebas relevantes y verificado el comportamiento en dispositivos/plataformas reales. Eres responsable del código que envíes, no de la herramienta.
+6. Elimina la verbosidad y la charla.
+   Quita relleno de comentarios de código, documentación, descripciones de PR y mensajes de confirmación. Todos estos — incluidos los nombres — deben ser concisos, claros y contener información útil, nada más.
+7. Elimina y desduplica código, pruebas y explicaciones redundantes.
+   La explicititud y la claridad son buenas; la verbosidad, la sobre-explicación y la redundancia son malas.
+8. Mantén la seguridad en el alcance.
+   No introduzas valores por defecto inseguros, análisis inseguro, filtraciones de tokens o nuevas superficies de ataque.
 
-## Pull request guidelines
+## Directrices de solicitud de extracción
 
-All submissions go through GitHub pull requests and maintainer review.
+Todos los envíos pasan por solicitudes de extracción de GitHub y revisión de mantenedor.
 
-Please keep PRs small and focused:
+Por favor, mantén los PR pequeños y enfocados:
 
-- One bug fix, one feature, or one isolated refactor per PR
-- Avoid bundling unrelated changes
+- Una corrección de error, una característica o un refactor aislado por PR
+- Evita agrupar cambios no relacionados
 
-Before opening a PR:
+Antes de abrir un PR:
 
-- Ensure relevant checks pass locally
-- Rebase/merge your branch as needed to resolve conflicts
-- Verify no unrelated files are included
+- Asegúrate de que las verificaciones relevantes pasen localmente
+- Rebase/fusión tu rama según sea necesario para resolver conflictos
+- Verifica que no se incluyan archivos no relacionados
 
-In your PR description, include:
+En tu descripción de PR, incluye:
 
-- What changed
-- Why it changed
-- Linked issue (`Fixes #...`)
-- Test evidence (commands run and outcomes)
-- Screenshots/recordings for UI changes
-- Platform impact (`desktop`, `mobile`, `core`, or combinations)
+- Qué cambió
+- Por qué cambió
+- Problema vinculado (`Fixes #...`)
+- Evidencia de prueba (comandos ejecutados y resultados)
+- Capturas de pantalla/grabaciones para cambios de interfaz de usuario
+- Impacto de plataforma (`desktop`, `mobile`, `core` o combinaciones)
 
-Commit style:
+Estilo de confirmación:
 
-- Use Conventional Commits when possible
-- Examples:
+- Usa Confirmaciones convencionales cuando sea posible
+- Ejemplos:
   - `fix(desktop): persist tray preference on macOS`
   - `feat(core): add date format normalization`
   - `docs: clarify sync troubleshooting`
 
-## Contributor License Agreement
+## Acuerdo de licencia de colaborador
 
-Before we can merge your pull request, you'll need to sign our
-[Contributor License Agreement (CLA)](https://gist.github.com/dongdongbh/0446c35e1d5c1a73c344b16cba4aeeaa).
+Antes de que podamos fusionar tu solicitud de extracción, necesitarás firmar nuestro
+[Acuerdo de licencia de colaborador (CLA)](https://gist.github.com/dongdongbh/0446c35e1d5c1a73c344b16cba4aeeaa).
 
-This is a one-time process — CLA Assistant will automatically check
-when you open a PR and prompt you if needed. Signing takes about
-30 seconds via your GitHub account.
+Este es un proceso único — el Asistente de CLA verificará automáticamente
+cuando abras un PR y te lo pedirá si es necesario. Firmar toma aproximadamente
+30 segundos a través de tu cuenta de GitHub.
 
-### Why a CLA?
+### ¿Por qué un CLA?
 
-Mindwtr is free, open-source, and licensed under AGPL-3.0. The CLA
-ensures the project has the flexibility to explore sustainability
-options (like dual licensing) in the future, so we can keep the
-project alive long-term. You retain full ownership of your
-contributions — the CLA just grants the project a license to use them.
+Mindwtr es gratuito, de código abierto y está bajo la licencia AGPL-3.0. El CLA
+asegura que el proyecto tenga la flexibilidad de explorar opciones de sostenibilidad
+(como licencias duales) en el futuro, para que podamos mantener vivo el proyecto a largo plazo.
+Retienes la propiedad total de tus contribuciones — el CLA simplemente otorga al proyecto una licencia para usarlas.
 
-The core of Mindwtr will always remain available under an
-OSI-approved open-source license.
+El núcleo de Mindwtr siempre seguirá siendo disponible bajo una
+licencia de código abierto aprobada por OSI.
 
-## Documentation contributions
+## Contribuciones de documentación
 
-Documentation updates are welcome in the docs site repo, `README.md`, `README_zh.md`, and repository-local docs.
+Las actualizaciones de documentación son bienvenidas en el repositorio del sitio de documentación, `README.md`, `README_zh.md` y documentación local del repositorio.
 
-Most user-facing documentation should go in the Mindwtr web docs source, which builds the public docs site at https://docs.mindwtr.app/. Use this repository's `docs/` directory for repository-local documentation such as contribution guides, architecture summaries, ADRs, and release notes. The `wiki/` directory holds only the retired GitHub Wiki's landing page, which points readers to the docs site; do not add content pages there.
+La mayoría de la documentación orientada al usuario debe ir en la fuente de documentación web de Mindwtr, que construye el sitio de documentación pública en https://docs.mindwtr.app/. Utiliza el directorio `docs/` de este repositorio para documentación local del repositorio como guías de contribución, resúmenes de arquitectura, ADRs y notas de lanzamiento. El directorio `wiki/` contiene solo la página de inicio de la wiki de GitHub retirada, que dirige a los lectores al sitio de documentación; no agregues páginas de contenido allí.
 
-When changing docs:
+Al cambiar documentos:
 
-- Keep instructions accurate and runnable
-- Prefer concrete examples over vague guidance
-- Validate links
-- Update both English and Chinese docs when the content is mirrored
-- Keep `README.md` and `README_zh.md` heading structure aligned; CI runs `bun run docs:check-readme`
-- Prefer updating the [Mindwtr web docs source](https://github.com/dongdongbh/mindwtr-web/tree/main/docs) when the content is public user/developer documentation
+- Mantén las instrucciones precisas y ejecutables
+- Prefiere ejemplos concretos sobre orientación vaga
+- Valida enlaces
+- Actualiza tanto documentación en inglés como en chino cuando el contenido se refleja
+- Mantén la estructura de encabezado de `README.md` y `README_zh.md` alineada; CI ejecuta `bun run docs:check-readme`
+- Prefiere actualizar la [fuente de documentación web de Mindwtr](https://github.com/dongdongbh/mindwtr-web/tree/main/docs) cuando el contenido es documentación pública de usuario/desarrollador
 
-Useful references:
+Referencias útiles:
 
-- [Official docs](https://docs.mindwtr.app/)
-- [Docs source](https://github.com/dongdongbh/mindwtr-web/tree/main/docs)
-- [Developer Guide](https://docs.mindwtr.app/developers/developer-guide)
-- [Architecture](https://docs.mindwtr.app/developers/architecture)
+- [Documentación oficial](https://docs.mindwtr.app/)
+- [Fuente de documentación](https://github.com/dongdongbh/mindwtr-web/tree/main/docs)
+- [Guía del desarrollador](https://docs.mindwtr.app/developers/developer-guide)
+- [Arquitectura](https://docs.mindwtr.app/developers/architecture)
 
-## Translation contributions
+## Contribuciones de traducción
 
-Most translation strings live in:
+La mayoría de las cadenas de traducción viven en:
 
 - [`packages/core/src/i18n/locales/`](https://github.com/dongdongbh/Mindwtr/tree/main/packages/core/src/i18n/locales/)
 
-When updating translations:
+Al actualizar traducciones:
 
-- Keep placeholders and interpolation keys unchanged
-- Keep command tokens intact where parser behavior depends on English commands
-- For a new language, register the locale in the shared i18n registries, date locale mapping, desktop/mobile language pickers, and locale parity checks
-- After changing any `starter.*` string, run `bun run scripts/i18n-locale-parity.ts --fix` to regenerate `packages/core/src/i18n/starter-seed-strings.ts`. That file is generated, never hand-edited, and `bun run i18n:check` fails until it is back in sync
-- Run `bun run i18n:check` and relevant core i18n tests
-- Confirm UI still fits in small mobile layouts
+- Mantén los marcadores de posición e internas de interpolación sin cambios
+- Mantén intactos los tokens de comando donde el comportamiento del analizador depende de comandos en inglés
+- Para un nuevo idioma, registra la configuración regional en los registros de i18n compartidos, mapeo de configuración regional de fecha, selectores de idioma de escritorio/móvil y verificaciones de paridad de configuración regional
+- Después de cambiar cualquier cadena `starter.*`, ejecuta `bun run scripts/i18n-locale-parity.ts --fix` para regenerar `packages/core/src/i18n/starter-seed-strings.ts`. Ese archivo se genera, nunca se edita a mano, y `bun run i18n:check` falla hasta que vuelve a estar sincronizado
+- Ejecuta `bun run i18n:check` y pruebas de i18n principales relevantes
+- Confirma que la interfaz de usuario aún cabe en diseños móviles pequeños
 
-## Need help?
+## ¿Necesitas ayuda?
 
-If you are unsure about scope or implementation details:
+Si no estás seguro sobre el alcance o detalles de implementación:
 
-- Open a GitHub issue with a short proposal
-- Join community chat on Discord: https://discord.gg/gc4h5t58PR
-- Ask for maintainer feedback before implementing large changes
+- Abre un problema de GitHub con una propuesta breve
+- Únete al chat comunitario en Discord: https://discord.gg/gc4h5t58PR
+- Pide retroalimentación del mantenedor antes de implementar cambios grandes
 
-Thanks again for contributing to Mindwtr.
+Gracias de nuevo por contribuir a Mindwtr.

@@ -33,7 +33,7 @@ export function AttachmentsField({
 }: AttachmentsFieldProps) {
     const isBareFileReference = useBareFileReferenceCheck();
     // Edit shows for real links and for file attachments pointing outside the
-    // managed dir — the pre-#1001-fix "Add link" shape; re-saving one converts
+    // managed dir — the pre-#1001-fix "agregar link" shape; re-saving one converts
     // it to a true pointer.
     const isExternalFileReference = useExternalFileReferenceCheck();
     const canEditAsLink = (attachment: Attachment) =>

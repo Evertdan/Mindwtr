@@ -156,8 +156,8 @@ vi.mock('react-native-draggable-flatlist', async () => {
   };
 });
 
-// The shared React Native test shim renders every SectionList row. For this
-// perf guard, keep the render path closer to native virtualization.
+// El simulador compartido de prueba de React Native renderiza cada fila de SectionList. Para esto
+// protección de rendimiento, mantén la ruta de renderizado más cerca de la virtualización nativa.
 vi.mock('react-native', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-native')>();
   const react = await import('react');
@@ -246,10 +246,10 @@ vi.mock('../contexts/language-context', () => ({
   }),
 }));
 
-// ToastProvider hands out one stable showToast/dismissToast pair (useCallback with no deps,
-// behind a memoized context value). Returning fresh spies per render would instead churn every
-// handler that closes over them, which is exactly what the render-count assertions below watch
-// for — the mock has to keep production's identity guarantee to measure anything real.
+// ToastProvider proporciona un par estable showToast/dismissToast (useCallback sin deps,
+// detrás de un valor de contexto memorizado). Devolver espías frescos por renderizado cambiaría cada
+// manejador que se cierra sobre ellos, que es exactamente lo que las aserciones de conteo de renderizado vigilan
+// for — la simulación debe mantener la garantía de identidad de producción para medir algo real.
 const toastControls = vi.hoisted(() => ({
   showToast: vi.fn(),
   dismissToast: vi.fn(),
@@ -265,11 +265,11 @@ vi.mock('@/lib/sync-service', () => ({
   performMobileSync: vi.fn().mockResolvedValue({ success: true }),
 }));
 
-// resolveThemeTokens caches its result, so the real useThemeColors hands out the SAME
-// object until the theme actually changes, and every memo boundary taking `tc` compares
-// it by identity. Returning a fresh literal per call would switch those boundaries off
-// and measure an app that re-renders more than the real one. Keep one hoisted object so
-// the mock matches production's identity guarantee; do not inline it back.
+// resolveThemeTokens almacena en caché su resultado, por lo que el verdadero useThemeColors proporciona el MISMO
+// objeto hasta que el tema realmente cambia, and cada límite de memo tomando `tc` compara
+// por identidad. Devolver un literal fresco por llamada apagaría esos límites
+// y medir una aplicación que se renderiza más que la real. Mantén un objeto elevado para que
+// la simulación coincida con la garantía de identidad de producción; no lo vuelvas a inlinear.
 const themeColors = vi.hoisted(() => ({
   bg: '#0f172a',
   cardBg: '#111827',
@@ -314,11 +314,11 @@ vi.mock('../components/task-edit/TaskEditFormTab', () => ({
   }),
 }));
 
-// Production wraps the row in React.memo(_, areRowPropsEqual) (#766), and that
-// comparator is exactly React's default: same key count, every prop compared by
-// Object.is. A bare function stub would switch the boundary off and measure an
-// app that re-renders far more than the real one — the same trap the theme-mock
-// note above describes. Keep the memo; do not unwrap it.
+// La producción envuelve la fila en React.memo(_, areRowPropsEqual) (#766), and that
+// el comparador es exactamente el predeterminado de React: mismo número de claves, cada prop comparado por
+// Object.is. Un stub de función desnuda apagaría el límite and measure an
+// aplicación que se renderiza mucho más que la real — la misma trampa que la simulación de tema
+// note above describes. Mantén el memo; no lo desenvuelvas.
 vi.mock('../components/swipeable-task-item', () => ({
   readTaskRowRenderCount: () => 0,
   SwipeableTaskItem: React.memo((props: Record<string, unknown>) => React.createElement('SwipeableTaskItem', props)),
@@ -328,7 +328,7 @@ vi.mock('../components/pomodoro-panel', () => ({
   PomodoroPanel: (props: Record<string, unknown>) => React.createElement('PomodoroPanel', props),
 }));
 
-// This closed overlay is outside the list render path under measurement.
+// Esta superposición cerrada está fuera de la ruta de renderizado de lista bajo medición.
 vi.mock('../components/task-list/TaskListTagModal', () => ({
   TaskListTagModal: () => null,
 }));
@@ -1071,8 +1071,8 @@ describe('large-store mobile interaction performance', () => {
     const projectsData = createLargeStoreData();
     loadLargeStore(projectsData);
     const projectAreaById = buildMap(projectsData.areas);
-    // Core's real computeTaskDerivedState output (#927) — the same summary the
-    // screen reads via getDerivedState(), not a test-local reimplementation.
+    // Salida real de computeTaskDerivedState de Core (#927) — el mismo resumen el
+    // la pantalla lee a través de getDerivedState(), no una reimplementación local de prueba.
     const projectTaskSummaryById = useTaskStore.getState().getDerivedState().projectTaskSummaryById;
     const projectRows = buildProjectListRows({
       areaById: projectAreaById,

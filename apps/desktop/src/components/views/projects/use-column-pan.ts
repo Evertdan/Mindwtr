@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, type PointerEvent as ReactPointerEvent,
  * that leaves the strip still pans and still ends.
  */
 export function useMiddleMousePan(ref: RefObject<HTMLElement | null>) {
-    // Unmounting mid-drag (e.g. switching projects) must stop the drag too,
+    // Unmounting mid-drag (e.g. switching projects) debe stop the drag too,
     // or these window listeners outlive the component.
     const stopRef = useRef<(() => void) | null>(null);
     useEffect(() => () => stopRef.current?.(), []);

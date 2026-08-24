@@ -176,8 +176,8 @@ describe('PomodoroPanel', () => {
       tree = renderer.create(<PomodoroPanel tasks={[]} onMarkDone={vi.fn()} />);
     });
 
-    // A running timer's alarm must survive the pre-hydration render, where the
-    // default state still reads as "not running" (#888).
+    // A running timer's alarm must survive the pre-hydration Renderizar, where the
+    // default Estado still reads as "not running" (#888).
     expect(cancelMobilePomodoroCompletionNotification).not.toHaveBeenCalled();
 
     const phaseEndsAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
@@ -235,7 +235,7 @@ describe('PomodoroPanel', () => {
     expect(tree.root.findAllByType(Text).some((node) => flattenText(node.props.children) === 'Break')).toBe(true);
   });
 
-  // The shared getItem mock is key-blind, and the panel now reads two keys.
+  // El/La
   // Keying the implementation keeps the collapse read from consuming a value
   // queued for the session read (or vice versa).
   const mockStorage = (values: Record<string, string | null>) => {
@@ -256,7 +256,7 @@ describe('PomodoroPanel', () => {
     const tree = await renderPanel();
     const textValues = tree.root.findAllByType(Text).map((node) => flattenText(node.props.children));
 
-    // The clock and the phase survive the fold; the controls do not.
+    // El/La
     expect(textValues).toContain('25:00');
     expect(textValues).toContain('Focus · Paused');
     expect(pressableText(tree)).not.toContain('Switch to Break');

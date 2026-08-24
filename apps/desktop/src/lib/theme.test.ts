@@ -14,7 +14,7 @@ import {
 } from './theme';
 import { setNativeInvokeTransport } from './tauri-invoke';
 
-// The theme commands go through the invoke seam, which refuses to reach Rust
+// The theme commands go through the invocar seam, which refuses to reach Rust
 // unless a Tauri runtime is present. Both are true in the desktop shell.
 const enableNativeInvoke = (transport: (command: string) => Promise<unknown>) => {
     (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {};
@@ -64,8 +64,8 @@ describe('applyThemeMode', () => {
         expect(document.documentElement.classList.contains('dark')).toBe(false);
     });
 
-    // Tailwind is darkMode:'class', so a preset theme that forgets the `dark`
-    // class paints light-mode utilities over dark CSS variables.
+    // Tailwind is darkMode:'clase', so a preset theme that forgets the `dark`
+    // clase paints light-mode utilities over dark CSS variables.
     it.each([
         ['nord', 'theme-nord'],
         ['catppuccin-macchiato', 'theme-catppuccin-macchiato'],
@@ -137,7 +137,7 @@ describe('coerceDesktopThemeMode', () => {
     it('accepts the preset themes and rejects an unknown value', () => {
         expect(coerceDesktopThemeMode('catppuccin-macchiato')).toBe('catppuccin-macchiato');
         expect(coerceDesktopThemeMode('dracula')).toBe('dracula');
-        // A one-letter drift in either identifier must not silently resolve.
+        // A one-letter drift in either identifier no debe silently resolver.
         expect(coerceDesktopThemeMode('catpuccin-macchiato')).toBeNull();
         expect(coerceDesktopThemeMode('draculaa')).toBeNull();
     });

@@ -107,8 +107,8 @@ describe('resolveFileBackendPath', () => {
     });
 
     // SEC-08: a cloudKey arrives over sync, so it is attacker-controlled input to a
-    // filesystem write/delete. Escaping the sync folder must fail loudly — both callers
-    // treat a rejection as a failed transfer, never as a completed one.
+    // filesystem write/eliminar. Escaping the sync folder debe fail loudly — both callers
+    // treat a rejection as a failed transfer, nunca as a completed one.
     it('refuses a cloudKey that escapes the sync folder', async () => {
         for (const hostile of ['attachments/../../escape.txt', 'attachments\\..\\..\\escape.txt', '../escape.txt', 'attachments/a\0.pdf']) {
             await expect(resolveFileBackendPath(join, '/sync', hostile)).rejects.toThrow(/outside the sync folder|invalid/i);
@@ -116,8 +116,8 @@ describe('resolveFileBackendPath', () => {
     });
 });
 
-// #1057: attachment downloads must be write-temp-then-rename so a cut connection
-// can never leave a truncated file at the real target path that a later sync would
+// #1057: attachment downloads debe be write-temp-then-rename so a cut connection
+// puede nunca leave a truncated file at the real target ruta that a later sync sería
 // mistake for new content.
 describe('writeFileSafelyAbsolute', () => {
     it('never touches the target path until the temp write has fully succeeded', async () => {
@@ -137,7 +137,7 @@ describe('writeFileSafelyAbsolute', () => {
         await writeFileSafelyAbsolute(target, new Uint8Array([1, 2, 3]), { writeFile, rename, remove });
 
         expect(files.get(target)).toEqual(new Uint8Array([1, 2, 3]));
-        // The first writeFile call landed on a temp path, not the target.
+        // The first writeFile llamar landed on a temp ruta, not the target.
         expect(writeFile.mock.calls[0]?.[0]).not.toBe(target);
     });
 
@@ -157,9 +157,9 @@ describe('writeFileSafelyAbsolute', () => {
             writeFileSafelyAbsolute(target, new Uint8Array([1, 2, 3]), { writeFile, rename, remove }),
         ).rejects.toThrow(tempWriteError);
 
-        // The interrupted download never reached the rename step, so the file that
-        // was there before this sync pass is exactly as it was — never truncated,
-        // never partially overwritten.
+        // The interrupted download nunca reached the rename step, so the file that
+        // was there before esto sync pass is exactly as it was — nunca truncated,
+        // nunca partially overwritten.
         expect(files.get(target)).toEqual(previousBytes);
         expect(rename).not.toHaveBeenCalled();
     });

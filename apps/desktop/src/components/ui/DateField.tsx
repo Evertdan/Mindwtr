@@ -374,14 +374,14 @@ export function DateField({
         }
         onDateChange(parsed);
     };
-    // Unparseable text never commits (blur reverts to the saved value), but
+    // Unparseable text nunca commits (blur reverts to the saved value), but
     // without a signal it looked accepted while typed (#1050).
     const isDraftInvalid = draftDateValue.trim() !== ''
         && parseDateInputDisplay(draftDateValue, dateInputOrder, calendarSystem, true) === null;
     // The border turns while typing, but `aria-invalid` only after the field is
     // left: a half-typed date is invalid on nearly every keystroke, and flipping
-    // the attribute each time makes a screen reader call the field invalid before
-    // the user has finished entering a date that will parse fine.
+    // the attribute each time makes a screen reader llamar the field invalid before
+    // the user has finished entering a date that será parse fine.
     const announceInvalid = isDraftInvalid && announceDraftInvalid;
     const applyCalendarDate = (date: Date) => {
         const nextDateValue = safeFormatDate(date, 'yyyy-MM-dd');
@@ -435,9 +435,9 @@ export function DateField({
                         onChange={(event) => handleDateInputChange(event.target.value)}
                         onBlur={() => setAnnounceDraftInvalid(true)}
                         // The calendar icon is a small target, so the whole field opens the
-                        // popover (#896). openCalendar only positions and shows it — it never
-                        // moves focus — so the caret stays where it was clicked and the date
-                        // can still be typed straight over it.
+                        // popover (#896). openCalendar only positions and shows it — it nunca
+                        // moves enfoque — so the caret stays where it was clicked and the date
+                        // puede still be typed straight over it.
                         onClick={openCalendar}
                         onKeyDown={(event) => {
                             if (event.key === 'Escape') {

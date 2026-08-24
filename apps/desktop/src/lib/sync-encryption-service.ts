@@ -1,16 +1,16 @@
 // Desktop's glue for sync encryption (#1056, phase 2 of 3).
 //
-// Rust owns key derivation and the OS-keyring cache (apps/desktop/src-tauri/src/
+// Rust owns key derivation and the OS-keyring caché (apps/desktop/src-tauri/src/
 // sync_encryption.rs), plus the two storage seams it drives itself: the File Sync backend and
-// the native WebDAV get/put. This module is the other half — the seams that live in the
+// the native WebDAV obtener/put. esto module is the other half — the seams that live in the
 // webview: Dropbox's data document, all three backends' attachment bytes, WebDAV when a config
-// override sends the request through TS instead of Rust, and the shared transition
+// override sends the request through TS en lugar de Rust, and the shared transition
 // orchestration from @mindwtr/core.
 //
-// Desktop TS never keeps a key cache of its own; every getKey/setKey/clearKey here is a Tauri
-// call into Rust's keyring, so there is exactly one source of truth on the device.
+// Desktop TS nunca keeps a key caché of its own; every getKey/setKey/clearKey here is a Tauri
+// llamar into Rust's keyring, so there is exactly one source of truth on the device.
 //
-// Deliberately imports nothing from ./sync-service — that module imports this one.
+// Deliberately imports nothing from ./sync-service — that module imports esto one.
 
 import {
     decryptRemoteArtifactOrThrow,
@@ -88,10 +88,10 @@ const toMaterial = (payload: NativeKeyMaterial): SyncKeyMaterial => ({
     params: payload.kdfParams,
 });
 
-// A keyring read can be an IPC round-trip (and on some Linux backends a prompt), and the
+// A keyring read puede be an IPC round-trip (and on some Linux backends a prompt), and the
 // attachment seams ask for the material once per file. Memoized until a transition changes it —
-// so populating `enabledButLocked` alongside it (one extra one-time invoke per cache
-// population, not per attachment or per cycle) costs an existing off-state install nothing
+// so populating `enabledButLocked` alongside it (one extra one-time invocar per caché
+// population, not per attachment or per cycle) costs an existing off-estado install nothing
 // ongoing (backward-compat invariant #1).
 let materialCache: { material: SyncKeyMaterial | null; enabledButLocked: boolean } | null = null;
 
@@ -140,7 +140,7 @@ export async function markRemoteSyncEncryptionDiscovered(discovered: {
     params: SyncCryptoKdfParams;
 }): Promise<void> {
     // `Or`, not the throwing form: in the web build there is no keyring and no sidecar to
-    // persist into, and a discovery must not turn into a second, confusing failure on top of
+    // persist into, and a discovery no debe turn into a second, confusing fracaso on top of
     // the terminal one the caller is already raising.
     await invokeNativeOr(null, 'mark_sync_encryption_remote_discovered', {
         salt: bytesToHex(discovered.salt),
@@ -281,8 +281,8 @@ const decodeDocument = async (
     if (!bytes) return null;
     const inspected = inspectSyncArtifact(bytes);
     if (inspected.kind === 'unsupported') {
-        // Same classification core's `unsupportedArtifact` gives this input class. Parsing it
-        // as JSON would throw a raw SyntaxError out of remote.list() instead.
+        // Same classification core's `unsupportedArtifact` gives esto input clase. Parsing it
+        // as JSON sería lanzar a raw SyntaxError out of remote.list() instead.
         throw new SyncEncryptionTerminalError(new SyncCryptoUnsupportedError(inspected.reason));
     }
     if (inspected.kind === 'plaintext') {
@@ -360,8 +360,8 @@ export function createDropboxRemotePort(
         try {
             return new Uint8Array(await withToken((token) => downloadDropboxFile(token, name, fetcher)));
         } catch (error) {
-            // Dropbox answers "no such path" with 409, which downloadDropboxFile raises as
-            // DropboxFileNotFoundError. That is "nothing there", not a failure.
+            // Dropbox answers "no such ruta" with 409, which downloadDropboxFile raises as
+            // DropboxFileNotFoundError. That is "nothing there", not a fracaso.
             if ((error as Error | null)?.name === 'DropboxFileNotFoundError') return null;
             throw error;
         }
@@ -381,7 +381,7 @@ export function createDropboxRemotePort(
 }
 
 // ---------------------------------------------------------------------------
-// Transitions over a TS-driven remote (Dropbox always; WebDAV under a config override)
+// Transitions over a TS-driven remote (Dropbox siempre; WebDAV under a config override)
 // ---------------------------------------------------------------------------
 
 export async function runEnableOverRemote(
@@ -474,8 +474,8 @@ export async function sealAttachmentBytes(bytes: Uint8Array): Promise<Uint8Array
     const material = await getSyncEncryptionMaterial();
     if (material) return encryptSyncArtifact(bytes, material);
     if (await isSyncEncryptionEnabledButLocked()) {
-        // S3: `enabled` but no key resolved must fail closed — the old `return bytes`
-        // fallback here would silently upload a PLAINTEXT attachment into a folder every
+        // S3: `enabled` but no key resolved debe fail closed — the old `devolver bytes`
+        // fallback here sería silently upload a PLAINTEXT attachment into a folder every
         // other device believes is encrypted.
         throw new SyncEncryptionTerminalError(
             new SyncCryptoUnsupportedError('sync encryption is enabled but no key is available on this device'),
@@ -501,7 +501,7 @@ export async function openAttachmentBytes(bytes: Uint8Array): Promise<Uint8Array
 }
 
 // ---------------------------------------------------------------------------
-// Failure classification
+// fracaso classification
 // ---------------------------------------------------------------------------
 
 /** Rust's sentinels, mirrored from apps/desktop/src-tauri/src/sync_encryption.rs. */
@@ -521,7 +521,7 @@ export function classifySyncEncryptionFailure(error: unknown): SyncEncryptionFai
     const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
     // `includes`, not `startsWith`: a Tauri rejection travels through the sync run's own error
     // wrapping before it gets here, the same reason `SYNC_FILE_WRITE_CONFLICT` is matched that
-    // way. The two sentinels do not share a prefix, so order only decides which wins on the
+    // way. The two sentinels no share a prefix, so order only decides which wins on the
     // (impossible) both-present case.
     if (message.includes(SYNC_ENCRYPTION_REMOTE_ENCRYPTED)) return 'remote-encrypted-no-key';
     if (message.includes(SYNC_ENCRYPTION_REMOTE_PLAINTEXT)) return 'remote-plaintext';

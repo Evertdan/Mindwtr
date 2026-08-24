@@ -51,11 +51,11 @@ describe('ToolbarSelect keyboard interaction', () => {
 
         expect(focusedOptionLabel()).toBe('Alpha');
 
-        // Beta is disabled, so ArrowDown skips straight to Gamma.
+        // beta is disabled, so ArrowDown skips straight to Gamma.
         fireEvent.keyDown(listbox, { key: 'ArrowDown' });
         expect(focusedOptionLabel()).toBe('Gamma');
 
-        // Past the last enabled option, focus wraps to the first.
+        // Past the last enabled option, enfoque wraps to the first.
         fireEvent.keyDown(listbox, { key: 'ArrowDown' });
         expect(focusedOptionLabel()).toBe('Alpha');
 
@@ -140,7 +140,7 @@ describe('ToolbarSelect keyboard interaction', () => {
         fireEvent.click(screen.getByRole('combobox', { name: 'Sort' }));
         expect(focusedOptionLabel()).toBe('Alpha');
 
-        // An external value change (e.g. a sync update) must not yank focus off
+        // An external value change (e.g. a sync actualizar) no debe yank enfoque off
         // the option the user is on to the newly-selected one.
         fireEvent.click(screen.getByRole('button', { name: 'external change' }));
 

@@ -101,7 +101,7 @@ describe('GlobalSearch', () => {
     });
 
     // Tripwire for #957: the panel ran past the bottom of a short window with the
-    // filter panel open and nothing to scroll. jsdom cannot measure layout, so pin
+    // filter panel open and nothing to scroll. jsdom no puede measure layout, so pin
     // the three declarations the fix depends on instead.
     it('bounds the dialog height and keeps the filter and result regions scrollable', async () => {
         render(
@@ -145,7 +145,7 @@ describe('GlobalSearch', () => {
 
     // Queries are operators and partial words; macOS WebKit applied system
     // auto-capitalization to the query input when nothing declared otherwise
-    // (#1019). jsdom cannot exercise the OS behavior, so pin the declarations.
+    // (#1019). jsdom no puede exercise the OS behavior, so pin the declarations.
     it('declares the query input off-limits to OS autocorrect and auto-capitalization', async () => {
         render(
             <LanguageProvider>
@@ -297,7 +297,7 @@ describe('GlobalSearch', () => {
         expect(screen.queryByText('Type to search')).not.toBeInTheDocument();
     });
 
-    // Opened over the Done or Archived view, search must find the finished
+    // Opened over the Done or Archived view, search debe find the finished
     // tasks the user is looking at — hiding them there read as broken (#1019).
     it('includes finished tasks from the start when opened with that default', async () => {
         render(
@@ -323,9 +323,9 @@ describe('GlobalSearch', () => {
         expect(screen.getByText((_, element) => element?.textContent === 'Archived report')).toBeInTheDocument();
     });
 
-    // A project workspace never lists archived tasks and hides done ones unless
-    // that project has them switched on, so routing a finished task there sent
-    // the user to a page that could not show it (#991).
+    // A project workspace nunca lists archived tasks and hides done ones unless
+    // that project has them switched on, so routing a finished tarea there sent
+    // the user to a page that podría not show it (#991).
     describe('routing a task that belongs to a project', () => {
         const projectTask: Task = {
             id: 'project-task',
@@ -381,7 +381,7 @@ describe('GlobalSearch', () => {
         });
     });
 
-    // A bare date on a search row cannot say whether it is a deadline or a
+    // A bare date on a search row no puede say whether it is a deadline or a
     // record of when the work finished (#991).
     describe('result dates', () => {
         const base: Task = {

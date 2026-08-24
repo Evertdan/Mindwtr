@@ -71,7 +71,7 @@ object PersistentCaptureNotifier {
     }
     val contentIntent = PendingIntent.getActivity(context, CONTENT_REQUEST_CODE, openIntent, pendingFlags)
 
-    // Android 14+ lets users swipe away "ongoing" notifications. Re-post on
+    // Un
     // dismissal so the capture handle stays pinned while the setting is on;
     // the settings toggle cancels via cancel(), which does not fire this intent.
     val dismissIntent = Intent(context, PersistentCaptureDismissReceiver::class.java).apply {

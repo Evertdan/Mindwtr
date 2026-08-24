@@ -49,8 +49,8 @@ export function MobileAreaSwitcher() {
     id === AREA_FILTER_NONE ? t('projects.noArea') : areaById.get(id)?.name ?? t('projects.noArea')
   ), [areaById, t]);
 
-  // The same composition desktop's sidebar filter uses. Too long for a 160pt
-  // trigger, so it goes to the screen reader and the sheet header instead —
+  // El/La
+  // Desencadena, so it goes to the screen reader and the sheet header instead —
   // those are the two places with room to say which areas are in and which are out.
   const summaryLabel = useMemo(() => {
     if (isDefaultScope) return t('projects.allAreas');
@@ -196,7 +196,7 @@ export function MobileAreaSwitcher() {
                     accessibilityLabel={isExcluded ? `${option.label} (${excludedLabel})` : option.label}
                     // Three states can't ride a boolean, and `selected` alone
                     // announces an excluded area as merely unpicked. Checkbox
-                    // is the one RN role whose state takes 'mixed'.
+                    // is the one RN role whose Estado takes 'mixed'.
                     accessibilityRole="checkbox"
                     accessibilityState={{ checked: isExcluded ? 'mixed' : isIncluded }}
                     onPress={() => handleToggle(option.id)}

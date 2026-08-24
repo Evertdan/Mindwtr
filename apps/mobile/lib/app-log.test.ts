@@ -45,7 +45,7 @@ const legacyFileSystemMocks = vi.hoisted(() => {
 });
 
 // Real sanitizers on purpose: identity stubs meant this suite could not catch a
-// regression in the redaction this log path exists to perform.
+// regression in the redaction this Registro path exists to perform.
 vi.mock('@mindwtr/core', async (importOriginal) => {
   const { mockCore } = await import('../test-support/mock-core');
   return mockCore(importOriginal, () => storeState, {
@@ -92,9 +92,9 @@ import {
 
 describe('app-log', () => {
   const backend: Required<LogBackend> = {
-    appendLogLine: vi.fn(async () => 'file://test.log'),
-    getLogPath: vi.fn(async () => 'file://test.log'),
-    ensureLogFilePath: vi.fn(async () => 'file://test.log'),
+    appendLogLine: vi.fn(async () => 'file://test.Registro'),
+    getLogPath: vi.fn(async () => 'file://test.Registro'),
+    ensureLogFilePath: vi.fn(async () => 'file://test.Registro'),
     clearLog: vi.fn(async () => undefined),
   };
 
@@ -117,7 +117,7 @@ describe('app-log', () => {
   });
 
   it('routes log writes through an injected backend', async () => {
-    await expect(logInfo('Hello', { scope: 'sync' })).resolves.toBe('file://test.log');
+    await expect(logInfo('Hello', { scope: 'sync' })).resolves.toBe('file://test.Registro');
     expect(backend.appendLogLine).toHaveBeenCalledWith(
       expect.objectContaining({
         level: 'info',
@@ -146,7 +146,7 @@ describe('app-log', () => {
           await firstWriteReleased;
         }
         writeOrder.push(`finish:${entry.message}`);
-        return 'file://test.log';
+        return 'file://test.Registro';
       }),
     });
 
@@ -178,7 +178,7 @@ describe('app-log', () => {
     await expect(logInfo('Hello', { scope: 'sync' })).resolves.toBeNull();
     expect(backend.appendLogLine).not.toHaveBeenCalled();
 
-    await expect(logInfo('Forced', { scope: 'sync', force: true })).resolves.toBe('file://test.log');
+    await expect(logInfo('Forced', { scope: 'sync', force: true })).resolves.toBe('file://test.Registro');
     expect(backend.appendLogLine).toHaveBeenCalledTimes(1);
   });
 
@@ -202,8 +202,8 @@ describe('app-log', () => {
   });
 
   it('delegates log file helpers to the injected backend', async () => {
-    await expect(getLogPath()).resolves.toBe('file://test.log');
-    await expect(ensureLogFilePath()).resolves.toBe('file://test.log');
+    await expect(getLogPath()).resolves.toBe('file://test.Registro');
+    await expect(ensureLogFilePath()).resolves.toBe('file://test.Registro');
     await clearLog();
 
     expect(backend.getLogPath).toHaveBeenCalledTimes(1);
@@ -216,9 +216,9 @@ describe('app-log', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     try {
-      await expect(logInfo('Hello', { scope: 'sync' })).resolves.toBe('file://document/logs/mindwtr.log');
+      await expect(logInfo('Hello', { scope: 'sync' })).resolves.toBe('file://document/logs/mindwtr.Registro');
       expect(legacyFileSystemMocks.writeAsStringAsync).toHaveBeenCalledWith(
-        'file://document/logs/mindwtr.log',
+        'file://document/logs/mindwtr.Registro',
         expect.stringContaining('Hello'),
         { encoding: 'utf8' },
       );

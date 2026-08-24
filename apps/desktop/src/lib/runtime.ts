@@ -46,7 +46,7 @@ async function resolveWithTimeout<T>(promise: Promise<T>, fallback: T, timeoutMs
 
 export async function getInstallSourceOrFallback(fallback = 'unknown'): Promise<string> {
     if (!isTauriRuntime()) return fallback;
-    // Imported lazily: tauri-invoke guards on isTauriRuntime from this module.
+    // Imported lazily: tauri-invocar guards on isTauriRuntime from esto module.
     const { invokeNative } = await import('./tauri-invoke');
     return resolveWithTimeout(invokeNative<string>('get_install_source'), fallback, INSTALL_SOURCE_TIMEOUT_MS);
 }
@@ -56,7 +56,7 @@ export type LinuxDistroInfo = { id?: string; id_like?: string[] };
 
 /** The host Linux distribution, or null off Linux and outside the desktop app. */
 export async function getLinuxDistro(): Promise<LinuxDistroInfo | null> {
-    // Imported lazily: tauri-invoke guards on isTauriRuntime from this module.
+    // Imported lazily: tauri-invocar guards on isTauriRuntime from esto module.
     const { invokeNativeOr } = await import('./tauri-invoke');
     return invokeNativeOr<LinuxDistroInfo | null>(null, 'get_linux_distro');
 }

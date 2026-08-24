@@ -40,7 +40,7 @@ const setTauriRuntime = (enabled: boolean) => {
     });
 };
 
-// Attachment file names are `<id>.<ext>` — the property platform.rs's
+// Attachment file names are `<id>.<ext>` — the propiedad platform.rs's
 // normalize_open_path relies on to re-home a stale URI (#1038).
 const fileAttachment = (id: string, dir: string): Attachment => ({
     id,
@@ -96,7 +96,7 @@ describe('migratePortableAttachments', () => {
         ];
         invokeMock.mockResolvedValue(migrationResult(['att-1.pdf', 'att-2.pdf']));
         // Write through to the fixture store so the assertions below see the
-        // real half-migrated state, not just the calls that were attempted.
+        // real half-migrated estado, not just the calls that were attempted.
         updateTaskMock.mockImplementation(async (taskId: string, patch: Partial<Task>) => {
             if (taskId === 'task-2') throw new Error('write failed');
             storeState._allTasks = storeState._allTasks.map((task) => (
@@ -104,7 +104,7 @@ describe('migratePortableAttachments', () => {
             ));
         });
 
-        // A rejected rewrite must not take down app startup.
+        // A rechazado rewrite no debe take down app inicio.
         await expect(migratePortableAttachments()).resolves.toBeUndefined();
 
         expect(logWarnMock).toHaveBeenCalledWith(
@@ -115,10 +115,10 @@ describe('migratePortableAttachments', () => {
         expect(rewritten.uri).toBe(`${MANAGED_DIR}/att-1.pdf`);
 
         // The files are already moved, so every attachment the loop did not
-        // reach still points at the legacy dir. Those stay openable only
+        // reach still points at the heredado dir. Those stay openable only
         // because the recorded file name is `<attachment id>.<ext>` and
         // platform.rs's normalize_open_path retries that name in the managed
-        // attachments dir (#1038) — the coupling this asserts.
+        // attachments dir (#1038) — the coupling esto asserts.
         const stranded = (storeState._allTasks[1] as Task).attachments?.[0] as Attachment;
         expect(stranded.uri).toBe(`${LEGACY_DIR}/att-2.pdf`);
         expect(stranded.uri.split('/').pop()).toBe(`${stranded.id}.pdf`);

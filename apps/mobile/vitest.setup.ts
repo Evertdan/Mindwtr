@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
 import React from 'react';
 
-// Minimal globals for Expo modules in node test env.
+// Mínimos globales para módulos Expo en entorno de prueba de nodo.
 const testGlobal = globalThis as typeof globalThis & {
   __DEV__?: boolean;
   IS_REACT_ACT_ENVIRONMENT?: boolean;
@@ -36,7 +36,7 @@ testGlobal.cancelAnimationFrame = testGlobal.cancelAnimationFrame ?? ((id: numbe
   clearTimeout(id);
 });
 
-// Unavailable by default so code under test exercises the AsyncStorage
+// No disponible por defecto
 // fallback; secure-config tests override this with their own mock.
 vi.mock('expo-secure-store', () => ({
   isAvailableAsync: vi.fn().mockResolvedValue(false),
@@ -156,7 +156,7 @@ vi.mock('@expo/vector-icons', () => {
 
 vi.mock('lucide-react-native', () => {
   const Icon = (props: any) => React.createElement('Icon', props, props.children);
-  // Keep this as a plain module object. A catch-all proxy also exposes `then`,
+  // Mantenga esto como un objeto de módulo simple. Un proxy global también expone `then`,
   // which makes the mock look promise-like and can stall ESM imports in Vitest.
   const iconNames = [
     'AlertTriangle',

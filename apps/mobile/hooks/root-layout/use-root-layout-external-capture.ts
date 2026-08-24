@@ -63,7 +63,7 @@ type ShareIntentFileCaptureResult = {
     attachedCount: number;
 };
 
-// Shared files (PDFs, images, audio, ...) become copied attachments on the
+// Los archivos compartidos (PDF, imágenes, audio, ...) se convierten en archivos adjuntos copiados en el
 // capture draft, mirroring the in-app attach flow: the share-extension file
 // lives in a temporary container, so the bytes must be re-homed into the
 // managed attachments dir before the capture sheet ever sees them.
@@ -99,8 +99,8 @@ async function buildShareIntentFileCaptureParams({
             localStatus: 'available',
         };
         try {
-            // Some providers omit the size; 0 still runs the mime blocklist,
-            // and the post-copy check below enforces the size cap.
+            // Some providers omit the Tamaño; 0 still runs the mime blocklist,
+            // and the post-copy check below enforces the Tamaño cap.
             const validation = await validateAttachmentForUpload(attachment, attachment.size ?? 0);
             if (!validation.valid) {
                 void logWarn('Skipped shared file failing attachment validation', {
@@ -111,7 +111,7 @@ async function buildShareIntentFileCaptureParams({
             }
             const persisted = await persistAttachmentLocallyDetailed(attachment);
             if (persisted.status !== 'copied' && persisted.status !== 'already-local') {
-                // A share-container path goes stale as soon as the intent is
+                // Una ruta de contenedor compartido se vuelve obsoleta tan pronto como la intención es
                 // consumed, so a failed copy means the file is lost to us.
                 void logWarn('Failed to copy shared file into attachments', {
                     scope: 'share-intent',
@@ -121,7 +121,7 @@ async function buildShareIntentFileCaptureParams({
             }
             const cached = persisted.attachment;
             if (typeof attachment.size !== 'number' && typeof cached.size === 'number') {
-                // The copy revealed the real size of a sizeless share; drop the
+                // El/La
                 // bytes again if they exceed the attachment cap.
                 const sizeValidation = await validateAttachmentForUpload(cached, cached.size);
                 if (!sizeValidation.valid) {
@@ -243,17 +243,17 @@ export function useRootLayoutExternalCapture({
     showToast,
 }: UseRootLayoutExternalCaptureParams) {
     const lastHandledUrl = useRef<string | null>(null);
-    // The async file-copy branch outlives a render; a dep-identity change
+    // El/La
     // mid-copy (language load swaps resolveText, for instance) must not start
     // a second copy of the same share.
     const shareHandlingRef = useRef(false);
 
     // Arms the AppSearch index (#1017) once per app start if the device-local
-    // preference is on. This hook already owns every other OS-level entry
-    // point (share intents, deep links) and runs unconditionally on mount, so
+    // preference is on. Este hook already owns every other OS-level entry
+    // point (share intents, deep links) and runs unconditionally on Montar, so
     // it is the natural place to also arm the search-index subscription —
     // there is no dedicated root-layout-startup file in this task's scope.
-    // No-op (and no AsyncStorage read) when unsupported or off.
+    // Sin operación (y sin lectura de AsyncStorage) cuando no es compatible o está apagado.
     useEffect(() => {
         void syncAppSearchIndexingWithPreference();
     }, []);
@@ -309,7 +309,7 @@ export function useRootLayoutExternalCapture({
         const hasSharedFiles = (shareFiles ?? []).some((file) => typeof file?.path === 'string' && file.path.trim().length > 0);
         if (!hasSharedFiles) {
             // Text/URL shares stay synchronous; only file shares need the
-            // async copy into the managed attachments dir.
+            // Un
             finish(buildShareIntentCaptureParams({ shareSubject, shareText, shareWebUrl }));
             resetShareIntent();
             shareHandlingRef.current = false;

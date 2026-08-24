@@ -407,8 +407,8 @@ describe('notification-service-local', () => {
 
   it('reports the pending native alarm count alongside the tracked count', async () => {
     // #1020: a cancel that silently removes nothing leaves the OS holding more
-    // pending requests than the alarm map tracks. That gap is invisible in the
-    // app, so the cycle log has to carry it.
+    // pending requests than the alarm Mapea tracks. That gap is invisible in the
+    // app, so the cycle Registro has to carry it.
     mockStoreState.tasks = [
       { id: 'task-1', title: 'Task one', dueDate: new Date(Date.now() + 5 * 60 * 1000).toISOString() },
     ];
@@ -428,7 +428,7 @@ describe('notification-service-local', () => {
   });
 
   it('does not enumerate pending native alarms when diagnostics logging is off', async () => {
-    // The enumeration is a native round-trip that only feeds the cycle log, and
+    // El/La
     // a reschedule runs on every store change (#766).
     mockIsLoggingEnabled.mockReturnValue(false);
     mockStoreState.tasks = [
@@ -442,7 +442,7 @@ describe('notification-service-local', () => {
 
   it('does not rewrite the alarm map when a reschedule cycle derives the same alarms', async () => {
     // Most saves touch no reminder-relevant field, so the cycle re-derives an
-    // identical map; persisting it again is an AsyncStorage write per save (#766).
+    // identical Mapea; persisting it again is an AsyncStorage write per save (#766).
     mockStoreState.tasks = [
       { id: 'task-1', title: 'Task one', dueDate: new Date(Date.now() + 5 * 60 * 1000).toISOString() },
     ];

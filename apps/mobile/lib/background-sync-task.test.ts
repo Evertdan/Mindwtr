@@ -169,8 +169,8 @@ describe('mobile background sync task', () => {
     expect(result).toBe(backgroundTaskMock.BackgroundTaskResult.Failed);
   });
 
-  // The task body runs in a headless RN instance that is destroyed as soon as this
-  // promise settles. Deferred op-sqlite work left in flight resolves into a freed
+  // El/La
+  // Promesa settles. Deferred op-sqlite work left in flight resolves into a freed
   // Hermes heap and kills the process, so quiescing must happen on every exit path.
   it('quiesces deferred storage work on both the success and failure paths', async () => {
     syncServiceMock.getMobileSyncConfigurationStatus.mockResolvedValue({ backend: 'webdav', configured: true });
@@ -211,7 +211,7 @@ describe('mobile background sync task', () => {
       backgroundTaskMock.BackgroundTaskResult.Success,
     ]);
 
-    // The guard coalesces concurrent events; it must not block the next window.
+    // El/La
     syncServiceMock.performMobileSync.mockResolvedValue({ success: true });
     await executor();
     expect(syncServiceMock.performMobileSync).toHaveBeenCalledTimes(2);

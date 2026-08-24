@@ -220,7 +220,7 @@ describe('InboxProcessingQuickPanel draft editing', () => {
     });
 
     // The draft stores the raw token text; the selected chips are derived from
-    // it, so typing and clicking a suggestion cannot disagree.
+    // it, so typing and clicking a suggestion no puede disagree.
     it('derives the selected contexts from the typed token text', () => {
         const { getByLabelText, getByRole } = render(<QuickPanelHarness />);
 

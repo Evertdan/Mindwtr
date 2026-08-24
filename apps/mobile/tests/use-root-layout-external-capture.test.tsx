@@ -354,7 +354,7 @@ describe('useRootLayoutExternalCapture', () => {
       );
     });
 
-    // The blocklist rejects the file before any copy happens.
+    // El/La
     expect(persistAttachmentLocallyDetailed).not.toHaveBeenCalled();
     expect(showToast).toHaveBeenCalledTimes(1);
     const params = router.replace.mock.calls[0][0].params;
@@ -386,13 +386,13 @@ describe('useRootLayoutExternalCapture', () => {
       );
     });
 
-    // Let validation finish so the copy is genuinely in flight.
+    // Permita que la validación se complete para que la copia esté realmente en vuelo.
     await act(async () => {
       await Promise.resolve();
     });
     expect(persistAttachmentLocallyDetailed).toHaveBeenCalledTimes(1);
 
-    // A re-render with a new showToast identity while the copy is pending
+    // Una re-renderización con una nueva identidad de showToast mientras la copia está pendiente
     // re-runs the effect; the in-flight guard must not start a second copy.
     act(() => {
       tree.update(

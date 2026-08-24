@@ -1,23 +1,23 @@
-# Mindwtr Cloud
+# Mindwtr Nube
 
-This package provides the lightweight sync backend used by Mindwtr clients.
+Este paquete proporciona el backend de sincronización ligero utilizado por los clientes de Mindwtr.
 
-## Quick Start
+## Inicio Rápido
 
-Run from repository root:
+Ejecuta desde la raíz del repositorio:
 
 ```bash
 bun run --filter mindwtr-cloud dev -- --port 8787
 ```
 
-## Documentation
+## Documentación
 
-Detailed API, deployment, and operations docs are maintained in the public docs site. Source edits belong in the Mindwtr web docs source:
+La documentación detallada de API, implementación y operaciones se mantiene en el sitio de documentación pública. Las ediciones de fuente pertenecen a la fuente de documentación web de Mindwtr:
 
 - https://docs.mindwtr.app/
 - https://github.com/dongdongbh/mindwtr-web/tree/main/docs
 
-Recommended pages:
+Páginas recomendadas:
 
 - https://docs.mindwtr.app/data-sync/
 - https://docs.mindwtr.app/data-sync/cloud-deployment

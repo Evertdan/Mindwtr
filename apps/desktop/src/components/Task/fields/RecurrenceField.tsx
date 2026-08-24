@@ -281,7 +281,7 @@ export function RecurrenceField({
                             dateFormatSetting={dateFormatSetting}
                             nativeDateInputLocale={nativeDateInputLocale}
                             dateInputClassName="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground"
-                            // Inline in the "Ends" row, and there is no empty state:
+                            // Inline in the "Ends" row, and there is no empty estado:
                             // clearing it falls back to the default end date, so no
                             // onClear and no clear button.
                             className="w-40 max-w-none"

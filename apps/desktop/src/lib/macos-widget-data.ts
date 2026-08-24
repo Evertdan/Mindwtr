@@ -89,11 +89,11 @@ const DARK_PALETTE: MacWidgetPalette = {
     onAccent: '#FFFFFF',
 };
 
-// Only light/dark are resolved here -- unlike mobile's widget-data.ts, named
+// Only light/dark are resolved here -- a diferencia de mobile's widget-data.ts, named
 // theme presets (Dracula, Nord, ...) are not ported to hex palettes for the
 // Mac widget in v1. The widget still falls back correctly (via `themeMode`
 // and `resolveThemeColorScheme`) to plain light/dark for any preset theme,
-// it just won't carry that preset's exact accent colors into the widget.
+// it just no será carry that preset's exact accent colors into the widget.
 const resolveMacWidgetPalette = (themeMode: string | undefined, systemIsDark: boolean): MacWidgetPalette => {
     const isDark = resolveThemeColorScheme(
         (themeMode || 'system') as AppTheme,
@@ -105,8 +105,8 @@ const resolveMacWidgetPalette = (themeMode: string | undefined, systemIsDark: bo
 // Ported from apps/mobile/lib/widget-data.ts's computeTodayFocusTasks so the
 // Mac widget shows the same "Today" selection: starred tasks first, then
 // next actions due/starting today or otherwise actionable, respecting
-// sequential-project gating. Kept in sync manually -- there is no shared
-// home for this without moving it into core, which is out of scope for #1054.
+// secuencial-project gating. Kept in sync manually -- there is no shared
+// home for esto without moving it into core, which is out of scope for #1054.
 function computeTodayFocusTasks(
     activeTasks: AppData['tasks'],
     projects: AppData['projects'],

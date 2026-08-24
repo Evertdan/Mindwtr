@@ -20,9 +20,9 @@ export default defineConfig({
       },
     ],
   },
-  // Prevent vite from obscuring rust errors in the console
+  // Prevenir que vite oculte errores de rust en la consola
   clearScreen: false,
-  // Tauri expects a fixed port
+  // Tauri espera un puerto fijo
   server: {
     port: 5173,
     strictPort: true,

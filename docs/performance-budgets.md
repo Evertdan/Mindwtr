@@ -1,63 +1,63 @@
-# Performance Budgets
+# Presupuestos de Rendimiento
 
-Mindwtr uses generated large-store tests to catch performance regressions before users hit them. The suite collects no user telemetry.
+Mindwtr usa pruebas de almacén grande generadas para capturar regresiones de rendimiento antes de que los usuarios las encuentren. La suite no recopila telemetría de usuarios.
 
-## Command
+## Comando
 
-Run the current budget suite from the repository root:
+Ejecuta la suite de presupuesto actual desde la raíz del repositorio:
 
 ```bash
 bun run test:perf
 ```
 
-This runs:
+Esto ejecuta:
 
 - `packages/core/src/performance-large-store.test.ts`
 - `apps/desktop/src/components/views/ListView.performance.test.tsx`
 - `apps/mobile/tests/large-store-performance.test.tsx`
 
-The core suite generates stores with 1k, 10k, and 50k tasks, many projects, many sections, mixed statuses, due dates, start dates, tags, contexts, deleted records, and a project with many selected-project tasks.
+La suite principal genera almacenes con 1k, 10k y 50k tareas, muchos proyectos, muchas secciones, estados mixtos, fechas de vencimiento, fechas de inicio, etiquetas, contextos, registros eliminados y un proyecto con muchas tareas de proyecto seleccionado.
 
-## Core Budgets
+## Presupuestos Principales
 
-Budgets are intentionally explicit and conservative. They should only change in PRs that explain the measured reason.
+Los presupuestos son intencionalmente explícitos y conservadores. Solo deben cambiar en PR que expliquen la razón medida.
 
-| Operation | 1k tasks | 10k tasks | 50k tasks | Growth Guard |
+| Operación | 1k tareas | 10k tareas | 50k tareas | Guardia de Crecimiento |
 | --- | ---: | ---: | ---: | ---: |
-| Project detail lookup and sort | 25ms | 90ms | 450ms | 50k <= 12x 10k |
-| Production task-derived state | 50ms | 250ms | 1200ms | 50k <= 8x 10k |
-| Focus derivation | 40ms | 500ms | 2500ms | 50k <= 12x 10k |
-| Search/filter/sort derivation | 30ms | 130ms | 650ms | 50k <= 12x 10k |
-| Production sync-change fingerprint | 20ms | 80ms | 350ms | 50k <= 8x 10k |
+| Búsqueda y clasificación de detalles de proyecto | 25ms | 90ms | 450ms | 50k <= 12x 10k |
+| Estado derivado de tarea de producción | 50ms | 250ms | 1200ms | 50k <= 8x 10k |
+| Derivación de enfoque | 40ms | 500ms | 2500ms | 50k <= 12x 10k |
+| Derivación de búsqueda/filtro/clasificación | 30ms | 130ms | 650ms | 50k <= 12x 10k |
+| Huella digital de cambio de sincronización de producción | 20ms | 80ms | 350ms | 50k <= 8x 10k |
 
-The suite also runs the real Zustand `updateTask` mutation and incremental persistence path at every dataset size. Its absolute budgets are 100ms at 1k, 250ms at 10k, and 1000ms at 50k, with a maximum 12x growth from 10k to 50k. Like the pure hot-path rows, this path uses the best of three measured runs to reduce runner and garbage-collection noise. Fingerprint cases assert both deterministic no-op behavior for aligned data and sensitivity to a synced revision change.
+La suite también ejecuta la mutación real de `updateTask` de Zustand y la ruta de persistencia incremental en cada tamaño de conjunto de datos. Sus presupuestos absolutos son 100ms en 1k, 250ms en 10k y 1000ms en 50k, con un crecimiento máximo de 12x de 10k a 50k. Como las filas de ruta caliente pura, esta ruta usa la mejor de tres ejecuciones medidas para reducir el ruido del ejecutor y recolección de basura. Los casos de huella digital afirman tanto el comportamiento de no operación determinista para datos alineados como la sensibilidad a un cambio de revisión sincronizado.
 
-The bulk-mutation path (`batchMoveTasks` over every task in the store, what "Select all -> Move" dispatches) is budgeted at 75ms at 1k, 250ms at 10k, and 2000ms at 50k, with a maximum 15x growth from 10k to 50k, taking the best of two runs. It is the largest mutation a user can trigger in one synchronous store write.
+La ruta de mutación en lote (`batchMoveTasks` sobre cada tarea en el almacén, lo que envía "Seleccionar todo -> Mover") se presupuesta en 75ms en 1k, 250ms en 10k y 2000ms en 50k, con un crecimiento máximo de 15x de 10k a 50k, tomando la mejor de dos ejecuciones. Es la mutación más grande que un usuario puede activar en una escritura de almacén sincrónica.
 
-The absolute budgets catch obvious regressions. The growth guard catches bad scaling, especially O(n^2) patterns that may still pass on small datasets. Growth comparisons use a 5ms denominator floor so very fast 10k measurements do not fail only because of runner timing noise.
+Los presupuestos absolutos atrapan regresiones obvias. La guardia de crecimiento atrapa mal escalado, especialmente patrones O(n^2) que aún pueden pasar en conjuntos de datos pequeños. Las comparaciones de crecimiento usan un piso de denominador de 5ms para que las mediciones 10k muy rápidas no fallen solo por ruido de tiempo de ejecución.
 
-## Platform Render Budgets
+## Presupuestos de Renderizado de Plataforma
 
-Platform tests exercise the production component seams with 5,000 generated tasks. Render budgets use the best of three mounts to reduce runner and garbage-collection noise, while still asserting that the real virtualization/list surface mounted successfully.
+Las pruebas de plataforma ejercen las costuras de componentes de producción con 5,000 tareas generadas. Los presupuestos de renderizado usan la mejor de tres montajes para reducir el ruido del ejecutor y recolección de basura, mientras aún afirman que la superficie de virtualización/lista real se montó correctamente.
 
-| Surface | Dataset | Budget |
+| Superficie | Conjunto de Datos | Presupuesto |
 | --- | ---: | ---: |
-| Desktop `ListView` | 5,000 next actions | 500ms |
-| Mobile `TaskList` | 5,000 mixed-status tasks | 350ms |
-| Mobile `ProjectDetailModal` | 5,000 tasks in one project | 500ms |
+| `ListView` de Escritorio | 5,000 próximas acciones | 500ms |
+| `TaskList` Móvil | 5,000 tareas de estado mixto | 350ms |
+| `ProjectDetailModal` Móvil | 5,000 tareas en un proyecto | 500ms |
 
-The mobile suite also retains budgets for Focus, Projects, Archived, Trash, editor open/save, completion, picker dismissal, and bulk selection. These are JavaScript render-path regression gates; use release-mode device profiling for native layout, UI-thread, and frame-timing conclusions.
+La suite móvil también retiene presupuestos para Enfoque, Proyectos, Archivado, Papelera, apertura/guardado del editor, finalización, despido del selector y selección en lote. Estas son puertas de regresión de ruta de renderizado de JavaScript; usa perfiles de dispositivo en modo de lanzamiento para conclusiones de diseño nativo, subproceso de UI y sincronización de fotogramas.
 
-## When To Add A Budget
+## Cuándo Agregar un Presupuesto
 
-Add or update a budget when a PR touches a hot path:
+Agrega o actualiza un presupuesto cuando una PR toca una ruta caliente:
 
-- capture open or first keystroke readiness
-- project detail opening
-- Focus, Inbox, or Projects derivation
-- search/filter/sort logic
-- project/context/tag summaries
-- task mutation or persistence
-- large list rendering
+- apertura de captura o disponibilidad de primer pulsación de tecla
+- apertura de detalles de proyecto
+- Derivación de Enfoque, Bandeja de entrada o Proyectos
+- lógica de búsqueda/filtro/clasificación
+- resúmenes de proyecto/contexto/etiqueta
+- mutación de tarea o persistencia
+- renderizado de lista grande
 
-Prefer core tests for pure derivation and platform tests for render or native-thread behavior. This suite is the CI regression radar; use release-mode device profiling to diagnose regressions that cross native or render-thread boundaries.
+Prefiere pruebas principales para derivación pura y pruebas de plataforma para comportamiento de renderizado o subproceso nativo. Esta suite es el radar de regresión de CI; usa perfiles de dispositivo en modo de lanzamiento para diagnosticar regresiones que cruzan límites de subproceso nativo o renderizado.

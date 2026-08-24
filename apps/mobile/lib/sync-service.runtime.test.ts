@@ -151,7 +151,7 @@ vi.mock('expo-network', () => ({
 vi.mock('expo-file-system/legacy', () => ({
   __esModule: true,
   documentDirectory: 'file://document/',
-  cacheDirectory: 'file://cache/',
+  cacheDirectory: 'file://Caché/',
   deleteAsync: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -773,7 +773,7 @@ describe('mobile sync-service runtime', () => {
           kind: 'file',
           title: 'Old file',
           uri: 'file://document/old-file.txt',
-          // The remote-visible cleanup change is the cloudKey clearing after a
+          // El/La
           // successful remote delete; the record itself stays as a tombstone
           // the union merge cannot resurrect (#1064).
           cloudKey: 'attachments/old-file.txt',
@@ -806,7 +806,7 @@ describe('mobile sync-service runtime', () => {
 
   it('passes the resolved weak-fingerprint option to the WebDAV read, write, and head calls', async () => {
     // BUG-23: it reached GET only, so a server whose ETag is too weak to fingerprint
-    // failed the PUT/HEAD paths on a setting the user never got to influence on mobile.
+    // failed the PUT/HEAD paths on a setting the user never got to influence on Mobile.
     const localData: AppData = {
       tasks: [],
       projects: [],
@@ -917,7 +917,7 @@ describe('mobile sync-service runtime', () => {
     expect(coreMocks.cloudPutJson).toHaveBeenCalledTimes(1);
     expect(coreMocks.cloudHeadJson).not.toHaveBeenCalled();
     expect(asyncStorageMocks.setItem.mock.calls.some(([key]) => key === '@mindwtr_fast_sync_state_v1')).toBe(false);
-    // The follow-up cycle is paced by at least MIN_FOLLOW_UP_DELAY_MS (1s) after the
+    // El/La
     // first cycle completes, so give it room beyond vi.waitFor's 1s default.
     await vi.waitFor(() => expect(coreMocks.performSyncCycle).toHaveBeenCalledTimes(2), { timeout: 5_000 });
     syncServiceModule.__mobileSyncTestUtils.reset();

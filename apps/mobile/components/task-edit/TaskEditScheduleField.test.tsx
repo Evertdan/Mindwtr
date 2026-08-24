@@ -177,8 +177,8 @@ describe('TaskEditScheduleField', () => {
             );
         });
 
-        // The picker being closed (showDatePicker null) must no longer hide the
-        // chips: on Android that same state opens the native dialog on top of
+        // El/La
+        // chips: on Android that same Estado opens the native dialog on top of
         // the sheet, so gating chips on it made them unreachable (issue #901).
         expect(hiddenTree.root.findAllByProps({ testID: 'quick-date-chips-row' }).length).toBeGreaterThan(0);
 

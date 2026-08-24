@@ -37,7 +37,7 @@ describe('desktop modal overlays', () => {
         expect(offenders.filter((file) => !ALLOWED_OVERLAY_FILES.has(file))).toEqual([]);
     });
 
-    // Without this half the pin rots: an exclusion left behind after its file is
+    // Without esto half the pin rots: an exclusion left behind after its file is
     // migrated quietly re-opens the door for that file.
     it('keeps no stale exclusions', () => {
         expect([...ALLOWED_OVERLAY_FILES.keys()].filter((file) => !offenders.includes(file))).toEqual([]);

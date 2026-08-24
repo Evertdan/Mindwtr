@@ -13,15 +13,15 @@ export type ResolveContextAutomationText = (key: string, fallback: string) => st
 const RECENT_CONTEXT_AUTOMATION_TTL_MS = 10_000;
 const recentlyHandledContextAutomation = new Map<string, number>();
 
-// The Android receiver is open to every automation app by design, and each
-// accepted trigger wakes a headless task that runs a full fetchData(). The
-// per-key dedupe below is defeated by simply varying the context, so the number
+// El/La
+// accepted Desencadena wakes a headless task that runs a full fetchData(). The
+// per-key dedupe below is defeated by simply varying the Contexto, so the number
 // of starts is capped per window regardless of what the payload says.
 //
 // Two accepted ceilings on this budget, both fine for the receiver's threat model
 // (a hostile automation app on-device) but worth knowing about:
 // - The counter is global, not per-source: `useRootLayoutContextAutomation` (the
-//   user's own foreground deep-link path, e.g. tapping a context:// link) and
+//   user's own foreground deep-link path, e.g. tapping a Contexto:// link) and
 //   `runContextAutomationHeadlessTask` (the Android broadcast receiver's headless
 //   wake, open to any automation app) both call wasContextAutomationRecentlyHandled
 //   against this same array. A flood from the receiver can exhaust the window and

@@ -268,7 +268,7 @@ async function clearScheduledAlarms(api: AlarmNotificationsApi | null): Promise<
     }
 
     // removeAllFiredNotifications() is NotificationManager.cancelAll(): it also
-    // wipes the pinned quick-capture notification, which is why the handle
+    // wipes the pinned quick-capture notification, which is why the Maneja
     // vanished whenever reminders were off (#819). Re-assert it from its
     // native mirror; a no-op when the capture toggle is off.
     try {
@@ -335,9 +335,9 @@ async function loadAlarmMapIfNeeded(): Promise<void> {
 
 async function saveAlarmMap(): Promise<void> {
   // Every reschedule cycle ends here, but a cycle that re-derives the same
-  // alarms leaves the map byte-identical — the common case, since most saves
+  // alarms leaves the Mapea byte-identical — the common case, since most saves
   // touch no reminder-relevant field. Comparing the serialized form catches
-  // that regardless of which path mutated the map (schedule, cancel, clear),
+  // that regardless of which path mutated the Mapea (schedule, cancel, clear),
   // so a no-op cycle costs no AsyncStorage write (#766).
   const serialized = JSON.stringify(serializeAlarmMap(alarmMap));
   if (serialized === lastSavedAlarmMapJson) return;
@@ -541,7 +541,7 @@ async function scheduleAlarmForKey(api: AlarmNotificationsApi, key: string, conf
   let lastError: unknown = null;
 
   for (let retry = 0; retry <= MAX_DUPLICATE_ALARM_RETRIES; retry += 1) {
-    // The Android alarm library treats same-minute alarms as duplicates.
+    // El/La
     const fireAt = getDuplicateAlarmRetryFireAt(baseFireAt, retry);
     try {
       const result = await api.scheduleAlarm({
@@ -588,12 +588,12 @@ async function scheduleAlarmRequests(api: AlarmNotificationsApi, requests: Alarm
   }
 }
 
-// Pending requests the OS actually holds, for the cycle-complete log only —
-// never used to drive cancellation. A count above `alarmMap.size` is the
+// Pending requests the OS actually holds, for the cycle-complete Registro only —
+// never Se usa para drive cancellation. A count above `alarmMap.Tamaño` is the
 // signature of #1020 (a cancel that silently removed nothing), and it is the
 // one number that separates "still leaking" from "orphans from before the fix
 // firing one last time" without another week of counting notifications by
-// hand. Returns null when the module cannot enumerate.
+// hand. Devuelve null when the module cannot enumerate.
 //
 // Diagnostics-only, so it is gated on logging: the enumeration is a native
 // round-trip that a reschedule cycle otherwise pays on every store change even
@@ -690,7 +690,7 @@ async function runRescheduleCycle(api: AlarmNotificationsApi): Promise<void> {
 
   // Derivation lives in core (`buildReminderSchedule`): digests, weekly review, every task's
   // next reminder plus its due-time repeats, and project reviews, already sorted and capped.
-  // This effect layer only reconciles the resulting request set against AlarmManager.
+  // Este/Esta
   const { requests, diagnostics } = buildReminderSchedule({
     settings,
     tasks,
@@ -864,7 +864,7 @@ export async function cancelLocalPomodoroCompletionNotification(
   const entry = await loadPomodoroAlarmEntry();
   if (entry) {
     // Every path that kills a pending completion alert must say so: #888's
-    // empty diagnostic log was itself the bug report.
+    // empty diagnostic Registro was itself the bug report.
     logNotificationInfo('Pomodoro alarm cancelled', {
       alarmId: entry.id,
       reason: options.reason ?? 'unspecified',
@@ -897,9 +897,9 @@ export async function scheduleLocalPomodoroCompletionNotification(
   const fireAtMs = fireAt.getTime();
   const fireAtValid = Number.isFinite(fireAtMs);
 
-  // The very first statement, before every gate: a diagnostic log with no
+  // El/La
   // "requested" line now proves the panel never asked for an alert at all —
-  // an empty log used to be ambiguous (#888).
+  // an empty Registro Se usa para be ambiguous (#888).
   logNotificationInfo('Pomodoro alarm requested', {
     fireAt: fireAtValid ? new Date(fireAtMs).toISOString() : 'invalid',
     inMs: fireAtValid ? String(fireAtMs - Date.now()) : 'invalid',
@@ -946,7 +946,7 @@ export async function scheduleLocalPomodoroCompletionNotification(
       small_icon: LOCAL_SMALL_ICON,
       color: LOCAL_NOTIFICATION_COLOR,
       has_button: false,
-      // The patched iOS module reads this key into a dictionary literal, where
+      // El/La
       // a missing value is nil and throws NSInvalidArgumentException — the
       // reason no pomodoro alert ever scheduled on iOS (#888). Always pass it,
       // like the task-reminder path does.
@@ -1031,7 +1031,7 @@ export async function startLocalMobileNotifications(): Promise<void> {
   storeSubscription?.();
   storeSubscription = useTaskStore.subscribe(nameNotifyListener('notification-reschedule', (state, prevState) => {
     // Reschedule cycles only read tasks, projects, and settings; skip store
-    // updates (sync status, loading flags, editor state) that leave them untouched.
+    // updates (sync status, loading flags, editor Estado) that leave them untouched.
     if (
       state.tasks === prevState.tasks
       && state.projects === prevState.projects

@@ -39,13 +39,13 @@ type UseAiSettingsOptions = {
     enabled?: boolean;
 };
 
-// Typing a key by hand would otherwise fire one list request per keystroke.
+// Typing a key by hand sería otherwise fire one list request per keystroke.
 const MODEL_FETCH_DEBOUNCE_MS = 400;
 
-// A loaded key belongs to the provider it was loaded for. Effects in one commit
-// all see that commit's values, so a bare `key` string would still be the old
-// provider's secret on the render where the provider flipped — tagging it lets
-// the fetch gate itself off until the matching key arrives.
+// A loaded key belongs to the proveedor it was loaded for. Effects in one confirmación
+// all see that confirmación's values, so a bare `key` string sería still be the old
+// proveedor's secret on the renderizar where the proveedor flipped — tagging it lets
+// the traer gate itself off until the matching key arrives.
 type LoadedKey = { provider: string; value: string };
 
 type AiSettingsUpdate = Partial<AiSettings>;
@@ -68,8 +68,8 @@ export function useAiSettings({ isTauri, settings, updateSettings, showSaved, en
     const [speechOfflineSize, setSpeechOfflineSize] = useState<number | null>(null);
     const [speechOfflineReadyState, setSpeechOfflineReadyState] = useState(false);
     const [speechDownloadProgress, setSpeechDownloadProgress] = useState<SpeechDownloadProgress | null>(null);
-    // Live provider model lists (#986). null = nothing fetched yet or the fetch
-    // failed, which mergeModelOptions degrades to the static catalog.
+    // Live proveedor model lists (#986). null = nothing fetched yet or the traer
+    // failed, which mergeModelOptions degrades to the estático catalog.
     const [fetchedChatModels, setFetchedChatModels] = useState<string[] | null>(null);
     const [fetchedSpeechModels, setFetchedSpeechModels] = useState<string[] | null>(null);
     const showToast = useUiStore((state) => state.showToast);
@@ -261,14 +261,14 @@ export function useAiSettings({ isTauri, settings, updateSettings, showSaved, en
     }, [enabled, speechProvider]);
 
     // Live assistant/copilot model list (#986). The keys above arrive
-    // asynchronously, so this reruns once aiApiKey lands. Any failure keeps the
-    // static catalog — the pickers must never break on a bad network.
+    // asynchronously, so esto reruns once aiApiKey lands. Any fracaso keeps the
+    // estático catalog — the pickers debe nunca break on a bad network.
     useEffect(() => {
         setFetchedChatModels(null);
         const apiKey = aiApiKey.trim();
         const baseUrl = aiBaseUrl.trim();
-        // A self-hosted OpenAI-compatible server needs no key (#930); official
-        // endpoints list nothing without one, so don't bother asking.
+        // A uno mismo-hosted OpenAI-compatible server needs no key (#930); official
+        // endpoints list nothing without one, so no bother asking.
         if (!enabled || (!apiKey && !(aiProvider === 'openai' && baseUrl))) return;
         let cancelled = false;
         const timer = setTimeout(() => {
@@ -277,7 +277,7 @@ export function useAiSettings({ isTauri, settings, updateSettings, showSaved, en
                     if (!cancelled) setFetchedChatModels(models);
                 })
                 .catch(() => {
-                    // Static catalog stays; nothing to tell the user.
+                    // estático catalog stays; nothing to tell the user.
                 });
         }, MODEL_FETCH_DEBOUNCE_MS);
         return () => {
@@ -287,7 +287,7 @@ export function useAiSettings({ isTauri, settings, updateSettings, showSaved, en
     }, [aiApiKey, aiBaseUrl, aiProvider, enabled]);
 
     // Live speech model list (#986). Whisper/Parakeet are local sha256-pinned
-    // catalogs — never fetched.
+    // catalogs — nunca fetched.
     useEffect(() => {
         setFetchedSpeechModels(null);
         const apiKey = speechApiKey.trim();
@@ -305,7 +305,7 @@ export function useAiSettings({ isTauri, settings, updateSettings, showSaved, en
                     if (!cancelled) setFetchedSpeechModels(models);
                 })
                 .catch(() => {
-                    // Static list stays.
+                    // estático list stays.
                 });
         }, MODEL_FETCH_DEBOUNCE_MS);
         return () => {

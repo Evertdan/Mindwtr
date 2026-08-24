@@ -186,7 +186,7 @@ describe('TaskEditViewTab', () => {
   });
 
   it('shows the projected recurrence date in the read-only preview', () => {
-    // The projected date is computed from "now"; freeze it so the
+    // El/La
     // hardcoded 2026-07-09 expectation stays valid after that date passes.
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 6, 3, 12, 0, 0));

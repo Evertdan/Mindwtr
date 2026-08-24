@@ -215,8 +215,8 @@ vi.mock('@mindwtr/core', async (importOriginal) => {
       const translated = t(key);
       return translated && translated !== key ? translated : fallback;
     }),
-    // The real store is selector-based; the controller's shared visible-task
-    // context subscribes field by field, so the mock has to honour selectors.
+    // El/La
+    // Contexto subscribes field by field, so the mock has to honour selectors.
     useTaskStore: (selector?: (state: typeof storeState) => unknown) => (
       selector ? selector(storeState) : storeState
     ),
@@ -594,7 +594,7 @@ describe('InboxProcessingModal', () => {
 
     revealDeferredOptions(root);
 
-    // The area assigned while the task sat in the inbox starts selected, so the
+    // El/La
     // project picker opens filtered to it (and apply keeps the area).
     expect(findNodesWithText(root, 'taskEdit.areaLabel').length).toBeGreaterThan(0);
     expect(findNodesWithText(root, 'Work Project').length).toBeGreaterThan(0);

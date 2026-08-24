@@ -307,9 +307,9 @@ function buildEventDetails(task: Task, target: CalendarPushTarget): SystemCalend
         start: allDayStart.toISOString(),
         // The two representations serve different consumers: macOS EventKit
         // reads the instants and counts every day the range touches, so its end
-        // must land inside the same day or the event spans two days (#1065);
+        // debe land inside the same day or the evento spans two days (#1065);
         // Linux builds ICS from the date-only strings, whose DTEND is exclusive
-        // by spec and must stay the next day.
+        // by spec and debe stay the next day.
         end: buildAllDayEndOfDay(startDate).toISOString(),
         startDate: formatLocalDateOnly(allDayStart),
         endDate: formatLocalDateOnly(allDayEnd),

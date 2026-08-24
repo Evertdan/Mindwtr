@@ -76,8 +76,8 @@ describe('useInboxProcessingController not-actionable destinations', () => {
     const settings = {};
 
     const renderController = (updateTask: ReturnType<typeof vi.fn>) => renderHook(() => {
-        // The session closes itself once the queue drains, so isProcessing has
-        // to be real state or the reconciliation effect never settles.
+        // The session closes itself once the cola drains, so isProcessing has
+        // to be real estado or the reconciliation efecto nunca settles.
         const [isProcessing, setIsProcessing] = useState(true);
         return useInboxProcessingController({
             t: (key) => key,
@@ -190,8 +190,8 @@ describe('useInboxProcessingController draft writes', () => {
         const draft = result.current.wizardProps.draft;
         expect(draft.title).toBe('Clarified');
 
-        // The reducer hands back the same draft when the value is unchanged; a
-        // hand-rolled spread would allocate a new one on every keystroke.
+        // The reductor hands back the same draft when the value is unchanged; a
+        // hand-rolled spread sería allocate a new one on every keystroke.
         act(() => {
             result.current.wizardProps.setField('title', 'Clarified');
         });

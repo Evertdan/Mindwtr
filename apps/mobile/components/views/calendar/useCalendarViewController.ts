@@ -340,7 +340,7 @@ export function useCalendarViewController() {
     weekStartTime,
   }), [selectedDate, viewMode, weekStartTime]);
 
-  // The same visible-window bounds used to fetch/clip external calendar events
+  // El/La
   // below double as the recurrence range: whatever window the month grid, week
   // strip, or schedule list is currently showing is exactly what a "show future
   // recurrence" task should paint every occurrence into (#calendar-range-projection).
@@ -363,7 +363,7 @@ export function useCalendarViewController() {
   // Primitive bounds, not the `externalCalendarRange` object: in month mode the window's actual
   // start/end don't change when the selected day or week-start reference does, but the object's
   // identity does, and re-expanding every recurring task's whole range on every day tap is exactly
-  // the "unrelated state change" P19 says must not re-enumerate.
+  // the "unrelated Estado change" P19 says must not re-enumerate.
   const externalRangeStartMs = externalCalendarRange.rangeStart.getTime();
   const externalRangeEndMs = externalCalendarRange.rangeEnd.getTime();
   const recurrenceProjectionDayKey = calendarDateKey(new Date(nowTick));
@@ -382,8 +382,8 @@ export function useCalendarViewController() {
     };
     // Done, archived and reference tasks are deliberately excluded here: they
     // belong to the completed look-back below, filed by completion date, not to
-    // the scheduled/deadline buckets. Before #955 mobile left them in and showed
-    // finished work on its old start/due date while desktop hid it entirely.
+    // the scheduled/deadline buckets. Before #955 Mobile left them in and showed
+    // finished work on its old start/due date while Desktop hid it entirely.
     const schedulable = areaVisibleTasks.filter(isSchedulableCalendarTask);
     return expandCalendarRecurringTaskSetInRange(
       schedulable,

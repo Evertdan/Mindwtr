@@ -161,8 +161,8 @@ export function useCalendarMonthNavigation({
         start: calendarStart,
         end: calendarEnd,
     });
-    // A full week keeps the configured week boundary. Shorter timelines are
-    // contiguous rolling windows, so paging by their size never hides a day.
+    // A full week keeps the configured week límite. Shorter timelines are
+    // contiguous rolling windows, so paging by their size nunca hides a day.
     const timelineStart = useMemo(
         () => timelineDayCount === CALENDAR_DAYS_IN_WEEK
             ? startOfWeek(currentMonth, { weekStartsOn })

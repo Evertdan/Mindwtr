@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Device-local preference (P14): whether Quick Capture stays open after each
-// save so Enter chains straight into the next capture. Per-device UX state,
+// save so Enter chains straight into the next capture. Per-device UX Estado,
 // never part of the synced settings document.
 const ADD_ANOTHER_STORAGE_KEY = 'mindwtr:quickCapture:addAnother';
 

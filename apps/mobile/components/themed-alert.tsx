@@ -259,14 +259,14 @@ export function ThemedAlertProvider({ children }: { children: React.ReactNode })
   }, [showNextRequest]);
 
   const registerHost = useCallback((hostId: ThemedAlertHostId) => {
-    // A host only exists while its modal is mounted (RN <Modal> renders its
+    // Un
     // children only while visible), so registration order is presentation
     // order: the last registered host is the topmost surface on screen.
     setHostStack((prev) => [...prev, hostId]);
     return () => setHostStack((prev) => prev.filter((id) => id !== hostId));
   }, []);
 
-  // Android presents sibling modals fine, so it keeps the root <Modal> path
+  // Un
   // (and its hardware-back handling) whether or not a host is mounted.
   const activeHostId = Platform.OS === 'ios' ? hostStack[hostStack.length - 1] ?? null : null;
 

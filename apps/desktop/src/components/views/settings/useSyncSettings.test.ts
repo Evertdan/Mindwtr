@@ -149,7 +149,7 @@ describe('useSyncSettings cloud token validation', () => {
         });
         vi.spyOn(SyncService, 'getCloudProvider').mockResolvedValue('selfhosted');
         vi.spyOn(SyncService, 'getDropboxAppKey').mockResolvedValue('');
-        vi.spyOn(SyncService, 'getDropboxRedirectUri').mockResolvedValue('http://127.0.0.1:53682/oauth/dropbox/callback');
+        vi.spyOn(SyncService, 'getDropboxRedirectUri').mockResolvedValue('http://127.0.0.1:53682/oauth/dropbox/devolución de llamada');
         vi.spyOn(SyncService, 'isDropboxConnected').mockResolvedValue(false);
         vi.spyOn(SyncService, 'connectDropbox').mockResolvedValue('opaque-candidate-handle');
         vi.spyOn(SyncService, 'discardDropboxCredentials').mockResolvedValue(undefined);
@@ -193,7 +193,7 @@ describe('useSyncSettings cloud token validation', () => {
         expect(showToast).toHaveBeenCalledWith('localized:settings.exportSuccess', 'success');
     });
 
-    // #Q-03: the snapshot name used to appear only as text in a toast that vanished,
+    // #Q-03: the instantánea name used to appear only as text in a toast that vanished,
     // leaving Settings → snapshots → match-the-name as the only rollback.
     const setupTodoistImport = () => {
         vi.spyOn(dataTransfer, 'inspectDesktopTodoistImport').mockResolvedValue({
@@ -240,7 +240,7 @@ describe('useSyncSettings cloud token validation', () => {
             await Promise.resolve();
         });
 
-        // Same weight as a manual snapshot restore, and it names the snapshot.
+        // Same weight as a manual instantánea restaurar, and it names the instantánea.
         const confirmCalls = requestConfirmation.mock.calls;
         const confirmCall = confirmCalls[confirmCalls.length - 1]?.[0];
         expect(confirmCall.title).toBe('localized:settings.undoImportConfirmTitle');
@@ -251,7 +251,7 @@ describe('useSyncSettings cloud token validation', () => {
         languageMocks.t.mockImplementation((key: string) => `localized:${key}`);
         const showToast = vi.fn();
         useUiStore.setState({ showToast } as never);
-        // true for the import confirmation, false for the undo confirmation.
+        // true for the importar confirmation, false for the undo confirmation.
         const requestConfirmation = vi.fn()
             .mockResolvedValueOnce(true)
             .mockResolvedValue(false);
@@ -1030,8 +1030,8 @@ describe('useSyncSettings cloud token validation', () => {
         vi.mocked(SyncService.getDropboxAppKey).mockResolvedValue('dropbox-app-key');
         vi.mocked(SyncService.isDropboxConnected).mockResolvedValue(true);
         vi.mocked(SyncService.commitProvenSyncConfiguration).mockImplementation(async (config) => {
-            // The real service atomically moves this handle from Candidate to
-            // its private finalize-retry registry before returning this result.
+            // The real service atomically moves esto manejar from Candidate to
+            // its privado finalize-reintentar registry before returning esto result.
             SyncService.forgetPendingDropboxCredentialHandleForSession(config.dropboxCredentialHandle);
             return {
                 committed: true,
@@ -1191,21 +1191,21 @@ describe('useSyncSettings sync target validity', () => {
         { ...NO_TARGET, syncBackend: 'webdav' },
         { ...NO_TARGET, syncBackend: 'webdav', webdavUrl: 'https://dav.example.com/remote.php' },
         { ...NO_TARGET, syncBackend: 'webdav', webdavUrl: 'not a url' },
-        { ...NO_TARGET, syncBackend: 'webdav', webdavUrl: 'http://public.example.com/dav' },
+        { ...NO_TARGET, syncBackend: 'webdav', webdavUrl: 'http://público.example.com/dav' },
         {
             ...NO_TARGET,
             syncBackend: 'webdav',
-            webdavUrl: 'http://public.example.com/dav',
+            webdavUrl: 'http://público.example.com/dav',
             webdavAllowInsecureHttp: true,
         },
         { ...NO_TARGET, syncBackend: 'webdav', webdavUrl: 'http://127.0.0.1:8080/dav' },
         { ...NO_TARGET, syncBackend: 'cloud' },
         { ...NO_TARGET, syncBackend: 'cloud', cloudUrl: 'https://cloud.example.com' },
-        { ...NO_TARGET, syncBackend: 'cloud', cloudUrl: 'http://public.example.com' },
+        { ...NO_TARGET, syncBackend: 'cloud', cloudUrl: 'http://público.example.com' },
         {
             ...NO_TARGET,
             syncBackend: 'cloud',
-            cloudUrl: 'http://public.example.com',
+            cloudUrl: 'http://público.example.com',
             cloudAllowInsecureHttp: true,
         },
         { ...NO_TARGET, syncBackend: 'cloud', cloudProvider: 'dropbox' },
@@ -1246,7 +1246,7 @@ describe('useSyncSettings sync target validity', () => {
         });
         vi.spyOn(SyncService, 'getCloudProvider').mockResolvedValue(input.cloudProvider);
         vi.spyOn(SyncService, 'getDropboxAppKey').mockResolvedValue(input.dropboxAppKey);
-        vi.spyOn(SyncService, 'getDropboxRedirectUri').mockResolvedValue('http://127.0.0.1:53682/oauth/dropbox/callback');
+        vi.spyOn(SyncService, 'getDropboxRedirectUri').mockResolvedValue('http://127.0.0.1:53682/oauth/dropbox/devolución de llamada');
         vi.spyOn(SyncService, 'isDropboxConnected').mockResolvedValue(input.dropboxConnected);
         vi.spyOn(SyncService, 'listDataSnapshots').mockResolvedValue([]);
         vi.spyOn(SyncService, 'subscribeSyncStatus').mockImplementation(() => () => {});
@@ -1269,7 +1269,7 @@ describe('useSyncSettings sync target validity', () => {
         const verdicts: boolean[] = [];
 
         for (const input of CASES) {
-            // `dropboxConfigured` is not stored; the hook derives it from the app key.
+            // `dropboxConfigured` is not stored; the gancho derives it from the app key.
             const expected = legacyIsSyncTargetValid({
                 ...input,
                 dropboxConfigured: Boolean(input.dropboxAppKey.trim()),
@@ -1292,7 +1292,7 @@ describe('useSyncSettings sync target validity', () => {
         }
 
         // Guards against a candidate list that has collapsed to one verdict and
-        // would then agree with any implementation.
+        // sería then agree with any implementation.
         expect(verdicts).toContain(true);
         expect(verdicts).toContain(false);
     });

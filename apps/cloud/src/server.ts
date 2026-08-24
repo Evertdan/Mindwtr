@@ -344,14 +344,15 @@ function finalizeCloudDataForWrite(
     return repaired;
 }
 
-// Mirrors the store's stampNewRecurringFollowUp (packages/core/src/store-tasks.ts):
-// a follow-up is a fresh task, so it needs a reserved project order (missing sorts
-// as +Infinity in compareTasksByProjectOrder, dumping it below its siblings) and a
-// zeroed push count, same as every other task-creation path.
-// Mirrors core's stampNewRecurringFollowUp: the next occurrence inherits the
-// completed instance's place (that instance leaves the active list, and a series
-// only ever has one active instance) and only reserves a fresh order when the
-// completed task had none.
+// Refleja el stampNewRecurringFollowUp de la tienda (packages/core/src/store-tasks.ts):
+// un seguimiento es una tarea nueva, así que necesita un orden de proyecto reservado
+// (las clasificaciones faltantes como +Infinity en compareTasksByProjectOrder, descargándola
+// por debajo de sus hermanos) y un conteo de push cero, igual que todos los demás caminos
+// de creación de tareas.
+// Refleja stampNewRecurringFollowUp del núcleo: la próxima ocurrencia hereda el
+// lugar de la instancia completada (esa instancia abandona la lista activa, y una serie
+// solo tiene una instancia activa) y solo reserva un orden nuevo cuando la
+// tarea completada no tenía ninguno.
 const stampRecurringFollowUp = (task: Task, completedTask: Task, existingTasks: Task[]): Task => {
     const order = getTaskOrder(completedTask) ?? getNextProjectOrder(task.projectId, existingTasks);
     return { ...task, pushCount: 0, order, orderNum: order };
@@ -538,7 +539,7 @@ const handleEntityRoute = async <T extends CloudEntity>(
     return null;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- The route table is heterogeneous; each route owns its entity type.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- La tabla de rutas es heterogénea; cada ruta posee su tipo de entidad.
 const ENTITY_ROUTES: Array<EntityRouteDefinition<any>> = [
     {
         path: '/v1/tasks',
@@ -602,10 +603,10 @@ const ENTITY_ROUTES: Array<EntityRouteDefinition<any>> = [
             if (rawStatus !== undefined && parsedStatus === null) {
                 return errorResponse('Invalid task status', 400);
             }
-            // Mirrors the store's create-side promotion (addTasks): a
-            // start date at capture is a clarify decision, so a task
-            // created with a start date and no explicit status enters
-            // as Next rather than Inbox.
+            // Refleja la promoción del lado de la creación de la tienda (addTasks): una
+            // fecha de inicio en la captura es una decisión de aclaración, así que una tarea
+            // creada con una fecha de inicio y sin estado explícito entra
+            // como Siguiente en lugar de Bandeja de entrada.
             const status = resolveCaptureStatusForStart(props, parsedStatus || 'inbox');
             const tags = Array.isArray(props.tags) ? props.tags : [];
             const contexts = Array.isArray(props.contexts) ? props.contexts : [];
@@ -619,9 +620,10 @@ const ENTITY_ROUTES: Array<EntityRouteDefinition<any>> = [
                 contexts: _contexts,
                 ...restProps
             } = props;
-            // Mirrors core's addTasks: an explicit order/orderNum in props wins, otherwise a
-            // task landing in a project reserves the next slot instead of sorting below every
-            // sibling (missing order is +Infinity in compareTasksByProjectOrder).
+            // Refleja el addTasks del núcleo: un order/orderNum explícito en props gana,
+            // de lo contrario una tarea que llega a un proyecto reserva el siguiente slot en
+            // lugar de ordenarse por debajo de todos los hermanos (el order faltante es
+            // +Infinity en compareTasksByProjectOrder).
             const hasExplicitOrder = Object.prototype.hasOwnProperty.call(props, 'order')
                 || Object.prototype.hasOwnProperty.call(props, 'orderNum');
             const task: Task = {
@@ -659,11 +661,11 @@ const ENTITY_ROUTES: Array<EntityRouteDefinition<any>> = [
             if (rawStatus !== undefined && asStatus(rawStatus) === null) {
                 return errorResponse('Invalid task status', 400);
             }
-            // Applies the same store invariants the apps get (inbox
-            // start-date promotion, star/status promotion+demotion,
-            // boardOrder/focusOrder clearing) before the shared core
-            // completion/recurrence logic in applyTaskUpdates runs, so
-            // REST writes obey the same rules as the desktop/mobile store.
+            // Aplica los mismos invariantes de tienda que obtienen las aplicaciones (bandeja
+            // de entrada promoción de fecha de inicio, promoción+degradación de estrella/estado,
+            // limpieza de boardOrder/focusOrder) antes de que se ejecute la lógica central
+            // compartida de finalización/recurrencia en applyTaskUpdates, por lo que
+            // las escrituras REST obedecen las mismas reglas que la tienda de escritorio/móvil.
             const normalizedUpdates = normalizeTaskUpdate(existing, updates);
             const { updatedTask, nextRecurringTask } = applyTaskUpdates(
                 existing,
@@ -1039,35 +1041,37 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
             withWriteLock(NAMESPACE_ADMISSION_LOCK_KEY, handler, signal)
         ),
     };
-    // GET creates the initial empty document when the token has no namespace, so
-    // it needs the same atomic admission section as PUT. Existing namespaces skip
-    // the global admission lock in withNamespace.
+    // GET crea el documento vacío inicial cuando el token no tiene espacio de nombres,
+    // por lo que necesita la misma sección de admisión atómica que PUT. Los espacios
+    // de nombres existentes omiten el bloqueo de admisión global en withNamespace.
     const dataServerConfig: ServerConfig = {
         ...baseServerConfig,
         guardMethods: (method) => method === 'PUT' || method === 'GET',
     };
     const calendarFeedServerConfig: ServerConfig = {
         ...baseServerConfig,
-        // Feed rotation is valid only after a real sync document exists. It
-        // checks quota under admission but must not reserve an empty namespace.
+        // La rotación de feed es válida solo después de que existe un documento
+        // de sincronización real. Verifica la cuota bajo admisión pero no debe
+        // reservar un espacio de nombres vacío.
         initializeNamespace: () => undefined,
     };
     const attachmentServerConfig: ServerConfig = { ...baseServerConfig, maxPerWindow: maxAttachmentPerWindow };
-    // /v1/attachments/orphans previously checked "is this POST or DELETE" *before*
-    // ever consulting the namespace guard, so an unsupported method (e.g. PATCH)
-    // fell straight through to 405 regardless of cap state; only guard POST/DELETE
-    // here so that stays true and the guard-response fix stays scoped to the two
-    // write methods this route actually supports.
+    // /v1/attachments/orphans previamente verificaba "¿es esto POST o DELETE?" *antes*
+    // de consultar el guardián del espacio de nombres, por lo que un método no admitido
+    // (p.ej. PATCH) pasaba directamente a 405 independientemente del estado del límite;
+    // solo protege POST/DELETE aquí para que eso siga siendo cierto y la corrección
+    // de respuesta del guardián siga siendo limitada a los dos métodos de escritura
+    // que esta ruta realmente admite.
     const orphansServerConfig: ServerConfig = {
         ...attachmentServerConfig,
         guardMethods: (method) => method === 'POST' || method === 'DELETE',
         initializeNamespace: () => undefined,
     };
-    // /v1/attachments/:path only ever guarded PUT (the only method that can create a
-    // new file). DELETE was never guarded pre-refactor; kept that way here rather
-    // than folding it into the default non-GET guard, since extending the cap to
-    // DELETE is a real behavior change this task did not ask for and isn't flagged
-    // as one of the routes with a missing-guard bug.
+    // /v1/attachments/:path solo guardaba PUT (el único método que puede crear un
+    // archivo nuevo). DELETE nunca se guardó pre-refactor; se mantiene de esa manera
+    // aquí en lugar de plegarlo en el guardián predeterminado no-GET, ya que extender
+    // el límite a DELETE es un cambio de comportamiento real que esta tarea no pidió
+    // y no está marcado como una de las rutas con un error de guardián faltante.
     const attachmentPathServerConfig: ServerConfig = { ...attachmentServerConfig, guardMethods: (method) => method === 'PUT' };
 
     const cleanupTimer = setInterval(() => {
@@ -1319,9 +1323,9 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                     }
 
                     if (req.method === 'PUT') {
-                        // Namespace admission has already reserved a valid empty
-                        // document, so body streaming and validation never hold the
-                        // global admission lock.
+                        // La admisión de espacio de nombres ya ha reservado un documento
+                        // vacío válido, por lo que la transmisión y validación del cuerpo
+                        // nunca mantienen el bloqueo de admisión global.
                         const body = await readJsonBody(req, maxBodyBytes, requestAbortController.signal);
                         if (isBodyReadError(body)) {
                             const err = body.__mindwtrError;
@@ -1350,14 +1354,14 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                                 lastModified: metadata.lastModified,
                                 contentLength,
                             });
-                            // Deliberate second merge: serverMergedRemoteData must be true
-                            // whenever the SERVER's stored data contributed anything to the
-                            // merged result — including settings-level and normalization-level
-                            // contributions that per-entity MergeStats cannot express. Merging
-                            // the incoming payload against an empty base yields the exact
-                            // "client-only" normal form to compare against. Do not replace this
-                            // with a stats-derived heuristic: a false negative makes clients
-                            // skip a needed re-read and diverge silently.
+                            // Segunda fusión deliberada: serverMergedRemoteData debe ser verdadero
+                            // cuando los datos almacenados del SERVIDOR contribuyeron algo a la
+                            // resultado fusionado — incluyendo contribuciones a nivel de configuración
+                            // y normalización que las MergeStats por entidad no pueden expresar.
+                            // Fusionar la carga entrante contra una base vacía produce el formulario
+                            // normal "solo del cliente" exacto para comparar. No reemplaces esto
+                            // con una heurística derivada de estadísticas: un falso negativo hace
+                            // que los clientes omitan una re-lectura necesaria y diverjan silenciosamente.
                             const incomingOnlyMerge = mergeAppDataWithStats({
                                 tasks: [],
                                 projects: [],
@@ -1385,8 +1389,9 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                         });
                     }
 
-                    // Unmatched method (only HEAD/GET/PUT are handled): fall through to
-                    // later routes exactly as before, instead of a route-specific 405.
+                    // Método sin coincidencia (solo HEAD/GET/PUT son manejados): cae a
+                    // las rutas posteriores exactamente como antes, en lugar de un 405
+                    // específico de la ruta.
                     return null;
                     }, requestAbortController.signal);
                     if (dataResponse) return dataResponse;
@@ -1398,9 +1403,9 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                             return jsonResponse({ feed: describeCalendarFeed(readCalendarFeed(dataDir, ctx.key)) });
                         }
                         if (req.method === 'POST') {
-                            // A feed for a namespace that has never synced would publish
-                            // nothing, and letting one be created would let unknown tokens
-                            // plant sidecar files past the namespace cap.
+                            // Un feed para un espacio de nombres que nunca se ha sincronizado
+                            // no publicaría nada, y permitir que se cree dejaría que tokens
+                            // desconocidos planten archivos sidecar más allá del límite de espacio de nombres.
                             if (!existsSync(ctx.filePath)) return errorResponse('No synced data to publish', 404);
                             return await withRequestWriteLock(ctx.key, async () => {
                                 throwIfRequestAborted(requestAbortController.signal);
@@ -1422,10 +1427,10 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                     if (feedResponse) return feedResponse;
                 }
 
-                // The published feed authenticates with the token in its own URL, so it
-                // never reaches withNamespace. An unknown token is a 404, not a 401: the
-                // URL is the only credential, and 401 would invite an Authorization
-                // header that this route does not read.
+                // El feed publicado se autentica con el token en su propia URL, por lo
+                // que nunca llega a withNamespace. Un token desconocido es un 404, no un 401:
+                // la URL es la única credencial, y un 401 invitaría un encabezado Authorization
+                // que esta ruta no lee.
                 const calendarFeedToken = parseCalendarFeedPathToken(pathname);
                 if (calendarFeedToken) {
                     if (req.method !== 'GET') return errorResponse('Method not allowed', 405);
@@ -1440,14 +1445,15 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                     );
                     if (feedClientRateLimitResponse) return feedClientRateLimitResponse;
 
-                    // Unknown tokens share only the stable client bucket above, so
-                    // rotating token strings cannot allocate limiter keys while
-                    // forcing namespace sidecar scans.
+                    // Los tokens desconocidos comparten solo el bucket de cliente estable
+                    // arriba, por lo que las cadenas de token giratorias no pueden asignar
+                    // claves de limitador mientras fuerzan escaneos sidecar del espacio de nombres.
                     const feedNamespaceKey = findCalendarFeedNamespace(dataDir, calendarFeedToken);
-                    // A namespace whose token left the allowlist gets the same 404 as an
-                    // unknown feed token - revoking sync access must also stop the feed
-                    // (R-03), not just the authenticated API. Any-token mode has no
-                    // allowlist to fall out of, so every feed stays valid there, unchanged.
+                    // Un espacio de nombres cuyo token se fue de la lista permitida obtiene
+                    // el mismo 404 que un token de feed desconocido - revocar el acceso de
+                    // sincronización también debe detener el feed (R-03), no solo el API
+                    // autenticado. El modo any-token no tiene lista permitida de la cual caer,
+                    // por lo que todos los feeds permanecen válidos allí, sin cambios.
                     if (!feedNamespaceKey || (allowedAuthTokens && !allowedAuthTokens.keys.has(feedNamespaceKey))) {
                         return errorResponse('Not found', 404);
                     }
@@ -1475,8 +1481,8 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
 
                 if (pathname.startsWith('/v1/attachments/')) {
                     const attachmentPathResponse = await withNamespace(req, url, attachmentPathServerConfig, async (ctx) => {
-                        // Only PUT may create the namespace's attachment directory; GET and
-                        // DELETE must never plant it (see resolveAttachmentPath's doc comment).
+                        // Solo PUT puede crear el directorio de adjuntos del espacio de nombres;
+                        // GET y DELETE nunca deben plantarlo (ver comentario de doc de resolveAttachmentPath).
                         const resolvedAttachmentPath = attachmentPathResolver(dataDir, ctx.key, pathname.slice('/v1/attachments/'.length), { create: req.method === 'PUT' });
                         if (!resolvedAttachmentPath) {
                             return errorResponse('Invalid attachment path', 400);
@@ -1547,7 +1553,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
         try {
             await Promise.resolve((server as { stop?: (closeIdleConnections?: boolean) => void | Promise<void> }).stop?.(true));
         } catch {
-            // Ignore stop errors during teardown.
+            // Ignora los errores de parada durante el desmontaje.
         }
     };
     const signalHandlers: Array<[NodeJS.Signals, () => void]> = [];

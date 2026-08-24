@@ -540,14 +540,14 @@ describe('TaskEditFormTab keyboard handling', () => {
     });
     mockScrollTo.mockClear();
 
-    // Android focuses before the keyboard opens: the focus scroll is deferred, not run.
+    // Un
     act(() => {
       findScrollContainer(tree).props.onScroll({ nativeEvent: { contentOffset: { y: 420 } } });
       registeredHandlers.at(-1)?.(42);
     });
     expect(mockScrollTo).not.toHaveBeenCalled();
 
-    // keyboardDidShow alone should replay the pending scroll — no second focus event needed.
+    // keyboardDidShow alone should replay the pending scroll — no second focus Evento needed.
     act(() => {
       listeners.get('keyboardDidShow')?.({ endCoordinates: { screenY: keyboardTop } });
     });
@@ -558,7 +558,7 @@ describe('TaskEditFormTab keyboard handling', () => {
     const measuredOverlap = (targetY + targetH) - (visibleBottom - bottomClearance);
     expect(mockScrollTo).toHaveBeenCalledWith({ y: 420 + measuredOverlap, animated: false });
 
-    // Hiding the keyboard clears the pending handle so a later show does not re-scroll.
+    // Hiding the keyboard clears the pending Maneja so a later show does not re-scroll.
     mockScrollTo.mockClear();
     act(() => {
       listeners.get('keyboardDidHide')?.();

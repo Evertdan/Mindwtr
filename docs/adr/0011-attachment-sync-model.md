@@ -1,46 +1,46 @@
-# ADR 0011: Attachment Sync Model
+# ADR 0011: Modelo de sincronización de archivos adjuntos
 
-Date: 2026-04-24
-Status: Accepted
+Fecha: 2026-04-24
+Estado: Aceptado
 
-## Context
+## Contexto
 
-Tasks and projects can reference attachments, but attachment bytes have different constraints from structured GTD data:
+Las tareas y proyectos pueden hacer referencia a archivos adjuntos, pero los bytes de archivo adjunto tienen restricciones diferentes de datos GTD estructurados:
 
-- files can be much larger than the JSON snapshot
-- local file URIs are device-specific
-- remote object paths must survive sync across devices
-- upload/download progress is useful locally but should not create remote churn
-- deletes need tombstone-style cleanup so remote orphan files do not accumulate
+- los archivos pueden ser mucho más grandes que la instantánea JSON
+- los URI de archivo local son específicos del dispositivo
+- las rutas de objeto remoto deben sobrevivir la sincronización entre dispositivos
+- el progreso de carga/descarga es útil localmente pero no debe crear churn remoto
+- las eliminaciones necesitan limpieza de estilo lápida para que los archivos huérfanos remotos no se acumulen
 
-Mixing binary attachment transfer directly into the main JSON snapshot would make ordinary task sync slower and harder to recover.
+Mezclar transferencia de archivo adjunto binario directamente en la instantánea JSON principal haría que la sincronización ordinaria de tareas fuera más lenta y más difícil de recuperar.
 
-## Decision
+## Decisión
 
-Mindwtr treats attachment metadata as part of task/project data and attachment bytes as a separate transfer stream.
+Mindwtr trata metadatos de archivo adjunto como parte de datos de tarea/proyecto y bytes de archivo adjunto como un flujo de transferencia separado.
 
-The metadata contract is:
+El contrato de metadatos es:
 
-1. `cloudKey`, `mimeType`, `size`, and `fileHash` can sync because they describe the remote object.
-2. `uri` is local-device state and is excluded from remote comparison.
-3. `localStatus` tracks local availability and transfer state; it is persisted locally but excluded from remote comparison.
-4. Attachment deletes use soft-delete metadata first, then background cleanup removes orphaned local and remote files.
+1. `cloudKey`, `mimeType`, `size` y `fileHash` pueden sincronizar porque describen el objeto remoto.
+2. `uri` es estado local del dispositivo y está excluido de comparación remota.
+3. `localStatus` rastrean disponibilidad local y estado de transferencia; se persisten localmente pero se excluyen de comparación remota.
+4. Las eliminaciones de archivos adjuntos utilizan metadatos de eliminación suave primero, luego la limpieza en segundo plano elimina archivos locales y remotos huérfanos.
 
-The transfer contract is:
+El contrato de transferencia es:
 
-1. Structured data sync can converge without downloading every attachment first.
-2. Attachment upload/download is backend-specific but must update local metadata through the same task/project records.
-3. Merge logic must preserve a usable local URI when two devices have different valid local paths for the same attachment.
-4. Remote deletes are retried through attachment cleanup state rather than blocking the main sync cycle indefinitely.
-5. Before a new or changed backend becomes active, its activation probe must account for every live file attachment. The backend must verify the remote object or upload a local copy; an object key from another backend does not prove availability.
-6. Activation probes merge the candidate document first, then run attachment transfer against a clone of that merged snapshot immediately before the candidate write. This accounts for candidate-remote-only attachments as well as local ones, and prevents a newer remote metadata row from replacing a key that the probe just proved. The probe can publish proven attachment metadata to the candidate remote, but it does not persist that metadata into the local store until the candidate configuration passes and a normal sync completes.
-7. The first durable sync after activation treats the live attachment keys in that proven candidate document as authoritative for the new destination while preserving local file URIs and availability.
+1. La sincronización de datos estructurados puede converger sin descargar primero todos los archivos adjuntos.
+2. La carga/descarga de archivos adjuntos es específica del backend pero debe actualizar metadatos locales a través de los mismos registros de tarea/proyecto.
+3. La lógica de fusión debe preservar un URI local utilizable cuando dos dispositivos tienen rutas locales válidas diferentes para el mismo archivo adjunto.
+4. Las eliminaciones remotas se reintentan a través del estado de limpieza de archivo adjunto en lugar de bloquear el ciclo de sincronización principal indefinidamente.
+5. Antes de que un backend nuevo o cambiad se active, su sonda de activación debe contabilizar todos los archivos adjuntos de archivo activos. El backend debe verificar el objeto remoto o cargar una copia local; una clave de objeto de otro backend no prueba disponibilidad.
+6. Las sondas de activación fusionan el documento candidato primero, luego ejecutan transferencia de archivos adjuntos contra un clon de esa instantánea fusionada inmediatamente antes de la escritura del candidato. Esto contabiliza archivos adjuntos solo remotos de candidato también como locales y evita que una fila de metadatos remoto más nueva reemplace una clave que la sonda acaba de probar. La sonda puede publicar metadatos de archivo adjunto probado a la candida remota, pero no persisten ese metadatos en el almacén local hasta que la configuración candidata pase y se complete una sincronización normal.
+7. La primera sincronización durable después de la activación trata las claves de archivo adjunto activas en ese documento candidato probado como autoritarias para el nuevo destino mientras se preservan URI de archivo local y disponibilidad.
 
-## Consequences
+## Consecuencias
 
-- Main sync remains fast and deterministic for task data.
-- Device-local paths and transient transfer state do not create false conflicts.
-- Users can see whether an attachment is available, missing, uploading, or downloading on the current device.
-- Backends need attachment-specific validation and cleanup code.
-- A backend switch fails closed when Mindwtr cannot prove one of the live attachments at the candidate destination.
-- Future attachment work should preserve the metadata-vs-bytes split unless a new storage architecture replaces snapshot sync entirely.
+- La sincronización principal permanece rápida y determinista para datos de tareas.
+- Las rutas locales del dispositivo y el estado transitorio de transferencia no crean conflictos falsos.
+- Los usuarios pueden ver si un archivo adjunto está disponible, faltante, cargando o descargando en el dispositivo actual.
+- Los backends necesitan código de validación y limpieza específico del archivo adjunto.
+- Un cambio de backend falla cerrado cuando Mindwtr no puede probar uno de los archivos adjuntos activos en el destino candidato.
+- El trabajo futuro de archivos adjuntos debe preservar la división de metadatos vs bytes a menos que una nueva arquitectura de almacenamiento reemplace la sincronización de instantánea por completo.

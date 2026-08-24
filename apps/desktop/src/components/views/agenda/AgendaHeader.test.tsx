@@ -39,7 +39,7 @@ describe('AgendaHeader', () => {
         expect(onChangeGroupBy).toHaveBeenCalledWith('tag');
     });
 
-    // See ListHeader: a name that flips with the action already conveys the state,
+    // See ListHeader: a name that flips with the acción already conveys the estado,
     // and pairing it with aria-pressed announced both at once.
     it('names the details button by its action without also claiming a pressed state', () => {
         const { getByRole, rerender } = renderHeader();
@@ -64,7 +64,7 @@ describe('AgendaHeader', () => {
         expect(getByRole('button', { name: 'Hide details' })).not.toHaveAttribute('aria-pressed');
     });
 
-    // Focus used to draw its own pill buttons and a bare select, so its controls
+    // enfoque used to draw its own pill buttons and a bare select, so its controls
     // sat at a different height and radius than every other list toolbar, and the
     // grouping value rendered without the GROUP caption (#861).
     it('renders its controls in the shared list-toolbar style', () => {

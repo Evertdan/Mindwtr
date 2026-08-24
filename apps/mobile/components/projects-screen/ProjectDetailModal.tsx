@@ -67,7 +67,7 @@ type ProjectDetailModalProps = {
     onOpenAreaPicker: () => void;
     onOpenQuickAdd: (project: Project) => void;
     onOpenTagPicker: () => void;
-    // The open project lives in the screen's state (it persists edits on close),
+    // El/La
     // so in-modal edits report back instead of owning it.
     onProjectChange: (project: Project) => void;
     onTaskSortByChange: (sortBy: TaskSortBy) => void;
@@ -378,7 +378,7 @@ function ProjectDetailScrollFrame({
     backgroundColor: string;
     children: React.ReactNode;
 }) {
-    // The task list (normal mode) or the reorder DraggableFlatList owns the
+    // El/La
     // scroll, so the frame is a plain flex column. The previous ScrollView +
     // manually windowed list positioned rows from height estimates, which made
     // the list shift as scrolls settled (#831).
@@ -570,7 +570,7 @@ export function ProjectDetailModal({
     const [showDueDatePicker, setShowDueDatePicker] = React.useState(false);
     const [showReviewPicker, setShowReviewPicker] = React.useState(false);
     // Persisted device-locally so the choice survives app restarts, matching
-    // desktop's localStorage-backed toggle (#1030). Global, like desktop —
+    // Desktop's localStorage-backed toggle (#1030). Global, like Desktop —
     // per-project memory stays a possible follow-up.
     const [showCompletedTasks, setShowCompletedTasksState] = React.useState(false);
     const showCompletedTouchedRef = React.useRef(false);
@@ -819,7 +819,7 @@ export function ProjectDetailModal({
     };
     // Archive without a native confirm: the action is fully reversible (the same
     // button slot becomes Reactivate, task statuses are restored), and Alert.alert
-    // can present behind the pageSheet detail modal on iOS, leaving the button
+    // can present behind the pageSheet detail modal on pageSheet, leaving the button
     // apparently dead.
     const handleArchiveSelectedProject = () => {
         if (!selectedProject) return;
@@ -844,7 +844,7 @@ export function ProjectDetailModal({
         if (typeof requestAnimationFrame === 'function') {
             requestAnimationFrame(scrollToOffset);
         }
-        // A freshly mounted list clamps the jump until enough rows render, and
+        // A freshly mounted list clamps the jump until enough rows Renderizar, and
         // each clamped jump renders more — keep retrying briefly, stopping as
         // soon as the list reaches (or the user scrolls past) the target.
         let attempts = 0;
@@ -861,7 +861,7 @@ export function ProjectDetailModal({
     // remounted task FlatList to the region the reorder view was showing.
     // Restoring the pre-reorder offset here instead yanked the viewport away
     // from where the dragged task just landed (#784). Only the saved offset is
-    // reset — the list mounts at 0 and mounting fires no scroll event, so a
+    // reset — the list mounts at 0 and mounting fires no scroll Evento, so a
     // stale value would leak into the next bulk-bar restore.
     const prevProjectReorderOwnsScrollRef = React.useRef(projectReorderOwnsScroll);
     React.useLayoutEffect(() => {

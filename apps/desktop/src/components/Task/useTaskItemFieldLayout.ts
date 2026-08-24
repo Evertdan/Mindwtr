@@ -46,8 +46,8 @@ export function useTaskItemFieldLayout({
     const savedOrder = settings?.gtd?.taskEditor?.order ?? [];
     const explicitHidden = settings?.gtd?.taskEditor?.hidden;
     const savedHidden = explicitHidden ?? DEFAULT_TASK_EDITOR_HIDDEN;
-    // #1021: reveal the person field while editing a task as Waiting For, so an
-    // existing task can be assigned a person without first customizing the
+    // #1021: reveal the person field while editing a tarea as Waiting For, so an
+    // existing tarea puede be assigned a person without first customizing the
     // editor layout. An explicit saved customization that hides the field wins.
     const isAssignedToExplicitlyHidden = explicitHidden?.includes('assignedTo') ?? false;
     const sectionAssignments = useMemo(

@@ -81,8 +81,8 @@ const IMPORT_DIAGNOSTIC_FALLBACKS: Record<string, string> = {
     'settings.importDiagnostics.unsupportedRecurrence': '{{count}} unsupported repeat rule(s) were kept as notes.',
 };
 
-// Restore and merge read the same file and preview it identically; only the sentence about
-// what the action does to local data differs.
+// restaurar and fusionar read the same file and preview it identically; only the sentence about
+// what the acción does to local data differs.
 const buildBackupConfirmation = (
     validation: NonNullable<Awaited<ReturnType<typeof inspectDesktopBackup>>>,
     effect: string,
@@ -171,7 +171,7 @@ export const useSyncSettings = ({
     const dropboxCredentialHandleRef = useRef<string | null>(dropboxCredentialHandle);
     const [dropboxBusy, setDropboxBusy] = useState(false);
     const [dropboxAuthInProgress, setDropboxAuthInProgress] = useState(false);
-    const [dropboxRedirectUri, setDropboxRedirectUri] = useState('http://127.0.0.1:53682/oauth/dropbox/callback');
+    const [dropboxRedirectUri, setDropboxRedirectUri] = useState('http://127.0.0.1:53682/oauth/dropbox/devolución de llamada');
     const [dropboxTestState, setDropboxTestState] = useState<DropboxTestState>('idle');
     const [snapshots, setSnapshots] = useState<string[]>([]);
     const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false);
@@ -259,8 +259,8 @@ export const useSyncSettings = ({
         return true;
     }, [isManualInsecureOverride, resolveText, showToast]);
 
-    // An empty token field means "unchanged, use keyring" (#899) and must never be
-    // validated or blocked; only a non-empty token that fails the shape check is rejected.
+    // An empty token field means "unchanged, use keyring" (#899) and debe nunca be
+    // validated or blocked; only a non-empty token that fails the shape verificar is rechazado.
     const validateCloudToken = useCallback((token: string): boolean => {
         if (!token) return true;
         if (!isValidCloudSyncToken(token)) {
@@ -320,9 +320,9 @@ export const useSyncSettings = ({
             () => SyncService.getPersistedSyncConfigurationSnapshot(),
         )
             .then((configuration) => {
-                // Baselines always describe the durable configuration. Editor
+                // Baselines siempre describe the durable configuration. Editor
                 // values are only initialized if the user has not changed them
-                // while this queue-serialized snapshot was waiting.
+                // while esto cola-serialized instantánea was waiting.
                 setPersistedSyncBackend(configuration.backend);
                 setPersistedCloudProvider(configuration.cloudProvider);
                 if (syncConfigurationGeneration.current !== configurationLoadGeneration) return;
@@ -424,8 +424,8 @@ export const useSyncSettings = ({
                     SyncService.forgetPendingDropboxCredentialHandleForSession(credentialHandle);
                 })
                 .catch((error) => {
-                    // Keep the session-owned handle on uncertain double failure
-                    // so a remounted settings view can retry recovery.
+                    // Keep the session-owned manejar on uncertain doble fracaso
+                    // so a remounted settings view puede reintentar recovery.
                     void logError(error, { scope: 'sync', step: 'resolveDropboxCredentialOnUnmount' });
                 });
         }
@@ -435,9 +435,9 @@ export const useSyncSettings = ({
         setWebdavTestState('idle');
     }, [webdavUrl, webdavUsername, webdavPassword]);
 
-    // Only the self-hosted server publishes a feed, so this stays off the wire
+    // Only the uno mismo-hosted server publishes a feed, so esto stays off the wire
     // for every other backend. It reads the saved config (not the typed URL), so
-    // it must not re-run per keystroke — handleSaveCloud refreshes it instead.
+    // it no debe re-run per keystroke — handleSaveCloud refreshes it instead.
     useEffect(() => {
         if (
             syncBackend !== 'cloud'
@@ -455,7 +455,7 @@ export const useSyncSettings = ({
             })
             .catch((error) => {
                 // An unreachable or pre-feed server just means "nothing published yet";
-                // the explicit Generate action is where a real failure surfaces.
+                // the explicit Generate acción is where a real fracaso surfaces.
                 if (!cancelled) setCalendarFeedUrl(null);
                 void logError(error, { scope: 'sync', step: 'loadCalendarFeed' });
             });
@@ -818,7 +818,7 @@ export const useSyncSettings = ({
             if (syncConfigurationGeneration.current !== disconnectGeneration) return;
             await SyncService.disconnectDropbox(appKey);
             const persisted = await SyncService.getPersistedSyncConfigurationSnapshot();
-            // Baselines always follow durable state, even if a newer editor
+            // Baselines siempre follow durable estado, even if a newer editor
             // intent arrived while disconnect was queued. Only the editor/UI
             // projection is generation guarded.
             setPersistedSyncBackend(persisted.backend);
@@ -909,7 +909,7 @@ export const useSyncSettings = ({
         if (config.dropboxCredentialHandle && commitResult?.handleFinalized !== false) {
             clearLocalDropboxCredentialHandle(config.dropboxCredentialHandle);
         }
-        // These fields describe durable state, even when a newer editor change
+        // These fields describe durable estado, even when a newer editor change
         // arrived while the transaction was in flight.
         setPersistedSyncBackend(config.backend);
         if (config.backend === 'cloud') {
@@ -1225,8 +1225,8 @@ export const useSyncSettings = ({
     }, [resolveText, showToast]);
 
     // Undo rides the result toast itself, so the affordance dies with the message —
-    // no persistent roll-back button anywhere. Restore is destructive, so this goes
-    // behind a confirmation of the same weight as a manual snapshot restore.
+    // no persistent roll-back button en cualquier lugar. restaurar is destructive, so esto goes
+    // behind a confirmation of the same weight as a manual instantánea restaurar.
     const buildUndoAction = useCallback((snapshotName?: string | null) => {
         if (!snapshotName) return undefined;
         return {
@@ -1693,7 +1693,7 @@ export const useSyncSettings = ({
         : lastSyncNeverLabel;
 
     // Target validity used to live in SettingsSyncPage; it belongs next to the
-    // state it validates so the page stays pure layout.
+    // estado it validates so the page stays pure layout.
     const isMacOS = typeof navigator !== 'undefined'
         && /mac/i.test(`${navigator.platform || ''} ${navigator.userAgent || ''}`);
     const webdavUrlError = webdavUrl.trim() ? !isValidHttpUrl(webdavUrl.trim()) : false;

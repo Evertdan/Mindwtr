@@ -165,14 +165,14 @@ export function useCalendarSettings({ showSaved, settings, updateSettings, suppo
         if (!isSupportedCalendarSourceUrl(url)) {
             setCalendarError(resolveFeedback(
                 'settings.calendar.invalidSource',
-                'Use an http(s), webcal, or absolute file:///path.ics source.',
+                'Use an http(s), webcal, or absolute file:///ruta.ics source.',
             ));
             return;
         }
         const name = (newCalendarName.trim() || resolveFeedback('calendar.title', 'Calendar')).trim();
         const id = generateUUID();
         // No color yet: an unset color means "no explicit pick", so a feed
-        // hint or the deterministic hash fallback can still apply (#974).
+        // hint or the deterministic hash fallback puede still apply (#974).
         const next = [
             ...externalCalendars,
             { id, name, url, enabled: true },
@@ -312,7 +312,7 @@ export function useCalendarSettings({ showSaved, settings, updateSettings, suppo
     }, [calendarPushEnabled, saveFailedMessage, showSaved, supportsSystemCalendar]);
 
     // Only user-initiated work blocks the controls; loading the target list in
-    // the background must never leave the push toggle stuck greyed out (#575).
+    // the background debe nunca leave the empujar toggle stuck greyed out (#575).
     const handleRefreshCalendarPushTargets = useCallback(async () => {
         setCalendarPushLoading(true);
         try {

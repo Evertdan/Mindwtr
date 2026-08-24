@@ -90,9 +90,9 @@ vi.mock('@mindwtr/core', async (importOriginal) => {
   return {
     ...actual,
     shallow: Object.is,
-    // Run the real selector: the screen reads through
-    // `useTaskStore((state) => ({…}), shallow)`, so a mock that ignores the
-    // selector never executes the projection it is meant to cover.
+    // Ejecuta el selector real: la pantalla lee a través de
+    // `useTaskStore((state) => ({…}), shallow)`, por lo que una simulación que ignora el
+    // el selector nunca ejecuta la proyección que se supone debe cubrir.
     useTaskStore: (selector?: (state: unknown) => unknown) => (
       selector ? selector(mocks.storeState) : mocks.storeState
     ),
@@ -192,7 +192,7 @@ vi.mock('lucide-react-native', () => ({
   SlidersHorizontal: (props: any) => React.createElement('SlidersHorizontal', props),
 }));
 
-// The sheet's own rendering is covered by task-filter-sheet.test.tsx; here it is
+// El/La
 // only a destination, so stub it rather than pull its whole icon/Modal tree in.
 vi.mock('@/components/task-filter-sheet', () => ({
   TaskFilterSheet: (props: any) => React.createElement('TaskFilterSheet', props),
@@ -394,7 +394,7 @@ describe('ArchivedScreen', () => {
   };
 
   // findAll matches the composite element and the host element it renders, so a
-  // plain count double-counts. Keep host nodes only.
+  // el conteo simple doble cuenta. Mantén solo nodos host.
   const countByLabel = (tree: renderer.ReactTestRenderer, label: string) => tree.root.findAll(
     (node) => typeof node.type === 'string' && node.props.accessibilityLabel === label,
   ).length;
@@ -482,7 +482,7 @@ describe('ArchivedScreen', () => {
       tree.root.find((node) => node.props.testID === 'archived-group-header-a1').props.onPress();
     });
 
-    // The heading and its count stay, so the group is still findable; the row does not.
+    // El encabezado y su conteo se mantienen, por lo que el grupo sigue siendo encontrable; la fila no.
     expect(hasText(tree, 'Work')).toBe(true);
     expect(hasText(tree, 'Quarterly report')).toBe(false);
     expect(hasText(tree, 'Fix the printer')).toBe(true);
@@ -550,7 +550,7 @@ describe('ArchivedScreen', () => {
     });
 
     typeSearch(tree, 'nothing matches this');
-    // The empty state must not take the search box down with it, or the only way
+    // El estado vacío no debe llevar la caja de búsqueda con él, or the only way
     // back is to leave the screen.
     expect(countByLabel(tree, 'Search')).toBe(1);
     expect(hasText(tree, 'No tasks match these filters.')).toBe(true);

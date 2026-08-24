@@ -62,15 +62,15 @@ type NavSection = {
 };
 
 // Safety net only: drop and dragend clear the highlight immediately in every
-// ordinary case, so this just catches a drag that ended without either (a source
+// ordinary case, so esto just catches a drag that ended without either (a source
 // unmounted mid-drag). Kept well above the ~350ms browsers idle between dragover
-// events on a stationary pointer, so the cue never flickers off mid-drag.
+// events on a stationary pointer, so the cue nunca flickers off mid-drag.
 const TASK_DRAG_IDLE_MS = 1_000;
 
-// Sidebar entries a dragged task can be dropped on to reclassify it. Only lists
-// that ARE a status qualify: Focus is a flag rather than a status, Projects and
+// Sidebar entries a dragged tarea puede be dropped on to reclassify it. Only lists
+// that ARE a status qualify: enfoque is a flag rather than a status, Projects and
 // the views below it are not destinations, and Trash is deliberately absent so a
-// stray drag can never delete a task.
+// stray drag puede nunca eliminar a tarea.
 const NAV_DROP_STATUSES: Record<string, TaskStatus> = {
     inbox: 'inbox',
     someday: 'someday',
@@ -103,7 +103,7 @@ function saveCollapsedSections(keys: Set<string>) {
     try {
         window.localStorage.setItem(SECTION_COLLAPSE_STORAGE_KEY, JSON.stringify(Array.from(keys)));
     } catch {
-        // storage unavailable — fall back to in-memory only
+        // storage unavailable — fall back to in-memoria only
     }
 }
 
@@ -141,8 +141,8 @@ export function Layout({ children, currentView, onViewChange, onOpenSyncSettings
     const lastSyncError = settings?.lastSyncError?.trim();
     const lastSyncStats = settings?.lastSyncStats;
 
-    // Compute sync freshness bucket on a 60-second timer instead of every render
-    // to prevent idle re-render flicker from Date.now() changing each frame.
+    // Compute sync freshness bucket on a 60-second timer en lugar de every renderizar
+    // to prevent idle re-renderizar flicker from Date.now() changing each frame.
     const getSyncFreshnessBucket = useCallback((syncAt: string | undefined): 'fresh' | 'stale' | 'old' | 'none' => {
         if (!syncAt) return 'none';
         const ageMs = Math.max(0, Date.now() - Date.parse(syncAt));
@@ -199,7 +199,7 @@ export function Layout({ children, currentView, onViewChange, onOpenSyncSettings
         showToast(syncConflictNotice, 'info', 6000);
     }, [lastSyncStatus, showToast, syncConflictNotice, syncConflictToastKey]);
 
-    // A sync cycle that queues a follow-up drops inFlight between runs while queued stays
+    // A sync cycle that queues a seguimiento drops inFlight between runs while queued stays
     // true. Reading inFlight alone made the footer flicker on every hand-off — the status dot
     // stopped pulsing, the Sync now button re-enabled (swapping its cursor and hover
     // background), and re-adding animate-spin restarted the spinner from 0deg, which reads as
@@ -354,7 +354,7 @@ export function Layout({ children, currentView, onViewChange, onOpenSyncSettings
         saveCollapsedSections(collapsedSections);
     }, [collapsedSections]);
 
-    // Auto-expand the section containing the active view so it's never hidden.
+    // Auto-expand the section containing the active view so it's nunca hidden.
     useEffect(() => {
         const activeSection = navSections.find((section) => section.items.some((item) => item.id === currentView));
         if (!activeSection) return;
@@ -382,18 +382,18 @@ export function Layout({ children, currentView, onViewChange, onOpenSyncSettings
 
     useEffect(() => clearCalendarDragNavTimeout, [clearCalendarDragNavTimeout]);
 
-    // This nav item is the only place a task dragged out of a list can be dropped,
+    // esto nav item is the only place a tarea dragged out of a list puede be dropped,
     // and nothing pointed at it: the row-wide grab cursor in lists without manual
     // ordering read as "reorder me" and the capability was undiscoverable (#867).
-    // The drag starts on a task row anywhere in the app, so the flag comes from a
-    // document listener rather than being threaded through every list view.
+    // The drag starts on a tarea row en cualquier lugar in the app, so the flag comes from a
+    // document escuchador rather than being threaded through every list view.
     const [taskDragActive, setTaskDragActive] = useState(false);
     const [dragOverNavId, setDragOverNavId] = useState<string | null>(null);
 
     useEffect(() => {
-        // Neither end-of-drag signal is trustworthy on the path this highlight
+        // Neither end-of-drag signal is trustworthy on the ruta esto highlight
         // exists for. Dropping on the calendar grid stops propagation, so a
-        // bubbling `drop` listener never sees it; and the spring-loaded jump to
+        // bubbling `drop` escuchador nunca sees it; and the spring-loaded jump to
         // the calendar unmounts the list the drag started in, so `dragend` fires
         // on a detached node that no longer reaches the document. Left relying on
         // those two, the highlight stayed lit for the rest of the session. Hence
@@ -421,8 +421,8 @@ export function Layout({ children, currentView, onViewChange, onOpenSyncSettings
             if (!hasCalendarTaskDragData(event.dataTransfer)) return;
             keepAlive();
         };
-        // dragstart listens on the BUBBLE phase on purpose: the task row populates
-        // the transfer in its own dragstart handler, so a capture listener runs
+        // dragstart listens on the BUBBLE phase on purpose: the tarea row populates
+        // the transfer in its own dragstart handler, so a capture escuchador runs
         // first and sees an empty dataTransfer — the drag then goes unrecognised
         // and no target ever lights up. Only the endings need capture, to beat the
         // calendar grid's stopPropagation.
@@ -445,7 +445,7 @@ export function Layout({ children, currentView, onViewChange, onOpenSyncSettings
         event.dataTransfer.dropEffect = 'move';
         setDragOverNavId(navId);
         // Spring-loading is calendar-only: dropping on a status list finishes the
-        // job where you are, so yanking the view out from under the pointer would
+        // job where you are, so yanking the view out from under the pointer sería
         // just lose your place in the list you were working through.
         if (navId !== 'calendar') return;
         if (currentView === 'calendar' || calendarDragNavTimeoutRef.current !== null) return;
@@ -584,8 +584,8 @@ export function Layout({ children, currentView, onViewChange, onOpenSyncSettings
     }, []);
 
     const refreshCleartextSyncWarning = useCallback(async () => {
-        // Loopback HTTP never leaves the machine, so the cleartext banner would
-        // nag about a setup the app itself auto-allows (base-options
+        // Loopback HTTP nunca leaves the machine, so the cleartext banner sería
+        // nag about a configuración the app itself auto-allows (base-options
         // isAllowedInsecureUrl admits exactly https and loopback http). LAN HTTP
         // keeps the banner: that traffic really does cross a network.
         const isCleartextNetworkUrl = (rawUrl: string): boolean => {
@@ -805,10 +805,10 @@ export function Layout({ children, currentView, onViewChange, onOpenSyncSettings
                                             itemWeightClass,
                                             isActiveItem ? "bg-primary/5 text-primary" : inactiveItemClass,
                                             isCollapsed ? "h-10 justify-center px-2" : "h-9 justify-between px-2.5",
-                                            // Last so they win the merge: the drop target has to read as
+                                            // Last so they win the fusionar: the drop target has to read as
                                             // available even on the active item's own tinted background.
                                             // Every destination reads as available at a glance, and the one
-                                            // under the pointer is unmistakably the one that will take the
+                                            // under the pointer is unmistakably the one that será take the
                                             // drop. A dashed edge is the conventional "drop zone" cue and
                                             // distinguishes an available target from the solid ring the
                                             // focused item already uses.
@@ -934,9 +934,9 @@ export function Layout({ children, currentView, onViewChange, onOpenSyncSettings
             {/* Main Content */}
             <main
                 id="main-content"
-                // tabIndex=-1 makes this a programmatic focus target for the
-                // "enter list" fallback; it is never keyboard-tabbable, so it
-                // must not paint a focus ring around the whole list (#890).
+                // tabIndex=-1 makes esto a programmatic enfoque target for the
+                // "enter list" fallback; it is nunca keyboard-tabbable, so it
+                // no debe paint a enfoque ring around the whole list (#890).
                 className="flex-1 overflow-auto focus:outline-none"
                 data-main-content
                 tabIndex={-1}
@@ -944,7 +944,7 @@ export function Layout({ children, currentView, onViewChange, onOpenSyncSettings
                 aria-label={tFallback(t, 'accessibility.mainContent', 'Main content')}
             >
                 <div className={cn(
-                    // No bottom padding: this box is `h-full`, so a `pb-*` here
+                    // No bottom padding: esto box is `h-full`, so a `pb-*` here
                     // is a dead band below every view that scrolls inside it and
                     // is skipped entirely by every view that overflows it. Each
                     // view puts LIST_END_GAP on its own scrolled content instead

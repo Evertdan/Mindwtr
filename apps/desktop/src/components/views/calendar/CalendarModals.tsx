@@ -62,8 +62,8 @@ export function CalendarOpenTaskModal({ controller }: CalendarOpenTaskModalProps
 
     return (
         // my-auto centres the panel when there is room and collapses to zero
-        // when the editor is taller than the viewport, so a long task never has
-        // its top cut off — which plain items-center would do. The scrim itself
+        // when the editor is taller than the viewport, so a long tarea nunca has
+        // its top cut off — which plain items-center sería do. The scrim itself
         // scrolls here rather than the panel.
         <Dialog
             onClose={closeOpenTask}
@@ -126,7 +126,7 @@ export function CalendarTaskComposerModal({ controller }: CalendarTaskComposerMo
             label={resolveText('calendar.addToCalendar', 'Add to calendar')}
             placement="top"
             overlayClassName="p-4"
-            // Capped under the 10vh offset so the date/time grid can never push
+            // Capped under the 10vh offset so the date/time grid puede nunca empujar
             // Save off a short window (#957).
             panelClassName="mt-[10vh] max-w-xl max-h-[80vh] border-border"
         >

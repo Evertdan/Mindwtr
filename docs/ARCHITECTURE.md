@@ -1,66 +1,66 @@
-# Mindwtr Architecture
+# Arquitectura de Mindwtr
 
-Mindwtr is a local-first GTD system built as a Bun workspace monorepo. The shared `@mindwtr/core` package owns the data model, persistence behavior, and sync rules; desktop, mobile, cloud, and MCP layers stay thin around that core.
+Mindwtr es un sistema GTD nativo-primero construido como un monorepo de espacio de trabajo de Bun. El paquete compartido `@mindwtr/core` es propietario del modelo de datos, comportamiento de persistencia y reglas de sincronización; las capas de escritorio, móvil, nube y MCP se mantienen delgadas alrededor de ese núcleo.
 
-## System shape
+## Forma del sistema
 
 - `packages/core`
-  Shared domain model, Zustand store, quick-add parsing, recurrence, sync/merge, storage adapters, and shared tests.
+  Modelo de dominio compartido, almacén Zustand, análisis de adición rápida, recurrencia, sincronización/fusión, adaptadores de almacenamiento y pruebas compartidas.
 - `apps/desktop`
-  Tauri + React shell. Uses the shared core store with desktop-specific UI state, native dialogs, filesystem access, and SQLite-backed persistence.
+  Shell de Tauri + React. Utiliza el almacén central compartido con estado de interfaz específico del escritorio, diálogos nativos, acceso al sistema de archivos y persistencia respaldada por SQLite.
 - `apps/mobile`
-  Expo + React Native shell. Reuses the core store and sync logic with mobile-specific storage, navigation, notifications, and calendar integrations.
+  Shell de Expo + React Native. Reutiliza la lógica de almacén central y sincronización con almacenamiento, navegación, notificaciones e integraciones de calendario específicas del móvil.
 - `apps/cloud`
-  Self-hosted sync endpoint. Stores one JSON namespace plus attachments per bearer token and merges incoming app data using the same shared sync semantics.
+  Punto final de sincronización alojado por el usuario. Almacena un espacio de nombres JSON más archivos adjuntos por token portador y fusiona datos de aplicaciones entrantes utilizando la misma semántica de sincronización compartida.
 - `apps/mcp-server`
-  MCP server for AI tools, over stdio by default or streamable HTTP when `--http` is set (bearer-token authenticated). It reads and optionally mutates the local SQLite database with explicit `--write` opt-in, or talks to a self-hosted `apps/cloud` endpoint instead when pointed at one. See [MCP integration](https://docs.mindwtr.app/power-users/mcp) for the user-facing setup.
+  Servidor MCP para herramientas de IA, sobre stdio de forma predeterminada o HTTP transmisible cuando se establece `--http` (autenticado por token portador). Lee y opcionalmente modifica la base de datos SQLite local con aceptación explícita de `--write`, o se comunica con un punto final `apps/cloud` alojado por el usuario en su lugar cuando se apunta a uno. Consulta [integración MCP](https://docs.mindwtr.app/power-users/mcp) para la configuración orientada al usuario.
 
-## Data flow
+## Flujo de datos
 
-1. UI actions update the shared Zustand store in `packages/core`.
-2. The store sanitizes and persists the full app snapshot through a platform storage adapter.
-3. Optional sync services read remote state, merge in memory, then write back local and remote snapshots.
-4. Derived views are recomputed from canonical store data plus view filters instead of mutating persisted records for presentation.
+1. Las acciones de la interfaz de usuario actualizan el almacén Zustand compartido en `packages/core`.
+2. El almacén desinfecta y persiste la instantánea completa de la aplicación a través de un adaptador de almacenamiento de plataforma.
+3. Los servicios de sincronización opcionales leen el estado remoto, fusionan en memoria y luego escriben instantáneas locales y remotas.
+4. Las vistas derivadas se recalculan desde datos de almacén canónicos más filtros de vista en lugar de mutar registros persistidos para la presentación.
 
-The design goal is that GTD behavior, merge logic, and validation live once in core, while platform apps handle input, rendering, and OS integration.
+El objetivo de diseño es que el comportamiento de GTD, la lógica de fusión y la validación existan una sola vez en el núcleo, mientras que las aplicaciones de plataforma manejan entrada, renderizado e integración del sistema operativo.
 
-## Persistence model
+## Modelo de persistencia
 
-- Desktop and mobile use SQLite as the primary structured store.
-- JSON snapshots remain part of the durability and sync story, but as a derived sync/backup representation rather than a second equal local source of truth.
-- Attachments are treated separately from structured task/project data.
-- Deletes are soft by default using `deletedAt` tombstones so sync can converge safely across devices.
+- El escritorio y el móvil utilizan SQLite como almacén estructurado principal.
+- Las instantáneas JSON permanecen como parte de la historia de durabilidad y sincronización, pero como representación sincronización/copia de seguridad derivada en lugar de una segunda fuente de verdad local igual.
+- Los archivos adjuntos se tratan por separado de los datos de tareas/proyectos estructurados.
+- Los eliminados son suaves de forma predeterminada utilizando lápidas `deletedAt` para que la sincronización pueda converger de forma segura entre dispositivos.
 
-The SQLite<->JSON bridge contract is recorded in [ADR 0009](./adr/0009-sqlite-json-sync-bridge.md).
+El contrato de puente SQLite<->JSON se registra en [ADR 0009](./adr/0009-sqlite-json-sync-bridge.md).
 
-Mindwtr prefers explicit repair and merge logic in the app layer over hard database-only assumptions. That is why sync-sensitive relationships are normalized and repaired by shared code instead of depending purely on foreign-key enforcement.
+Mindwtr prefiere lógica de reparación y fusión explícita en la capa de aplicación sobre suposiciones de solo base de datos. Es por eso que las relaciones sensibles a la sincronización se normalizan y reparan mediante código compartido en lugar de depender puramente de la ejecución de clave externa.
 
-## Sync model
+## Modelo de sincronización
 
-Sync is optional and backend-agnostic. Supported backends include file sync, WebDAV, Dropbox in supported builds, and the self-hosted cloud server.
+La sincronización es opcional e independiente del backend. Los backends admitidos incluyen sincronización de archivos, WebDAV, Dropbox en compilaciones admitidas y el servidor en la nube alojado por el usuario.
 
-Important properties:
+Propiedades importantes:
 
-- Merge is item-based, not whole-file overwrite.
-- Revisions and timestamps are both used for conflict resolution.
-- Tombstones prevent deleted records from being silently resurrected.
-- Attachments are merged and transferred separately from the main JSON payload.
-- The blob backends (file sync, WebDAV, Dropbox) can optionally encrypt everything written to the sync location with a user-held passphrase (Argon2id -> AES-256-GCM, MWENC1 container); the server-merged backends (self-hosted cloud, CloudKit) are excluded because their merge must read the document (ADR 0025).
-- New or changed sync destinations stay inactive until a candidate probe verifies snapshot IO and every live attachment. Failed commits restore the last verified setup or leave sync off.
+- La fusión se basa en elementos, no en sobrescritura de archivo completo.
+- Las revisiones y marcas de tiempo se utilizan para la resolución de conflictos.
+- Las lápidas evitan que los registros eliminados se resuciten silenciosamente.
+- Los archivos adjuntos se fusionan y transfieren por separado de la carga útil JSON principal.
+- Los backends de blob (sincronización de archivos, WebDAV, Dropbox) pueden cifrar opcionalmente todo lo escrito en la ubicación de sincronización con una frase de contraseña con clave de usuario (Argon2id -> AES-256-GCM, contenedor MWENC1); los backends de fusión de servidor (nube alojada, CloudKit) se excluyen porque su fusión debe leer el documento (ADR 0025).
+- Los destinos de sincronización nuevos o modificados permanecen inactivos hasta que un sondeo candidato verifica la E/S de instantánea y todos los archivos adjuntos activos. Las confirmaciones fallidas restauran la última configuración verificada o dejan la sincronización desactivada.
 
-The detailed algorithm, edge cases, and tie-break rules are documented in the public docs site. The source for those pages lives in the Mindwtr web docs source:
+El algoritmo detallado, casos extremos y reglas de desempate se documentan en el sitio de documentación pública. La fuente de esas páginas vive en la fuente de documentación web de Mindwtr:
 
-- [Docs source](https://github.com/dongdongbh/mindwtr-web/tree/main/docs)
-- [Architecture](https://docs.mindwtr.app/developers/architecture)
-- [Sync Algorithm](https://docs.mindwtr.app/data-sync/sync-algorithm)
-- [Data and Sync](https://docs.mindwtr.app/data-sync/)
-- [Performance Guide](https://docs.mindwtr.app/developers/performance)
+- [Fuente de documentación](https://github.com/dongdongbh/mindwtr-web/tree/main/docs)
+- [Arquitectura](https://docs.mindwtr.app/developers/architecture)
+- [Algoritmo de sincronización](https://docs.mindwtr.app/data-sync/sync-algorithm)
+- [Datos y sincronización](https://docs.mindwtr.app/data-sync/)
+- [Guía de rendimiento](https://docs.mindwtr.app/developers/performance)
 
-## Boundaries and responsibilities
+## Límites y responsabilidades
 
-- Core decides what data means.
-- Desktop/mobile decide how users interact with that data.
-- Cloud decides how remote snapshots are stored and validated.
-- MCP decides how external AI tools can safely read or write local data.
+- Core decide qué significan los datos.
+- Desktop/mobile deciden cómo los usuarios interactúan con esos datos.
+- Cloud decide cómo se almacenan y validan las instantáneas remotas.
+- MCP decide cómo las herramientas de IA externas pueden leer o escribir datos locales de forma segura.
 
-That separation keeps product behavior consistent across platforms and makes most regression tests possible in shared code instead of duplicating logic per app.
+Esa separación mantiene el comportamiento del producto consistente entre plataformas y hace posibles la mayoría de las pruebas de regresión en código compartido en lugar de duplicar lógica por aplicación.

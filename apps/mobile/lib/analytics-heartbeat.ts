@@ -58,7 +58,7 @@ async function getMobileAnalyticsChannel(
   if (channel) return channel;
   if (Platform.OS === 'ios') return 'app-store';
   if (Platform.OS !== 'android') return Platform.OS || 'mobile';
-  // Release builds bake ANALYTICS_HEARTBEAT_CHANNEL (play-store, android-internal-test,
+  // Los lanzamientos incorporan ANALYTICS_HEARTBEAT_CHANNEL (play-store, android-internal-test,
   // android-direct), so this fallback only fires for builds without one. The old
   // install-referrer probe is gone: testing-track installs carry no referrer and the
   // API can reject, which misfiled Play testers as android-sideload/android-unknown.

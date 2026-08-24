@@ -61,9 +61,9 @@ async function appendLogLine(entry: LogEntry, options?: AppendLogOptions): Promi
         try {
             return await invokeNative<string>('append_log_line', { line });
         } catch (error) {
-            // No non-append retry: writeTextFile without `append` replaces the
-            // whole file, so a failed append used to throw away every line
-            // logged so far to save the one that just failed.
+            // Sin reintento no-append: writeTextFile sin `append` reemplaza el
+            // archivo completo, así que un append fallido solía tirar todos los líneas
+            // registradas hasta ahora para guardar la que acaba de fallar.
             const logDir = await ensureLogDir();
             const logFile = await join(logDir, LOG_FILE_NAME);
             await writeTextFile(logFile, line, { append: true });
@@ -112,9 +112,9 @@ export async function readRecentLogText(maxChars = RECENT_LOG_MAX_CHARS): Promis
 
 export async function collectFeedbackDiagnostics(maxChars = RECENT_LOG_MAX_CHARS): Promise<string | null> {
     const breadcrumbs = getBreadcrumbs();
-    // Feedback attachment is an explicit, one-time opt-in. Build the snapshot in
-    // memory so checking the box does not persist a log when detailed logging is
-    // disabled, while still explaining the recent app flow.
+    // El adjunto de retroalimentación es una opción de una sola vez explícita. Construir la snapshot en
+    // memoria para que marcar la casilla no persista un registro cuando el registro detallado está
+    // deshabilitado, mientras se explica el flujo reciente de la aplicación.
     const snapshot = JSON.stringify({
         ts: new Date().toISOString(),
         level: 'info',

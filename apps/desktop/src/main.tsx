@@ -75,7 +75,7 @@ const installCoreLoggerBridge = () => {
     });
 };
 
-// Initialize theme immediately before React renders to prevent flash
+// Inicializar tema inmediatamente antes de que React renderice para evitar parpadeo
 const savedTheme = coerceDesktopThemeMode(localStorage.getItem(THEME_STORAGE_KEY));
 applyThemeMode(savedTheme);
 if ((savedTheme ?? 'system') === 'system' && isTauriRuntime()) {
@@ -152,13 +152,13 @@ async function restoreWebviewZoomState() {
     }
 }
 
-// Tauri's native drag-drop handler is off (tauri.conf.json dragDropEnabled:
-// false) so HTML5 drag-and-drop works for task rows; that also means the
-// webview's plain browser default runs for OS file drops anywhere else,
-// navigating away to the dropped file. Block navigation here, but only
-// preventDefault (never stopPropagation) so the editor's own file-drop
-// handler, which runs first since React attaches below document, still
-// gets the event.
+// El manejador nativo de arrastrar y soltar de Tauri está apagado (tauri.conf.json dragDropEnabled:
+// false) para que el arrastrar y soltar HTML5 funcione para filas de tareas; eso también significa que
+// el navegador simple predeterminado de la webview se ejecuta para caídas de archivos del SO en cualquier otro lugar,
+// navegando lejos del archivo soltado. Bloquear navegación aquí, pero solo
+// preventDefault (nunca stopPropagation) para que el propio manejador de caída de archivos del editor,
+// que se ejecuta primero ya que React se adjunta debajo del documento, aún
+// reciba el evento.
 function installFileDropNavigationGuard() {
     const isFileDrag = (event: DragEvent) => Boolean(event.dataTransfer?.types.includes('Files'));
     document.addEventListener('dragover', (event) => {
@@ -169,16 +169,16 @@ function installFileDropNavigationGuard() {
     });
 }
 
-// The main window is built hidden so the restored geometry and the first paint
-// stay off screen (#936). Two animation frames after the first render is the
-// cheapest "has painted" signal the webview gives us; Rust reveals the window
-// anyway after a few seconds if this never arrives.
+// La ventana principal se construye oculta para que la geometría restaurada y la primera pintura
+// se mantengan fuera de pantalla (#936). Dos fotogramas de animación después del primer renderizado es la
+// señal más económica "ha pintado" que la webview nos proporciona; Rust revela la ventana
+// de todos modos después de unos pocos segundos si esto nunca llega.
 async function signalUiReady() {
     if (!isTauriRuntime()) return;
     try {
-        // Resolve the transport during the paint wait, not on the reveal call
-        // itself — the two frames below are the signal's timing, and nothing
-        // else may be added to it.
+        // Resolver el transporte durante la espera de pintura, no en la llamada de revelación
+        // en sí — los dos fotogramas a continuación son el tiempo de la señal, y nada
+        // más puede añadirse a esto.
         await preloadNativeTransport();
         await new Promise<void>((resolve) => {
             requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
@@ -206,11 +206,11 @@ async function bootstrap() {
     }
 
     if (!isTauriRuntime()) {
-        // A lazy route chunk can fail to import when the served index.html and
-        // the deployed assets are from different builds (web app redeployed
-        // while a tab was open, or a stale cached shell). One reload fetches a
-        // fresh shell with matching chunk names; the guard stops a reload loop
-        // when the failure is not staleness.
+        // Un chunk de ruta perezosa puede no lograr importar cuando index.html servido y
+        // los activos implementados son de diferentes compilaciones (aplicación web reimplementada
+        // mientras una pestaña estaba abierta, o un shell en caché obsoleto). Una recarga obtiene un
+        // shell fresco con nombres de chunk coincidentes; la guardia detiene un bucle de recarga
+        // cuando el fracaso no es obsolescencia.
         window.addEventListener('vite:preloadError', () => {
             const RELOAD_FLAG = 'mindwtr-chunk-reload-at';
             const lastReload = Number(sessionStorage.getItem(RELOAD_FLAG) || 0);

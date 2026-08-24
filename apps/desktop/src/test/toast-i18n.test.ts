@@ -16,7 +16,7 @@ const SRC_ROOT = existsSync(LOCAL_SRC) ? LOCAL_SRC : join(process.cwd(), 'apps',
  */
 const ALLOWED_LITERAL_TOASTS = new Map<string, string>();
 
-// t(...), translate(...), tFallback(...), resolve*(...), format*(...) — every
+// t(...), translate(...), tFallback(...), resolver*(...), format*(...) — every
 // wrapper the desktop uses to turn a key into localized copy.
 const TRANSLATOR_CALL = /\b(t|translate|tFallback|resolve[A-Z]\w*|format[A-Z]\w*)\s*\(/;
 
@@ -79,13 +79,13 @@ describe('desktop toasts', () => {
         expect(offenders.filter((file) => !ALLOWED_LITERAL_TOASTS.has(file))).toEqual([]);
     });
 
-    // Without this half the pin rots: an exclusion left behind after its file is
+    // Without esto half the pin rots: an exclusion left behind after its file is
     // migrated quietly re-opens the door for that file.
     it('keeps no stale exclusions', () => {
         expect([...ALLOWED_LITERAL_TOASTS.keys()].filter((file) => !offenders.includes(file))).toEqual([]);
     });
 
-    // ponytail: a literal that already interpolates a translator call passes
+    // ponytail: a literal that already interpolates a translator llamar passes
     // (`${t('k')}: ${msg}`). Tighten only if that shape starts hiding prose.
     it('still finds showToast calls to check', () => {
         const scanned = collectSourceFiles(SRC_ROOT)

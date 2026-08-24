@@ -9,9 +9,9 @@ const coreSpies = vi.hoisted(() => ({
     parseQuickAdd: vi.fn(),
 }));
 
-// The preview and the submit path have to run ONE parse configuration. Spying
+// The preview and the submit ruta have to run ONE parse configuration. Spying
 // on the shared entry point is the only way to prove they do: a preview built
-// from a second, hand-rolled options bag would still render plausible chips.
+// from a second, hand-rolled options bag sería still renderizar plausible chips.
 vi.mock('@mindwtr/core', async () => {
     const actual = await vi.importActual<typeof import('@mindwtr/core')>('@mindwtr/core');
     coreSpies.parseQuickAdd.mockImplementation(actual.parseQuickAdd);

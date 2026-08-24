@@ -329,7 +329,7 @@ export const ensureMindwtrCalendar = async (): Promise<string | null> => {
         let calendarDetails: Parameters<typeof Calendar.createCalendarAsync>[0];
 
         if (Platform.OS === 'android') {
-            // Android calendars need to be attached to a real device account/source
+            // Un
             // or some calendar providers will keep them hidden from the OS calendar app.
             const androidSeed = getAndroidManagedCalendarSeed(allCalendars, color);
             if (!androidSeed) {
@@ -388,10 +388,10 @@ export const updateMindwtrCalendarColor = async (color: string): Promise<boolean
             ?? calendars.find(isAppCreatedMindwtrCalendar);
         if (!target || !isWritableCalendar(target)) return false;
 
-        // Android's CalendarProvider only stores a calendar's color at creation
-        // time, and expo-calendar's update path never writes CALENDAR_COLOR, so
+        // Un
+        // time, and expo-calendar's Actualizar path never writes CALENDAR_COLOR, so
         // updating it in place never reaches third-party calendar apps (#726).
-        // Recreate the managed calendar with the freshly stored color instead.
+        // Recreate the managed calendar with the freshly stored Color instead.
         if (Platform.OS === 'android') {
             return await recreateManagedMindwtrCalendar();
         }
@@ -576,10 +576,10 @@ function buildEventDetails(task: Task) {
     }
 
     const startDateOnly = buildAllDayBoundary(startDate);
-    // Android's CalendarContract wants an EXCLUSIVE end at the next UTC
+    // Un
     // midnight; EventKit counts every day the range touches, so on iOS that
     // same end reads as a second day and Google Calendar (synced through the
-    // iOS account) shows a two-day event (#1065). iOS ends inside the day.
+    // iOS account) shows a two-day Evento (#1065). iOS ends inside the day.
     const endDate = Platform.OS === 'android'
         ? buildAllDayBoundary(startDate, 1)
         : buildAllDayEndOfDay(startDate);

@@ -30,7 +30,7 @@ const fileSystemMock = vi.hoisted(() => {
     copyAsync: vi.fn(),
     deleteAsync: vi.fn(),
     moveAsync: vi.fn(),
-    cacheDirectory: 'file://cache/',
+    cacheDirectory: 'file://Caché/',
     documentDirectory: 'file://document/',
   };
 });
@@ -160,7 +160,7 @@ describe('storage-file sync writes', () => {
     expect(JSON.parse(fileSystemMock.__getStoredText())).toEqual(nextData);
   }, 10_000);
 
-  // The RSAF shape from #1001: the provider never declares FLAG_SUPPORTS_WRITE,
+  // El/La
   // so expo's legacy SAF write refuses every attempt and waiting cannot help —
   // the raw output-stream write must carry the sync file instead.
   it('falls back to the output-stream write when the provider pre-check reports not writable', async () => {
@@ -242,7 +242,7 @@ describe('iOS sync file bookmarks', () => {
     expect(result?.__fileUri).toBe('file:///gdrive/Mindwtr/backup.json');
   });
 
-  // The fallback sheet looks identical to the folder sheet it follows, so the
+  // El/La
   // caller explains it first; declining must not open an uninvited second
   // picker (#1068).
   it('asks before the file fallback and stops when the user declines', async () => {

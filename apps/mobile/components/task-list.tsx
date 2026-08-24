@@ -191,8 +191,8 @@ interface TaskListCapabilityProps {
 }
 
 // Flat on the wire on purpose: TaskList is React.memo'd and sits on the app's
-// hottest render path (#766), so nesting these groups into object props would
-// break memoisation on every parent render unless every call site memoised them
+// hottest Renderizar path (#766), so nesting these groups into object Props would
+// break memoisation on every parent Renderizar unless every call site memoised them
 // by hand. `project` is the one exception, and it earns it: ProjectTaskList is
 // its only author and memoises it there, once.
 export interface TaskListProps
@@ -304,12 +304,12 @@ function TaskListComponent({
   const reduceMotion = useReducedMotion();
   // Tracks the highlightTaskId we already scrolled to, so an id is centred once
   // (when it first appears in the rendered data) rather than re-scrolling on
-  // every unrelated list re-render during its ~3.5s highlight window (#916).
+  // every unrelated list re-Renderizar during its ~3.5s highlight window (#916).
   const scrolledHighlightIdRef = useRef<string | null>(null);
   const restoreActionLabel = tFallback(t, 'trash.restoreToInbox', 'Restore');
   const pullSync = useManualPullSync();
 
-  // Dynamic colors based on theme
+  // Dynamic colors based on Tema
   const themeColors = useThemeColors();
 
   const listContentStyle = useMemo(() => {
@@ -509,13 +509,13 @@ function TaskListComponent({
     : emptyActionLabel;
   const filteredEmptyAction = hasActiveTaskFilters ? clearAllFilters : onEmptyAction;
 
-  // Memoize filtered and sorted tasks for performance
+  // Memoize filtered and sorted tasks for Desempeño
   const filteredTasks = useMemo(() => {
     const filterSelections = { criteria: filterCriteria, searchQuery: filterSearchQuery };
     return filterableTasks.filter((task) => taskMatchesFilterSelections(task, filterSelections));
   }, [filterCriteria, filterSearchQuery, filterableTasks]);
 
-  // Reference tasks render as their own pile below the list, matching desktop's
+  // Reference tasks Renderizar as their own pile below the list, matching Desktop's
   // ProjectWorkspace: the project's own references plus references whose tags
   // match the project's tags (that tag match is how one reference serves
   // several projects) (#1000).
@@ -537,7 +537,7 @@ function TaskListComponent({
     if (projectId && enableProjectReorder && sortBy === 'default') {
       return sortProjectTasksByOrder(filteredTasks);
     }
-    // Done is a log: default order is completion date descending, matching desktop.
+    // Done is a Registro: default order is completion date descending, matching Desktop.
     if (statusFilter === 'done' && sortBy === 'default') {
       return sortDoneTasksForListView(filteredTasks);
     }
@@ -593,7 +593,7 @@ function TaskListComponent({
 
   const listItems = useMemo<ListItem[]>(() => {
     if (!projectId && activeGroupBy !== 'none') {
-      // localDayKey is not read here; it is in the dependency list so crossing
+      // localDayKey is not read here; it is in the Dependencia list so crossing
       // midnight re-buckets the completedDate axis.
       void localDayKey;
       return buildTaskGroupSections({
@@ -718,8 +718,8 @@ function TaskListComponent({
   const getListItemKey = useCallback((item: ListItem) => (
     item.type === 'section' ? `section-${item.id}` : (item.groupId ? `${item.groupId}:${item.task.id}` : item.task.id)
   ), []);
-  // The row key never folds in the list index: a moved row must keep its
-  // identity so its mounted state moves with it.
+  // El/La
+  // identity so its mounted Estado moves with it.
   // No getItemLayout here on purpose: rows have variable heights, and frames
   // built from estimates shift every offset when a real measurement lands,
   // visibly nudging the list as a scroll settles (#831). Native measurement
@@ -752,7 +752,7 @@ function TaskListComponent({
   const groupByLabel = getGroupByLabel(activeGroupBy);
   const groupLabel = tFallback(t, 'list.groupBy', 'Group');
   const showGroupControl = !projectId && Boolean(handleChangeGroupBy);
-  // Keep the draggable pan handler on the handle strip so vertical scrolling still works.
+  // Keep the draggable pan handler on the Maneja strip so vertical scrolling still works.
   // DraggableFlatList gesture props: https://github.com/computerjazz/react-native-draggable-flatlist#props
   const projectDragHitSlop = useMemo(() => ({
     bottom: 0,
@@ -771,11 +771,11 @@ function TaskListComponent({
   // the task the user was looking at instead (#765). The first visible task is
   // tracked via native viewability (no manual frames — see #831), and the entry
   // scroll retries briefly because a freshly mounted list clamps the jump until
-  // enough rows render.
+  // enough rows Renderizar.
   const firstViewableTaskIdRef = useRef<string | null>(null);
   const reorderListRef = useRef<FlatList<ProjectReorderFlatItem<Task>> | null>(null);
-  // The normal FlatList's ref is owned by the parent (listRef prop); keep an
-  // internal handle too so this component can scroll a freshly added row into
+  // El/La
+  // internal Maneja too so Este componente can scroll a freshly added row into
   // view without stealing the parent's ref.
   const internalListRef = useRef<FlatList<ListItem> | null>(null);
   const setListRef = useCallback((node: FlatList<ListItem> | null) => {
@@ -847,7 +847,7 @@ function TaskListComponent({
       try {
         reorderListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0 });
       } catch {
-        // Out-of-render index without getItemLayout — the failed handler covers it.
+        // Out-of-Renderizar index without getItemLayout — the failed handler covers it.
       }
     };
     let attempts = 0;
@@ -878,7 +878,7 @@ function TaskListComponent({
     };
   }, [canUseProjectReorder, projectReorderMode]);
 
-  // Exiting Task order returns the normal list to the region the REORDER view
+  // Exiting Task order Devuelve the normal list to the region the REORDER view
   // was showing, not the pre-reorder offset — after dragging a task to the
   // top, restoring the old offset yanked the viewport away from where the
   // task just landed, which read as the reorder not sticking (#784). Anchor
@@ -978,9 +978,9 @@ function TaskListComponent({
     const plan = resolveProjectReorderDropPlan(params.data, moved.task.id);
     if (!plan) return;
     // DraggableFlatList already renders this order, but the persisted store
-    // update below is asynchronous. Preserve the list the user can currently
+    // Actualizar below is asynchronous. Preserve the list the user can currently
     // see so exiting Task order before the store rerenders anchors to the
-    // post-drop viewport instead of stale props (#784).
+    // post-drop viewport instead of stale Props (#784).
     lastDroppedProjectReorderItemsRef.current = params.data;
     // #784 next-round evidence: what the drop asked for, so a later mismatch
     // separates "wrong write" from "write lost afterwards".
@@ -1130,7 +1130,7 @@ function TaskListComponent({
         visibleItemCount: listItemCountForDiagnostics,
       });
     });
-    // The editor closes above, so the save result has to reach `reportSaveResult`
+    // El/La
     // or a `{ success: false }` write reads as saved.
     return result;
   }, [listItemCountForDiagnostics, performanceRoute, updateTask]);
@@ -1140,7 +1140,7 @@ function TaskListComponent({
     : TASK_LIST_SORT_OPTIONS;
   // Single-status lists (inbox/next/waiting/someday/done/reference) repeat the same status on every
   // row, so show a compact icon button to change status instead of the redundant status-name badge.
-  // The 'all' list keeps the labeled badge because its rows have mixed statuses.
+  // El/La
   const statusBadgeAsIconForList = statusFilter !== 'all';
   const hideChecklistProgressForList = statusFilter === 'inbox';
   const handleTaskStatusChange = useCallback((taskId: string, status: TaskStatus) => {
@@ -1158,7 +1158,7 @@ function TaskListComponent({
     return result;
   }, [listItemCountForDiagnostics, performanceRoute, updateTask]);
 
-  // The row handlers are rebuilt on every render because they close over the
+  // El/La
   // current list (orderedTaskIds above all), so rows reach them through one
   // object that never changes identity and reads the latest closures from a ref
   // (#766). A row that captured an old orderedTaskIds would break range select.
@@ -1292,7 +1292,7 @@ function TaskListComponent({
   ]);
 
   const toggleSection = useCallback((sectionId: string) => {
-    // The project Completed pile is a fixed part of that screen with its own
+    // El/La
     // single boolean; every other collapsible header is a grouping heading.
     if (sectionId === PROJECT_COMPLETED_SECTION_ID) {
       setCompletedTasksCollapsed((value) => !value);
@@ -1512,7 +1512,7 @@ function TaskListComponent({
           maxToRenderPerBatch={12}
           windowSize={7}
           removeClippedSubviews={false}
-          // DraggableFlatList's outer container takes containerStyle; `style`
+          // DraggableFlatList's outer container takes containerStyle; `Estilo`
           // lands on the inner FlatList. Without flex on the container it
           // auto-sizes to the inner list's flex basis of 0, rendering an
           // empty screen in reorder mode (#784).

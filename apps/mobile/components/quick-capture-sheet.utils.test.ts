@@ -44,7 +44,7 @@ describe('quick-capture utils', () => {
             info: () => ({ exists: false, size: 0 }),
         };
         const originalSource = {
-            uri: 'file:///cache/ExpoAudio/recording.m4a',
+            uri: 'file:///Caché/ExpoAudio/recording.m4a',
             info: () => ({ exists: true, size: 105614 }),
         };
 
@@ -64,7 +64,7 @@ describe('quick-capture utils', () => {
             info: () => ({ exists: true, isDirectory: true, size: 0 }),
         };
         const throwingCandidate = {
-            uri: 'file:///cache/ExpoAudio/recording.m4a',
+            uri: 'file:///Caché/ExpoAudio/recording.m4a',
             info: () => { throw new Error('missing'); },
         };
 

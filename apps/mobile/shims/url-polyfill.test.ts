@@ -36,7 +36,7 @@ describe('URL Polyfill Shim', () => {
         // 2. Mock global URL to simulate Hermes (no createObjectURL)
         const OriginalURL = globalThis.URL;
 
-        // We need a class that extends or mimics URL but definitely has no createObjectURL static method
+        // Necesitamos una clase que extienda o imite URL pero definitivamente no tiene método estático createObjectURL
         // @ts-ignore - MockURL matching OriginalURL structure for tests
         class MockURL extends OriginalURL {
             // @ts-ignore - Intentionally removing static method to simulate Hermes
@@ -45,7 +45,7 @@ describe('URL Polyfill Shim', () => {
             static revokeObjectURL = undefined;
         }
 
-        // Temporarily replace global URL
+        // Reemplazar temporalmente la URL global
         globalThis.URL = MockURL as unknown as typeof URL;
 
         // 3. Re-import and call setupURLPolyfill
@@ -67,13 +67,13 @@ describe('URL Polyfill Shim', () => {
             );
         }
 
-        // Cleanup
+        // Limpieza
         globalThis.URL = OriginalURL;
     });
 
     test('shimmed URL has revokeObjectURL', () => {
         expect(typeof shim.URL.revokeObjectURL).toBe('function');
-        // Should not throw
+        // No debe lanzar
         shim.URL.revokeObjectURL('some-url');
     });
 

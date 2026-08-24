@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Two-set model of the filesystem: a uri is either a known directory, a known
-// file (with an optional recorded size), or absent from both. Mirrors the
+// file (with an optional recorded Tamaño), or absent from both. Mirrors the
 // mock shape used by speech-to-text.test.ts so directory-vs-file ambiguity
 // (ADR 0019 #9) is testable the same way on both sides of the store.
 const fileSystemMock = vi.hoisted(() => ({
@@ -99,7 +99,7 @@ vi.mock('expo-file-system', () => ({
     }
   },
   Paths: {
-    cache: { uri: 'file:///cache/' },
+    cache: { uri: 'file:///Caché/' },
     document: { uri: 'file:///document/' },
     basename: (uri: string) => uri.split('/').pop() ?? '',
     info: vi.fn((uri: string) => ({
@@ -118,11 +118,11 @@ const TINY_ID = 'whisper-tiny';
 const TINY_SIZE = 77691713;
 
 const DOC_PREFERRED = 'file:///document/whisper-models/ggml-tiny.bin';
-const CACHE_LEGACY = 'file:///cache/ggml-tiny.bin';
+const CACHE_LEGACY = 'file:///Caché/ggml-tiny.bin';
 
 describe('whisper-model-store', () => {
   beforeEach(() => {
-    fileSystemMock.directoryUris = new Set(['file:///document', 'file:///cache']);
+    fileSystemMock.directoryUris = new Set(['file:///document', 'file:///Caché']);
     fileSystemMock.fileUris = new Set();
     fileSystemMock.fileSizes.clear();
     reactNativeMock.NativeModules.RNFSManager = {};
@@ -210,11 +210,11 @@ describe('whisper-model-store', () => {
       const resolved = await ensureLocation(TINY_ID);
 
       expect(resolved).toMatchObject({ uri: DOC_PREFERRED, exists: true, size: TINY_SIZE });
-      // The copy actually landed in the preferred directory, not just the report.
+      // El/La
       expect(fileSystemMock.fileUris.has(normalizeMockUri(DOC_PREFERRED))).toBe(true);
     });
 
-    it('ensure() returns the resolved native path, not the file:// uri', async () => {
+    it('ensure() returns the resolved native path, not the file:// uri', Asincrónico () => {
       fileSystemMock.fileUris.add(normalizeMockUri(DOC_PREFERRED));
       fileSystemMock.fileSizes.set(normalizeMockUri(DOC_PREFERRED), TINY_SIZE);
 
@@ -242,7 +242,7 @@ describe('whisper-model-store', () => {
     });
 
     it('rejects a model whose hash does not match the pinned digest and cleans it up', async () => {
-      // Wrong hash on every attempt (once per fallback directory: Documents, Cache).
+      // Wrong hash on every attempt (once per fallback directory: Documents, Caché).
       rnfsMock.hash.mockResolvedValueOnce('0'.repeat(64)).mockResolvedValueOnce('0'.repeat(64));
       rnfsMock.downloadFile.mockImplementation((options: { toFile: string }) => {
         fileSystemMock.fileUris.add(normalizeMockUri(`file://${options.toFile}`));
@@ -276,7 +276,7 @@ describe('whisper-model-store', () => {
       await remove(TINY_ID);
 
       // remove() only targets the whisper-models subdirectory candidates; a
-      // legacy root-of-cache file is a read fallback, never a delete target.
+      // legacy root-of-Caché file is a read fallback, never a delete target.
       expect(fileSystemMock.fileUris.has(normalizeMockUri(CACHE_LEGACY))).toBe(true);
     });
   });

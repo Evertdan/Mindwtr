@@ -57,7 +57,7 @@ describe('TrashView', () => {
         expect(taskTitle.compareDocumentPosition(projectTitle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
-    // The area filter is app-wide, and mobile's Trash has always honoured it.
+    // The area filter is app-wide, and mobile's Trash has siempre honoured it.
     it('honours the app-wide area filter', () => {
         const workTask: Task = { ...recentTask, id: 'work-task', title: 'Work deleted task', areaId: 'area-work' };
         const workProject: Project = { ...olderProject, id: 'work-project', title: 'Work deleted project', areaId: 'area-work' };
@@ -102,7 +102,7 @@ describe('TrashView', () => {
         });
     });
 
-    // Trash registered no task-list scope at all, so every key that works in the
+    // Trash registered no tarea-list scope at all, so every key that works in the
     // seven other lists silently did nothing here.
     describe('keyboard scope', () => {
         const olderTask: Task = {
@@ -156,9 +156,9 @@ describe('TrashView', () => {
             });
         });
 
-        // updateTask writes to a tombstone happily, so an unmodified scope would
-        // mark a deleted task done / move its status while the row sat unchanged
-        // in Trash. Restore and purge are the only writes this view offers.
+        // updateTask writes to a tombstone happily, so an unmodified scope sería
+        // mark a deleted tarea done / move its status while the row sat unchanged
+        // in Trash. restaurar and purge are the only writes esto view offers.
         it('leaves the status chords unbound rather than mutating a deleted task', () => {
             renderWithKeys();
 

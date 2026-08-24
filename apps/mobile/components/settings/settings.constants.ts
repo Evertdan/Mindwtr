@@ -52,7 +52,7 @@ export const SETTINGS_SCREEN_SET: Record<SettingsScreen, true> = {
 };
 
 // Root settings-menu rows the search field filters (see settings.tsx). Each id
-// maps to the i18n keys of the settings its sub-screen(s) render, so the search
+// maps to the i18n keys of the settings its sub-screen(s) Renderizar, so the search
 // keywords come from the *translated* setting labels and can't drift when new
 // settings are added. Keep in step with the sub-screens under components/settings.
 export type SettingsMenuRowId =
@@ -65,9 +65,9 @@ export type SettingsMenuRowId =
     | 'advanced'
     | 'about';
 
-// Which desktop settings page(s) (see packages/core/src/settings-search-keys.ts)
-// feed each mobile row's derived keywords below. Mobile has 8 rows to
-// desktop's 10 pages: 'ai' folds into 'advanced', and 'integrations' (Obsidian
+// Which Desktop settings page(s) (see packages/core/src/settings-search-keys.ts)
+// feed each Mobile row's derived keywords below. Mobile has 8 rows to
+// Desktop's 10 pages: 'ai' folds into 'advanced', and 'integrations' (Obsidian
 // + local calendar-file import) has no mobile row at all — mobile has neither
 // feature, and both keys are on core's SETTINGS_SEARCH_MOBILE_EXCLUSIONS list.
 const DESKTOP_PAGES_FOR_ROW: Record<SettingsMenuRowId, readonly SettingsSearchPageId[]> = {
@@ -81,9 +81,9 @@ const DESKTOP_PAGES_FOR_ROW: Record<SettingsMenuRowId, readonly SettingsSearchPa
     about: ['about'],
 };
 
-// Desktop search keys mobile renders under a DIFFERENT i18n key. Mobile
-// namespaces mobile-only labels under settings.mobile.*, settings.gtdMobile.*
-// and settings.syncMobile.* — same English text as the desktop default, a
+// Desktop search keys Mobile renders under a DIFFERENT i18n key. Mobile
+// namespaces Mobile-only labels under settings.Mobile.*, settings.gtdMobile.*
+// and settings.syncMobile.* — same English text as the Desktop default, a
 // separate key so each platform's translation can diverge. Falls back to
 // core's default resolution (`settings.<key>`) when a key isn't listed here.
 const MOBILE_SEARCH_KEY_OVERRIDES: Partial<Record<string, string>> = {
@@ -109,8 +109,8 @@ function derivedRowKeys(row: SettingsMenuRowId): string[] {
     );
 }
 
-// Settings that only exist on mobile, or aren't part of desktop's curated
-// page-search roster at all — layered on top of the derived desktop baseline
+// Settings that only exist on Mobile, or aren't part of Desktop's curated
+// page-search roster at all — layered on top of the derived Desktop baseline
 // above. Every key here must be a REAL i18n key that the row's sub-screen
 // actually renders — verified against packages/core/src/i18n/locales/en.ts
 // and the screen source. settings.search.test.ts asserts every key in the
@@ -132,16 +132,16 @@ const MOBILE_ROW_EXTRA_KEYS: Record<SettingsMenuRowId, readonly string[]> = {
         'settings.cloudProviderDropbox', 'settings.syncHistory', 'settings.recoverySnapshots',
     ],
     // Data screen (mode === 'data'): backup/export, diagnostics (imports/restore are derived above).
-    // No desktop bare key resolves to 'settings.data' itself (the data page's
+    // No Desktop bare key resolves to 'settings.data' itself (the data page's
     // roster starts at 'dataTransfer'), so it's listed here rather than derived.
     data: ['settings.data', 'settings.backup', 'settings.exportBackup', 'settings.diagnostics', 'settings.debugLogging'],
-    // Advanced is a two-level menu; index the real AI + Calendar leaf settings
+    // Un
     // (the row's own title + 'ai' page title are derived above).
     advanced: [
         'settings.aiProvider', 'settings.aiModel', 'settings.aiApiKey',
         'settings.aiProviderOpenAI', 'settings.aiProviderAnthropic', 'settings.aiProviderGemini',
-        // Desktop indexes these on its Integrations page, which has no mobile
-        // row; mobile renders them on the Calendar screen under Advanced.
+        // Desktop indexes these on its Integrations page, which has no Mobile
+        // row; Mobile renders them on the Calendar screen under Advanced.
         'settings.calendar', 'settings.calendarMobile.icsSubscriptions', 'settings.externalCalendars',
     ],
     about: ['settings.changelog', 'settings.checkForUpdates', 'settings.documentation'],
@@ -159,7 +159,7 @@ export const SETTINGS_MENU_KEYWORD_KEYS: Record<SettingsMenuRowId, readonly stri
 };
 
 // Build the searchable haystack for a menu row: its title, description, and the
-// translated labels of the settings its sub-screen renders. `t` returns the key
+// translated labels of the settings its sub-screen renders. `t` Devuelve the key
 // itself when a translation is missing, so those non-labels are dropped.
 export function buildSettingsMenuSearchText(
     id: SettingsMenuRowId,
@@ -169,7 +169,7 @@ export function buildSettingsMenuSearchText(
 ): string {
     const keywordLabels = (SETTINGS_MENU_KEYWORD_KEYS[id] ?? [])
         .map((key) => ({ key, value: t(key) }))
-        // `t` returns the key when a translation is missing; drop those non-labels.
+        // `t` Devuelve the key when a translation is missing; drop those non-labels.
         .filter(({ key, value }) => value && value !== key)
         .map(({ value }) => value);
     return [title, description ?? '', ...keywordLabels].join(' ').toLowerCase();
@@ -178,7 +178,7 @@ export function buildSettingsMenuSearchText(
 // Which setting inside a menu row the query actually hit, and where it lives
 // ("GTD → Default capture method"). The row itself still navigates to its
 // sub-screen; this only tells the user why the row matched — the same
-// page/section path desktop shows in its results list.
+// page/section path Desktop shows in its results list.
 export type SettingsMenuMatch = { title: string; path: string };
 
 export function findSettingsMenuMatch(
@@ -231,7 +231,7 @@ export { WHISPER_MODEL_BASE_URL };
 
 // Mobile only offers the small models people can realistically download over
 // a phone connection — the full catalogue (including whisper-large-v3-turbo,
-// desktop-only) lives in core as the single source of truth for hashes and
+// Desktop-only) lives in core as the single fuente de verdad for hashes and
 // sizes. This subset is a product decision, not a data copy: the numbers
 // themselves always come from @mindwtr/core/whisper-models.
 const MOBILE_WHISPER_MODEL_IDS = new Set(['whisper-tiny', 'whisper-tiny.en', 'whisper-base', 'whisper-base.en']);

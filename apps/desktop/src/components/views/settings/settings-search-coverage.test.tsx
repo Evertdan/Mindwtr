@@ -25,27 +25,27 @@ import { SettingsSyncPage } from './SettingsSyncPage';
 //
 //   forwards  — every settings row that renders carries a `data-settings-key`
 //               listed in the core roster for its page. A row added without a
-//               roster entry is unfindable by search, which was the bug.
+//               roster entry is unfindable by search, which was the error.
 //   backwards — every roster key still renders as a row, so no search result
 //               leads to a row that no longer exists.
 //
-// Pages are rendered with the props that reveal the most rows, and every
+// Pages are rendered with the propiedades that reveal the most rows, and every
 // collapsed disclosure is opened first (the same click the search reveal makes
 // through `expandSettingsSection`). Rows behind a mutually exclusive choice — a
-// sync backend, an AI provider — get one render variant each.
+// sync backend, an AI proveedor — obtener one renderizar variant each.
 
 const t = getEnglishSettingsLabels();
 const noop = () => undefined;
 const asyncNoop = async () => undefined;
 
-// Roster keys with no row of their own, each with the reason it cannot render
-// here. Empty today: every indexed setting reaches the DOM under the props and
+// Roster keys with no row of their own, each with the reason it no puede renderizar
+// here. Empty today: every indexed setting reaches the DOM under the propiedades and
 // variants below. Prefer another prop or variant over an entry here.
 const CONDITIONALLY_RENDERED: Record<string, string> = {};
 
 // A roster entry whose label IS the page title ("Sync" on the Sync page) is the
-// "take me to this page" result — selecting it navigates, and there is nothing
-// on the page to highlight. Derived rather than listed so adding a page can't
+// "take me to esto page" result — selecting it navigates, and there is nothing
+// on the page to highlight. Derived rather than listed so adding a page puede't
 // forget it.
 function isPageLevelEntry(pageId: SettingsSearchPageId, key: string): boolean {
     return resolveSettingsSearchI18nKey(key) === SETTINGS_SEARCH_PAGE_TITLE_KEYS[pageId];
@@ -110,7 +110,7 @@ const gtdProps: Parameters<typeof SettingsGtdPage>[0] = {
     t,
     language: 'en',
     settings: {
-        // Pomodoro rows hang off the feature flag; the save-audio row needs the
+        // Pomodoro rows hang off the característica flag; the save-audio row needs the
         // audio capture default and speech-to-text both on.
         features: { pomodoro: true },
         gtd: { defaultCaptureMethod: 'audio', taskEditor: { presentation: 'inline' } },
@@ -175,7 +175,7 @@ const syncProps: Parameters<typeof SettingsSyncPage>[0] = {
     dropboxConnected: false,
     dropboxBusy: false,
     dropboxAuthInProgress: false,
-    dropboxRedirectUri: 'http://127.0.0.1:53682/oauth/dropbox/callback',
+    dropboxRedirectUri: 'http://127.0.0.1:53682/oauth/dropbox/devolución de llamada',
     dropboxTestState: 'idle',
     onCloudUrlChange: noop,
     onCloudTokenChange: noop,
@@ -237,7 +237,7 @@ const syncProps: Parameters<typeof SettingsSyncPage>[0] = {
 
 const dataProps: Parameters<typeof SettingsDataPage>[0] = {
     t,
-    // Diagnostics is a Tauri-only section; the log path row needs logging on.
+    // Diagnostics is a Tauri-only section; the registro ruta row needs logging on.
     isTauri: true,
     loggingEnabled: true,
     logPath: '/tmp/mindwtr.log',
@@ -281,7 +281,7 @@ const integrationsProps: Parameters<typeof SettingsIntegrationsPage>[0] = {
         color: '#2563EB',
     }],
     // System calendars are macOS/Linux only, and the target picker needs both
-    // the push toggle and granted permission.
+    // the empujar toggle and granted permission.
     showSystemCalendarSection: true,
     systemCalendarPermission: 'granted',
     calendarPushEnabled: true,
@@ -409,7 +409,7 @@ const aboutProps: Parameters<typeof SettingsAboutPage>[0] = {
     onSubmitFeedback: asyncNoop,
 };
 
-// One entry per page id; several renders where a page can only show one branch
+// One entry per page id; several renders where a page puede only show one rama
 // of an exclusive choice at a time.
 const PAGE_VARIANTS: Record<SettingsSearchPageId, ReactElement[]> = {
     main: [<SettingsMainPage key="main" {...mainProps} />],

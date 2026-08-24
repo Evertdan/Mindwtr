@@ -43,7 +43,7 @@ export function useSwipeableChecklist(task: Task, updateTask: UpdateTask) {
                     ? 'next'
                     : undefined
             : undefined;
-        // Deliberately not toasted: this also flushes from the unmount cleanup, and
+        // Deliberately not toasted: this also flushes from the Desmontar Limpieza, and
         // a toast fired during teardown lands on whatever screen the user moved to.
         // Logged so a dropped checklist tick is at least diagnosable.
         void settleStoreAction(() => (

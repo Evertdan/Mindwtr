@@ -40,15 +40,15 @@ export interface TaskListScope {
     deleteSelected: () => void;
     setStatusSelected?: (status: TaskStatus) => void;
     focusAddInput?: () => boolean;
-    // Move DOM focus onto the currently selected task's title and render its
+    // Move DOM enfoque onto the currently selected tarea's title and renderizar its
     // highlight, so entering the list from the sidebar (ArrowRight / `l`)
-    // selects a task instead of focusing the scroll container (#890). Returns
-    // false when there is no task to select so the caller can fall back to
+    // selects a tarea en lugar de focusing the scroll container (#890). Returns
+    // false when there is no tarea to select so the caller puede fall back to
     // focusing the main-content container.
     focusSelected?: () => boolean;
 }
 
-// Status chord: `s` then a letter sets the selected task's status (#860).
+// Status chord: `s` then a letter sets the selected tarea's status (#860).
 // Letters mirror the g-navigation chords (gi/gn/gw/gs/gd/ga).
 const STATUS_CHORD_MAP: Record<string, TaskStatus> = {
     i: 'inbox',
@@ -76,15 +76,15 @@ function isEditableTarget(target: EventTarget | null): boolean {
     return tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable;
 }
 
-// An open modal dialog (global search, quick add, prompts) owns the keyboard:
-// list shortcuts must never act on the view behind it. Without this, a stray
-// Enter or 'e' with focus outside the dialog's input completed a task in the
-// background Focus list from inside search (same class as the #848 menu fix).
+// An open modal dialog (global search, quick agregar, prompts) owns the keyboard:
+// list shortcuts debe nunca act on the view behind it. Without esto, a stray
+// Enter or 'e' with enfoque outside the dialog's input completed a tarea in the
+// background enfoque list from inside search (same clase as the #848 menu fix).
 function hasModalDialogOpen(): boolean {
     return document.querySelector('[role="dialog"][aria-modal="true"]') !== null;
 }
 
-// Enter must keep activating whatever control actually has focus (buttons,
+// Enter debe keep activating whatever control actually has enfoque (buttons,
 // menu items, links); the list-level Enter binding only fires when nothing
 // interactive is focused.
 function hasInteractiveFocus(): boolean {
@@ -150,9 +150,9 @@ function triggerQuickAdd() {
     window.dispatchEvent(new Event('mindwtr:quick-add'));
 }
 
-// Click the current view's visible add-task affordance so a keyboard add
-// inherits its context — a project view's trigger presets that project —
-// instead of always landing in the Inbox (#978).
+// Click the current view's visible agregar-tarea affordance so a keyboard agregar
+// inherits its contexto — a project view's trigger presets that project —
+// en lugar de siempre landing in the Inbox (#978).
 function clickVisibleAddTaskTrigger(): boolean {
     const root = document.querySelector<HTMLElement>('[data-main-content]') ?? document.body;
     const target = Array.from(root.querySelectorAll<HTMLElement>('[data-add-task-trigger]'))
@@ -169,18 +169,18 @@ function clickVisibleAddTaskTrigger(): boolean {
 
 function getAppScopedShortcutKey(event: KeyboardEvent): string {
     if (event.key.length !== 1) return event.key;
-    // Caps Lock reports 'A' without Shift; decide the a/A pair by Shift alone
-    // so Caps Lock doesn't arm the area chord instead of quick add (#865).
+    // Caps candado reports 'A' without Shift; decide the a/A pair by Shift alone
+    // so Caps candado doesn't arm the area chord en lugar de quick agregar (#865).
     if (event.key.toLowerCase() === 'a') return event.shiftKey ? 'A' : 'a';
     return event.key;
 }
 
-// A modifier pressed mid-chord (re-pressing Shift before the digit) must not
-// consume and cancel the pending chord (#865).
+// A modifier pressed mid-chord (re-pressing Shift before the digit) no debe
+// consume and cancel the pendiente chord (#865).
 const CHORD_MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'AltGraph']);
 
 function getAreaChordKey(event: KeyboardEvent): string {
-    // Users often hold Shift from the chord prefix into the digit (Shift+1
+    // Users a menudo hold Shift from the chord prefix into the digit (Shift+1
     // reports '!'), and some layouts put digits on shifted keys. Read the
     // digit from the physical key so the chord still lands (#865).
     const digit = /^(?:Digit|Numpad)(\d)$/.exec(event.code)?.[1];
@@ -307,11 +307,11 @@ export function KeybindingProvider({
         scopeRef.current = scope;
     }, []);
 
-    // Every task list decision — which task is selected, what a key does to it —
+    // Every tarea list decision — which tarea is selected, what a key does to it —
     // belongs to a registered TaskListScope built from the view's own ordered
-    // task array (see `views/list/task-list-scope.ts`). A view that cannot
+    // tarea array (see `views/list/tarea-list-scope.ts`). A view that no puede
     // supply one (the calendar grid) registers nothing and keeps a single
-    // last-resort affordance: entering the list focuses the first task row so
+    // last-resort affordance: entering the list focuses the first tarea row so
     // Tab/Enter still reach it (#890).
     const focusFirstTaskRow = useCallback((): boolean => {
         const root = document.querySelector<HTMLElement>('[data-main-content]') ?? document.body;
@@ -319,8 +319,8 @@ export function KeybindingProvider({
         if (!row) return false;
         row.scrollIntoView?.({ block: 'nearest' });
         // A comma selector returns the first match in document order, which is
-        // the done button — Enter would then complete the task (#847). Prefer
-        // the title toggle so Enter opens the task instead.
+        // the done button — Enter sería then complete the tarea (#847). Prefer
+        // the title toggle so Enter opens the tarea instead.
         const focusTarget = row.querySelector<HTMLElement>('[data-task-view-toggle]')
             ?? row.querySelector<HTMLElement>('button, [tabindex]:not([tabindex="-1"])');
         if (!focusTarget) return false;
@@ -328,10 +328,10 @@ export function KeybindingProvider({
         return true;
     }, []);
 
-    // Entering the list from the sidebar (ArrowRight / `l`) should focus the
-    // selected task, not the scroll container — focusing the container painted
-    // its focus ring around the whole list and left no task visibly selected
-    // (#890). Fall back to the container only when there is no task to select.
+    // Entering the list from the sidebar (ArrowRight / `l`) debería enfoque the
+    // selected tarea, not the scroll container — focusing the container painted
+    // its enfoque ring around the whole list and left no tarea visibly selected
+    // (#890). Fall back to the container only when there is no tarea to select.
     const focusActiveSelection = useCallback((): boolean => {
         if (scopeRef.current?.focusSelected?.()) return true;
         if (focusFirstTaskRow()) return true;
@@ -495,8 +495,8 @@ export function KeybindingProvider({
             }
         };
 
-        // Gmail/Superhuman/Todoist-style task-action cluster: e done, x select,
-        // Enter open, z undo, # delete. Navigation matches the Vim preset since
+        // Gmail/Superhuman/Todoist-style tarea-acción cluster: e done, x select,
+        // Enter open, z undo, # eliminar. Navigation matches the Vim preset since
         // Gmail uses j/k and g-chords too.
         const handleStandard = (e: KeyboardEvent) => {
             if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -719,11 +719,11 @@ export function KeybindingProvider({
                 }
                 return;
             }
-            // An open menu owns the keyboard: don't fire list shortcuts (j/k,
-            // e, x, dd…) while focus sits on a menu item (#848).
+            // An open menu owns the keyboard: no fire list shortcuts (j/k,
+            // e, x, dd…) while enfoque sits on a menu item (#848).
             if (e.target instanceof HTMLElement && e.target.closest('[role="menu"]')) return;
-            // Same for modal dialogs: arrows and app shortcuts must not reach
-            // the list behind global search / quick add / prompts.
+            // Same for modal dialogs: arrows and app shortcuts no debe reach
+            // the list behind global search / quick agregar / prompts.
             if (hasModalDialogOpen()) return;
             if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.code === 'Comma') {
                 e.preventDefault();
@@ -943,8 +943,8 @@ export function KeybindingProvider({
     );
 }
 
-// Views register their task list opportunistically: one rendered outside the
-// provider (unit tests, embedded previews) simply has no keyboard scope.
+// Views register their tarea list opportunistically: one rendered outside the
+// proveedor (unit tests, embedded previews) simply has no keyboard scope.
 export function useOptionalKeybindings(): KeybindingContextType | null {
     return useContext(KeybindingContext) ?? null;
 }

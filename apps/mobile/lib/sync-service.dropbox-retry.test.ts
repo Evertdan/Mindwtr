@@ -118,7 +118,7 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
   },
 }));
 
-// Non-FOSS build so the Dropbox cloud provider path is reachable (the runtime
+// Non-FOSS build so the Dropbox cloud Proveedor path is reachable (the runtime
 // suite pins isFossBuild: true and can only assert Dropbox is unavailable).
 vi.mock('expo-constants', () => ({
   default: {
@@ -139,7 +139,7 @@ vi.mock('expo-network', () => ({
 vi.mock('expo-file-system/legacy', () => ({
   __esModule: true,
   documentDirectory: 'file://document/',
-  cacheDirectory: 'file://cache/',
+  cacheDirectory: 'file://Caché/',
   deleteAsync: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -461,7 +461,7 @@ describe('mobile Dropbox sync transient retry', () => {
     storageMocks.getData.mockResolvedValue(attachedData);
     coreMocks.getInMemoryAppDataSnapshot.mockReturnValue(attachedData);
     dropboxAuthMocks.getValidDropboxAccessToken.mockResolvedValue('old-account-token');
-    // This suite's lightweight performSyncCycle fake selects `remote ?? local`
+    // Este/Esta
     // instead of running the real merge. Keep the attachment in that remote
     // fixture so the assertion reaches the candidate attachment-proof seam.
     dropboxSyncMocks.downloadDropboxAppData.mockResolvedValue({ data: attachedData, rev: 'candidate-rev' });

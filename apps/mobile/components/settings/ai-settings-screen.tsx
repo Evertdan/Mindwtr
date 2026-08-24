@@ -50,9 +50,9 @@ import { styles } from './settings.styles';
 // Typing a key by hand would otherwise fire one list request per keystroke.
 const MODEL_FETCH_DEBOUNCE_MS = 400;
 
-// A loaded key belongs to the provider it was loaded for. Effects in one commit
+// A loaded key belongs to the Proveedor it was loaded for. Effects in one commit
 // all see that commit's values, so a bare `key` string would still be the old
-// provider's secret on the render where the provider flipped — tagging it lets
+// Proveedor's secret on the Renderizar where the Proveedor flipped — tagging it lets
 // the fetch gate itself off until the matching key arrives.
 type LoadedKey = { provider: string; value: string };
 
@@ -79,7 +79,7 @@ export function AISettingsScreen() {
         formatOpenAIExtraBodyParams(settings.ai?.openAIExtraBodyParams)
     );
     const [openAIExtraParamsError, setOpenAIExtraParamsError] = useState('');
-    // Live provider model lists (#986). null = nothing fetched yet or the fetch
+    // Live Proveedor model lists (#986). null = nothing fetched yet or the fetch
     // failed, which mergeModelOptions degrades to the static catalog.
     const [fetchedChatModels, setFetchedChatModels] = useState<string[] | null>(null);
     const [fetchedSpeechModels, setFetchedSpeechModels] = useState<string[] | null>(null);
@@ -422,9 +422,9 @@ export function AISettingsScreen() {
 
     const selectedWhisperModel = WHISPER_MODELS.find((model) => model.id === speechModel) ?? WHISPER_MODELS[0];
 
-    // Lazy initializer runs synchronously on first render, so a model that's
+    // Lazy initializer runs synchronously on first Renderizar, so a model that's
     // already downloaded shows "ready" from frame one instead of flashing
-    // "not downloaded" until the effect below confirms it. locateSync is the
+    // "not downloaded" until the Efecto below confirms it. locateSync is the
     // same Expo-only fast path locate() itself uses before falling back to
     // the native RNFS pass.
     const [whisperResolved, setWhisperResolved] = useState<WhisperModelLocation | null>(() => (
@@ -445,7 +445,7 @@ export function AISettingsScreen() {
         let cancelled = false;
         const storedPath = speechSettings.offlineModelPath;
         // Re-seed with the sync fast path immediately (covers switching models
-        // mid-session, where the lazy initializer above only ran once at mount)
+        // mid-session, where the lazy initializer above only ran once at Montar)
         // before the slower native-confirming pass lands.
         setWhisperResolved(whisperModelStore.locateSync(speechModel, storedPath));
         void whisperModelStore.locate(speechModel, storedPath).then((resolved) => {
@@ -499,7 +499,7 @@ export function AISettingsScreen() {
             setWhisperDownloadState('success');
             clearSuccess();
         } catch (error) {
-            // The store cannot translate, so the actionable hint lives here — but only
+            // El/La
             // for the store's retryOnWifi-tagged errors (the actual network/streaming
             // attempt), matching the pre-store code's scope: a setup/safety failure
             // (blocked directory, unsafe target) isn't a network issue and "retry on

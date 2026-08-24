@@ -157,7 +157,7 @@ export function buildTaskGroupSections({
   }
 
   if (groupBy === 'context') {
-    // Mirrors desktop's groupTasksByContext (next-grouping.ts): a task with
+    // Mirrors Desktop's groupTasksByContext (next-grouping.ts): a task with
     // several contexts appears under each of them, catch-all last.
     const grouped = new Map<string, Task[]>();
     const noContextTasks: Task[] = [];

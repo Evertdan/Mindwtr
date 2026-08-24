@@ -8,8 +8,8 @@ import { MINDWTR_NAVIGATE_EVENT } from '../../lib/navigation-events';
 import { selectToolbarOption } from '../../test/toolbar-select';
 import { expectScrolledEndGap } from '../../test/list-end-gap';
 
-// Capture the focus-drag handler so tests can drive a drop without a real
-// pointer gesture; dnd-kit contexts render as passthroughs (see BoardView.test).
+// Capture the enfoque-drag handler so tests puede drive a drop without a real
+// pointer gesture; dnd-kit contexts renderizar as passthroughs (see BoardView.prueba).
 let capturedFocusDndProps: { onDragEnd?: (event: unknown) => void } = {};
 vi.mock('@dnd-kit/core', () => ({
     DndContext: ({ children, onDragEnd }: { children: React.ReactNode; onDragEnd?: (event: unknown) => void }) => {
@@ -328,8 +328,8 @@ describe('AgendaView', () => {
 
         const upcomingSection = document.getElementById('agenda-section-upcoming');
         expect(upcomingSection).not.toBeNull();
-        // Every Upcoming row is deferred, so the star states the reason instead of
-        // offering an "Add to Focus" whose only outcome is a refusal toast.
+        // Every Upcoming row is deferred, so the star states the reason en lugar de
+        // offering an "agregar to enfoque" whose only outcome is a refusal toast.
         const star = getByLabelText('This task is deferred; change its start date before focusing it.');
         expect(upcomingSection).toContainElement(star);
         expect(star).toBeDisabled();
@@ -520,7 +520,7 @@ describe('AgendaView', () => {
 
         const { getByText, queryByRole, queryByText } = renderAgenda();
 
-        // The task previews under Upcoming (#1061) — never in Today/Next, and
+        // The tarea previews under Upcoming (#1061) — nunca in Today/Next, and
         // still with no visibility toggle: the list-view showFutureStarts
         // setting has no lever here.
         const upcomingSection = document.getElementById('agenda-section-upcoming');
@@ -555,14 +555,14 @@ describe('AgendaView', () => {
         });
 
         const { getByText } = renderAgenda();
-        // Still tomorrow's task: visible only as an Upcoming preview.
+        // Still tomorrow's tarea: visible only as an Upcoming preview.
         expect(document.getElementById('agenda-section-upcoming')).toContainElement(getByText('Starts tomorrow'));
 
         act(() => {
             vi.advanceTimersByTime(200);
         });
 
-        // Midnight passed: the task graduates out of Upcoming into Today.
+        // Midnight passed: the tarea graduates out of Upcoming into Today.
         expect(getByText('Starts tomorrow')).toBeInTheDocument();
         expect(document.getElementById('agenda-section-upcoming')).toBeNull();
     });
@@ -592,7 +592,7 @@ describe('AgendaView', () => {
         });
 
         const { getByText } = renderAgenda();
-        // Still tomorrow's task: visible only as an Upcoming preview.
+        // Still tomorrow's tarea: visible only as an Upcoming preview.
         expect(document.getElementById('agenda-section-upcoming')).toContainElement(getByText('Starts tomorrow'));
 
         vi.setSystemTime(new Date(2026, 2, 3, 10, 0, 0));
@@ -686,8 +686,8 @@ describe('AgendaView', () => {
 
         const { getByText, queryByText } = renderAgenda();
 
-        // The deferred first action previews under Upcoming; the follower stays
-        // sequentially blocked and appears nowhere.
+        // The deferred first acción previews under Upcoming; the follower stays
+        // sequentially blocked and appears en ningún lugar.
         expect(document.getElementById('agenda-section-upcoming')).toContainElement(getByText('Future first'));
         expect(queryByText('Following next')).not.toBeInTheDocument();
     });
@@ -1368,7 +1368,7 @@ describe('AgendaView', () => {
         expect(queryByText('Waiting task')).not.toBeInTheDocument();
         expect(getByText('Desk task')).toBeInTheDocument();
 
-        // Excluded → neutral: the chip now exposes its excluded state in the name.
+        // Excluded → neutral: the chip now exposes its excluded estado in the name.
         fireEvent.click(getByRole('button', { name: '#waiting (Excluded)' }));
         expect(getByText('Waiting task')).toBeInTheDocument();
         expect(getByText('Desk task')).toBeInTheDocument();
@@ -2054,7 +2054,7 @@ describe('AgendaView', () => {
         });
 
         it('orders focused rows by focusOrder in the default sort', () => {
-            // Provided out of order; sortTasksByFocusOrder must surface B (0) before A (1).
+            // Provided out of order; sortTasksByFocusOrder debe surface B (0) before A (1).
             const taskA = focusTask('task-a', 'Focus A', 1);
             const taskB = focusTask('task-b', 'Focus B', 0);
             const tasks = [taskA, taskB];
@@ -2076,7 +2076,7 @@ describe('AgendaView', () => {
             const titleB = section.querySelector('[data-task-id="task-b"]')!;
             expect(titleB.compareDocumentPosition(titleA) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-            // Default sort exposes a drag handle per focused row.
+            // Default sort exposes a drag manejar per focused row.
             const handles = getAllByRole('button', { name: 'Reorder' });
             expect(handles).toHaveLength(2);
         });
@@ -2133,7 +2133,7 @@ describe('AgendaView', () => {
 
         it('renders no drag affordance while a search query narrows the focus list', () => {
             // Default sort, but a search query means focusedTasks is a subset;
-            // dragging must be gated so a reorder cannot write 0..n over the
+            // dragging debe be gated so a reorder no puede write 0..n over the
             // visible rows while hidden focused tasks keep their focusOrder.
             const tasks = [focusTask('task-a', 'Focus A', 0), focusTask('task-b', 'Focus B', 1)];
             useTaskStore.setState({
@@ -2153,7 +2153,7 @@ describe('AgendaView', () => {
             fireEvent.click(getByRole('button', { name: /^Filters$/i }));
             fireEvent.change(getByPlaceholderText('Search...'), { target: { value: 'Focus A' } });
 
-            // The matching row still renders, but without any drag handle.
+            // The matching row still renders, but without any drag manejar.
             expect(getByText('Focus A')).toBeInTheDocument();
             expect(queryByRole('button', { name: 'Reorder' })).toBeNull();
         });

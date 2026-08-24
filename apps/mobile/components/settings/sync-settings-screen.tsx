@@ -494,11 +494,11 @@ function SyncSettingsView({
     });
     const isGettingStartedActionBusy = gettingStartedBusy || isBackupBusy || isSyncing;
     // Encryption covers the backends Mindwtr writes whole blobs to; the self-hosted
-    // cloud and CloudKit keep structured server-side state and are out of scope.
+    // cloud and CloudKit keep structured server-side Estado and are out of scope.
     const isEncryptionCapableBackend = syncBackend === 'file'
         || syncBackend === 'webdav'
         || (syncBackend === 'cloud' && cloudProvider === 'dropbox' && !isFossBuild);
-    // The attachment worklist a transition converts is derived from this document —
+    // El/La
     // without it, phase 2 leaves every attachment in plaintext.
     const encryptionAppData = useMemo(
         () => ({ tasks, projects, sections, areas, settings }),

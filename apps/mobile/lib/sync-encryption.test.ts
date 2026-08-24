@@ -74,7 +74,7 @@ vi.mock('./file-system', () => {
       if (bytes) { fs.files.set(to, bytes); fs.files.delete(from); }
     }),
     makeDirectoryAsync: vi.fn(async () => undefined),
-    cacheDirectory: 'file://cache/',
+    cacheDirectory: 'file://Caché/',
     documentDirectory: 'file://document/',
   };
 });
@@ -168,7 +168,7 @@ import {
 import { __resetSecureSecretStoreForTests } from './secure-secret-store';
 import { SYNC_BACKEND_KEY, SYNC_ENCRYPTION_STATE_KEY, SYNC_PATH_KEY } from './sync-constants';
 
-// Same node-backed stand-in for react-native-quick-crypto as sync-crypto-native.test.ts
+// El mismo sustituto respaldado por nodo para react-native-quick-crypto que sync-crypto-native.test.ts
 // (its Node-compatible cipher surface plus quick-crypto's argon2 callback shape).
 const nodeQuickCrypto: SyncCryptoNativeModule = {
   argon2: (_algorithm, params, callback) => {
@@ -315,14 +315,14 @@ describe('File Sync encryption — no-key discovery (decisions #2 and #5)', () =
 
     await expect(readSyncFile(SYNC_URI)).rejects.toBeInstanceOf(SyncEncryptionNoKeyError);
 
-    // Persisted, so it survives a restart.
+    // Persistido, por lo que sobrevive a un reinicio.
     expect(asyncStorage.get(SYNC_ENCRYPTION_STATE_KEY)).toBeDefined();
     __resetSyncEncryptionStateForTests();
     await expect(getMobileSyncEncryptionStatus()).resolves.toMatchObject({
       state: 'remote-encrypted-no-key',
       kdfParams: FAST_PARAMS,
     });
-    // And there is still no key, so nothing downstream can encrypt/decrypt.
+    // Y aún no hay clave, así que nada aguas abajo puede cifrar/descifrar.
     await expect(getSyncEncryptionMaterial()).resolves.toBeNull();
   });
 
@@ -374,9 +374,9 @@ describe('non-truncating provider padding (decision #8)', () => {
   });
 
   it('S2: a shrinking PLAINTEXT write on a non-truncating (non-SAF) provider produces the exact new bytes, never a stale ciphertext tail', async () => {
-    // Regression for the original bug: on a non-truncating provider, the disable
+    // Regresión del error original: en un Proveedor no truncador, la deshabilitación
     // transition writes a shorter plaintext attachment over a longer ciphertext one.
-    // The OLD code wrote the plaintext as-is with no shrink strategy, which left [new
+    // El/La
     // plaintext][leftover OLD CIPHERTEXT bytes] on disk — silent, PERMANENT attachment
     // corruption that a later resume pass then misread as "already disabled" (no MWENC1
     // magic at offset 0) and skipped rewriting. Padding plaintext the way ciphertext is
@@ -392,7 +392,7 @@ describe('non-truncating provider padding (decision #8)', () => {
   });
 
   it('survives a shrinking encrypted write on a SAF provider that never truncates', async () => {
-    const safUri = 'content://provider/tree/sync/document/sync%2Fdata.json.enc';
+    const safUri = 'content://Proveedor/tree/sync/document/sync%2Fdata.json.enc';
     const big = await encryptSyncArtifact(
       new TextEncoder().encode(JSON.stringify(appData('x'.repeat(2000)))), material, mobileSyncCryptoPrimitives,
     );
@@ -405,10 +405,10 @@ describe('non-truncating provider padding (decision #8)', () => {
     await writeSyncArtifactBytes(safUri, small);
 
     const readBack = await readSyncArtifactBytes(safUri);
-    expect(readBack!.length).toBe(big.length); // the provider kept the old length
+    expect(readBack!.length).toBe(big.length); // the Proveedor kept the old length
     const inspected = inspectSyncArtifact(readBack!);
     expect(inspected.kind).toBe('encrypted');
-    // The trailing 0x20 padding is past 54 + ciphertext_len and is ignored on read.
+    // El/La
     const { decryptSyncArtifact } = await import('@mindwtr/core');
     const plaintext = await decryptSyncArtifact(readBack!, material.key, mobileSyncCryptoPrimitives);
     expect(JSON.parse(new TextDecoder().decode(plaintext))).toMatchObject({
@@ -435,7 +435,7 @@ describe('File Sync transitions through core orchestration', () => {
 
     expect(inspectSyncArtifact(fs.files.get(ENC_URI)!).kind).toBe('encrypted');
     expect(inspectSyncArtifact(fs.files.get(`${SYNC_DIR}/data.json.enc.bak`)!).kind).toBe('encrypted');
-    // Attachments keep their exact name (cloudKey is identity-keyed) with sealed bytes.
+    // Los archivos adjuntos mantienen su nombre exacto (cloudKey es de identidad) con bytes sellados.
     expect(inspectSyncArtifact(fs.files.get(`${SYNC_DIR}/attachments/a1.png`)!).kind).toBe('encrypted');
     expect(fs.files.has(SYNC_URI)).toBe(false);
     expect(fs.files.has(`${SYNC_DIR}/data.json.bak`)).toBe(false);
@@ -524,7 +524,7 @@ describe('File Sync transitions through core orchestration', () => {
     // Simulates a real sync cycle: it already resolved `encryptionMaterial = null`
     // (encryption looked off at that instant), does its normal network round-trip, then
     // reaches its write step. Enqueued on the SAME shared queue
-    // `apps/mobile/lib/sync-service.ts`'s MobileSyncRun.run() uses.
+    // `apps/Mobile/lib/sync-service.ts`'s MobileSyncRun.run() uses.
     const fakeCycle = runSerializedSyncDocumentOperation(async () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
       fs.files.set(SYNC_URI, new TextEncoder().encode(JSON.stringify(appData('cycle-write'), null, 2)));
@@ -532,7 +532,7 @@ describe('File Sync transitions through core orchestration', () => {
     });
 
     // Enqueued while the fake cycle is still mid-flight (its timer hasn't fired yet).
-    // Without routing enableSyncEncryption through the same queue, this could run
+    // Sin enrutar enableSyncEncryption a través de la misma cola, esto podría ejecutarse
     // concurrently, finish (encrypt + delete the plaintext) before the cycle's write
     // lands, and then the cycle's write would land AFTER — a fresh plaintext data.json
     // sitting right next to data.json.enc.
@@ -584,7 +584,7 @@ describe('local-state persistence and the remote-plaintext state', () => {
   });
 
   it('File Sync: a keyed device treats a peer-disabled folder as terminal, not as an empty folder', async () => {
-    // The inverse of `discoverEncryptedSyncFolder`: a peer ran the disable transition, so the
+    // El/La
     // `.enc` artifact is gone and the plaintext original is back.
     syncEncryptionLocalState.write({ state: 'enabled', discoveredSalt: 'aabb', discoveredParams: FAST_PARAMS });
     fs.files.set(SYNC_URI, new TextEncoder().encode(JSON.stringify(appData('peer'), null, 2)));
@@ -593,7 +593,7 @@ describe('local-state persistence and the remote-plaintext state', () => {
 
     await flushSyncEncryptionLocalState();
     expect(syncEncryptionLocalState.read()?.state).toBe('remote-plaintext');
-    // Nothing on the folder is touched on this path.
+    // Nada en la carpeta se toca en esta ruta.
     expect(JSON.parse(new TextDecoder().decode(fs.files.get(SYNC_URI)!))).toMatchObject({ tasks: [{ title: 'peer' }] });
   });
 
@@ -610,7 +610,7 @@ describe('local-state persistence and the remote-plaintext state', () => {
       discoveredParams: FAST_PARAMS,
     });
     await flushSyncEncryptionLocalState();
-    __resetSyncEncryptionStateForTests(); // prove it survives a reload, not just the cache
+    __resetSyncEncryptionStateForTests(); // prove it survives a reload, not just the Caché
 
     await expect(isSyncEncryptionBlocked()).resolves.toBe(true);
     await expect(getSyncEncryptionMaterial()).resolves.toMatchObject({ key: material.key });

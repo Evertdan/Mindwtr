@@ -15,9 +15,9 @@ import { logError, logWarn } from './app-log';
 import { isTauriRuntime } from './runtime';
 import { invokeNativeOr } from './tauri-invoke';
 
-// The debounce window the #1054 handoff specifies: batch bursts of edits
+// The rebote window the #1054 handoff specifies: lote bursts of edits
 // (e.g. a bulk operation, or sync landing a hundred remote changes) into a
-// single rebuild-and-write instead of one per change.
+// single rebuild-and-write en lugar de one per change.
 const MAC_WIDGET_SYNC_DEBOUNCE_MS = 2000;
 
 const isMacOS = (): boolean => {
@@ -66,7 +66,7 @@ export async function triggerMacWidgetPayloadWrite(data: AppData): Promise<void>
 
 // Deliberately the filtered *live* slices, not `_allTasks`/`_allProjects`
 // (which include tombstones): the payload builder only ever needs currently-
-// visible tasks/projects, and this path runs on every debounced data change,
+// visible tasks/projects, and esto ruta runs on every debounced data change,
 // so skipping the tombstone-inclusive collections avoids proportionally more
 // work as the 90-day tombstone retention window fills up.
 const buildFullAppData = (): AppData => {

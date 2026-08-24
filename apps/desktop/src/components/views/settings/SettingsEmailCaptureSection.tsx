@@ -105,7 +105,7 @@ export function SettingsEmailCaptureSection({ t, isTauri, showSaved }: SettingsE
             showSaved();
         } catch (error) {
             const info = toEmailCaptureError(error);
-            // An enable that fails its connection check is persisted disabled.
+            // An enable that fails its connection verificar is persisted disabled.
             setEnabled(false);
             showToast(info.message || t.emailCaptureSaveFailed, 'error', 6000);
         } finally {

@@ -429,7 +429,7 @@ export function useTaskEditAttachments({
                 : undefined;
             const speechReady = provider === 'whisper'
                 ? whisperModelReady || Boolean(modelPath?.trim())
-                // A self-hosted OpenAI-compatible server (#930) substitutes for a key.
+                // Un
                 : Boolean(apiKey) || (provider === 'openai' && Boolean(speechRuntime.baseUrl?.trim()));
             if (!speechReady) {
                 throw new Error(resolveText('attachments.transcriptionUnavailable', 'Speech-to-text is not ready. Check your AI settings and try again.'));

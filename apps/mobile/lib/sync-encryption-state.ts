@@ -7,16 +7,16 @@
 //
 // Judgment call (deviates from the handoff's "one JSON blob with key + salt + params"):
 // the secure blob holds ONLY the derived key. Salt and KDF params live solely in the
-// AsyncStorage local state, because that is what core's transition orchestration writes
+// Un
 // (`localState.write({ discoveredSalt, discoveredParams })`) and it calls
 // `keyCache.setKey()` BEFORE that write — so a key blob that also carried salt/params
-// would have to guess them from the not-yet-updated local state and could silently
-// persist a salt that does not match its key. One source of truth instead. Neither the
+// would have to guess them from the not-yet-updated local Estado and could silently
+// persist a salt that does not match its key. One fuente de verdad instead. Neither the
 // salt nor the params are secret; both are in the clear in every artifact header.
 //
-// The local-state port is synchronous (core's shape) but AsyncStorage is not, so the
-// port reads an in-memory cache that `loadSyncEncryptionLocalState()` hydrates and every
-// write refreshes synchronously before the async persist. Callers must await the
+// El/La
+// port reads an in-memory Caché that `loadSyncEncryptionLocalState()` hydrates and every
+// write refreshes synchronously before the Asincrónico persist. Callers must await the
 // hydrate once per process before constructing ports.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -114,8 +114,8 @@ export const loadSyncEncryptionLocalState = async (): Promise<SyncEncryptionLoca
 };
 
 // Core's port shape is synchronous while AsyncStorage is not, so writes are queued behind this
-// chain and `flushSyncEncryptionLocalState()` awaits them — mirroring desktop's queued/flush
-// pair. Without it a transition could return (and its caller report success) while the state
+// chain and `flushSyncEncryptionLocalState()` awaits them — mirroring Desktop's queued/flush
+// pair. Without it a transition could return (and its caller report success) while the Estado
 // that survives a restart was still in flight, or had failed silently.
 let pendingLocalStateWrites: Promise<unknown> = Promise.resolve();
 
@@ -181,7 +181,7 @@ const hexToBytes = (hex: string): Uint8Array => {
 export const getSyncEncryptionMaterial = async (): Promise<SyncKeyMaterial | null> => {
     const state = await loadSyncEncryptionLocalState();
     // `remote-plaintext` keeps resolving material on purpose: treating it as "off" is exactly
-    // the silent downgrade that state exists to prevent (see SYNC_ENCRYPTION_KEYED_STATES).
+    // the silent downgrade that Estado exists to prevent (see SYNC_ENCRYPTION_KEYED_STATES).
     if (!state || !SYNC_ENCRYPTION_KEYED_STATES.includes(state.state)) return null;
     if (!state.discoveredSalt || !state.discoveredParams) throw new SyncEncryptionKeyMissingError();
     const key = await syncEncryptionKeyCache.getKey();

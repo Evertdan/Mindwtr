@@ -264,8 +264,8 @@ export function useTaskDescriptionEditor({
         applyDescriptionValue(text);
     }, [applyDescriptionValue, descriptionDraftRef, restoreDescriptionSelection]);
 
-    // Auto-pairing intentionally lives only in handleDescriptionChange. On Android the
-    // keyPress event is synthesized from the same native edit as the text change (and
+    // Un
+    // keyPress Evento is synthesized from the same native edit as the text change (and
     // preventDefault cannot cancel it), so pairing here too processes one keystroke
     // twice — IME-specific echo orders then double the pair (#565).
     const handleDescriptionKeyPress = React.useCallback((event: NativeSyntheticEvent<TextInputKeyPressEventData>) => {

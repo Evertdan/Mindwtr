@@ -1,27 +1,27 @@
-# ADR 0021: Review Candidates Beyond Review Dates
+# ADR 0021: Candidatos de revisión más allá de fechas de revisión
 
-Date: 2026-07-01
-Status: Accepted
+Fecha: 2026-07-01
+Estado: Aceptado
 
-## Context
+## Contexto
 
-The Review workflow was strictly review-date-driven: items surface in Daily Review and the Focus review-due section only when `reviewAt` is due. Issue #804 (consolidating #685, #317, #724) asked whether Review should also surface candidates for people who never set review dates.
+El flujo de trabajo de revisión fue estrictamente impulsado por fecha de revisión: los artículos se muestran en Revisión diaria y la sección de revisión de enfoque debida solo cuando `reviewAt` es debido. El problema #804 (consolidación de #685, #317, #724) preguntó si la revisión también debería mostrar candidatos para personas que nunca establecen fechas de revisión.
 
-Signals from users split two ways:
+Las señales de los usuarios se dividen de dos maneras:
 
-- Power users drive everything through `someday + review date` and treat due dates as hard commitments only (#724). For them the date-driven model works and extra items are noise.
-- Users who do not set review dates found the review-date surfaces empty and reviewed ad-hoc from Projects/Next/Someday (#317, #685).
+- Los usuarios avanzados impulsan todo a través de `someday + review date` y tratan los plazos como compromisos duros solo (#724). Para ellos el modelo impulsado por la fecha funciona y los artículos adicionales son ruido.
+- Los usuarios que no establecen fechas de revisión encontraron que las superficies de fecha de revisión estaban vacías y revisaron ad-hoc desde Proyectos/Siguiente/Algún día (#317, #685).
 
-Stale-item detection already existed in core (`getStaleItems`, 14-day threshold over next/waiting tasks and active projects) but was only consumed by the AI review step, so users without an AI provider never saw it. Separately, #317 deferred an "advance review date" action because it needed an interval decision.
+La detección de artículos obsoletos ya existía en núcleo (`getStaleItems`, umbral de 14 días sobre tareas siguiente/en espera y proyectos activos) pero solo fue consumida por el paso de revisión de IA, por lo que los usuarios sin un proveedor de IA nunca la vieron. Por separado, #317 diferido una acción "avanzar fecha de revisión" porque necesitaba una decisión de intervalo.
 
-## Decision
+## Decisión
 
-1. **Weekly Review gets a "Stale items" step; Daily Review stays date-driven.** The weekly wizard shows the plain `getStaleItems` list to everyone (no AI required). When AI review is enabled, the AI analysis tools appear inside the same step instead of a separate AI-only step — one surface, no duplication. The step auto-skips when there are no stale items, so date-driven users see nothing new unless items actually go stale.
-2. **"Review in 1 week" joins "Mark reviewed" as a post-review action.** The interval is a fixed 7 days from now (`getAdvancedReviewDate` in core), matching the weekly review cadence. No per-task interval field and no settings knob: per-task intervals are recurrence-style complexity for a niche need, and editing `reviewAt` directly remains available for custom cadences. The new date preserves the original value's date-only vs datetime shape.
-3. **Candidate logic stays a core predicate.** Both platforms consume `getStaleItems` and `getAdvancedReviewDate` from `@mindwtr/core`; no per-platform copies.
+1. **Revisión semanal obtiene un paso "Artículos obsoletos"; la revisión diaria permanece impulsada por la fecha.** El asistente semanal muestra la lista de `getStaleItems` plana a todos (no se requiere IA). Cuando la revisión de IA está habilitada, las herramientas de análisis de IA aparecen dentro del mismo paso en lugar de un paso solo de IA separado — una superficie, sin duplicación. El paso se salta automáticamente cuando no hay artículos obsoletos, por lo que los usuarios impulsados por la fecha no ven nada nuevo a menos que los artículos realmente se vuelvan obsoletos.
+2. **"Revisar en 1 semana" se une a "Marcar revisado" como acción posterior a la revisión.** El intervalo es un fijo de 7 días a partir de ahora (`getAdvancedReviewDate` en core), coincidiendo con el ritmo de revisión semanal. Sin campo de intervalo por tarea y sin perilla de configuración: los intervalos por tarea son complejidad de estilo de recurrencia para una necesidad de nicho y editar `reviewAt` directamente sigue disponible para ritmos personalizados. La nueva fecha preserva la forma de solo fecha vs datetime del valor original.
+3. **La lógica candidata se mantiene un predicado central.** Ambas plataformas consumen `getStaleItems` y `getAdvancedReviewDate` de `@mindwtr/core`; sin copias por plataforma.
 
-## Consequences
+## Consecuencias
 
-- Users without review dates get one weekly surface listing neglected items; users with disciplined review dates see no change unless items stall for 14+ days.
-- No new task fields, no new settings, no sync schema change (`reviewAt` writes go through the existing update path).
-- The 14-day stale threshold stays a core default rather than a setting; revisit only if real usage shows the fixed threshold failing.
+- Los usuarios sin fechas de revisión obtienen una superficie semanal listando artículos descuidados; los usuarios con fechas de revisión disciplinadas no ven cambios a menos que los artículos se bloqueen durante 14+ días.
+- Sin nuevos campos de tarea, sin nueva configuración, sin cambio de esquema de sincronización (los escritos de `reviewAt` pasan a través de la ruta de actualización existente).
+- El umbral de 14 días obsoleto permanece como predeterminado central en lugar de un ajuste; revisar solo si el uso real muestra el umbral fijo fallando.

@@ -30,19 +30,19 @@ inline fun <T> startupSection(phase: String, block: () -> T): T {
 }
 `;
 
-// ContextAutomationReceiver.kt and ContextAutomationHeadlessService.kt used to be
+// ContextAutomationReceiver.kt y ContextAutomationHeadlessService.kt solían ser
 // generated here as template strings. They are now real, compiled, lintable
-// Kotlin source in the local Expo module at
+// Fuente Kotlin en el módulo Expo local en
 // apps/mobile/modules/context-automation/android/... (mirroring the
 // notification-open-intents module's structure), so this plugin no longer
 // writes them into the app's own package. android-manifest-fixes.js registers
 // them by fully-qualified name.
 
 const selfLaunchGuardFunction = `  private fun isSelfLaunchedIntent(intent: Intent?): Boolean {
-    // MainActivity is exported, so any app can start it carrying taskId /
+    // MainActivity se exporta, por lo que cualquier aplicación puede iniciarlo llevando taskId /
     // actionIdentifier extras. The referrer is the package that sent the
     // launch — for our own notification PendingIntents that is us, and
-    // Instrumentation swaps it in for the duration of onNewIntent too. But
+    // La instrumentación lo intercambia para la duración de onNewIntent también. Pero
     // getReferrer() prefers the caller-supplied EXTRA_REFERRER over it, so an
     // intent carrying either referrer extra is disqualified outright.
     if (intent == null) return false
@@ -208,9 +208,9 @@ const patchMainActivity = (source) => {
       /override fun onCreate\(savedInstanceState: Bundle\?\) \{[\s\S]*?\n  \}/,
       `override fun onCreate(savedInstanceState: Bundle?) {
     startupMark("native.main_activity.on_create:start")
-    // Set the theme to AppTheme BEFORE onCreate to support
+    // Establecer el tema en AppTheme ANTES de onCreate para admitir
     // coloring the background, status bar, and navigation bar.
-    // This is required for expo-splash-screen.
+    // Este/Esta
     // setTheme(R.style.AppTheme);
     // @generated begin expo-splashscreen - expo prebuild (DO NOT MODIFY) sync-f3ff59a738c56c9a6119210cb55f0b613eb8b6af
     startupSection("native.main_activity.splash_register") {

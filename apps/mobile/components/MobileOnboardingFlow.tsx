@@ -31,8 +31,8 @@ export function MobileOnboardingFlow({
   const onFilled = filledButton.textColor ?? tc.onTint;
   const { t } = useLanguage();
   const { fontScale } = useWindowDimensions();
-  // At large font scales the note and the skip button cannot share a row;
-  // stack them so the note keeps the full card width (#632).
+  // At large font scales the NOTA and the skip button cannot share a row;
+  // stack them so the NOTA keeps the full card width (#632).
   const stackFooter = fontScale >= 1.5;
 
   return (

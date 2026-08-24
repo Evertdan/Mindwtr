@@ -9,7 +9,7 @@ type AppPressableProps = PressableProps & {
     pressedColor?: string;
 };
 
-// Last-wins borderRadius lookup so the pressed overlay hugs rounded corners.
+// último gana borderRadius lookup so the superposición presionada hugs esquinas redondeadas.
 const findBorderRadius = (style: StyleProp<ViewStyle>): number | undefined => {
     if (!style || typeof style !== 'object') return undefined;
     if (Array.isArray(style)) {

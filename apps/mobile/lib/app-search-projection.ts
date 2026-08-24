@@ -38,7 +38,7 @@ export function isTaskIndexable(task: Task): boolean {
     return isTaskVisible(task) && task.status !== 'done';
 }
 
-// The store's visible-projects selector filters deletedAt only, not archived
+// El/La
 // status, so that check lives here.
 export function isProjectIndexable(project: Project): boolean {
     return !project.deletedAt && project.status !== 'archived';

@@ -1,30 +1,30 @@
-# ADR 0004: SQLite WAL and FTS5 as the Default Local Persistence Stack
+# ADR 0004: SQLite WAL y FTS5 como pila de persistencia local predeterminada
 
-Date: 2026-03-14
-Status: Accepted
+Fecha: 2026-03-14
+Estado: Aceptado
 
-## Context
+## Contexto
 
-Mindwtr is local-first and needs a single persistence approach that works across desktop and mobile without introducing a separate database service or sync-specific storage tier.
+Mindwtr es nativo-primero y necesita un enfoque de persistencia único que funcione entre escritorio y móvil sin introducir un servicio de base de datos separado o una capa de almacenamiento específica de sincronización.
 
-The storage layer needs to support:
+La capa de almacenamiento necesita soportar:
 
-- offline reads and writes with low operational overhead
-- safe concurrent access patterns from app code and background work
-- predictable snapshots for sync/export
-- fast full-text search over tasks and projects
+- lecturas y escrituras sin conexión con baja sobrecarga operativa
+- patrones de acceso concurrente seguro desde código de aplicación y trabajo en segundo plano
+- instantáneas predecibles para sincronización/exportación
+- búsqueda de texto completo rápida sobre tareas y proyectos
 
-Using SQLite with write-ahead logging (WAL) and an FTS5 index keeps the storage model embedded and portable while still covering those requirements.
+Usar SQLite con registro de escritura anticipada (WAL) e índice FTS5 mantiene el modelo de almacenamiento incrustado y portátil mientras aún cubre esos requisitos.
 
-## Decision
+## Decisión
 
-We use SQLite as the primary local store, enable WAL mode, and maintain FTS5-backed search indexes for task/project search.
+Usamos SQLite como almacén local principal, habilitamos modo WAL y mantenemos índices de búsqueda respaldados por FTS5 para búsqueda de tarea/proyecto.
 
-This remains the default persistence stack for desktop and mobile adapters unless a platform constraint forces a temporary fallback path.
+Este sigue siendo la pila de persistencia predeterminada para adaptadores de escritorio y móvil a menos que una restricción de plataforma fuerce una ruta de respaldo temporal.
 
-## Consequences
+## Consecuencias
 
-- Search stays local and fast without introducing an external search service.
-- Readers can continue while writes are in progress, which fits Mindwtr's offline-first model better than a single locked JSON file.
-- We must manage schema migrations, FTS index rebuilds, and corruption recovery explicitly in application code.
-- JSON backups and exports remain important as portability and repair mechanisms, but they are not the primary runtime store.
+- La búsqueda permanece local y rápida sin introducir un servicio de búsqueda externo.
+- Los lectores pueden continuar mientras las escrituras están en progreso, lo que se ajusta mejor al modelo nativo-primero de Mindwtr que un archivo JSON bloqueado único.
+- Debemos administrar migraciones de esquema, reconstrucciones de índice FTS y recuperación de corrupción explícitamente en código de aplicación.
+- Las copias de seguridad JSON y las exportaciones siguen siendo importantes como mecanismos de portabilidad y reparación, pero no son el almacén de tiempo de ejecución principal.

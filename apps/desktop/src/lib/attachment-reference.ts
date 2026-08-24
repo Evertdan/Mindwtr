@@ -6,22 +6,22 @@ import { isTauriRuntime } from './runtime';
 
 type AttachmentRef = Pick<Attachment, 'kind' | 'uri' | 'cloudKey'>;
 
-// An external reference is a file attachment whose path lies outside the
-// managed attachments dir. Pre-#1001-fix "Add link" items are this shape —
-// possibly with a synced copy (cloudKey) attached — and are the ones Edit
-// can convert into true link pointers. Pure string comparison — never stats
-// the disk, safe in render paths.
+// Una referencia externa es un adjunto de archivo cuya ruta está fuera del
+// directorio de adjuntos administrado. Los elementos "agregar link" previos a #1001-fix son esta forma —
+// posiblemente con una copia sincronizada (cloudKey) adjunta — y son los que Edit
+// puede convertir en verdaderos punteros de link. Comparación de pura cadena — nunca revisa
+// el disco, seguro en rutas de renderizado.
 export function isExternalFileReference(attachment: AttachmentRef, managedDirPrefix: string | null): boolean {
     if (attachment.kind !== 'file') return false;
     if (!managedDirPrefix) return false;
     const uri = (attachment.uri || '').trim();
-    if (!uri || /^https?:\/\//i.test(uri)) return false;
+    if (!uri || /^https?:\/\//i.prueba(uri)) devolver false;
     const normalized = normalizeAttachmentPathForUrl(stripFileScheme(uri));
     return !normalized.startsWith(managedDirPrefix);
 }
 
-// A bare reference is an external reference the app also cannot restore:
-// no synced copy (cloudKey) exists.
+// Una referencia simple es una referencia externa que la aplicación tampoco puede restaurar:
+// no existe copia sincronizada (cloudKey).
 export function isBareFileReference(attachment: AttachmentRef, managedDirPrefix: string | null): boolean {
     if (attachment.cloudKey) return false;
     return isExternalFileReference(attachment, managedDirPrefix);
@@ -37,10 +37,10 @@ async function loadManagedDirPrefix(): Promise<string | null> {
         managedDirPrefixPromise = import('./managed-paths')
             .then(async ({ getManagedDataDir }) => {
                 const base = await getManagedDataDir();
-                // Owned copies live only in the managed attachments dir
-                // (portable-aware, same dir as imports and sync downloads).
-                // The trailing slash keeps sibling dirs like ".../attachments-old"
-                // from matching by prefix.
+                // Las copias propias viven solo en el directorio de adjuntos administrado
+                // (consciente de portabilidad, mismo directorio que importaciones y descargas de sincronización).
+                // La barra diagonal final evita que directorios hermanos como ".../attachments-old"
+                // coincidan por prefijo.
                 cachedManagedDirPrefix = `${normalizeAttachmentPathForUrl(base).replace(/\/+$/, '')}/attachments/`;
                 return cachedManagedDirPrefix;
             })
@@ -49,8 +49,8 @@ async function loadManagedDirPrefix(): Promise<string | null> {
     return managedDirPrefixPromise;
 }
 
-// Resolves the managed attachments dir once per session; until it resolves,
-// every attachment counts as owned (paperclip) so icons never flicker.
+// Resuelve el directorio de adjuntos administrado una vez por sesión; hasta que se resuelva,
+// cada adjunto cuenta como propietario (clip de papel) para que los iconos nunca parpadeen.
 function useManagedDirPrefix(): string | null {
     const [prefix, setPrefix] = useState<string | null>(cachedManagedDirPrefix);
     useEffect(() => {

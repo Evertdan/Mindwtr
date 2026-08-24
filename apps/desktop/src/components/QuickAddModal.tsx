@@ -60,7 +60,7 @@ import { QuickAddSyntaxHint } from './ui/QuickAddSyntaxHint';
 import { QuickAddPreview } from './QuickAddPreview';
 import { FocusStarIcon } from './FocusStarIcon';
 
-// Relative to the managed data dir (portable-aware, #855).
+// Relativo al directorio de datos administrado (consciente de portabilidad, #855).
 const QUICK_ADD_IMAGE_CAPTURE_DIR = 'quick-add-images';
 
 type PastedImageAttachment = {
@@ -205,7 +205,7 @@ export function QuickAddModal({ standaloneWindow = false }: QuickAddModalProps) 
     const defaultAreaId = defaultAreaMode === 'active'
         ? activeAreaId ?? ''
         : resolveDefaultNewTaskAreaId(settings, sortedAreas) ?? '';
-    // Read lazily on each open: the modal does not subscribe to tasks/people.
+    // Leer lentamente en cada apertura: la modal no se suscribe a tareas/personas.
     const quickAddParseOptions = useMemo(
         () => buildQuickAddParseOptions(settings, isOpen ? useTaskStore.getState() : {}),
         [isOpen, settings],
@@ -214,7 +214,7 @@ export function QuickAddModal({ standaloneWindow = false }: QuickAddModalProps) 
         () => parseQuickAdd(value, projects, new Date(), areas, quickAddParseOptions),
         [value, projects, areas, quickAddParseOptions],
     );
-    // Same parse object the submit path uses, shaped for display only.
+    // El mismo objeto de análisis que usa la ruta de envío, formado solo para mostrar.
     const previewEntries = useMemo(
         () => buildQuickAddPreviewEntries(parsedInput, { t, projects, areas, rawInput: value }),
         [areas, parsedInput, projects, t, value],
@@ -542,11 +542,11 @@ export function QuickAddModal({ standaloneWindow = false }: QuickAddModalProps) 
     const startRecording = useCallback(async () => {
         if (recordingBusy || isRecording) return;
         setRecordingError(null);
-        // Voice capture is speech-to-text: if no model/key is configured, transcription
-        // can never run, so guard before showing the recording indicator. Keep the dialog
-        // open and point the user at Settings instead of silently aborting (#886).
-        // This must derive from the same resolveSpeechCapture call the transcribe gate
-        // below uses, or the two can silently disagree.
+        // La captura de voz es conversión de voz a texto: si no se configura ningún modelo/clave, la transcripción
+        // puede nunca ejecutarse, así que proteger antes de mostrar el indicador de grabación. Mantener la ventana de diálogo
+        // abierta y señalar al usuario en Configuración en lugar de abortar silenciosamente (#886).
+        // Esto debe derivarse del mismo llamado resolveSpeechCapture que la puerta de transcripción
+        // a continuación usa, o los dos pueden silenciosamente no estar de acuerdo.
         const { ready: speechConfigured } = await resolveSpeechCapture(settings.ai);
         if (!speechConfigured) {
             showToast(
@@ -840,8 +840,8 @@ export function QuickAddModal({ standaloneWindow = false }: QuickAddModalProps) 
         let currentAreas = areas;
         if (standaloneWindow) {
             // The standalone window re-parses against projects/areas fetched
-            // here, which can be fresher than the ones the preview strip
-            // rendered from — the preview may lag by whatever this fetch pulls
+            // here, which puede be fresher than the ones the preview strip
+            // rendered from — the preview puede lag by whatever esto traer pulls
             // in. Accepted: the submit deciding on fresher data is the right
             // direction, and the window closes on save.
             await refreshStandaloneData().catch((error) => reportError('Failed to refresh quick add data', error));
@@ -866,7 +866,7 @@ export function QuickAddModal({ standaloneWindow = false }: QuickAddModalProps) 
             await notifyStandaloneTaskSaved();
         }
         if (addAnother) {
-            // Shift+Enter batch capture: clear per-task state but keep the
+            // Shift+Enter lote capture: clear per-tarea estado but keep the
             // dialog (and the picked area) for the next entry.
             setValue('');
             setFocusNewTask(false);
@@ -878,9 +878,9 @@ export function QuickAddModal({ standaloneWindow = false }: QuickAddModalProps) 
         if (openAfterSave && result.createdTaskId && result.props && !standaloneWindow) {
             openCreatedTaskForEditing(result.createdTaskId, result.props);
         } else if (initialProps?.projectId && result.createdTaskId) {
-            // Opened from a project/section preset (ProjectWorkspace's add button):
-            // flash + scroll the new row in the project view. Global captures with
-            // no project preset intentionally skip this so they never leave a
+            // Opened from a project/section preset (ProjectWorkspace's agregar button):
+            // flash + scroll the new row in the project view. global captures with
+            // no project preset intentionally saltar esto so they nunca leave a
             // stray highlight on an unrelated view (#916).
             setHighlightTask(result.createdTaskId);
         }
@@ -915,9 +915,9 @@ export function QuickAddModal({ standaloneWindow = false }: QuickAddModalProps) 
             return;
         }
 
-        // One store write for the whole import, not one per line (#942): a
+        // One store write for the whole importar, not one per line (#942): a
         // per-line loop left a half-imported inbox behind whenever any line
-        // failed, and queued one full-data save snapshot per task. Mobile's
+        // failed, and queued one full-data save instantánea per tarea. Mobile's
         // bulk capture already prepares then batches the same way.
         const bulkFailed = (detail?: string) => {
             const message = tFallback(t, 'quickAdd.bulkCreateError', 'Could not create all tasks.');
@@ -989,7 +989,7 @@ export function QuickAddModal({ standaloneWindow = false }: QuickAddModalProps) 
         <Dialog
             onClose={handleClose}
             labelledBy={titleId}
-            // Escape stays with the window keydown listener, which also has to
+            // Escape stays with the window keydown escuchador, which also has to
             // close the standalone capture window (#869).
             closeOnEscape={false}
             placement="top"

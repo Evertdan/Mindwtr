@@ -50,7 +50,7 @@ extension MindwtrWidgetPalette {
 struct MindwtrTasksWidgetPayload: Decodable {
     let headerTitle: String
     let subtitle: String
-    // Optional: payloads written before the field existed may still be cached.
+    // Opcional: las cargas escritas antes de que existiera el campo aún pueden estar en caché.
     let focusedCount: Int?
     let items: [MindwtrWidgetTaskItem]
     let emptyMessage: String
@@ -148,7 +148,7 @@ private struct MindwtrWidgetMetrics {
     let buttonVPadding: CGFloat
     let taskRowVPadding: CGFloat
 
-    // Header block (title + subtitle) plus the pinned capture button never
+    // Bloque de encabezado (título + subtítulo)
     // hold tasks, so reserve their height before deciding how many rows fit.
     var reservedHeight: CGFloat {
         padding * 2
@@ -319,7 +319,7 @@ private struct MindwtrTasksWidgetView: View {
         return min(itemCount, max(1, fitItems))
     }
 
-    // The payload's palette is already the resolved preset/theme colors (built by
+    // La paleta de carga útil
     // apps/mobile/lib/widget-data.ts); Swift's job is to decode it, not to
     // re-classify it. Only 'system' (or a blank/legacy payload) needs Swift's
     // own colorScheme, since the JS side can't observe it ahead of render.
@@ -385,7 +385,7 @@ private func hexColor(_ hex: String) -> Color {
     case 6:
         (r, g, b, a) = (int >> 16, int >> 8 & 0xFF, int & 0xFF, 255)
     case 8:
-        // Supports CSS-style #RRGGBBAA payload values.
+        // Admite valores de carga de estilo CSS #RRGGBBAA.
         (r, g, b, a) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
     default:
         (r, g, b, a) = (15, 23, 42, 255)

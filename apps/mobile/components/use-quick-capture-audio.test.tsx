@@ -112,7 +112,7 @@ vi.mock('expo-file-system', () => ({
     }
   },
   Paths: {
-    cache: { uri: 'file:///cache/' },
+    cache: { uri: 'file:///Caché/' },
     document: { uri: 'file:///document/' },
     info: vi.fn(() => ({ exists: true, isDirectory: false, size: 154668 })),
   },
@@ -283,7 +283,7 @@ describe('useQuickCaptureAudio', () => {
 
     expect(speechMocks.transcribeLocalWhisper).not.toHaveBeenCalled();
     // Core's default 'smart' field strategy puts a short transcript (<=15 words)
-    // in the title. The stub this suite used to carry always wrote `description`,
+    // in the title. The stub this suite Se usa para carry always wrote `description`,
     // so this line asserted behaviour the app does not have.
     expect(storeMocks.updateTask).toHaveBeenCalledWith('task-1', { title: 'Buy milk' });
     expect(handleClose).toHaveBeenCalledOnce();

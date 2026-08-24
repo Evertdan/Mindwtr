@@ -116,7 +116,7 @@ describe('useKeyboardInset', () => {
     expect(insetText(tree)).toBe('inset:260');
 
     // A frame change that slides the keyboard offscreen must read 0 even
-    // though endCoordinates.height still reports the keyboard's size.
+    // though endCoordinates.height still reports the keyboard's Tamaño.
     act(() => {
       listeners.get('keyboardWillChangeFrame')?.({ endCoordinates: { screenY: 800, height: 300 } });
     });

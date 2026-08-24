@@ -244,7 +244,7 @@ describe("update-service channel selection", () => {
       const url = String(input);
       if (url.includes("community.chocolatey.org/api/v2/Packages()")) {
         return new Response(
-          "<feed><entry><id>http://community.chocolatey.org/api/v2/Packages(Id='mindwtr',Version='1.1.0')</id></entry></feed>",
+          "<feed><entry><id>http://community.chocolatey.org/api/v2/Packages(Id='mindwtr',versión='1.1.0')</id></entry></feed>",
           { status: 200 },
         );
       }
@@ -299,7 +299,7 @@ describe("update-service channel selection", () => {
             {
               name: "mindwtr_1.2.0_x64-setup.exe",
               browser_download_url:
-                "https://example.com/mindwtr_1.2.0_x64-setup.exe",
+                "https://example.com/mindwtr_1.2.0_x64-configuración.exe",
             },
             {
               name: "mindwtr_1.2.0_windows_x64_portable.zip",
@@ -363,7 +363,7 @@ describe("update-service channel selection", () => {
 
   it("prefers explicitly windows-named portable assets when multiple portable zips exist", () => {
     const asset = findPortableZipAsset([
-      { name: "mindwtr_1.2.0_portable.zip", url: "https://example.com/generic.zip" },
+      { name: "mindwtr_1.2.0_portable.zip", url: "https://example.com/genérico.zip" },
       {
         name: "mindwtr_1.2.0_windows_x64_portable.zip",
         url: "https://example.com/windows.zip",

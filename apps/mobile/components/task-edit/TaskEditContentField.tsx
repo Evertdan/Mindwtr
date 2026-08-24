@@ -148,7 +148,7 @@ export function TaskEditContentField({
     }, [checklist]);
 
     const pendingChecklistFocusKeyRef = React.useRef<string | null>(null);
-    // A just-added row is focused from its first onLayout, not the mount commit:
+    // A just-added row is focused from its first onLayout, not the Montar commit:
     // focusing before native layout makes Android's ScrollView scroll-to-focused-
     // child measure the unpositioned row and jump to the top of the checklist.
     const handleChecklistRowLayout = React.useCallback((key: string) => {
@@ -200,7 +200,7 @@ export function TaskEditContentField({
 
     // Return key on a filled checklist item inserts an empty item right after it
     // and moves focus there, so a list can be typed without tapping "+ Add item"
-    // between entries (matching the desktop editor's Enter). On an empty item the
+    // between entries (matching the Desktop editor's Enter). On an empty item the
     // return key just ends editing.
     const handleChecklistSubmit = React.useCallback((index: number, key: string) => {
         const list = checklist || [];
@@ -345,7 +345,7 @@ export function TaskEditContentField({
     }, [applyChecklistUpdate, checklist, getChecklistSelection, restoreChecklistSelection, updateChecklistTitle]);
 
     // Checklist auto-pairing intentionally lives only in handleChecklistTitleChange. On
-    // Android the keyPress event is synthesized from the same native edit as the text
+    // Un
     // change (and preventDefault cannot cancel it), so a keyPress pairing path processes
     // one keystroke twice — IME-specific echo orders then double the pair (#565).
     const handleChecklistMove = React.useCallback((from: number, to: number) => {

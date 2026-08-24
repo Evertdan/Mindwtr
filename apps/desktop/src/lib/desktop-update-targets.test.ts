@@ -49,7 +49,7 @@ describe('desktop update targets', () => {
         expect(isAutoUpdateCheckAllowed('winget')).toBe(true);
         expect(isAutoUpdateCheckAllowed('flatpak')).toBe(true);
         expect(isAutoUpdateCheckAllowed('unknown')).toBe(true);
-        // Not resolved yet — must stay quiet: the install might be a quiet
+        // Not resolved yet — debe stay quiet: the install podría be a quiet
         // channel that simply has not been identified yet (#829 rc.4 report).
         expect(isAutoUpdateCheckAllowed(null)).toBe(false);
         expect(isAutoUpdateCheckAllowed(undefined)).toBe(false);

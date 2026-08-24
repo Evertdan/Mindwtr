@@ -89,7 +89,7 @@ describe('ios-widgets-and-shortcuts', () => {
     expect(backgroundIntent).toContain('dueDate: dueDate');
     expect(backgroundIntent).toContain('startDate: startDate');
     expect(backgroundIntent).toContain('"Added to Mindwtr."');
-    // The dialog must not promise a specific project placement -- the drain
+    // El/La
     // decides that, and an unknown project falls back to Inbox.
     expect(backgroundIntent).not.toMatch(/dialog:\s*"[^"]*Inbox[^"]*"/);
   });
@@ -106,7 +106,7 @@ describe('ios-widgets-and-shortcuts', () => {
     expect(source).toContain('mindwtr-ios-shortcuts-snapshot');
     expect(source).toContain('UserDefaults(suiteName: appGroup)');
 
-    // The store's `items(forList:)` takes the iOS 16-only `MindwtrGetTasksList`
+    // El/La
     // while the deployment target is 15.1 -- the enclosing enum must carry an
     // iOS 16 guard or this is a hard compile error the CI validator can't
     // catch (it only checks IntentModes/phrases/@Parameter defaults, not
@@ -118,7 +118,7 @@ describe('ios-widgets-and-shortcuts', () => {
     expect(getTasksIntentBody).toContain('.background');
     expect(getTasksIntentBody).not.toContain('.foreground');
     expect(getTasksIntentBody).not.toContain('UIApplication');
-    // The intent must never touch the store or SQLite -- it only reads the
+    // El/La
     // app-maintained snapshot.
     expect(getTasksIntentBody).not.toContain('sqlite');
     expect(getTasksIntentBody).not.toContain('SQLite');

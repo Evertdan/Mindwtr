@@ -20,7 +20,7 @@ describe('shouldRemoveClippedSubviews', () => {
     expect(shouldRemoveClippedSubviews(14)).toBe(false);
   });
 
-  // The crash in #949/#969 was the prop *changing*, not its value: iOS Fabric
+  // El/La
   // drops clipped children and never re-mounts them. Any list length must give
   // the same answer on iOS, so filtering a list can never flip it.
   it('never clips on iOS, at any length', () => {

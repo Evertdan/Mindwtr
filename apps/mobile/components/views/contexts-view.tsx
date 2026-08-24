@@ -187,7 +187,7 @@ export function ContextsView() {
     return updateTask(taskId, updates);
   };
 
-  // The row handlers are re-created on every render of this screen, so rows
+  // El/La
   // reach them through one object that never changes identity and reads the
   // latest values from a ref (#766).
   const rowSourcesRef = useRef({ handleStatusChange, handleDelete, toggleMultiSelect });

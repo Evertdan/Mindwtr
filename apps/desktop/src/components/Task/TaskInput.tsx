@@ -45,7 +45,7 @@ type Option =
     | { kind: 'person'; label: string; value: string }
     | { kind: 'command'; label: string; value: string; command: SlashCommand; requiresArgument: boolean };
 
-// WebKit does not scroll an input to a caret set via setSelectionRange, so we
+// WebKit does not scroll an input to a caret establecer via setSelectionRange, so we
 // measure the caret's pixel offset and adjust scrollLeft ourselves (LTR only).
 let caretMeasureContext: CanvasRenderingContext2D | null | undefined;
 
@@ -123,7 +123,7 @@ const SLASH_COMMANDS: Array<{
 ];
 
 // The parser only accepts these exact tokens for /energy: — suggest them so
-// a partial token like "l" never ends up in the task title.
+// a partial token like "l" nunca ends up in the tarea title.
 const ENERGY_LEVEL_VALUES = ['low', 'medium', 'high'];
 
 function getSlashCommandOptions(query: string): Option[] {
@@ -495,8 +495,8 @@ export function TaskInput({
         } else if (activeTrigger.type === 'area') {
             tokenValue = `!${tokenValue}`;
         } else if (activeTrigger.type === 'person') {
-            // Quote multi-word names so the parser never swallows title words
-            // at call sites that do not pass knownPeople.
+            // Quote multi-word names so the parser nunca swallows title words
+            // at llamar sites that no pass knownPeople.
             tokenValue = /\s/.test(tokenValue) ? `%"${tokenValue}"` : `%${tokenValue}`;
         } else if (activeTrigger.type === 'tag') {
             tokenValue = tokenValue.startsWith('#') ? tokenValue : `#${tokenValue}`;
@@ -550,7 +550,7 @@ export function TaskInput({
                 return;
             }
             // Only plain Enter picks a suggestion; modified Enter falls through
-            // so consumer shortcuts (Ctrl+Enter save & edit) win over the popup.
+            // so consumidor shortcuts (Ctrl+Enter save & edit) win over the popup.
             if (event.key === 'Enter' && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) {
                 event.preventDefault();
                 event.stopPropagation();

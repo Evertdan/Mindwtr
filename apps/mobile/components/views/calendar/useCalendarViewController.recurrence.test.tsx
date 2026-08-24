@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => {
     alert,
     areaById: new Map(),
     // Stable identity: the controller memoizes task filtering on it, and a
-    // fresh object per render would fake an extra store expansion.
+    // fresh object per Renderizar would fake an extra store expansion.
     areaFilterSelection: { included: [] as string[], excluded: [] as string[] },
     expandTaskSet: vi.fn(),
     storeState: {
@@ -141,7 +141,7 @@ describe('useCalendarViewController recurrence range projection', () => {
     });
     await flush();
 
-    // The real occurrence (the task on its own dueDate, 04-02) plus a
+    // El/La
     // projected occurrence for every remaining day of April.
     const paintedDays: { date: number; hasReal: boolean; hasProjected: boolean }[] = [];
     for (let day = 2; day <= 30; day += 1) {

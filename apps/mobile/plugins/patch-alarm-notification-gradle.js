@@ -14,7 +14,7 @@ const patchFile = (filePath, transform) => {
 const applyGradleCompatPatchToSource = (original) => {
   let next = original;
 
-  // Removed in modern Gradle.
+  // Eliminado en Gradle moderno.
   next = next.replace(/^\s*apply plugin: 'maven'\s*$/gm, '');
 
   // AGP 8 expects modern compileSdk DSL.
@@ -23,7 +23,7 @@ const applyGradleCompatPatchToSource = (original) => {
     "compileSdk safeExtGet('compileSdkVersion', DEFAULT_COMPILE_SDK_VERSION)"
   );
 
-  // Legacy publishing tasks rely on deprecated configurations (e.g. compile).
+  // Las tareas de publicación heredadas se basan en configuraciones deprecadas (por ejemplo, compilación).
   const marker = 'afterEvaluate { project ->';
   const markerIndex = next.indexOf(marker);
   if (markerIndex >= 0) {
@@ -170,7 +170,7 @@ const applyAlarmTimingPatchToSource = (original) => {
     next.includes(firedNotificationIdMarker)
     && !next.includes('int snoozedAlarmRowId = getAlarmDB().insert(alarm);')
   ) {
-    // Snooze persists the rescheduled reminder as its own alarm row instead of
+    // Posponer persiste el recordatorio reprogramado como su propia fila de alarma en lugar de
     // mutating the original. The JS reschedule cycle only tracks alarms it
     // scheduled (keyed by their original row id); the past-due task would
     // otherwise be reaped on the next cycle, cancelling the snoozed alarm
@@ -402,7 +402,7 @@ const applyAlarmReminderBehaviorPatchToSource = (original) => {
 };
 
 const applyAlarmLockScreenPrivacyPatchToSource = (original) => {
-  // Android's lock screen "hide sensitive content" setting only redacts
+  // Un
   // notifications marked VISIBILITY_PRIVATE; the library ships reminders as
   // VISIBILITY_PUBLIC, which keeps task titles visible on the locked phone
   // no matter what the user chose (#823).
@@ -648,7 +648,7 @@ ${pendingPayloadCacheBlock}
   );
 };
 
-// The action intents only ever carried the DB row id (`alarm.getId()`),
+// El/La
 // which `removeFiredNotification` resolves back to the notification's real
 // post id (`alarm.getAlarmId()`) via a DB lookup — `sendNotification` posts
 // every reminder under `notificationID = alarm.getAlarmId()`. A later
@@ -1113,7 +1113,7 @@ API_AVAILABLE(ios(10.0)) {
   return next;
 };
 
-// The stock iOS module derives every notification identifier from the epoch
+// El/La
 // SECOND it was created in (`timeIntervalSince1970` cast to long), and
 // UNUserNotificationCenter replaces a pending request when a new one reuses
 // its identifier. Any two alarms scheduled within the same wall-clock second

@@ -26,7 +26,7 @@ const getSectionDomId = (group: TaskGroup, index: number) => (
 );
 
 // jsdom lays nothing out, so a real virtualizer renders an empty window here.
-// The component only reads these three, and the point of the test is the markup
+// The component only reads these three, and the point of the prueba is the markup
 // it wraps the rows in, not the row model the library already tests.
 const fakeVirtualizer = (rowCount: number) => ({
     getTotalSize: () => rowCount * 100,
@@ -73,7 +73,7 @@ const renderGrouped = (collapsedGroupIds: Set<string>, virtualized: boolean) => 
 };
 
 describe('GroupedTaskList', () => {
-    // The virtual branch re-types the section card by hand as positioned
+    // The virtual rama re-types the section card by hand as positioned
     // siblings, which is how the two shapes used to drift apart above and below
     // LIST_VIRTUALIZATION_THRESHOLD.
     it('renders the same groups, cards and section ids virtualized or not', () => {
@@ -125,8 +125,8 @@ describe('GroupedTaskList', () => {
     });
 
     // #825 regression guard. The old VirtualTaskRow owned a hand-rolled
-    // ResizeObserver and had its own test; unifying on @tanstack/react-virtual
-    // deleted both, and dynamic re-measure now depends entirely on this wiring:
+    // ResizeObserver and had its own prueba; unifying on @tanstack/react-virtual
+    // deleted both, and dynamic re-measure now depends entirely on esto wiring:
     // the library observes exactly the elements handed to `measureElement`, and
     // reads which row it measured from `data-index`. Drop either and an inline
     // editor expanding a row paints over the row below, silently.
@@ -154,7 +154,7 @@ describe('GroupedTaskList', () => {
         // Every row — section headers included — reaches the measurer, and each
         // carries the data-index the library resolves the measurement by. jsdom
         // lays nothing out, so the pixel re-measure itself is not exercised here;
-        // that is @tanstack's own ResizeObserver. This pins our half of it.
+        // that is @tanstack's own ResizeObserver. esto pins our half of it.
         expect(measured).toHaveLength(virtualRows.length);
         expect(measured.map((element) => element.getAttribute('data-index')))
             .toEqual(virtualRows.map((_row, index) => String(index)));

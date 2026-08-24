@@ -47,7 +47,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // ('system', 'light', 'dark', both material3 modes) fall back to 'default'.
     const themePreset: ThemePreset = themeDescriptor(themeMode)?.statusPreset ?? 'default';
 
-    // Determine actual color scheme based on mode and system
+    // Determine actual Color scheme based on mode and system
     const colorScheme: ColorScheme = resolveThemeColorScheme(themeMode, systemColorScheme);
     const isDark = colorScheme === 'dark';
 

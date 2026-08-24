@@ -3,10 +3,10 @@ import WidgetKit
 
 private let mindwtrFocusLockWidgetKind = "MindwtrFocusLockWidget"
 
-// Lock screen (accessory family) widget showing the current focused task (#821).
-// Reuses MindwtrTasksWidgetProvider: accessory families fall through to the
+// Widget de pantalla de bloqueo (familia de accesorios) que muestra la tarea enfocada actual (#821).
+// Reutiliza MindwtrTasksWidgetProvider
 // default payload key, whose items mirror the app's Today's Focus list.
-// Accessory families are iOS 16+; on iOS 15 the widget offers no families.
+// Las familias de accesorios son iOS 16+; en iOS 15 el widget no ofrece familias.
 struct MindwtrFocusLockWidget: Widget {
     let kind: String = mindwtrFocusLockWidgetKind
 
@@ -39,7 +39,7 @@ private struct MindwtrFocusLockWidgetEntryView: View {
     }
 }
 
-// Lock screen widgets render in the system's monochrome/vibrant style, so the
+// Los widgets de pantalla de bloqueo se renderizan
 // theme palette deliberately does not apply here.
 @available(iOSApplicationExtension 16.0, *)
 private struct MindwtrFocusLockView: View {
@@ -63,7 +63,7 @@ private struct MindwtrFocusLockView: View {
             Text(focusedTitle ?? entry.payload.emptyMessage)
 
         case .accessoryCircular:
-            // The star counts starred (Today's Focus) tasks, not the truncated
+            // El conteo de estrellas marca
             // display list — items.count is capped by the payload's maxItems.
             ZStack {
                 AccessoryWidgetBackground()

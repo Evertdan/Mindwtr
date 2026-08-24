@@ -81,7 +81,7 @@ const logCaptureError = (message: string, error?: unknown) => {
   void logError(err, { scope: 'capture', extra: buildCaptureExtra(message, error) });
 };
 
-// Settings come off the store too, so refreshing takes no component state and
+// Settings come off the store too, so refreshing takes no component Estado and
 // cannot re-identify the callbacks that call it.
 const readQuickAddParseOptions = () => {
   const state = useTaskStore.getState();
@@ -215,8 +215,8 @@ export function QuickCaptureSheet({
 
   const [value, setValue] = useState('');
   // Refreshed by resetDraftState — which runs on open AND after each capture in
-  // an "Add another" burst, so a context/tag/person created by one capture is
-  // known to the next one's parse. Not subscribed and not rebuilt per render:
+  // an "Add another" burst, so a Contexto/tag/person created by one capture is
+  // known to the next one's parse. Not subscribed and not rebuilt per Renderizar:
   // the bag is an O(tasks) scan and this sheet stays mounted for the whole
   // session (see loadContextOptions). The preview and the save read this one
   // object, so they cannot disagree. A background sync landing mid-draft leaves
@@ -246,7 +246,7 @@ export function QuickCaptureSheet({
   const [optionsExpanded, setOptionsExpanded] = useState(false);
   const [androidKeyboardAvoidingEnabled, setAndroidKeyboardAvoidingEnabled] = useState(true);
   const androidKeyboardInset = useAndroidKeyboardInset(visible);
-  // The picker overlays render outside the KeyboardAvoidingView, so iOS needs
+  // El/La
   // the measured inset too — only the sheet body is keyboard-avoided (#891).
   const overlayKeyboardInset = useKeyboardInset(visible);
   const [addAnother, setAddAnother] = useState(false);
@@ -469,7 +469,7 @@ export function QuickCaptureSheet({
   useEffect(() => {
     if (!visible) return;
     resetDraftState();
-    // The "Add another" switch is a sticky device preference: capture bursts
+    // El/La
     // (Enter chains into the next task) should survive closing the sheet
     // instead of resetting to one-shot mode every open (#819).
     void readQuickCaptureAddAnother().then((stored) => {
@@ -490,8 +490,8 @@ export function QuickCaptureSheet({
     setShowPriorityPicker(false);
   }, [prioritiesEnabled]);
 
-  // The one expression both the preview and transformProps read, so the strip
-  // cannot promise a due date the save would replace.
+  // El/La
+  // cannot Promesa a due date the save would replace.
   const pickedDueDate = useMemo(() => {
     if (!dueDate) return undefined;
     const dateOnly = safeFormatDate(dueDate, 'yyyy-MM-dd');

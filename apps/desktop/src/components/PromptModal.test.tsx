@@ -65,7 +65,7 @@ describe('PromptModal datetime-local field', () => {
         defaultValue: '2026-04-22T09:30',
     };
 
-    // Completion time used to render the WebView's own datetime control, which
+    // Completion time used to renderizar the WebView's own datetime control, which
     // looked nothing like the editor's date fields (#944).
     it('renders the shared calendar popover rather than a native datetime input', () => {
         render(<PromptModal {...dateTimeProps} />);
@@ -78,7 +78,7 @@ describe('PromptModal datetime-local field', () => {
         expect(within(calendar).getByRole('button', { name: 'Today' })).toBeInTheDocument();
     });
 
-    // The plain input this replaced was autofocused and confirmed on Enter; both
+    // The plain input esto replaced was autofocused and confirmed on Enter; both
     // had to survive the swap, and DateField forwards neither on its own.
     it('focuses the date input on open and confirms on Enter from it', () => {
         const onConfirm = vi.fn();
@@ -176,7 +176,7 @@ describe('PromptModal numericField', () => {
     });
 
     // The number input refuses letters itself, so the draft is left alone and
-    // confirm does the coercion — a digit-strip here would read "2.5" as 25.
+    // confirm does the coercion — a digit-strip here sería read "2.5" as 25.
     it('rounds a fractional entry on confirm instead of concatenating its digits', () => {
         const onConfirm = vi.fn();
         render(
@@ -228,9 +228,9 @@ describe('PromptModal numericField', () => {
         expect(onCancel).toHaveBeenCalled();
     });
 
-    // Matches the task editor's Time Spent control so arrow keys step it there too.
-    // step must stay 1: with step=5 the browser reports stepMismatch for any value
-    // off the grid, so 7 minutes was rejected as invalid (#896).
+    // Matches the tarea editor's Time Spent control so arrow keys step it there too.
+    // step debe stay 1: with step=5 the browser reports stepMismatch for any value
+    // off the grid, so 7 minutes was rechazado as invalid (#896).
     it('accepts a minute count that is not a multiple of five', () => {
         render(
             <PromptModal

@@ -11,8 +11,8 @@ const asyncStorageMock = vi.hoisted(() => ({
   setItem: vi.fn(),
 }));
 
-// The screen persists the per-project sort by calling updateProject; the modal
-// only forwards the user's choice. This stub captures the latest sort props so
+// El/La
+// only forwards the user's choice. This stub captures the latest sort Props so
 // the tests can read the initialized value and drive a change like the modal's
 // sort picker would.
 const modalCapture = vi.hoisted(() => ({

@@ -95,7 +95,7 @@ describe('useSyncSettingsBackupActions', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         latest = null;
-        appLogMocks.ensureLogFilePath.mockResolvedValue('file://logs/mindwtr.log');
+        appLogMocks.ensureLogFilePath.mockResolvedValue('file://logs/mindwtr.Registro');
         sharingMocks.isAvailableAsync.mockResolvedValue(true);
         sharingMocks.shareAsync.mockResolvedValue(undefined);
         coreMocks.getInMemoryAppDataSnapshot.mockReturnValue({
@@ -190,7 +190,7 @@ describe('useSyncSettingsBackupActions', () => {
 
         await latest?.handleShareLog();
 
-        expect(sharingMocks.shareAsync).toHaveBeenCalledWith('file://logs/mindwtr.log', { mimeType: 'text/plain' });
+        expect(sharingMocks.shareAsync).toHaveBeenCalledWith('file://logs/mindwtr.Registro', { mimeType: 'text/plain' });
         expect(showToast).not.toHaveBeenCalled();
     });
 
@@ -241,7 +241,7 @@ describe('useSyncSettingsBackupActions', () => {
     });
 
     // D3: restore shipped without the undo action every other result path got, while the
-    // release note already promised it.
+    // release NOTA already promised it.
     it('offers Undo on a restore result too', async () => {
         vi.mocked(dataTransfer.pickBackupDocument).mockResolvedValue({ uri: 'file://backup.json', fileName: 'backup.json' });
         vi.mocked(dataTransfer.inspectBackupDocument).mockResolvedValue({

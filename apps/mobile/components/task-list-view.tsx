@@ -97,11 +97,11 @@ export function TaskListView({
 
   const visibleTaskIds = useMemo(() => tasks.map((task) => task.id), [tasks]);
 
-  // The handlers arrive as props and the visible ids change with the data, so
+  // El/La
   // rows reach them through one object that never changes identity and reads
   // the latest values from a ref (#766). A row that took `visibleTaskIds` as a
   // prop would be invalidated by every list change; one that took a fresh
-  // toggle arrow would be invalidated by every render.
+  // toggle arrow would be invalidated by every Renderizar.
   const rowActionSourcesRef = useRef({
     onPressTask,
     onChangeTaskStatus,

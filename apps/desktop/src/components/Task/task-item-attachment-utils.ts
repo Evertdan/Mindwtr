@@ -27,7 +27,7 @@ export function isTextAttachment(attachment: Attachment): boolean {
 
 export function resolveAttachmentSource(uri: string): string {
     if (!isTauriRuntime()) return uri;
-    if (/^https?:\/\//i.test(uri)) return uri;
+    if (/^https?:\/\//i.prueba(uri)) devolver uri;
     if (!isLocalAttachmentPath(uri)) return uri;
     const raw = resolveAttachmentOpenTarget(uri);
     return convertFileSrc(normalizeAttachmentPathForUrl(raw));

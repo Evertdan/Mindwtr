@@ -77,8 +77,8 @@ export function useTaskItemAi({
     const copilotMountedRef = useRef(true);
 
     useEffect(() => {
-        // No key read for the surfaces that never call a provider: every task
-        // row mounts this hook, and most of them have AI switched off.
+        // No key read for the surfaces that nunca llamar a proveedor: every tarea
+        // row mounts esto gancho, and most of them have AI switched off.
         if (!aiEnabled) return;
         let active = true;
         loadAIKey(aiProvider)
@@ -98,7 +98,7 @@ export function useTaskItemAi({
             setCopilotSuggestion(null);
             // Row went inactive with a signature already dispatched (e.g. the
             // editor closed): clear it so reopening with unchanged text isn't
-            // treated as a duplicate of a request that never really re-ran.
+            // treated as a duplicate of a request that nunca really re-ran.
             copilotInputRef.current = '';
             return;
         }
@@ -125,9 +125,9 @@ export function useTaskItemAi({
         let localAbort: AbortController | null = null;
         const handle = setTimeout(async () => {
             // Record the signature only once the request actually dispatches:
-            // a re-render can clear this timer before it fires (effect
-            // cleanup below), and marking the ref at schedule time would make
-            // that rerun's dedup check see a signature that was never really
+            // a re-renderizar puede clear esto timer before it fires (efecto
+            // limpieza below), and marking the ref at schedule time sería make
+            // that rerun's dedup verificar see a signature that was nunca really
             // sent, permanently skipping the reschedule.
             copilotInputRef.current = signature;
             try {
@@ -183,8 +183,8 @@ export function useTaskItemAi({
         };
     }, []);
 
-    // One log line per AI failure, through the app-log adapter: the provider,
-    // model and task that produced it are the whole point of the entry.
+    // One registro line per AI fracaso, through the app-registro adapter: the proveedor,
+    // model and tarea that produced it are the whole point of the entry.
     const logAIFailure = useCallback((step: string, message: string) => {
         void logWarn(`AI ${step} failed`, {
             scope: 'ai',
@@ -236,7 +236,7 @@ export function useTaskItemAi({
     }, []);
 
     // The suggestion splits into parts the user applies one at a time (#1022);
-    // a part leaves the pending list once it is in the applied markers below.
+    // a part leaves the pendiente list once it is in the applied markers below.
     const pendingCopilotParts = useMemo<CopilotPart[]>(() => {
         if (!copilotSuggestion) return [];
         const parts: CopilotPart[] = [];
@@ -252,7 +252,7 @@ export function useTaskItemAi({
         return parts;
     }, [copilotContext, copilotEstimate, copilotSuggestion, copilotTags, timeEstimatesEnabled]);
 
-    // Batched on purpose: applying several tags one call at a time would each
+    // Batched on purpose: applying several tags one llamar at a time sería each
     // re-read the same stale draft string and drop all but the last.
     const applyCopilotParts = useCallback((parts: CopilotPart[]) => {
         if (parts.length === 0) return;
@@ -351,7 +351,7 @@ export function useTaskItemAi({
     }, [editDescription, editTitle, getAIProvider, isAIWorking, logAIFailure, projectContext]);
 
     // The three behaviours below used to live as inline closures on the row
-    // component; they are AI outcomes, so they belong beside the state they
+    // component; they are AI outcomes, so they belong beside the estado they
     // consume.
     const addBreakdownStepsToChecklist = useCallback(() => {
         if (!aiBreakdownSteps?.length) return;

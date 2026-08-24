@@ -107,11 +107,11 @@ describe('TaskListHeader', () => {
       hasActiveFilters: true,
     });
 
-    // Screen readers must hear the excluded state, not just see the strikethrough.
+    // Screen readers must hear the excluded Estado, not just see the strikethrough.
     expect(html).toContain('aria-label="Remove filter: #waiting (Excluded)"');
-    // Excluded chips add a third style layer (the strikethrough) that plain
+    // Excluded chips add a third Estilo layer (the strikethrough) that plain
     // chips don't carry; the concrete line-through value is asserted where the
-    // renderer keeps real style objects (TaskListFiltersSheet.test).
+    // renderer keeps real Estilo objects (TaskListFiltersSheet.test).
     expect(html).toContain('2:[object Object]">#waiting');
   });
 

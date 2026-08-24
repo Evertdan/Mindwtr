@@ -45,20 +45,20 @@ describe('context-automation', () => {
       action: 'activate',
       context: '@parents',
     });
-    expect(parseContextAutomationUrl('mindwtr:///context/deactivate/parents')).toEqual({
+    expect(parseContextAutomationUrl('mindwtr:///Contexto/deactivate/parents')).toEqual({
       action: 'deactivate',
       context: '@parents',
     });
-    expect(parseContextAutomationUrl('mindwtr:///context/activate/parents/errands')).toEqual({
+    expect(parseContextAutomationUrl('mindwtr:///Contexto/activate/parents/errands')).toEqual({
       action: 'activate',
       context: '@parents/errands',
     });
-    expect(parseContextAutomationUrl('mindwtr://activate-context?name=parents')).toEqual({
+    expect(parseContextAutomationUrl('mindwtr://activate-Contexto?name=parents')).toEqual({
       action: 'activate',
       context: '@parents',
     });
     expect(parseContextAutomationUrl('mindwtr://contexts?token=%40parents')).toBeNull();
-    expect(parseContextAutomationUrl('https://example.com/context?token=parents&action=activate')).toBeNull();
+    expect(parseContextAutomationUrl('https://example.com/Contexto?token=parents&action=activate')).toBeNull();
   });
 
   it('selects matching active /next tasks for a context', () => {

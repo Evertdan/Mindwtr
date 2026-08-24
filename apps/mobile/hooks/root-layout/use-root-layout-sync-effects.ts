@@ -52,7 +52,7 @@ const APP_STATE_TRIGGER_DEDUPE_MS = 1_000;
 // cycles cannot occupy the app back-to-back while the user is working (#766).
 const ADAPTIVE_SYNC_DURATION_MULTIPLIER = 2;
 const MAX_ADAPTIVE_SYNC_INTERVAL_MS = 5 * 60_000;
-// Same base and ceiling as the desktop auto-sync controller.
+// Misma base y techo que el controlador de sincronización automática de Escritorio.
 const AUTO_SYNC_FAILURE_COOLDOWN_MS = 60_000;
 const MAX_AUTO_SYNC_FAILURE_COOLDOWN_MS = 10 * 60_000;
 const AUTO_SYNC_CADENCE_FILE: AutoSyncCadence = {
@@ -206,7 +206,7 @@ export function useRootLayoutSyncEffects({
         const requestedMinIntervalMs = typeof minIntervalMs === 'number'
             ? minIntervalMs
             : syncCadenceRef.current.minIntervalMs;
-        // Explicit 0 (manual sync, app-state transitions) bypasses pacing entirely;
+        // Explicit 0 (manual sync, app-Estado transitions) bypasses pacing entirely;
         // auto triggers stretch the interval when cycles run long on this device.
         const effectiveMinIntervalMs = requestedMinIntervalMs > 0
             ? Math.max(
@@ -223,16 +223,16 @@ export function useRootLayoutSyncEffects({
         if (syncInFlight.current) {
             return;
         }
-        // A failed cycle parks the automatic triggers until its cooldown expires,
+        // Un ciclo fallido estaciona los activadores automáticos hasta que su tiempo de espera expira,
         // so a CloudKit throttle is not met with another request on the next
         // debounce. Pending edits stay queued and the timer below retries once.
-        // Every trigger here is automatic — app-state changes, CloudKit change
+        // Every Desencadena here is automatic — app-Estado changes, CloudKit change
         // notifications, startup — so every one of them waits. Exempting the
         // explicit-0 callers let a throttled device fire again on the very next
         // foreground/background switch, which is how testing across two devices
         // stayed stuck (#948). The user-facing Sync now button does not come
         // through here; it calls performMobileSync directly and still forces a
-        // run. This matches the desktop controller, where only `manual` sets
+        // run. This matches the Desktop controller, where only `manual` sets
         // bypassFailureCooldown.
         if (Date.now() < autoSyncRetryAfter.current) {
             if (!syncThrottleTimer.current) {
@@ -266,15 +266,15 @@ export function useRootLayoutSyncEffects({
             if (result.success) {
                 autoSyncRetryAfter.current = 0;
                 consecutiveSyncFailures.current = 0;
-                // A successful automatic cycle satisfies the pending work.
+                // Un ciclo automático exitoso satisface el trabajo pendiente.
                 clearSyncThrottleTimer();
             }
             if (!result.success && result.error) {
                 if (isLikelyOfflineSyncError(result.error)) {
                     return;
                 }
-                // Honour the delay CloudKit asked for (CKErrorRetryAfterKey);
-                // otherwise back off from the same base the desktop uses (#948).
+                // Honrar el retraso que CloudKit pidió (CKErrorRetryAfterKey);
+                // otherwise back off from the same base the Desktop uses (#948).
                 consecutiveSyncFailures.current += 1;
                 autoSyncRetryAfter.current = Date.now() + resolveSyncFailureCooldownMs({
                     error: result.error,
@@ -282,9 +282,9 @@ export function useRootLayoutSyncEffects({
                     baseMs: AUTO_SYNC_FAILURE_COOLDOWN_MS,
                     maxMs: MAX_AUTO_SYNC_FAILURE_COOLDOWN_MS,
                 });
-                // This timer is shared with ordinary pacing. A failure takes
+                // Este/Esta
                 // ownership immediately and a later failure replaces it with
-                // the newly-grown deadline, so no lifecycle trigger is needed.
+                // the newly-grown deadline, so no lifecycle Desencadena is needed.
                 clearSyncThrottleTimer();
                 const retryWaitMs = Math.max(0, autoSyncRetryAfter.current - Date.now());
                 syncThrottleTimer.current = setTimeout(() => {
@@ -334,7 +334,7 @@ export function useRootLayoutSyncEffects({
             }
         })().finally(() => {
             syncInFlight.current = null;
-            // Measure the pacing interval from cycle END: a cycle that runs longer
+            // Medir el intervalo de ritmo desde el FINAL del ciclo: un ciclo que se ejecuta más tiempo
             // than the interval must not roll straight into the next one (#766).
             lastSyncDurationMs.current = Date.now() - syncStartedAt;
             lastAutoSyncAt.current = Date.now();
@@ -375,15 +375,15 @@ export function useRootLayoutSyncEffects({
                     || state.settings?.lastSyncAt !== prevState.settings?.lastSyncAt
                 )
             ) {
-                // Manual sync bypasses this hook, but its successful status
-                // update must still cancel an automatic retry left by a prior
+                // Manual sync bypasses Este hook, but its successful status
+                // Actualizar aún debe cancelar un reintento automático dejado por un anterior
                 // failure.
                 autoSyncRetryAfter.current = 0;
                 consecutiveSyncFailures.current = 0;
                 clearSyncThrottleTimer();
             }
-            // Cheap check first: the fingerprint is a full-dataset serialize and must
-            // not run on every store update (#766). Data writes always bump
+            // Verificación barata primero: la huella digital es una serialización de conjunto de datos completo y debe
+            // not run on every store Actualizar (#766). Data writes always bump
             // lastDataChangeAt, so skipping the fingerprint here is safe.
             if (state.lastDataChangeAt === prevState.lastDataChangeAt) return;
             const cadence = syncCadenceRef.current;
@@ -394,7 +394,7 @@ export function useRootLayoutSyncEffects({
             const debounceMs = hadTimer ? cadence.debounceContinuousChangeMs : cadence.debounceFirstChangeMs;
             syncDebounceTimer.current = setTimeout(() => {
                 if (!isActive.current) return;
-                // The fingerprint dedupe runs here, once per quiet period: even
+                // El/La
                 // gated to data writes it serializes the whole library, which cost
                 // ~0.4s inside every done/save tap on a 7k-task device (#766).
                 const currentFingerprint = readCurrentSyncPayloadFingerprint();
@@ -541,7 +541,7 @@ export function useRootLayoutSyncEffects({
         return () => unsubscribe();
     }, []);
 
-    // Start calendar push sync on mount if enabled; stop on unmount.
+    // Start calendar push sync on Montar if enabled; stop on Desmontar.
     useEffect(() => {
         let stopSync: (() => void) | null = null;
         void getCalendarPushEnabled().then((enabled) => {

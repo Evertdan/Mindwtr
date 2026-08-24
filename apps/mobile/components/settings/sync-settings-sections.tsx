@@ -140,7 +140,7 @@ type SyncBackupSectionProps = {
   handleImportTodoist: () => void;
   handleMergeBackup: () => void;
   handleRestoreBackup: () => void;
-  // The screen owns the docs URL, so it passes the rendered link in rather than
+  // El/La
   // this module reaching into the settings shell for SettingsGuideLink.
   importGuide?: ReactNode;
   isBackupBusy: boolean;
@@ -152,7 +152,7 @@ type SyncBackupSectionProps = {
   tc: ThemeColors;
 };
 
-// Two folded cards, matching desktop's Data page: restoring a backup and
+// Two folded cards, matching Desktop's Data page: restoring a backup and
 // migrating from another app are unrelated errands, and both are rare enough to
 // stay folded until asked for (same disclosure shape as the recovery snapshots
 // card below). The cards title themselves, so there is no outer section header.

@@ -150,7 +150,7 @@ const saveStoredPomodoroSnapshot = (snapshot: PomodoroSnapshot) => {
             sessionHistory: snapshot.sessionHistory,
         }));
     } catch {
-        // Pomodoro state is device-local convenience data; storage failures should not block timer controls.
+        // Pomodoro estado is device-local convenience data; storage failures no debería block timer controls.
     }
 };
 
@@ -158,8 +158,8 @@ const saveStoredPomodoroSnapshot = (snapshot: PomodoroSnapshot) => {
 // (#528), and each tick moves nothing but remainingSeconds and updatedAtMs. Both
 // are read back as a pair — reconciliation replays `now - updatedAtMs` onto the
 // stored remainingSeconds — so an older pair restores to exactly the same clock
-// as the current one, and the synchronous localStorage write can be skipped.
-// Everything else (pause, phase change, a credited session, a task link, new
+// as the current one, and the synchronous localStorage write puede be skipped.
+// Everything else (pause, phase change, a credited session, a tarea link, new
 // durations) still persists immediately.
 const isCountdownTickOnly = (prev: PomodoroSnapshot, next: PomodoroSnapshot): boolean => (
     prev.timerState.isRunning
@@ -185,13 +185,13 @@ const saveStoredCollapsed = (collapsed: boolean) => {
     try {
         window.localStorage.setItem(DESKTOP_POMODORO_COLLAPSED_STORAGE_KEY, collapsed ? 'true' : 'false');
     } catch {
-        // Collapse preference is device-local convenience; storage failures should not block the panel.
+        // Collapse preference is device-local convenience; storage failures no debería block the panel.
     }
 };
 
-// Completed focus sessions add their focus minutes to the linked task's
-// synced time-spent total. Runs on every snapshot commit, so panel ticks,
-// startup reconciles, and quick-starts all credit through one path.
+// Completed enfoque sessions agregar their enfoque minutes to the linked tarea's
+// synced time-spent total. Runs on every instantánea confirmación, so panel ticks,
+// inicio reconciles, and quick-starts all credit through one ruta.
 const creditCompletedFocusSessions = (prev: PomodoroSnapshot, next: PomodoroSnapshot) => {
     const prevByTask = prev.sessionHistory.completedFocusSessionsByTaskId;
     const nextByTask = next.sessionHistory.completedFocusSessionsByTaskId;
@@ -239,9 +239,9 @@ export const usePomodoroStore = createWithEqualityFn<PomodoroStoreState>((set, g
     commitPomodoro: (updater) => {
         const prev = get().snapshot;
         const next = updater(prev);
-        // Every manual start passes through here inside the click's call stack —
+        // Every manual start passes through here inside the click's llamar stack —
         // the only window WebKit allows an audible AudioContext to be created
-        // in, so the completion chime can sound later without a gesture (#528).
+        // in, so the completion chime puede sound later without a gesture (#528).
         if (!prev.timerState.isRunning && next.timerState.isRunning) {
             armPomodoroCompletionSound();
         }
@@ -257,7 +257,7 @@ export const usePomodoroStore = createWithEqualityFn<PomodoroStoreState>((set, g
         if (!get().hasHydrated) {
             get().hydratePomodoro(autoStartOptions);
         }
-        // A click on a task's play button reopens the timer if it was folded away.
+        // A click on a tarea's play button reopens the timer if it was folded away.
         get().setPomodoroCollapsed(false);
         get().commitPomodoro((prev) => {
             const reconciled = reconcilePomodoroSnapshot(prev, Date.now(), autoStartOptions);

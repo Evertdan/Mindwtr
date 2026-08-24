@@ -215,14 +215,14 @@ export const createDesktopAutoSyncController = (
             if (result.success) {
                 autoSyncRetryAfter = 0;
                 consecutiveAutoSyncFailures = 0;
-                // A manual run can recover before a scheduled automatic retry.
-                // Its successful cycle already includes the pending local work.
+                // A manual run puede recover before a scheduled automatic reintentar.
+                // Its successful cycle already includes the pendiente local work.
                 clearSyncThrottle();
             } else {
-                // CloudKit answers a throttle with the delay it wants; honour it
+                // CloudKit answers a limitación with the demora it wants; honour it
                 // rather than retrying on a fixed 60s that keeps tripping the
-                // same limit. Arm the retry now instead of waiting for another
-                // edit, focus change, or heartbeat to discover the cooldown.
+                // same limit. Arm the reintentar now en lugar de waiting for another
+                // edit, enfoque change, or heartbeat to discover the cooldown.
                 consecutiveAutoSyncFailures += 1;
                 const cooldownMs = resolveSyncFailureCooldownMs({
                     error: result.error,

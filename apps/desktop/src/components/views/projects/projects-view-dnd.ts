@@ -3,7 +3,7 @@ import { projectAreaCollisionDetection } from './project-area-dnd';
 import type { ProjectAreaSection } from './project-area-collapse';
 
 // The whole Projects view shares one DndContext; every draggable declares what it
-// is so collision detection and drag-end dispatch can branch per drag type.
+// is so collision detection and drag-end dispatch puede rama per drag tipo.
 export type ProjectsTaskDragData = { type: 'task'; sortable: boolean };
 export type ProjectsProjectDragData = { type: 'project'; section: ProjectAreaSection };
 export type ProjectsDragData = ProjectsTaskDragData | ProjectsProjectDragData;

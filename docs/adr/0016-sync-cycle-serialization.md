@@ -1,26 +1,26 @@
-# ADR 0016: Serialize Sync Cycles Around The Merge/Write Window
+# ADR 0016: Serializar ciclos de sincronización alrededor de la ventana de fusión/escritura
 
-Date: 2026-05-06
-Status: Accepted
+Fecha: 2026-05-06
+Estado: Aceptado
 
-## Context
+## Contexto
 
-Desktop and mobile can request sync from multiple triggers: startup, foregrounding, scheduled background work, manual buttons, and post-save nudges. Without serialization, two cycles can overlap their read, merge, and write windows.
+El escritorio y el móvil pueden solicitar sincronización desde múltiples disparadores: inicio, primer plano, trabajo en segundo plano programado, botones manuales y nudges posteriores al guardado. Sin serialización, dos ciclos pueden superponer sus ventanas de lectura, fusión y escritura.
 
-Overlapping cycles can write stale merged snapshots, lose tombstones, or report misleading conflict state even when each individual merge is valid.
+Los ciclos superpuestos pueden escribir instantáneas fusionadas obsoletas, perder lápidas o informar estado de conflicto engañoso incluso cuando cada fusión individual es válida.
 
-## Decision
+## Decisión
 
-Serialize `performSyncCycle` in core so only one read/merge/write cycle runs at a time in a process. Follow-up sync requests queue behind the in-flight cycle.
+Serializar `performSyncCycle` en core para que solo se ejecute un ciclo de lectura/fusión/escritura a la vez en un proceso. Las solicitudes de sincronización de seguimiento se ponen en cola detrás del ciclo en vuelo.
 
-On mobile, sync runs and destructive full-document transfers (import, restore, or replacement) also share a serialized document-operation lane. A transfer takes the store-write barrier only after it reaches the front of that lane; ordinary edits can continue during sync and are handled by the existing freshness check and follow-up sync path.
+En móvil, las ejecuciones de sincronización y transferencias destructivas de documentos completos (importación, restauración o reemplazo) también comparten un carril de operación de documento serializado. Una transferencia toma la barrera de escritura del almacén solo después de que llega al frente de ese carril; las ediciones ordinarias pueden continuar durante la sincronización y se manejan mediante la verificación de frescura existente y la ruta de seguimiento de sincronización.
 
-Tombstone conflict ordering also treats a delete operation's effective time as `max(updatedAt, deletedAt)`. This preserves deletes that received later metadata updates and prevents a live edit between `deletedAt` and a later tombstone `updatedAt` from incorrectly winning.
+El ordenamiento de conflicto de lápida también trata el tiempo efectivo de una operación de eliminación como `max(updatedAt, deletedAt)`. Esto preserva las eliminaciones que recibieron actualizaciones de metadatos posteriores y evita que una edición activa entre `deletedAt` y una `updatedAt` de lápida posterior gane incorrectamente.
 
-## Consequences
+## Consecuencias
 
-- Manual and scheduled sync can no longer interleave writes within the same app process.
-- Mobile sync cannot interleave its read/merge/write window with a full-document import or restore, regardless of which operation starts first.
-- The core merge/write invariant is testable once instead of being reimplemented in desktop and mobile services.
-- Cross-device concurrency is still resolved by the sync merge rules; this decision only serializes local in-process cycles.
-- A later shared sync runtime can reuse this core behavior rather than adding another platform-level mutex.
+- La sincronización manual y programada ya no puede intercalar escrituras dentro del mismo proceso de aplicación.
+- La sincronización móvil no puede intercalar su ventana de lectura/fusión/escritura con una importación o restauración de documento completo, independientemente de qué operación comience primero.
+- El invariante de fusión/escritura central es comprobable una vez en lugar de ser reimplementado en servicios de escritorio y móvil.
+- La concurrencia entre dispositivos se resuelve mediante las reglas de fusión de sincronización; esta decisión solo serializa ciclos locales en proceso.
+- Un tiempo de ejecución de sincronización compartida posterior puede reutilizar este comportamiento central en lugar de agregar otro mutex a nivel de plataforma.

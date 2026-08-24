@@ -1,5 +1,5 @@
-// Lightweight shim that prefers native Hermes URL/URLSearchParams.
-// Falls back to a minimal, standards-like implementation if missing.
+// Shim ligero que prefiere URL/URLSearchParams nativo de Hermes.
+// Recurre a una implementación mínima similar a estándares si falta.
 // IMPORTANT: This file is loaded via Metro's getModulesRunBeforeMainModule
 // to ensure it runs before any other module that might need URL.
 
@@ -117,11 +117,11 @@ class FallbackURL {
     }
 }
 
-// Determine which implementation to use
+// Determinar qué implementación usar
 const NativeURL = typeof globalThis !== 'undefined' ? globalThis.URL : undefined;
 const NativeURLSearchParams = typeof globalThis !== 'undefined' ? globalThis.URLSearchParams : undefined;
 
-// Check if native URLSearchParams has .keys() method (the critical missing feature)
+// Verificar si URLSearchParams nativo tiene el método .keys() (la característica faltante crítica)
 const nativeURLSearchParamsWorks = (() => {
     try {
         if (NativeURLSearchParams) {
@@ -135,10 +135,10 @@ const nativeURLSearchParamsWorks = (() => {
 })();
 
 const URLPoly = NativeURL || FallbackURL;
-// Use fallback if native lacks .keys()
+// Usar respaldo si nativo carece de .keys()
 const URLSearchParamsPoly = nativeURLSearchParamsWorks ? NativeURLSearchParams : FallbackURLSearchParams;
 
-// Patch createObjectURL/revokeObjectURL if missing (e.g. strict Hermes)
+// Parche createObjectURL/revokeObjectURL si falta (por ejemplo, Hermes estricto)
 if (!URLPoly.createObjectURL) {
     URLPoly.createObjectURL = FallbackURL.createObjectURL;
 }
@@ -146,8 +146,8 @@ if (!URLPoly.revokeObjectURL) {
     URLPoly.revokeObjectURL = FallbackURL.revokeObjectURL;
 }
 
-// Set globals at module load time (before exports)
-// This ensures URL is defined before any other module tries to use it
+// Establecer globales en el tiempo de carga del módulo (antes de exportaciones)
+// Este/Esta
 if (typeof globalThis !== 'undefined') {
     globalThis.URL = URLPoly;
     globalThis.URLSearchParams = URLSearchParamsPoly;
@@ -158,7 +158,7 @@ if (typeof global !== 'undefined') {
 }
 
 function setupURLPolyfill() {
-    // Ensure globals are set in case tests or other shims reset them.
+    // Asegurar que los globales se establezcan en caso de que pruebas u otros shims los restablezcan.
     if (typeof globalThis !== 'undefined') {
         globalThis.URL = URLPoly;
         globalThis.URLSearchParams = URLSearchParamsPoly;
@@ -167,7 +167,7 @@ function setupURLPolyfill() {
         global.URL = URLPoly;
         global.URLSearchParams = URLSearchParamsPoly;
     }
-    // Patch createObjectURL/revokeObjectURL if missing (e.g. strict Hermes)
+    // Parche createObjectURL/revokeObjectURL si falta (por ejemplo, Hermes estricto)
     if (!URLPoly.createObjectURL) {
         URLPoly.createObjectURL = FallbackURL.createObjectURL;
     }

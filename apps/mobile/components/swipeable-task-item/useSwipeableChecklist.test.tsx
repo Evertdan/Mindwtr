@@ -103,7 +103,7 @@ describe('useSwipeableChecklist addChecklistItem', () => {
         expect(updateTask).not.toHaveBeenCalled();
     });
 
-    // The status recomputation lives in flushPendingChecklist, not in the caller:
+    // El/La
     // an unchecked item on a finished list-mode task reopens it.
     it('reopens a completed list-mode task when a new item lands on it', () => {
         const task = {

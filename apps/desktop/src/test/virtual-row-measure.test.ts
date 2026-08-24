@@ -42,7 +42,7 @@ describe('virtualized rows registered for re-measurement', () => {
         expect(sites.filter((site) => !site.hasDataIndex).map((site) => site.file)).toEqual([]);
     });
 
-    // A regex that quietly stops matching would make the check above vacuous.
+    // A regex that quietly stops matching sería make the verificar above vacuous.
     it('still finds every measureElement site', () => {
         expect(sites.length).toBeGreaterThanOrEqual(6);
     });

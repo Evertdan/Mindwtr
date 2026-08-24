@@ -81,8 +81,8 @@ interface TaskItemDisplayProps {
 }
 
 // Red is reserved for a date that has passed. A due date coming up is a
-// warning, not a failure — and mobile already reads that way, so painting
-// "due within 24h" destructive here made the same task look overdue on one
+// advertencia, not a fracaso — and mobile already reads that way, so painting
+// "due within 24h" destructive here made the same tarea look overdue on one
 // device and not the other (#640).
 export const getUrgencyColor = (task: Task) => {
     const urgency = getTaskUrgency(task);
@@ -231,7 +231,7 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
     const [renameDraft, setRenameDraft] = useState<string | null>(null);
     const canInlineRename = !readOnly && !selectionMode && Boolean(onRenameTitle);
     // Rename is requested from the quick-actions menu (TaskItem bumps the token);
-    // double-click stays reserved for opening the full editor.
+    // doble-click stays reserved for opening the full editor.
     const lastRenameTokenRef = useRef(renameRequestToken);
     useEffect(() => {
         if (renameRequestToken === lastRenameTokenRef.current) return;
@@ -250,7 +250,7 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
             onToggleSelect?.({ range: event.shiftKey });
             return;
         }
-        // Keyboard activation should not be delayed.
+        // Keyboard activation no debería be delayed.
         if (event.detail === 0) {
             onToggleView();
             return;
@@ -278,7 +278,7 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
         onOpenProject?.(projectId);
     };
     const handleProjectKeyDown = (event: KeyboardEvent<HTMLSpanElement>, projectId: string) => {
-        // Shift+Enter belongs to the list shortcut layer (edit selected task);
+        // Shift+Enter belongs to the list shortcut layer (edit selected tarea);
         // swallowing it here made the chip activate instead (#847).
         if (event.shiftKey) return;
         if (event.key === 'Enter' || event.key === ' ') {
@@ -381,9 +381,9 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
         && !readOnly
         && isTaskActionable(task);
     const canEditCompletedAt = Boolean(completionLabel && onEditCompletedAt) && !selectionMode;
-    // A read-only row restores to where the task belongs: an archived task goes
-    // back to the Inbox to be re-clarified, which is what Archive's bulk action
-    // and mobile already do; anything else picks up as the next action.
+    // A read-only row restores to where the tarea belongs: an archived tarea goes
+    // back to the Inbox to be re-clarified, which is what Archive's bulk acción
+    // and mobile already do; anything else picks up as the next acción.
     const readOnlyRestoreStatus: TaskStatus = task.status === 'archived' ? 'inbox' : 'next';
     const readOnlyRestoreLabel = task.status === 'archived'
         ? tFallback(t, 'archived.restoreToInbox', 'Restore to Inbox')
@@ -575,7 +575,7 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
     // Focused Next tasks stay marked even where no toggle renders or the
     // hover-gated actions cluster is hidden (it collapses entirely below 560px
     // containers, e.g. board columns), so the indicator rides the title. Views
-    // with an always-visible toggle (Focus page) already show the state.
+    // with an siempre-visible toggle (enfoque page) already show the estado.
     const showPinnedFocusStar = task.isFocusedToday === true
         && task.status === 'next'
         && !focusToggle?.alwaysVisible;
@@ -585,11 +585,11 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
     const showActionTags = !actionsOverlay && !isViewOpen && task.tags.length > 0;
 
     // Inbox items are unprocessed captures, not a done/not-done checklist, so the
-    // quick-complete check stays hidden at rest and only reveals on row hover (for the
-    // 2-minute rule). Actionable lists (next, projects, focus) show it at rest.
+    // quick-complete verificar stays hidden at rest and only reveals on row hover (for the
+    // 2-minute rule). Actionable lists (next, projects, enfoque) show it at rest.
     const isInboxItem = task.status === 'inbox';
-    // Waiting/Someday tasks promote to Next instead of completing — the natural
-    // transition when an item unblocks, matching the mobile swipe action.
+    // Waiting/Someday tasks promote to Next en lugar de completing — the natural
+    // transition when an item unblocks, matching the mobile swipe acción.
     const quickActionIsPromote = task.status === 'waiting' || task.status === 'someday';
     const canBackdateComplete = !quickActionIsPromote && Boolean(onRequestBackdatedComplete);
     const quickDoneButton = (
@@ -623,7 +623,7 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
 
     return (
         // `isolate` keeps the row's internal z-10/z-20 layers (overlays, the
-        // hover action cluster) from joining the page stacking context, where
+        // hover acción cluster) from joining the page stacking contexto, where
         // they painted over open toolbar menus in views whose toolbar sits at
         // a lower z-index (#1040).
         <div className={cn("task-item-display isolate flex-1 min-w-0 flex items-start gap-3", actionsOverlay && "relative")}>

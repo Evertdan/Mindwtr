@@ -1,77 +1,77 @@
-# ADR 0018: Mobile Theming via Unified Token Hook with Theme-Isolation Invariant
+# ADR 0018: Tematización móvil a través de gancho de token unificado con invariante de aislamiento de tema
 
-Date: 2026-06-20
-Status: Accepted
+Fecha: 2026-06-20
+Estado: Aceptado
 
-## Context
+## Contexto
 
-Mobile theming centralizes only **color**: every consumer reads from the single
-`useThemeColors()` hook, and each theme (default light/dark, eink, nord, sepia, oled, and
-a "Material 3" option) supplies color values. Type scale, corner radius, elevation, and
-press feedback are inline `StyleSheet` in ~82 bespoke components.
+La tematización móvil centraliza solo **color**: cada consumidor lee desde el gancho único
+`useThemeColors()` y cada tema (luz/oscuridad predeterminados, eink, nord, sepia, oled y
+una opción "Material 3") proporciona valores de color. La escala de tipo, el radio de esquina, la elevación y
+la retroalimentación de presión son `StyleSheet` en línea en ~82 componentes personalizados.
 
-The shipped "Material 3" theme is **Material in name only** — a single palette mapped onto
-the generic color shape, with no M3 type scale, shape system, tonal elevation, or state
-layers. Deepening it to a genuine Material 3 design system risks a different problem:
-*leaking Material traits into the other themes*, several of which (eink, nord, sepia,
-oled) are deliberately non-Material and must stay exactly as they are.
+El tema "Material 3" enviado es **Material solo de nombre** — una paleta única asignada a
+la forma de color genérica, sin escala de tipo M3, sistema de forma, elevación tonal o capas de
+estado. Profundizarlo en un sistema de diseño Material 3 genuino corre el riesgo de un problema diferente:
+*filtrar rasgos de Material a otros temas*, varios de los cuales (eink, nord, sepia,
+oled) son deliberadamente no-Material y deben seguir siendo exactamente como son.
 
-Two delivery shapes were considered and rejected:
+Se consideraron y rechazaron dos formas de entrega:
 
-- **A new M3 primitive component set** (`M3Button`, `M3Card`, FAB…) and swapping call
-  sites — a larger rewrite that risks behavior drift and exceeds the agreed scope.
-- **Inline `themeStyle === 'material3'` branches** in each component — scatters M3 logic
-  with no reusable foundation (the per-view-duplication anti-pattern).
+- **Un nuevo conjunto de componentes primitivos M3** (`M3Button`, `M3Card`, FAB…) e intercambio de
+  sitios de llamada — una reescritura más grande que riesgo comportamiento a la deriva y excede el alcance acordado.
+- **Ramas `themeStyle === 'material3'` en línea** en cada componente — dispersa lógica M3
+  sin fundación reutilizable (el anti-patrón de duplicación por vista).
 
-## Decision
+## Decisión
 
-Mobile theming uses a single **token hook** rather than ad-hoc per-component styling.
+La tematización móvil utiliza un único **gancho de token** en lugar del estilo por componente ad-hoc.
 
-1. `useThemeTokens()` returns `{ colors, type, shape, elevation, state, isMaterial }`.
-   The Material 3 theme supplies Material values for every category; **every other theme
-   supplies "today's look" defaults**. Converting a component to consume tokens is a
-   visual/behavioral no-op for non-Material themes and Materializes the same component
-   under M3.
-2. `useThemeColors()` is retained and re-implemented to delegate to `useThemeTokens()`,
-   so existing call sites keep working and Materialization proceeds incrementally,
-   surface by surface — no flag day, and unconverted surfaces are never broken, only
-   "not yet Materialized."
-3. **Behavioral tokens are gated, not just colored.** Elevation and ripple/state-layers
-   are new visual/interactive effects that do not exist today; they are gated behind
-   `isMaterial` (true only under the Material 3 theme). Under non-Material themes the
-   helpers are no-ops: no ripple color, transparent state layer, empty elevation style.
-4. **Theme isolation is a test-enforced invariant**, covering both dimensions:
-   - a **byte-identical color regression** asserting every non-Material theme's resolved
-     colors equal today's output, and
-   - a **behavioral non-degradation** suite asserting `isMaterial === false`, no ripple,
-     transparent state layer, and empty elevation style for each non-Material theme.
+1. `useThemeTokens()` devuelve `{ colors, type, shape, elevation, state, isMaterial }`.
+   El tema Material 3 proporciona valores de Material para cada categoría; **cada otro tema
+   proporciona valores predeterminados de "look actual"**. Convertir un componente para consumir tokens es una
+   no-operación visual/conductual para temas no-Material y Materializa el mismo componente
+   en M3.
+2. `useThemeColors()` se retiene y se reimplementa para delegar a `useThemeTokens()`,
+   por lo que los sitios de llamada existentes siguen funcionando y la Materialización procede incrementalmente,
+   superficie por superficie — sin día de bandera y las superficies no convertidas nunca se rompen, solo
+   "aún no Materializadas".
+3. **Los tokens de comportamiento se cierran, no solo se colorean.** La elevación y rizo/capas de estado
+   son efectos visuales/interactivos nuevos que no existen hoy; se cierran detrás de
+   `isMaterial` (verdadero solo en el tema Material 3). En temas no-Material los
+   ayudantes son no-ops: sin color de rizo, capa de estado transparente, estilo de elevación vacío.
+4. **El aislamiento del tema es un invariante aplicado por prueba**, cubriendo ambas dimensiones:
+   - una **regresión de color idéntico a bytes** afirmando que los colores resueltos de cada tema no-Material
+     son iguales a la salida actual y
+   - un conjunto de **no-degradación conductual** afirmando `isMaterial === false`, sin rizo,
+     capa de estado transparente y estilo de elevación vacío para cada tema no-Material.
 
-   Color substitution alone cannot prove the behavioral effects don't leak, so both
-   assertions are required; a future token change cannot silently Materialize another
-   theme without failing CI.
-5. **No new `theme` enum values.** The existing `material3-light` / `material3-dark`
-   modes are kept, so there are no `packages/core` types, sync, or settings changes. M3
-   stays explicit two-mode; "system appearance → auto light/dark" is deferred as a
-   separate, theme-agnostic feature. No `react-native-paper` and no Material You /
-   dynamic color.
+   La sustitución de color solo no puede probar que los efectos conductuales no se filtren, por lo que ambas
+   afirmaciones son necesarias; un cambio de token futuro no puede Materializar silenciosamente otro
+   tema sin fallar en CI.
+5. **Sin nuevos valores de enum `theme`.** Los modos `material3-light` / `material3-dark` existentes
+   se mantienen, por lo que no hay tipos de `packages/core`, cambios de sincronización o configuración. M3
+   se mantiene dos-modo explícito; "apariencia del sistema → auto claro/oscuro" se difiere como
+   una característica separada e independiente del tema. Sin `react-native-paper` y sin Material You /
+   color dinámico.
 
-## Consequences
+## Consecuencias
 
-- The Material 3 theme can become a genuine M3 design system (color roles, type scale,
-  shape, tonal elevation, state layers) *through* existing components, without a UI
-  rewrite or a new dependency.
-- "Does this degrade my other themes?" stops being a hope and becomes a CI-enforced
-  property across both color and behavior.
-- Partial Materialization is acceptable: a bounded set of high-traffic surfaces is
-  converted first; the rest keep working and can be picked up later.
-- One user-visible change for existing Material-theme users: primary action surfaces move
-  from `primary` to `primaryContainer` (correct M3). This warrants a release-notes line.
-- Future themes and future token categories plug into the same hook; the isolation
-  invariant guards against regressions as the system grows.
-- This decision is scoped to `apps/mobile` and does not affect desktop theming, the core
-  data model, or sync.
+- El tema Material 3 puede convertirse en un sistema de diseño M3 genuino (roles de color, escala de tipo,
+  forma, elevación tonal, capas de estado) *a través de* componentes existentes, sin
+  reescritura de interfaz de usuario o dependencia nueva.
+- "¿Esto degrada mis otros temas?" deja de ser una esperanza y se convierte en una
+  propiedad aplicada por CI a través del color y el comportamiento.
+- La Materialización parcial es aceptable: un conjunto limitado de superficies de alto tráfico se
+  convierte primero; el resto sigue funcionando y se puede recoger más tarde.
+- Un cambio visible para el usuario para usuarios de tema existente Material: las superficies de acción primaria se mueven
+  de `primary` a `primaryContainer` (M3 correcto). Esto merece una línea de notas de lanzamiento.
+- Los temas futuros y las categorías de token futuras se conectan al mismo gancho; el invariante de aislamiento
+  protege contra regresiones a medida que crece el sistema.
+- Esta decisión se circunscribe a `apps/mobile` y no afecta la tematización de escritorio, el modelo de
+  datos central o la sincronización.
 
-## References
+## Referencias
 
-- Working design detail: `docs/superpowers/specs/2026-06-20-mobile-material3-theme-design.md`
-  (untracked local working file; this ADR is the durable record of the decision).
+- Detalle de diseño de trabajo: `docs/superpowers/specs/2026-06-20-mobile-material3-theme-design.md`
+  (archivo de trabajo local sin rastrear; este ADR es el registro duradero de la decisión).

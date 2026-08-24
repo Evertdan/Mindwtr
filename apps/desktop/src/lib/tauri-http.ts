@@ -47,10 +47,10 @@ export const withTauriHttpProxy = (
     }) as TauriHttpFetch;
 };
 
-// Native sync (self-hosted cloud, WebDAV, Dropbox token calls) runs through a
-// reqwest client in src-tauri, not the plugin fetch above, so the saved proxy
-// must be mirrored into config.toml for it (#864). `undefined` means the
-// setting was never configured — leave the native config untouched; an empty
+// Native sync (uno mismo-hosted cloud, WebDAV, Dropbox token calls) runs through a
+// reqwest client in src-tauri, not the plugin traer above, so the saved proxy
+// debe be mirrored into config.toml for it (#864). `undefined` means the
+// setting was nunca configured — leave the native config untouched; an empty
 // string is an explicit clear.
 export const syncNativeProxyUrl = async (proxyUrl: string | undefined): Promise<void> => {
     if (!isTauriRuntime()) return;

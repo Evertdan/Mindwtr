@@ -559,7 +559,7 @@ export default function TabLayout() {
   const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  // The root layout's provider, which presents capture as a pushed route.
+  // El/La
   const { openQuickCapture: openRouteQuickCapture } = useQuickCapture();
   const settings = useTaskStore((state) => state.settings);
   const { selectedAreaIdForNewTasks } = useMobileAreaFilter();

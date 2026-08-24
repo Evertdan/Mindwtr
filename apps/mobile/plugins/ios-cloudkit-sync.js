@@ -14,17 +14,17 @@ const withCloudKitEntitlements = (config) => {
   return withEntitlementsPlist(config, (mod) => {
     const entitlements = mod.modResults;
 
-    // Enable CloudKit services (not key-value or documents)
+    // Habilitar servicios CloudKit (no clave-valor ni documentos)
     entitlements['com.apple.developer.icloud-services'] = ['CloudKit'];
 
-    // Register our container identifier
+    // Registrar nuestro identificador de contenedor
     const containers = entitlements['com.apple.developer.icloud-container-identifiers'] ?? [];
     if (!containers.includes(CLOUDKIT_CONTAINER)) {
       containers.push(CLOUDKIT_CONTAINER);
     }
     entitlements['com.apple.developer.icloud-container-identifiers'] = containers;
 
-    // APS environment for silent push notifications (zone subscriptions)
+    // Entorno APS para notificaciones push silenciosas (suscripciones de zona)
     if (!entitlements['aps-environment']) {
       entitlements['aps-environment'] = 'production';
     }

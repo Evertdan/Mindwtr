@@ -88,7 +88,7 @@ describe('InboxProcessingScheduleFields calendar system', () => {
     const originalLanguages = navigator.languages;
 
     afterEach(() => {
-        // Unmount before restoring the store, or the settings write lands on a
+        // desmontar before restoring the store, or the settings write lands on a
         // still-mounted DateField outside act().
         cleanup();
         useTaskStore.setState({ settings: originalSettings });

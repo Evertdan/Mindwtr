@@ -2,7 +2,7 @@ import type { QuickAddPreviewEntry } from '@mindwtr/core';
 
 import { cn } from '../lib/utils';
 
-// Past this the strip wraps into a third row and starts pushing the surface
+// Past esto the strip wraps into a third row and starts pushing the surface
 // around more than it informs; the rest collapse into a count.
 const MAX_VISIBLE_ENTRIES = 8;
 
@@ -22,7 +22,7 @@ export function QuickAddPreview({ entries, className }: QuickAddPreviewProps) {
     const overflow = entries.length - visible.length;
 
     // The region renders even while empty (a bare flex row is zero height): a
-    // live region has to be in the accessibility tree before its content
+    // live region has to be in the accesibilidad tree before its content
     // changes, or the first announcement is dropped.
     return (
         <div
@@ -34,9 +34,9 @@ export function QuickAddPreview({ entries, className }: QuickAddPreviewProps) {
             {visible.map((entry) => (
                 <span
                     key={entry.id}
-                    // The title chip echoes the draft as typed (quick-add-preview.ts),
+                    // The title chip echoes the draft as typed (quick-agregar-preview.ts),
                     // so it changes on every keystroke; excluded from the live region
-                    // so screen readers don't announce it on top of keystroke echo.
+                    // so screen readers no announce it on top of keystroke echo.
                     // Other chips (a token appearing/disappearing/changing) still
                     // announce normally. Stays in the same visual position either way.
                     aria-hidden={entry.kind === 'title' ? true : undefined}

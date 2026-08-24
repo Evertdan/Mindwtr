@@ -1,62 +1,62 @@
-# Mindwtr MCP Server
+# Servidor MCP de Mindwtr
 
-MCP server for Mindwtr. Connect MCP clients (Claude Desktop, etc.) to either your local Mindwtr SQLite database or a self-hosted Mindwtr Cloud endpoint.
+Servidor MCP para Mindwtr. Conecta clientes MCP (Claude Desktop, etc.) a tu base de datos local Mindwtr SQLite o a un punto final de Mindwtr Cloud autohospedado.
 
-By default this is a **stdio** server: MCP clients launch it as a subprocess and talk over JSON-RPC on stdin/stdout. It also has an opt-in **HTTP transport** (see [Remote access (HTTP)](#remote-access-http)) for self-hosters who want to expose it at a URL instead.
-
----
-
-## App Binaries vs. MCP Helper
-
-The desktop and mobile app binaries include the Mindwtr app, but they do **not** currently include a desktop start/stop toggle or a standalone `mindwtr-mcp` command on your `PATH`.
-
-You do **not** need to run the whole app from source to use MCP. You can use the normal desktop app binary for your tasks, then run this separate MCP helper from the repository with Bun, or build the helper once and run it with Node. Point the helper at the desktop app's local `mindwtr.db`.
-
-On desktop, the app shows the exact local data path in **Settings -> Sync -> Local Data**. Mobile binaries do not expose a local MCP server surface.
+De forma predeterminada, este es un servidor **stdio**: los clientes MCP lo inician como un subproceso y se comunican por JSON-RPC en stdin/stdout. También tiene un **transporte HTTP** opcional (ver [Acceso remoto (HTTP)](#acceso-remoto-http)) para aquellos que autoalojan y desean exponerlo en una URL.
 
 ---
 
-## Requirements
+## Binarios de Aplicación vs. Asistente MCP
 
-- Node.js 18+ (for the MCP client that spawns the server)
-- npm package installs use better-sqlite3, a native SQLite addon. If no prebuilt binary is available for your platform, npm needs a working C/C++ build toolchain and Python for node-gyp.
-- Bun (recommended for development in this repo)
-- A local Mindwtr database (`mindwtr.db`) for local mode, or a self-hosted Mindwtr Cloud URL and bearer token for Cloud mode
+Los binarios de la aplicación de escritorio y móvil incluyen la aplicación Mindwtr, pero **actualmente no** incluyen un alternar de inicio/parada de escritorio ni un comando `mindwtr-mcp` independiente en tu `PATH`.
 
-Default database locations:
+**No** necesitas ejecutar toda la aplicación desde la fuente para usar MCP. Puedes usar el binario normal de la aplicación de escritorio para tus tareas, luego ejecutar este asistente MCP separado desde el repositorio con Bun, o compilar el asistente una vez y ejecutarlo con Node. Apunta el asistente a la `mindwtr.db` local de la aplicación de escritorio.
+
+En el escritorio, la aplicación muestra la ruta exacta de datos locales en **Configuración -> Sincronización -> Datos Locales**. Los binarios móviles no exponen una superficie de servidor MCP local.
+
+---
+
+## Requisitos
+
+- Node.js 18+ (para el cliente MCP que inicia el servidor)
+- Las instalaciones de paquetes npm usan better-sqlite3, un complemento SQLite nativo. Si no hay binario precompilado disponible para tu plataforma, npm necesita una cadena de herramientas de compilación C/C++ funcional y Python para node-gyp.
+- Bun (recomendado para desarrollo en este repositorio)
+- Una base de datos local de Mindwtr (`mindwtr.db`) para modo local, o una URL de Mindwtr Cloud autohospedada y token de portador para modo Nube
+
+Ubicaciones de base de datos predeterminadas:
 - Linux: `~/.local/share/mindwtr/mindwtr.db`
 - macOS: `~/Library/Application Support/mindwtr/mindwtr.db`
 - Windows: `%APPDATA%\mindwtr\mindwtr.db`
 
-Additional macOS path for sandboxed builds:
+Ruta macOS adicional para compilaciones en sandbox:
 - `~/Library/Containers/tech.dongdongbh.mindwtr/Data/Library/Application Support/mindwtr/mindwtr.db`
 
-If `mindwtr.db` is missing but `data.json` exists in the same desktop data folder, the MCP server will bootstrap a fresh SQLite database from that local data snapshot on first start.
-Desktop Settings → Sync → Local Data shows the exact storage location used by the app.
+Si falta `mindwtr.db` pero existe `data.json` en la misma carpeta de datos de escritorio, el servidor MCP comenzará a generar una nueva base de datos SQLite desde esa instantánea de datos local al iniciarse.
+Configuración de Escritorio → Sincronización → Datos Locales muestra la ubicación exacta de almacenamiento utilizada por la aplicación.
 
-You can override local mode with:
+Puedes anular el modo local con:
 - `--db /path/to/mindwtr.db`
 - `MINDWTR_DB_PATH=/path/to/mindwtr.db`
 - `MINDWTR_DB=/path/to/mindwtr.db`
 
-For self-hosted Cloud mode, use:
-- `--cloud-url https://mindwtr.example.com` or `MINDWTR_MCP_CLOUD_URL`
-- `--cloud-token <token>` or `MINDWTR_MCP_CLOUD_TOKEN`
-- optional `--cloud-allow-insecure-http=true` for trusted private HTTP deployments
+Para el modo Nube autohospedado, usa:
+- `--cloud-url https://mindwtr.example.com` o `MINDWTR_MCP_CLOUD_URL`
+- `--cloud-token <token>` o `MINDWTR_MCP_CLOUD_TOKEN`
+- opcional `--cloud-allow-insecure-http=true` para implementaciones HTTP privadas de confianza
 
 ---
 
 ## Start / Stop
 
-### Run from npm
+### Ejecutar desde npm
 
-After installing the published package, run it directly:
+Después de instalar el paquete publicado, ejecútalo directamente:
 
 ```bash
 mindwtr-mcp --db "/path/to/mindwtr.db"
 ```
 
-Or let an MCP client launch it through npx:
+O deja que un cliente MCP lo lance a través de npx:
 
 ```json
 {
@@ -74,11 +74,11 @@ Or let an MCP client launch it through npx:
 }
 ```
 
-The npm package is read-only by default. Add `--write` only when you explicitly want add/update/complete/delete tools enabled.
+El paquete npm es de solo lectura de forma predeterminada. Agrega `--write` solo cuando explícitamente desees que se habiliten las herramientas agregar/actualizar/completar/eliminar.
 
-### Self-hosted Cloud mode
+### Modo Cloud autohospedado
 
-Use Cloud mode when you run your own Mindwtr Cloud server and want MCP tools without pointing the helper at a local SQLite database:
+Usa modo Cloud cuando ejecutes tu propio servidor Mindwtr Cloud y desees herramientas MCP sin apuntar el ayudante a una base de datos SQLite local:
 
 ```bash
 npx -y mindwtr-mcp \
@@ -86,7 +86,7 @@ npx -y mindwtr-mcp \
   --cloud-token "$MINDWTR_TOKEN"
 ```
 
-Or pass the same values through environment variables:
+O pasa los mismos valores a través de variables de entorno:
 
 ```bash
 MINDWTR_MCP_CLOUD_URL="https://mindwtr.example.com" \
@@ -94,130 +94,130 @@ MINDWTR_MCP_CLOUD_TOKEN="$MINDWTR_TOKEN" \
 npx -y mindwtr-mcp
 ```
 
-Cloud mode uses the self-hosted Cloud API. Reads come from the current `/v1/data` snapshot; with `--write`, task/project/section/area writes go through the Cloud server's per-resource REST endpoints (`POST /v1/tasks`, `PATCH /v1/tasks/:id`, and so on), so they get the same validation and revision stamping as any other client. Without `--write`, write tools return `read_only`. Person edits and restoring deleted tasks are not available in Cloud mode yet.
+El modo Cloud usa la API de Cloud autohospedada. Las lecturas provienen de la instantánea actual de `/v1/data`; con `--write`, las escrituras de tarea/proyecto/sección/área pasan por los puntos finales REST por recurso del servidor en la nube (`POST /v1/tasks`, `PATCH /v1/tasks/:id`, y así sucesivamente), para que obtengan la misma validación y sellado de revisión que cualquier otro cliente. Sin `--write`, las herramientas de escritura devuelven `read_only`. Las ediciones de personas y la restauración de tareas eliminadas aún no están disponibles en modo Cloud.
 
-This does not make Mindwtr Cloud itself a hosted MCP server. It is still the same stdio helper, backed by a Cloud URL that you operate.
+Esto no convierte Mindwtr Cloud en un servidor MCP hospedado. Sigue siendo el mismo ayudante stdio, respaldado por una URL de Cloud que operas.
 
-For private HTTP test deployments, local/private HTTP URLs are allowed by the shared Cloud client rules. Use `--cloud-allow-insecure-http=true` only for a self-hosted endpoint you intentionally trust.
+Para despliegues de prueba HTTP privados, las URL HTTP locales/privadas se permiten según las reglas del cliente de Cloud compartido. Usa `--cloud-allow-insecure-http=true` solo para un punto final autohospedado que confías intencionalmente.
 
-### Remote access (HTTP)
+### Acceso remoto (HTTP)
 
-By default `mindwtr-mcp` only speaks stdio. Pass `--http` to also (instead of stdio) serve a stateless streamable-HTTP MCP endpoint, so you can point a remote MCP client at a URL — the motivating case is [Gemini Spark](https://gemini.google.com) "custom apps", which take an MCP server URL. HTTP mode works with either backend (local SQLite or self-hosted Cloud).
+De forma predeterminada, `mindwtr-mcp` solo habla stdio. Pasa `--http` para también (en lugar de stdio) servir un punto final MCP HTTP sin estado transmisible, para que puedas apuntar un cliente MCP remoto a una URL — el caso motivador es [Gemini Spark](https://gemini.google.com) “aplicaciones personalizadas”, que toman una URL de servidor MCP. El modo HTTP funciona con cualquier backend (SQLite local o Cloud autohospedado).
 
 ```bash
-mindwtr-mcp --http --http-token "$(openssl rand -hex 32)" --db "/path/to/mindwtr.db"
+mindwtr-mcp --http --http-token “$(openssl rand -hex 32)” --db “/path/to/mindwtr.db”
 ```
 
-Flags (all have `MINDWTR_MCP_HTTP*` env var equivalents):
+Banderas (todas tienen equivalentes de variable de entorno `MINDWTR_MCP_HTTP*`):
 
-- `--http` / `MINDWTR_MCP_HTTP` — enable HTTP mode. Also implied by setting `--http-host`, `--http-port`, or `--http-token`.
-- `--http-token <token>` / `MINDWTR_MCP_HTTP_TOKEN` — **required** whenever HTTP mode is on, at least 16 characters. Generate one with `openssl rand -hex 32`. The server refuses to start without it — there is no way to expose HTTP mode unauthenticated, even on loopback.
-- `--http-host <host>` / `MINDWTR_MCP_HTTP_HOST` — bind address, default `127.0.0.1`.
-- `--http-port <port>` / `MINDWTR_MCP_HTTP_PORT` — bind port, default `8722`.
+- `--http` / `MINDWTR_MCP_HTTP` — habilita modo HTTP. También implicado al establecer `--http-host`, `--http-port` o `--http-token`.
+- `--http-token <token>` / `MINDWTR_MCP_HTTP_TOKEN` — **requerido** siempre que el modo HTTP esté activado, al menos 16 caracteres. Genera uno con `openssl rand -hex 32`. El servidor se niega a iniciarse sin él — no hay forma de exponer el modo HTTP sin autenticar, ni siquiera en loopback.
+- `--http-host <host>` / `MINDWTR_MCP_HTTP_HOST` — dirección de enlace, predeterminada `127.0.0.1`.
+- `--http-port <port>` / `MINDWTR_MCP_HTTP_PORT` — puerto de enlace, predeterminado `8722`.
 
-The MCP endpoint is `POST /mcp` and requires `Authorization: Bearer <token>` on every request; `GET /healthz` returns `200 ok` without auth for reverse-proxy health checks. Requests without a valid token get `401`; bodies over 1 MiB get `413`. When HTTP mode is on, the server does not also connect a stdio transport — it stays alive as long as the HTTP server is listening, not stdin.
+El punto final MCP es `POST /mcp` y requiere `Authorization: Bearer <token>` en cada solicitud; `GET /healthz` devuelve `200 ok` sin autenticación para verificaciones de salud de proxy inverso. Las solicitudes sin un token válido obtienen `401`; los cuerpos superiores a 1 MiB obtienen `413`. Cuando el modo HTTP está activado, el servidor tampoco conecta un transporte stdio — permanece vivo mientras el servidor HTTP está escuchando, no stdin.
 
-There is no built-in TLS termination or rate limiting. If you're exposing this beyond localhost, put a reverse proxy (e.g. Caddy, nginx) in front for TLS and put the resulting `https://` URL (plus your token) into the remote MCP client.
+No hay terminación TLS integrada ni limitación de velocidad. Si estás exponiendo esto más allá de localhost, coloca un proxy inverso (p. ej., Caddy, nginx) al frente para TLS y coloca la URL `https://` resultante (más tu token) en el cliente MCP remoto.
 
-### Run directly from the repo
+### Ejecutar directamente desde el repo
 
 ```bash
-# from repo root (read-only by default)
-bun run mindwtr:mcp -- --db "/path/to/mindwtr.db"
+# desde la raíz del repo (solo lectura de forma predeterminada)
+bun run mindwtr:mcp -- --db “/path/to/mindwtr.db”
 ```
 
-Enable writes (required for add/update/complete/delete tools):
+Habilita escrituras (requerido para herramientas agregar/actualizar/completar/eliminar):
 
 ```bash
-bun run mindwtr:mcp -- --db "/path/to/mindwtr.db" --write
+bun run mindwtr:mcp -- --db “/path/to/mindwtr.db” --write
 ```
 
-Stop:
-- Press `Ctrl+C` in the terminal.
+Parar:
+- Presiona `Ctrl+C` en la terminal.
 
-### Keep-alive behavior (why it sometimes exits)
+### Comportamiento de keep-alive (por qué a veces se sale)
 
-The MCP server is **stdio‑based**. It stays alive as long as stdin is open.
-If your shell/client closes stdin, the process exits.
+El servidor MCP está **basado en stdio**. Se mantiene vivo mientras stdin esté abierto.
+Si tu shell/cliente cierra stdin, el proceso se sale.
 
-To force an immediate exit when stdin closes (no keep-alive), pass `--nowait`:
+Para forzar una salida inmediata cuando se cierre stdin (sin keep-alive), pasa `--nowait`:
 
 ```bash
-bun run mindwtr:mcp -- --db "/path/to/mindwtr.db" --nowait
+bun run mindwtr:mcp -- --db “/path/to/mindwtr.db” --nowait
 ```
 
-Note: When an MCP client launches the server, it keeps stdin open, so the server should remain connected.
+Nota: Cuando un cliente MCP lanza el servidor, mantiene stdin abierto, por lo que el servidor debe permanecer conectado.
 
-### Run without the helper script
+### Ejecutar sin el script ayudante
 
 ```bash
-bun run --filter mindwtr-mcp dev -- --db "/path/to/mindwtr.db"
+bun run --filter mindwtr-mcp dev -- --db “/path/to/mindwtr.db”
 ```
 
-Stop:
-- Press `Ctrl+C` in the terminal.
+Parar:
+- Presiona `Ctrl+C` en la terminal.
 
-### Build and run the binary entry (Node)
+### Compilar y ejecutar la entrada binaria (Node)
 
 ```bash
-# from repo root
+# desde la raíz del repo
 bun run --filter mindwtr-mcp build
-node apps/mcp-server/dist/cli.js --db "/path/to/mindwtr.db"
+node apps/mcp-server/dist/cli.js --db “/path/to/mindwtr.db”
 ```
 
-Stop:
-- Press `Ctrl+C` in the terminal.
+Parar:
+- Presiona `Ctrl+C` en la terminal.
 
 ---
 
-## Why `mindwtr-mcp` is “command not found”
+## Por qué `mindwtr-mcp` es “command not found”
 
-`mindwtr-mcp` is the package binary. It exists after installing the npm package globally, after an MCP client launches it through `npx`, or after you build the source package and run it with Node.
+`mindwtr-mcp` es el binario del paquete. Existe después de instalar el paquete npm globalmente, después de que un cliente MCP lo lance a través de `npx`, o después de que compiles el paquete fuente y lo ejecutes con Node.
 
-Use one of these source-tree options instead:
+Usa una de estas opciones de árbol de fuentes en su lugar:
 
 ```bash
-# ✅ works immediately
-bun run mindwtr:mcp -- --db "/path/to/mindwtr.db"
+# ✅ funciona inmediatamente
+bun run mindwtr:mcp -- --db “/path/to/mindwtr.db”
 
-# ✅ build then run
+# ✅ compilar luego ejecutar
 bun run --filter mindwtr-mcp build
-node apps/mcp-server/dist/cli.js --db "/path/to/mindwtr.db"
+node apps/mcp-server/dist/cli.js --db “/path/to/mindwtr.db”
 ```
 
-### Optional: create a global `mindwtr-mcp` command
+### Opcional: crear un comando global `mindwtr-mcp`
 
-If you want a real `mindwtr-mcp` command on your PATH, create a tiny wrapper:
+Si deseas un comando real `mindwtr-mcp` en tu PATH, crea un pequeño envoltorio:
 
 ```bash
 cat > ~/bin/mindwtr-mcp <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 cd /absolute/path/to/Mindwtr
-exec bun run mindwtr:mcp -- "$@"
+exec bun run mindwtr:mcp -- “$@”
 EOF
 chmod +x ~/bin/mindwtr-mcp
 ```
 
-Then use:
+Luego usa:
 
 ```bash
-mindwtr-mcp --db "/path/to/mindwtr.db"
+mindwtr-mcp --db “/path/to/mindwtr.db”
 ```
 
-### Desktop app toggle?
+### ¿Botón de aplicación de escritorio?
 
-Not yet. Start/stop is still manual.
+Todavía no. El inicio/parada sigue siendo manual.
 
 ---
 
-## MCP Client Configuration
+## Configuración del Cliente MCP
 
-MCP clients run the server as a subprocess. You point them to **the command** and pass args/env.
+Los clientes MCP ejecutan el servidor como un subproceso. Les señalas **el comando** y pasas args/env.
 
-**Important:** Do NOT use `bun run mindwtr:mcp` for MCP clients. The `bun run` wrapper outputs shell messages to stdout (e.g., `$ bun run --filter...`) which breaks the JSON-RPC protocol. Always run bun directly on the source file.
+**Importante:** NO uses `bun run mindwtr:mcp` para clientes MCP. El envoltorio `bun run` emite mensajes del shell a stdout (p. ej., `$ bun run --filter...`) lo que rompe el protocolo JSON-RPC. Siempre ejecuta bun directamente en el archivo fuente.
 
-### Example (generic MCP config)
+### Ejemplo (configuración genérica de MCP)
 
 ```json
 {
@@ -234,12 +234,12 @@ MCP clients run the server as a subprocess. You point them to **the command** an
 }
 ```
 
-Add `--write` to the args if you want to enable **add/update/complete/delete** tools.
+Agrega `--write` a los args si deseas habilitar herramientas **agregar/actualizar/completar/eliminar**.
 
-If your client doesn't support Bun, build first and use Node:
+Si tu cliente no soporta Bun, compila primero y usa Node:
 
 ```bash
-# Build once
+# Compilar una vez
 cd /path/to/Mindwtr && bun run --filter mindwtr-mcp build
 ```
 
@@ -258,28 +258,28 @@ cd /path/to/Mindwtr && bun run --filter mindwtr-mcp build
 }
 ```
 
-Add `--write` to the args if you want to enable **add/update/complete/delete** tools.
+Agrega `--write` a los args si deseas habilitar herramientas **agregar/actualizar/completar/eliminar**.
 
 ### Claude Desktop
 
-Claude Desktop supports MCP (stdio). Add a server entry in its MCP configuration.
+Claude Desktop soporta MCP (stdio). Agrega una entrada de servidor en su configuración MCP.
 
-Typical config file locations:
+Ubicaciones típicas del archivo de configuración:
 - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
-After editing, fully quit and relaunch Claude Desktop.
+Después de editar, cierra completamente y relanza Claude Desktop.
 
 ### Claude Code (CLI)
 
-Add a server via the CLI:
+Agrega un servidor a través de la CLI:
 
 ```bash
 claude mcp add mindwtr -- \
   bun /path/to/Mindwtr/apps/mcp-server/src/cli.ts --db "/path/to/mindwtr.db" --write
 ```
 
-Or edit `~/.claude.json` directly:
+O edita `~/.claude.json` directamente:
 
 ```json
 {
@@ -302,33 +302,33 @@ Or edit `~/.claude.json` directly:
 }
 ```
 
-Then restart the Claude Code session and run `/mcp` to verify it's connected.
+Luego reinicia la sesión de Claude Code y ejecuta `/mcp` para verificar que está conectado.
 
 ### OpenAI Codex (config.toml)
 
-Codex stores MCP config in `~/.codex/config.toml`. Add:
+Codex almacena la configuración de MCP en `~/.codex/config.toml`. Agrega:
 
 ```toml
 [mcp_servers.mindwtr]
 command = "bun"
 args = ["/absolute/path/to/Mindwtr/apps/mcp-server/src/cli.ts", "--db", "/path/to/mindwtr.db", "--write"]
 
-# Optional: pass env vars to the server
+# Opcional: pasar variables de entorno al servidor
 [mcp_servers.mindwtr.env]
 MINDWTR_DB_PATH = "/path/to/mindwtr.db"
 ```
 
-Restart Codex after saving.
+Reinicia Codex después de guardar.
 
 ### Gemini CLI
 
-Gemini CLI uses a JSON `settings.json` with `mcpServers`, either:
-- User scope: `~/.gemini/settings.json`
-- Project scope: `.gemini/settings.json` in your repo
+Gemini CLI usa un `settings.json` JSON con `mcpServers`, ya sea:
+- Alcance de usuario: `~/.gemini/settings.json`
+- Alcance del proyecto: `.gemini/settings.json` en tu repo
 
-You can add Mindwtr MCP two ways:
+Puedes agregar Mindwtr MCP de dos formas:
 
-**1) CLI (recommended):**
+**1) CLI (recomendado):**
 
 ```bash
 gemini mcp add mindwtr \
@@ -336,7 +336,7 @@ gemini mcp add mindwtr \
   --db "/path/to/mindwtr.db" --write
 ```
 
-**2) Edit settings.json manually:**
+**2) Edita settings.json manualmente:**
 
 ```json
 {
@@ -349,21 +349,21 @@ gemini mcp add mindwtr \
 }
 ```
 
-Restart the Gemini CLI session after saving.
+Reinicia la sesión de Gemini CLI después de guardar.
 
-### Other MCP clients
+### Otros clientes MCP
 
-Any MCP-compatible client can work as long as it can launch a **stdio** server with the command + args above.
+Cualquier cliente compatible con MCP puede funcionar mientras pueda lanzar un servidor **stdio** con el comando + args anteriores.
 
 ---
 
-## Migration: tool rename (`mindwtr.*` → `mindwtr_*`)
+## Migración: renombramiento de herramientas (`mindwtr.*` → `mindwtr_*`)
 
-> **Breaking change** (introduced in this release): all tool names have changed from dot-notation (`mindwtr.list_tasks`) to underscore-notation (`mindwtr_list_tasks`) to comply with MCP client validation rules (e.g. Claude Desktop).
+> **Cambio importante** (introducido en esta versión): todos los nombres de herramientas han cambiado de notación de puntos (`mindwtr.list_tasks`) a notación de guiones bajos (`mindwtr_list_tasks`) para cumplir con las reglas de validación del cliente MCP (p. ej., Claude Desktop).
 
-**Old → new mapping:**
+**Mapeo antiguo → nuevo:**
 
-| Old name                  | New name                   |
+| Nombre antiguo            | Nombre nuevo               |
 | ------------------------- | -------------------------- |
 | `mindwtr.list_tasks`      | `mindwtr_list_tasks`       |
 | `mindwtr.list_projects`   | `mindwtr_list_projects`    |
@@ -382,7 +382,7 @@ Any MCP-compatible client can work as long as it can launch a **stdio** server w
 | `mindwtr.update_area`     | `mindwtr_update_area`      |
 | `mindwtr.delete_area`     | `mindwtr_delete_area`      |
 
-**Upgrade action:** find and replace `mindwtr.` with `mindwtr_` in any MCP client configs, system prompts, scripts, or automations that reference these tool names. No other changes are required.
+**Acción de actualización:** busca y reemplaza `mindwtr.` con `mindwtr_` en cualquier configuración de cliente MCP, avisos del sistema, scripts o automatizaciones que hagan referencia a estos nombres de herramientas. No se requieren otros cambios.
 
 ---
 
@@ -408,10 +408,10 @@ Any MCP-compatible client can work as long as it can launch a **stdio** server w
   - Input: `{ id, includeDeleted? }`
 - `mindwtr_add_task` **(requires `--write`)**
   - Input: `{ title? | quickAdd?, status?, projectId?, sectionId?, areaId?, dueDate?, startTime?, reviewAt?, recurrence?, contexts?, tags?, description?, priority?, energyLevel?, assignedTo?, timeEstimate?, taskMode?, relativeStartOffset?, showFutureRecurrence?, pushCount?, checklist?, textDirection?, location?, isFocusedToday?, timeSpentMinutes?, suppressMindwtrReminders?, repeatReminderMinutes? }`
-- `mindwtr_update_task` **(requires `--write`)**
-  - Input: `{ id, title?, status?, projectId?, sectionId?, areaId?, dueDate?, startTime?, reviewAt?, recurrence?, contexts?, tags?, description?, priority?, energyLevel?, assignedTo?, timeEstimate?, taskMode?, relativeStartOffset?, showFutureRecurrence?, pushCount?, checklist?, textDirection?, location?, isFocusedToday?, timeSpentMinutes?, suppressMindwtrReminders?, repeatReminderMinutes?, order?, boardOrder?, focusOrder? }`
-  - `recurrence` accepts a recurrence object or an RFC 5545 RRULE string. Pass `null` to clear it.
-- `mindwtr_complete_task` **(requires `--write`)**
+- `mindwtr_update_task` **(requiere `--write`)**
+  - Entrada: `{ id, title?, status?, projectId?, sectionId?, areaId?, dueDate?, startTime?, reviewAt?, recurrence?, contexts?, tags?, description?, priority?, energyLevel?, assignedTo?, timeEstimate?, taskMode?, relativeStartOffset?, showFutureRecurrence?, pushCount?, checklist?, textDirection?, location?, isFocusedToday?, timeSpentMinutes?, suppressMindwtrReminders?, repeatReminderMinutes?, order?, boardOrder?, focusOrder? }`
+  - `recurrence` acepta un objeto de recurrencia o una cadena RFC 5545 RRULE. Pasa `null` para borrarla.
+- `mindwtr_complete_task` **(requiere `--write`)**
   - Input: `{ id }`
 - `mindwtr_delete_task` **(requires `--write`)**
   - Input: `{ id }`
@@ -444,36 +444,36 @@ Any MCP-compatible client can work as long as it can launch a **stdio** server w
 - `mindwtr_delete_person` **(requires `--write`)**
   - Input: `{ id }`
 
-All tools return JSON text payloads with the resulting task, project, section, area, person, or collection payload.
+Todas las herramientas devuelven cargas útiles de texto JSON con la tarea resultante, proyecto, sección, área, persona o carga útil de colección.
 
 ---
 
-## Testing
+## Pruebas
 
-### Quick smoke test (CLI)
+### Prueba de humo rápida (CLI)
 
-1) Start the server (read‑only):
+1) Inicia el servidor (solo lectura):
 ```bash
 bun run mindwtr:mcp -- --db "~/.local/share/mindwtr/mindwtr.db"
 ```
 
-2) Connect via your MCP client and run:
-- `mindwtr_list_tasks` (limit 5)
+2) Conecta a través de tu cliente MCP y ejecuta:
+- `mindwtr_list_tasks` (límite 5)
 
-If you want to test writes, restart with `--write`:
+Si deseas probar escrituras, reinicia con `--write`:
 ```bash
 bun run mindwtr:mcp -- --db "~/.local/share/mindwtr/mindwtr.db" --write
 ```
 
-Then test:
+Luego prueba:
 - `mindwtr_add_task` (quickAdd: "Test task @home /due:tomorrow")
-- `mindwtr_complete_task` (use returned task id)
-- `mindwtr_update_task` (e.g. set status or dueDate)
-- `mindwtr_delete_task` (use returned task id)
-- `mindwtr_get_task` (use returned task id)
-- `mindwtr_restore_task` (after delete, restore the task)
+- `mindwtr_complete_task` (usa el id de tarea devuelto)
+- `mindwtr_update_task` (p. ej., establecer estado o dueDate)
+- `mindwtr_delete_task` (usa el id de tarea devuelto)
+- `mindwtr_get_task` (usa el id de tarea devuelto)
+- `mindwtr_restore_task` (después de eliminar, restaura la tarea)
 - `mindwtr_list_projects`
-- `mindwtr_get_project` (use returned project id)
+- `mindwtr_get_project` (usa el id de proyecto devuelto)
 - `mindwtr_list_areas`
 - `mindwtr_list_people`
 - `mindwtr_add_project`
@@ -485,49 +485,49 @@ Then test:
 - `mindwtr_add_person`
 - `mindwtr_update_person`
 - `mindwtr_rename_person`
-- `mindwtr_get_person` (use returned person id)
+- `mindwtr_get_person` (usa el id de persona devuelto)
 - `mindwtr_delete_person`
-- `mindwtr_list_tasks` with `dueDateFrom`, `dueDateTo`, `sortBy`, `sortOrder`
+- `mindwtr_list_tasks` con `dueDateFrom`, `dueDateTo`, `sortBy`, `sortOrder`
 
-If the list returns tasks and add/complete works, the server is healthy.
+Si la lista devuelve tareas y agregar/completar funciona, el servidor está sano.
 
-### Stdio JSON-RPC E2E (transport validation)
+### E2E JSON-RPC de Stdio (validación de transporte)
 
-Use any MCP client or a small script to send:
+Usa cualquier cliente MCP o un pequeño script para enviar:
 - `initialize`
 - `notifications/initialized`
 - `tools/list`
-- `tools/call` (e.g. `mindwtr_list_projects` or `mindwtr_list_tasks`)
+- `tools/call` (p. ej., `mindwtr_list_projects` o `mindwtr_list_tasks`)
 
-If these succeed, the stdio transport is working end-to-end.
+Si estos tienen éxito, el transporte stdio funciona de extremo a extremo.
 
-### Claude Code sanity check
+### Verificación de cordura de Claude Code
 
-1) Add the server:
+1) Agrega el servidor:
 ```bash
 claude mcp add mindwtr -- \
   bun /path/to/Mindwtr/apps/mcp-server/src/cli.ts --db "/path/to/mindwtr.db" --write
 ```
-2) Restart Claude Code, run `/mcp`, and verify **mindwtr** is connected.
-3) Ask the model to call:
-   - `mindwtr_list_tasks` (limit 5)
+2) Reinicia Claude Code, ejecuta `/mcp` y verifica que **mindwtr** esté conectado.
+3) Pide al modelo que llame:
+   - `mindwtr_list_tasks` (límite 5)
    - `mindwtr_add_task` (quickAdd: "Test MCP @home /due:tomorrow")
-   - `mindwtr_complete_task` (use returned id)
+   - `mindwtr_complete_task` (usa el id devuelto)
 
 ---
 
-## Safety & Concurrency
+## Seguridad y Concurrencia
 
-- The server uses **SQLite WAL mode**. Read-only tools can run while the desktop app is open.
-- Write tools fail fast on SQLite writer locks, then retry the whole Mindwtr write operation. Each retry reloads current data before applying the requested change, so a delayed MCP write does not keep working from a stale pre-lock snapshot.
-- Writes are **disabled by default**. Use `--write` to enable edits.
-- Write operations go through the shared **@mindwtr/core** store to enforce business rules (both Bun and Node).
-- SQL is reserved for read-heavy paths (list/search) where performance matters.
-- Do not point a separate container/server deployment at the same local storage or sync data while the desktop app is also writing. That creates independent writers outside the local SQLite coordination path and is unsupported.
+- El servidor usa **modo SQLite WAL**. Las herramientas de solo lectura pueden ejecutarse mientras la aplicación de escritorio está abierta.
+- Las herramientas de escritura fallan rápidamente en bloqueos de escritor de SQLite, luego reintentan toda la operación de escritura de Mindwtr. Cada reintento recarga datos actuales antes de aplicar el cambio solicitado, por lo que una escritura MCP retrasada no continúa funcionando desde una instantánea anterior al bloqueo obsoleta.
+- Las escrituras están **deshabilitadas de forma predeterminada**. Usa `--write` para habilitar ediciones.
+- Las operaciones de escritura van a través del almacén compartido **@mindwtr/core** para hacer cumplir las reglas comerciales (tanto Bun como Node).
+- SQL se reserva para rutas pesadas de lectura (lista/búsqueda) donde importa el rendimiento.
+- No apuntes un despliegue separado de contenedor/servidor al mismo almacenamiento local o datos de sincronización mientras la aplicación de escritorio también está escribiendo. Esto crea escritores independientes fuera de la ruta de coordinación de SQLite local y no es compatible.
 
 ---
 
-## Notes
+## Notas
 
-- This MCP server targets the SQLite database used by the desktop app, with mutations routed through `@mindwtr/core`.
-- Keep an eye on schema changes across app versions (update queries if needed).
+- Este servidor MCP apunta a la base de datos SQLite utilizada por la aplicación de escritorio, con mutaciones enrutadas a través de `@mindwtr/core`.
+- Ten cuidado con los cambios de esquema entre versiones de aplicaciones (actualiza consultas si es necesario).

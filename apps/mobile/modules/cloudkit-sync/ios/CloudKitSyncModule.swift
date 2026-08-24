@@ -166,7 +166,7 @@ public class CloudKitSyncModule: Module {
         ])
     }
 
-    /// A partial failure carries the real reason — including the retry
+    /// Un
     /// interval — on the per-item errors rather than the top-level one.
     private static func retryAfterSeconds(in error: Error) -> Double? {
         let nsError = error as NSError

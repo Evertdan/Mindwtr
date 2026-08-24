@@ -232,64 +232,64 @@ gh release list
 
 Use the SDK you installed in the "Building APK Locally" section.
 
-## Android Startup Profiling
+## Perfil de Inicio de Android
 
-Use this workflow to get repeatable startup numbers and phase-level logs.
+Usa este flujo de trabajo para obtener números de inicio repetibles y registros a nivel de fase.
 
-### 1. Build a release app with startup markers enabled
+### 1. Compila una aplicación de lanzamiento con marcadores de inicio habilitados
 
 ```bash
 cd apps/mobile
 EXPO_PUBLIC_STARTUP_PROFILING=1 npx expo run:android --variant release
 ```
 
-This enables JS startup markers (`[MindwtrStartup] ...`) while keeping normal builds quiet.
-If native Android files already exist, run `npx expo prebuild --clean --platform android` first so config plugins re-apply startup tracing patches.
+Esto habilita marcadores de inicio de JS (`[MindwtrStartup] ...`) mientras mantiene las compilaciones normales silenciosas.
+Si los archivos nativos de Android ya existen, ejecuta `npx expo prebuild --clean --platform android` primero para que los complementos de configuración reaplicen los parches de rastreo de inicio.
 
-### 2. Run repeatable startup benchmark loops
+### 2. Ejecuta bucles de referencia de inicio repetibles
 
-From repo root:
+Desde la raíz del repositorio:
 
 ```bash
 bash apps/mobile/scripts/android_startup_benchmark.sh
 ```
 
-Useful variants:
+Variantes útiles:
 
 ```bash
-# 15 cold starts
+# 15 inicios en frío
 RUNS=15 MODE=cold bash apps/mobile/scripts/android_startup_benchmark.sh
 
-# warm starts (process already cached)
+# inicios en caliente (proceso ya almacenado en caché)
 RUNS=15 MODE=warm bash apps/mobile/scripts/android_startup_benchmark.sh
 
-# custom package/activity
+# paquete/actividad personalizado
 PACKAGE=tech.dongdongbh.mindwtr ACTIVITY=.MainActivity bash apps/mobile/scripts/android_startup_benchmark.sh
 ```
 
-Outputs are written to:
+Los resultados se escriben en:
 
 ```text
 apps/mobile/build/startup-benchmark/<timestamp>-<mode>/
 ```
 
-Key files:
-- `summary.txt`: median/p95/min/max for `ThisTime`/`TotalTime` and startup phase durations.
-- `am_start_results.csv`: per-run launch times from `am start -W` plus `launch_state`/`sample_quality`.
-- `phase_durations.tsv`: per-phase `durationMs` extracted from startup markers.
-- `js_since_start.tsv`: per-phase `sinceJsStartMs` from JS startup markers.
-- `run-*.log`: raw filtered logcat per run.
-- `run-*-am-start.txt`: raw `am start -W` output per run (use this for missing/timeout samples).
+Archivos clave:
+- `summary.txt`: mediana/p95/mín/máx para `ThisTime`/`TotalTime` y duraciones de fase de inicio.
+- `am_start_results.csv`: tiempos de lanzamiento por ejecución desde `am start -W` más `launch_state`/`sample_quality`.
+- `phase_durations.tsv`: `durationMs` por fase extraído de marcadores de inicio.
+- `js_since_start.tsv`: `sinceJsStartMs` por fase desde marcadores de inicio de JS.
+- `run-*.log`: logcat filtrado sin procesar por ejecución.
+- `run-*-am-start.txt`: salida bruta de `am start -W` por ejecución (úsalo para muestras faltantes/timeout).
 
-Notes:
-- On recent Android versions, `ThisTime` may be omitted; treat `TotalTime` + startup phase markers as primary.
-- Runs with `sample_quality` like `missing_total_time_wait_timeout` should be treated as unstable samples, not baseline medians.
-- If `LaunchState` is `UNKNOWN (0)` and `TotalTime` is missing, rely on `js.splash_hidden`/`js.app_ready` summaries from `js_since_start.tsv`.
-- If `sample_quality` includes `log_quota_dropped`, Android dropped process logs (`LOG_FLOWCTRL`), so missing JS markers are likely a logging artifact. Trust `TotalTime`, and re-run with fewer noisy tags if you need full marker chains.
+Notas:
+- En versiones recientes de Android, `ThisTime` puede omitirse; trata `TotalTime` + marcadores de fase de inicio como primarios.
+- Las ejecuciones con `sample_quality` como `missing_total_time_wait_timeout` deben tratarse como muestras inestables, no como medianas de línea base.
+- Si `LaunchState` es `UNKNOWN (0)` y falta `TotalTime`, confía en resúmenes `js.splash_hidden`/`js.app_ready` de `js_since_start.tsv`.
+- Si `sample_quality` incluye `log_quota_dropped`, Android descartó registros de proceso (`LOG_FLOWCTRL`), por lo que los marcadores de JS faltantes probablemente sean un artefacto de registro. Confía en `TotalTime` y vuelve a ejecutar con menos etiquetas ruidosas si necesitas cadenas de marcadores completas.
 
-### 3. Capture Perfetto trace for deep root-cause
+### 3. Capturar seguimiento de Perfetto para causa raíz profunda
 
-While reproducing a slow cold start:
+Mientras reproduces un inicio en frío lento:
 
 ```bash
 adb shell perfetto -o /data/misc/perfetto-traces/mindwtr-startup.pftrace -t 12s \
@@ -297,108 +297,108 @@ adb shell perfetto -o /data/misc/perfetto-traces/mindwtr-startup.pftrace -t 12s 
 adb pull /data/misc/perfetto-traces/mindwtr-startup.pftrace
 ```
 
-Then open https://ui.perfetto.dev and correlate `MindwtrStartup` log phases with main-thread blocking, I/O, and GC sections.
+Luego abre https://ui.perfetto.dev y correlaciona fases de registro de `MindwtrStartup` con bloqueo de hilo principal, I/O y secciones de GC.
 
-## Data Storage
+## Almacenamiento de Datos
 
-Tasks are stored in AsyncStorage and synced via the shared @mindwtr/core package.
+Las tareas se almacenan en AsyncStorage y se sincronizan a través del paquete compartido @mindwtr/core.
 
-## Project Structure
+## Estructura del Proyecto
 
 ```
 apps/mobile/
-├── app/                    # Expo Router pages
-│   ├── (tabs)/            # Tab navigation
-│   ├── _layout.tsx        # Root layout
-│   └── settings.tsx       # Settings page
-├── components/            # React components
-├── contexts/              # React contexts (theme, language)
-├── lib/                   # Utilities
-│   ├── storage-adapter.ts # AsyncStorage integration
-│   └── storage-file.ts    # File operations for sync
-├── global.css             # NativeWind entry CSS
-├── tailwind.config.js     # Tailwind configuration
-├── metro.config.js        # Metro bundler config
-├── babel.config.js        # Babel config with NativeWind
-└── nativewind-env.d.ts    # TypeScript declarations
+├── app/                    # Páginas de Expo Router
+│   ├── (tabs)/            # Navegación por pestañas
+│   ├── _layout.tsx        # Diseño raíz
+│   └── settings.tsx       # Página de configuración
+├── components/            # Componentes React
+├── contexts/              # Contextos React (tema, idioma)
+├── lib/                   # Utilidades
+│   ├── storage-adapter.ts # Integración de AsyncStorage
+│   └── storage-file.ts    # Operaciones de archivo para sincronización
+├── global.css             # CSS de entrada de NativeWind
+├── tailwind.config.js     # Configuración de Tailwind
+├── metro.config.js        # Configuración del empaquetador Metro
+├── babel.config.js        # Configuración de Babel con NativeWind
+└── nativewind-env.d.ts    # Declaraciones de TypeScript
 ```
 
 ## NativeWind (Tailwind CSS)
 
-The mobile app uses NativeWind v4 for Tailwind CSS styling.
+La aplicación móvil usa NativeWind v4 para estilos de Tailwind CSS.
 
-### Configuration Files
+### Archivos de Configuración
 
-| File                  | Purpose                               |
-| --------------------- | ------------------------------------- |
-| `tailwind.config.js`  | Tailwind theme and NativeWind preset  |
-| `global.css`          | Tailwind directives entry point       |
-| `babel.config.js`     | NativeWind babel preset               |
-| `metro.config.js`     | CSS processing with `withNativeWind`  |
-| `nativewind-env.d.ts` | TypeScript types for `className` prop |
+| Archivo               | Propósito                                    |
+| --------------------- | -------------------------------------------- |
+| `tailwind.config.js`  | Tema de Tailwind y preset de NativeWind      |
+| `global.css`          | Punto de entrada de directivas de Tailwind   |
+| `babel.config.js`     | Preset de babel de NativeWind                |
+| `metro.config.js`     | Procesamiento de CSS con `withNativeWind`    |
+| `nativewind-env.d.ts` | Tipos de TypeScript para la propiedad `className` |
 
-## Sync and Data
+## Sincronización y Datos
 
-### Local Storage
-Data is stored in AsyncStorage and automatically synced with the shared Zustand store.
+### Almacenamiento Local
+Los datos se almacenan en AsyncStorage y se sincronizan automáticamente con el almacén Zustand compartido.
 
-### File Sync
-Configure a sync folder in Settings to sync via:
+### Sincronización de Archivos
+Configura una carpeta de sincronización en Configuración para sincronizar a través de:
 - Dropbox
 - Syncthing
-- Any folder-based sync service
+- Cualquier servicio de sincronización basado en carpetas
 
-For frequent multi-device edits, WebDAV is recommended over folder sync tools.
-If you use Syncthing, prefer `Send & Receive` + `Watch for Changes`, keep scan intervals short, and run **Sync** before switching devices.
+Para ediciones frecuentes en múltiples dispositivos, se recomienda WebDAV sobre herramientas de sincronización de carpetas.
+Si usas Syncthing, prefiere `Enviar y Recibir` + `Vigilar cambios`, mantén intervalos de escaneo cortos y ejecuta **Sincronizar** antes de cambiar dispositivos.
 
-### WebDAV / Cloud
-Mindwtr also supports WebDAV and Cloud sync backends in **Settings → Sync**:
-- `Self-hosted` (existing `/data` endpoint + token)
-- `Dropbox` OAuth (App Folder)
+### WebDAV / Nube
+Mindwtr también admite backends de sincronización WebDAV y Nube en **Configuración → Sincronización**:
+- `Autohospedado` (punto final `/data` existente + token)
+- `Dropbox` OAuth (Carpeta de Aplicación)
 
-#### Dropbox OAuth setup
-1. Create a Dropbox app with **Scoped access** + **App folder**.
-2. Enable scopes: `files.content.read`, `files.content.write`, `files.metadata.read`.
-3. Add redirect URI: `mindwtr://redirect`.
-4. Set env var before starting Expo:
-   - `DROPBOX_APP_KEY=<your-dropbox-app-key>`
-5. Restart app and connect in **Settings → Sync → Cloud → Dropbox**.
-6. Use a development/release build for OAuth. Expo Go is not supported for Dropbox OAuth redirects.
+#### Configuración de OAuth de Dropbox
+1. Crea una aplicación de Dropbox con **Acceso limitado** + **Carpeta de aplicación**.
+2. Habilita ámbitos: `files.content.read`, `files.content.write`, `files.metadata.read`.
+3. Agrega URI de redirección: `mindwtr://redirect`.
+4. Establece variable de entorno antes de iniciar Expo:
+   - `DROPBOX_APP_KEY=<tu-clave-de-aplicación-de-dropbox>`
+5. Reinicia la aplicación y conecta en **Configuración → Sincronización → Nube → Dropbox**.
+6. Usa una compilación de desarrollo/lanzamiento para OAuth. Expo Go no es compatible con redirecciones OAuth de Dropbox.
 
-Dropbox backend syncs:
+El backend de Dropbox sincroniza:
 - `/Apps/Mindwtr/data.json`
-- `/Apps/Mindwtr/attachments/*` (file attachments)
+- `/Apps/Mindwtr/attachments/*` (adjuntos de archivos)
 
-## Troubleshooting
+## Solución de Problemas
 
-### Metro Cache Issues
+### Problemas de Caché de Metro
 
 ```bash
-# Clear cache and restart
+# Borrar caché e iniciar de nuevo
 bun start --clear
 
-# Or manually clear
+# O borrar manualmente
 rm -rf .expo node_modules/.cache
 ```
 
-### NativeWind Not Working
+### NativeWind No Funciona
 
-1. Ensure `global.css` is imported in `app/_layout.tsx`
-2. Check `babel.config.js` has NativeWind preset
-3. Restart Metro with cache clear
+1. Asegúrate de que `global.css` se importe en `app/_layout.tsx`
+2. Verifica que `babel.config.js` tenga el preset de NativeWind
+3. Reinicia Metro con borrado de caché
 
-### Build Errors
+### Errores de Compilación
 
 ```bash
-# Reinstall dependencies
+# Reinstalar dependencias
 cd /path/to/Mindwtr
 rm -rf node_modules apps/mobile/node_modules
 bun install
 ```
 
-## Resources
+## Recursos
 
-- [Expo Documentation](https://docs.expo.dev/)
-- [NativeWind Documentation](https://www.nativewind.dev/)
+- [Documentación de Expo](https://docs.expo.dev/)
+- [Documentación de NativeWind](https://www.nativewind.dev/)
 - [Tailwind CSS](https://tailwindcss.com/)
 - [React Native](https://reactnative.dev/)

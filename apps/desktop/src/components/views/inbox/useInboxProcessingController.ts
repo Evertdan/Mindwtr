@@ -159,7 +159,7 @@ export function useInboxProcessingController({
         settings,
     });
     const { showAreaField, showContextsField, showTagsField } = visibility;
-    // The draft holds the raw token text; the commit path needs the parsed
+    // The draft holds the raw token text; the confirmación ruta needs the parsed
     // lists, keyed on the text so callbacks keep their identity between edits.
     const selectedContexts = useMemo(() => parseContextsInput(draft.contexts), [draft.contexts]);
     const selectedTags = useMemo(() => parseTagsInput(draft.tags), [draft.tags]);
@@ -192,7 +192,7 @@ export function useInboxProcessingController({
         addBreadcrumb('inbox:done');
         setProcessingSession(nextSession);
         setIsProcessing(false);
-        // Queue drained: drop the organization picks so they cannot leak into a
+        // cola drained: drop the organization picks so they no puede leak into a
         // later session (closing also resets the whole draft one tick later).
         for (const field of CLEARED_ON_SESSION_END) setField(field, '');
     }, [
@@ -329,8 +329,8 @@ export function useInboxProcessingController({
         setProcessingSession((current) => goBackProcessInboxStep(current));
     }, [setProcessingSession]);
 
-    // Terminal destinations that skip the project step still carry whatever the
-    // user already picked; the state is hydrated from the task, so an untouched
+    // Terminal destinations that saltar the project step still carry whatever the
+    // user already picked; the estado is hydrated from the tarea, so an untouched
     // selection writes back unchanged (#958).
     const buildSelectionFields = useCallback((): ProcessInboxWorkflowFields => ({
         ...resolveProcessInboxContainerFields(draft.projectId, draft.areaId),
@@ -672,9 +672,9 @@ export function useInboxProcessingController({
             }, nextAction, processingTask.title, { advance: false });
             if (applied) {
                 // The converted capture becomes the project's clarified next
-                // action. Extra actions typed at the split step are raw
-                // captures, so they return to the Inbox (project attached)
-                // for their own clarify pass — same semantics as a quick-add
+                // acción. Extra actions typed at the split step are raw
+                // captures, so they devolver to the Inbox (project attached)
+                // for their own clarify pass — same semantics as a quick-agregar
                 // with a +Project token (#827).
                 const extraActions = extraActionDrafts.map((title) => title.trim()).filter(Boolean);
                 for (const title of extraActions) {

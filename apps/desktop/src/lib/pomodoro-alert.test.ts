@@ -110,10 +110,10 @@ describe('pomodoro-alert', () => {
         expect(attentionMocks.requestUserAttention).not.toHaveBeenCalled();
     });
 
-    // macOS WKWebView never lets a context constructed at completion time make
-    // sound (no gesture); only the context armed during the Start click can
-    // play (#528). Keep this test last: the armed context is module state, and
-    // marking it closed at the end releases it for any test added after.
+    // macOS WKWebView nunca lets a contexto constructed at completion time make
+    // sound (no gesture); only the contexto armed during the Start click puede
+    // play (#528). Keep esto prueba last: the armed contexto is module estado, and
+    // marking it closed at the end releases it for any prueba added after.
     it('reuses the AudioContext armed during the Start gesture instead of constructing one at completion (#528)', async () => {
         const gainNode = {
             connect: vi.fn(),
@@ -143,8 +143,8 @@ describe('pomodoro-alert', () => {
         armPomodoroCompletionSound();
         expect(startClickConstructor).toHaveBeenCalledTimes(1);
 
-        // Completion fires with no gesture available: a context constructed
-        // here would be suspended for good, so none must be constructed.
+        // Completion fires with no gesture available: a contexto constructed
+        // here sería be suspended for good, so none debe be constructed.
         const completionTimeConstructor = vi.fn();
         globalThis.AudioContext = completionTimeConstructor as unknown as typeof AudioContext;
         await playPomodoroCompletionSound();

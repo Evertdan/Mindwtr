@@ -7,7 +7,7 @@ import { setNotificationOpenHandler } from '@/lib/notification-service';
 import { consumePendingNotificationOpenPayload } from '@/modules/notification-open-intents';
 
 // Outcome evidence for #1028: a received action that changes nothing must say
-// why, or the log can't separate a lost tap from a deliberately ignored one.
+// why, or the Registro can't separate a lost tap from a deliberately ignored one.
 const logNotificationOutcome = (message: string, extra: Record<string, string>) => {
     void logInfo(`[Local Notifications] ${message}`, { scope: 'notifications', extra });
 };

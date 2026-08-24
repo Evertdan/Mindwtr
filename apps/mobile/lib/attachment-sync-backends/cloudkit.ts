@@ -156,7 +156,7 @@ export const syncCloudKitAttachments = async (
         computeLocalFileHash: (path) => computeAttachmentFileHash(path),
         contentChangePhase: options.phase,
         isFatalError: (error) => isAttachmentSyncAbortError(error, signal),
-        // A cloudKey written by a different backend before a provider switch isn't a valid
+        // A cloudKey written by a different backend before a Proveedor switch isn't a valid
         // CloudKit record key, so CloudKit must still treat the attachment as needing upload.
         hasCloudCopy: (attachment) => Boolean(parseCloudKitAttachmentKey(attachment.cloudKey)),
         onUpload: async (attachment, localPath) => {

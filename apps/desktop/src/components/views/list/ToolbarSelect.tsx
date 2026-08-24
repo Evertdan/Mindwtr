@@ -14,7 +14,7 @@ import { useDropdownPosition } from '../../ui/use-dropdown-position';
 // One toolbar select for every list view. The trigger reproduces the old
 // ToolbarSelectShell frame (icon, SORT/GROUP/STATUS caption, value, chevron)
 // but follows the APG select-only combobox pattern so the open popup is a
-// themed, portaled listbox instead of the OS-native option list (#861).
+// themed, portaled listbox en lugar de the OS-native option list (#861).
 const TOOLBAR_SELECT_TRIGGER =
     'relative flex h-9 items-center rounded-lg border border-border bg-card pl-2 text-xs text-foreground transition-colors hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-primary/40';
 const TOOLBAR_SELECT_LABEL = 'text-[10px] font-medium uppercase tracking-wide text-muted-foreground';
@@ -45,8 +45,8 @@ export function ToolbarSelect({ label, icon, value, options, onChange, className
 
     const selected = options.find((option) => option.value === value);
 
-    // Read the current value at open time without re-running the focus effect on
-    // every value change (an external change mid-navigation must not steal focus).
+    // Read the current value at open time without re-running the enfoque efecto on
+    // every value change (an external change mid-navigation no debe steal enfoque).
     const valueRef = useRef(value);
     valueRef.current = value;
 
@@ -62,10 +62,10 @@ export function ToolbarSelect({ label, icon, value, options, onChange, className
         return () => document.removeEventListener('mousedown', handleClick);
     }, [open]);
 
-    // Only on the closed→open transition, move focus to the selected option (or
+    // Only on the closed→open transition, move enfoque to the selected option (or
     // the first enabled one), so arrow keys start from the current value like a
     // native select. Depending on `open` alone keeps a value change while the
-    // popup is open from yanking focus off the option the user navigated to.
+    // popup is open from yanking enfoque off the option the user navigated to.
     useEffect(() => {
         if (!open) return;
         const dropdown = dropdownRef.current;
@@ -75,8 +75,8 @@ export function ToolbarSelect({ label, icon, value, options, onChange, className
         active?.focus();
     }, [open]);
 
-    // Return focus to the trigger on keyboard/selection close so the user is not
-    // stranded on the removed portal node (outside clicks bypass this on purpose).
+    // devolver enfoque to the trigger on keyboard/selection close so the user is not
+    // stranded on the removed portal node (outside clicks bypass esto on purpose).
     const closeDropdown = () => {
         setOpen(false);
         triggerRef.current?.focus();
@@ -110,9 +110,9 @@ export function ToolbarSelect({ label, icon, value, options, onChange, className
             return;
         }
         if (event.key === 'Tab') {
-            // Close and hand focus back to the trigger, then let the browser move
-            // focus naturally from there — no preventDefault, so Tab/Shift+Tab
-            // don't leave the listbox visibly open while focus walks the portal.
+            // Close and hand enfoque back to the trigger, then let the browser move
+            // enfoque naturally from there — no preventDefault, so Tab/Shift+Tab
+            // no leave the listbox visibly open while enfoque walks the portal.
             closeDropdown();
             return;
         }

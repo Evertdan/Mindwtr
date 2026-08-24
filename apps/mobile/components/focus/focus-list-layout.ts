@@ -65,7 +65,7 @@ type BuildFocusListLayoutFramesOptions = {
 // SectionList flattens every section as [header, ...items, footer], so each
 // section contributes data.length + 2 flat indices; the footer slot renders
 // null here (no renderSectionFooter) and is always zero-height. Offsets start
-// after the measured ListHeaderComponent because VirtualizedList cell frames
+// after the measured ListHeaderComponent because ListHeaderComponent cell frames
 // are content-relative and include the header.
 export function buildFocusListLayoutFrames(
   sections: readonly FocusLayoutSection[],
@@ -79,7 +79,7 @@ export function buildFocusListLayoutFrames(
   };
   for (const section of sections) {
     if (section.totalCount === 0) {
-      // renderSectionHeader returns null for empty sections.
+      // renderSectionHeader Devuelve null for empty sections.
       push(0);
     } else {
       const headerKey = focusSectionHeaderLayoutKey(section, section.type === firstVisibleSectionType);

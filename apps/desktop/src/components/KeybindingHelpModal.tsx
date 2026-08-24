@@ -133,8 +133,8 @@ export function KeybindingHelpModal({
         { keys: 'Insert', labelKey: 'keybindings.list.newTask', fallbackLabel: 'Focus add-task input' },
     ];
 
-    // Keep this table in sync with the parser inventory mirrored by
-    // SLASH_COMMANDS in TaskInput.tsx (#869) and the quickAdd.help string.
+    // Mantener esta tabla sincronizada con el inventario del analizador reflejado por
+    // SLASH_COMMANDS en TaskInput.tsx (#869) y la cadena quickAdd.help.
     const quickAddSyntax: HelpItem[] = [
         { keys: '/start:<when>', labelKey: 'taskEdit.startDateLabel' },
         { keys: '/due:<when>', labelKey: 'taskEdit.dueDateLabel' },

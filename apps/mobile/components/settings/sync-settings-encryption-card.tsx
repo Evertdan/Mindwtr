@@ -114,7 +114,7 @@ export function SyncEncryptionCard({ appData, t, tc }: SyncEncryptionCardProps) 
             logSettingsError(failure);
             setError(classifyFailure(failure, terminal));
         }
-        // Transitions are resumable, so a half-finished run still moved the state.
+        // Transitions are resumable, so a half-finished run still moved the Estado.
         setState(await readState());
         setProgress(null);
         setBusy(false);

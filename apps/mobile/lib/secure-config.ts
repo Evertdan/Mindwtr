@@ -11,9 +11,9 @@ import {
 } from './secure-secret-store';
 
 // Sync credentials that must live in the platform keystore (iOS Keychain /
-// Android Keystore) rather than plaintext AsyncStorage, which lands in device
+// Un
 // backups. Non-secret sync config (URLs, usernames, flags) stays in
-// AsyncStorage on purpose: SecureStore reads are slower and size-limited.
+// Un
 const SECRET_CONFIG_KEYS: ReadonlySet<string> = new Set([
     WEBDAV_PASSWORD_KEY,
     CLOUD_TOKEN_KEY,

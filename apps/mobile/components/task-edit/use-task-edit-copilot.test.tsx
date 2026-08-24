@@ -7,7 +7,7 @@ import { useTaskEditCopilot } from './use-task-edit-copilot';
 
 const predictMetadata = vi.hoisted(() => vi.fn());
 
-// Explicit export list: the hook only reaches for the provider factory.
+// Explicit export list: the hook only reaches for the Proveedor factory.
 vi.mock('@mindwtr/core', () => ({
   createAIProvider: () => ({ predictMetadata }),
 }));
@@ -74,7 +74,7 @@ describe('useTaskEditCopilot suggestion parts', () => {
     await act(async () => {
       create(<CopilotHost setDraftField={setDraftField} onResult={(value) => { copilot = value; }} />);
     });
-    // The debounced request plus the promise it awaits.
+    // El/La
     await act(async () => {
       await vi.advanceTimersByTimeAsync(900);
     });

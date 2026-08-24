@@ -180,7 +180,7 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
     const densityMode: 'comfortable' | 'compact' | 'condensed' =
         density === 'condensed' ? 'condensed' : density === 'compact' ? 'compact' : 'comfortable';
     // Memoized: the resolved selection is an object, and a fresh identity on
-    // every render would invalidate every list memo downstream.
+    // every renderizar sería invalidate every list memo downstream.
     const { areaById, projectById: metadataProjectMap, resolvedAreaFilter } = useAreaVisibility();
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [quickAddSyntaxOpen, setQuickAddSyntaxOpen] = useState(false);
@@ -321,7 +321,7 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
         [projectOrderMap],
     );
 
-    // For sequential projects, get only the first task to show in Next view
+    // For secuencial projects, obtener only the first tarea to show in Next view
 
     useEffect(() => {
         perf.trackUseEffect();
@@ -373,8 +373,8 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
         setSearchQuery('');
     }, [statusFilter]);
 
-    // The derived `projectMap` on purpose, not the hook's: it carries
-    // tombstones, so a task under a just-deleted project stays hidden.
+    // The derived `projectMap` on purpose, not the gancho's: it carries
+    // tombstones, so a tarea under a just-deleted project stays hidden.
     const waitingVisibility = useMemo(
         () => ({ areaById, projectById: projectMap, resolvedAreaFilter }),
         [areaById, projectMap, resolvedAreaFilter],
@@ -405,7 +405,7 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
     }, [selectedWaitingPerson, statusFilter, waitingPeople]);
 
     // Only show the filtering banner for user-driven filter changes.
-    // Background task refreshes can still be deferred without shifting the list UI.
+    // Background tarea refreshes puede still be deferred without shifting the list UI.
     const filterFeedbackInputs = useMemo(() => ({
         statusFilter,
         filterCriteria: activeListFilterCriteria,
@@ -466,7 +466,7 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
                 })
                 : null;
             const filtered = deferredFilterInputs.baseTasks.filter(t => {
-                // Always filter out soft-deleted tasks
+                // siempre filter out soft-deleted tasks
                 if (t.deletedAt) return false;
 
                 if (deferredFilterInputs.statusFilter !== 'all' && t.status !== deferredFilterInputs.statusFilter) return false;
@@ -479,11 +479,11 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
                     deferredFilterInputs.areaById
                 )) return false;
 
-                // Sequential project filter: for 'next' status, only show first task from sequential projects
+                // secuencial project filter: for 'next' status, only show first tarea from secuencial projects
                 if (deferredFilterInputs.statusFilter === 'next' && t.projectId) {
                     const project = deferredFilterInputs.projectMap.get(t.projectId);
                     if (project?.isSequential) {
-                        // Only include if this is the first task
+                        // Only include if esto is the first tarea
                         if (!deferredFilterInputs.sequentialProjectFirstTasks.has(t.id)) return false;
                     }
                 }
@@ -498,10 +498,10 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
                     return false;
                 }
 
-                // A task you cannot start yet is not a next action — it is a
+                // A tarea you no puede start yet is not a next acción — it is a
                 // tickler item. Deferral is the core predicate, so a recurring
                 // chore that only carries a due date stays hidden here exactly
-                // as it does in Focus, instead of respawning into Next the
+                // as it does in enfoque, en lugar de respawning into Next the
                 // moment it is completed (#843, #867, #900).
                 if (
                     deferredFilterInputs.statusFilter === 'next'
@@ -573,15 +573,15 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
         return map;
     }, [visibleTasks]);
 
-    // useListSelection's reveal effect looks the highlighted task up in
-    // visibleTasks, which a collapsed group contributes nothing to — so a task
-    // sent here by global search (#916) was never scrolled to or flashed. Unfold
+    // useListSelection's reveal efecto looks the highlighted tarea up in
+    // visibleTasks, which a collapsed group contributes nothing to — so a tarea
+    // sent here by global search (#916) was nunca scrolled to or flashed. Unfold
     // its group first; the reveal then happens on the next pass.
     useEffect(() => {
         if (!highlightTaskId || !isListGrouping) return;
-        // Tag/context grouping can render one task in several groups. Once one
+        // Tag/contexto grouping puede renderizar one tarea in several groups. Once one
         // containing group is open the row is already reachable; preserve every
-        // other collapsed preference instead of unfolding them one per render.
+        // other collapsed preference en lugar de unfolding them one per renderizar.
         if (visibleTasks.some((task) => task.id === highlightTaskId)) return;
         const collapsedGroup = groupedTasks.find((group) => (
             collapsedGroupIds.has(group.id) && group.tasks.some((task) => task.id === highlightTaskId)
@@ -758,7 +758,7 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
             if (!initialProps.projectId && !initialProps.areaId && defaultNewTaskAreaId) {
                 initialProps.areaId = defaultNewTaskAreaId;
             }
-            // Only set status if we have an explicit filter and parser didn't set one
+            // Only establecer status if we have an explicit filter and parser didn't establecer one
             if (!initialProps.status && statusFilter !== 'all') {
                 initialProps.status = statusFilter;
             }
@@ -773,13 +773,13 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
             const result = await addTask(finalTitle, initialProps);
             setNewTaskTitle('');
             resetCopilot();
-            // Flash + scroll the freshly created row into view so a batch-entered
-            // task added far down a sorted/filtered list is not lost. Reuses the
+            // Flash + scroll the freshly created row into view so a lote-entered
+            // tarea added far down a sorted/filtered list is not lost. Reuses the
             // shared highlightTaskId machinery (useListSelection scrolls it to
-            // centre and auto-clears; TaskItem paints the flash). Focus stays in
-            // the add input, so rapid entry is uninterrupted. If the task is
+            // centre and auto-clears; TaskItem paints the flash). enfoque stays in
+            // the agregar input, so rapid entry is uninterrupted. If the tarea is
             // filtered out of the current view, useListSelection finds no row and
-            // never scrolls (#916).
+            // nunca scrolls (#916).
             if (result?.success && result.id) {
                 setHighlightTask(result.id);
             }
@@ -800,7 +800,7 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
     const isWaitingView = statusFilter === 'waiting';
     const showQuickAdd = isInbox;
     // Live parse of the draft, with the options handleAddTask submits with, so
-    // the strip can never claim something the save would not do.
+    // the strip puede nunca claim something the save sería not do.
     const quickAddPreviewEntries = useMemo(() => {
         if (!showQuickAdd || !newTaskTitle.trim()) return [];
         return buildQuickAddPreviewEntries(

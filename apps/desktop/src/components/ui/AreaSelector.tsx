@@ -69,8 +69,8 @@ export function AreaSelector({
         return () => document.removeEventListener('mousedown', handleClick);
     }, [open]);
 
-    // Keyboard/selection closes return focus to the trigger so the user is not
-    // stranded on a removed node (outside clicks bypass this on purpose).
+    // Keyboard/selection closes devolver enfoque to the trigger so the user is not
+    // stranded on a removed node (outside clicks bypass esto on purpose).
     const closeDropdown = () => {
         setOpen(false);
         setQuery('');
@@ -97,7 +97,7 @@ export function AreaSelector({
     };
 
     // stopPropagation keeps the app-wide shortcut handler (and an enclosing
-    // quick-action menu) from reacting to keys the open dropdown consumes —
+    // quick-acción menu) from reacting to keys the open dropdown consumes —
     // the dropdown is portaled outside any [role="menu"] ancestor.
     const handleDropdownKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
         if (event.key === 'Escape') {

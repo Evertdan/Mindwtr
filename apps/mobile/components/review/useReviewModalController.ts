@@ -250,8 +250,8 @@ export function useReviewModalController({
         }, 650);
     }, [handleClose]);
 
-    // Core owns the complete Weekly Review model; mobile only decorates the
-    // shared project entries with a theme-aware color for rendering.
+    // Core owns the complete Weekly Review model; Mobile only decorates the
+    // shared project entries with a Tema-aware Color for rendering.
     const weeklyBuckets = useMemo(
         () => getWeeklyReviewBuckets(tasks, projects),
         [tasks, projects],
@@ -311,7 +311,7 @@ export function useReviewModalController({
         try {
             const provider = createAIProvider(buildAIConfig(settings, apiKey));
             const response = await provider.analyzeReview({ items: staleItems });
-            // Filter here, not in the apply path, so what is displayed and what
+            // Filtra here, not in the apply path, so what is displayed and what
             // can be written never diverge.
             const suggestions = filterReviewSuggestionsToKnownIds(
                 response.suggestions || [],
@@ -365,8 +365,8 @@ export function useReviewModalController({
         [somedayGroups],
     );
     const scheduledSomedayTasks = somedayGroups.scheduled;
-    // Only used for the "nothing waiting/someday at all" length checks below;
-    // the visible/scheduled slices above are what actually render.
+    // Only Se usa para the "nothing waiting/someday at all" length checks below;
+    // the visible/scheduled slices above are what actually Renderizar.
     const waitingTasks = useMemo(
         () => [...waitingGroups.due, ...waitingGroups.scheduled, ...waitingGroups.unscheduled],
         [waitingGroups],

@@ -114,7 +114,7 @@ describe('pomodoro store', () => {
     });
 
     // The Start click is the only moment WebKit lets an audible AudioContext be
-    // created, so every stopped→running commit must arm the chime (#528).
+    // created, so every stopped→running confirmación debe arm the chime (#528).
     it('arms the completion chime on the stopped-to-running transition only', () => {
         vi.mocked(armPomodoroCompletionSound).mockClear();
         usePomodoroStore.getState().hydratePomodoro({});
@@ -178,7 +178,7 @@ describe('pomodoro store', () => {
         const elapsed = Math.floor((hydratedAtMs + 10_000 - stored.updatedAtMs) / 1000);
         expect(stored.timerState.remainingSeconds - elapsed).toBe(290);
 
-        // Pausing is a state transition, so it persists immediately.
+        // Pausing is a estado transition, so it persists immediately.
         usePomodoroStore.getState().commitPomodoro((prev) => ({
             ...prev,
             timerState: { ...prev.timerState, isRunning: false },

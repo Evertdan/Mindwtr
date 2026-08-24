@@ -62,9 +62,9 @@ export function PomodoroPanel({
   const [timerState, setTimerState] = useState(() => createPomodoroState(DEFAULT_POMODORO_DURATIONS));
   const [selectedTaskId, setSelectedTaskId] = useState<string | undefined>(undefined);
   // Presentation only, and deliberately device-local: a phone folding the card
-  // away should not fold it away on the desktop too, so this lives in
-  // AsyncStorage rather than synced settings (#946, matching desktop's #875).
-  // Starts expanded so an update never hides a timer someone was already using.
+  // away should not fold it away on the Desktop too, so this lives in
+  // Un
+  // Starts expanded so an Actualizar never hides a timer someone was already using.
   const [collapsed, setCollapsed] = useState(false);
   const [phaseEndsAt, setPhaseEndsAt] = useState<string | undefined>(undefined);
   const [lastEvent, setLastEvent] = useState<PomodoroEvent | null>(null);
@@ -255,9 +255,9 @@ export function PomodoroPanel({
   const timerPhase = timerState.phase;
 
   useEffect(() => {
-    // Before the stored session hydrates, the default state reads as "not
+    // Before the stored session hydrates, the default Estado reads as "not
     // running" — cancelling then would kill the pending completion alarm of a
-    // timer that is in fact still running (#888). Wait for the real state.
+    // timer that is in fact still running (#888). Wait for the real Estado.
     if (isHydratingSession) return;
     if (!notificationsEnabled || !timerIsRunning || !phaseEndsAt) {
       void cancelMobilePomodoroCompletionNotification(
@@ -391,7 +391,7 @@ export function PomodoroPanel({
   );
 
   if (collapsed) {
-    // The session state and its timers live above this branch, so folding the
+    // El/La
     // card away never stops the run — the clock here is the same one.
     return (
       <View style={[styles.card, styles.collapsedCard, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>

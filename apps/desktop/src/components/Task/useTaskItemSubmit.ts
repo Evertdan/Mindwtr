@@ -47,7 +47,7 @@ export function useTaskItemSubmit({
         if (options?.completedAtOverride !== undefined) {
             patch.completedAt = options.completedAtOverride;
         }
-        // Presence check, not `!== undefined`: an explicit undefined override
+        // Presence verificar, not `!== undefined`: an explicit undefined override
         // means "the time-spent field was shown but left blank," which clears
         // timeSpentMinutes rather than leaving it untouched (mirrors mobile's
         // completed-at-picker.tsx / #896).

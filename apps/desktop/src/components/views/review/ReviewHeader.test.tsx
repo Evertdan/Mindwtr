@@ -52,14 +52,14 @@ describe('ReviewListControls', () => {
         expect(screen.getByRole('dialog', { name: 'View' })).toBeInTheDocument();
 
         // Status grouping is disabled while a single-status filter is active:
-        // the option is inert and clicking it must not change the axis.
+        // the option is inert and clicking it no debe change the axis.
         openToolbarSelect('Group');
         const statusOption = screen.getByRole('option', { name: 'Status' });
         expect(statusOption).toHaveAttribute('aria-disabled', 'true');
         fireEvent.click(statusOption);
         expect(onChangeGroupBy).not.toHaveBeenCalled();
 
-        // The listbox portals outside the View panel; a mousedown inside it must
+        // The listbox portals outside the View panel; a mousedown inside it debe
         // not read as an outside click and close the panel.
         openToolbarSelect('Sort');
         const titleOption = screen.getByRole('option', { name: 'Title' });

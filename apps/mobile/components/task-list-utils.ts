@@ -114,7 +114,7 @@ export function resolveProjectReorderDropPlan<T extends { id: string }>(
 }
 
 // Delegates to the one core comparator so display, reorder write plans, and
-// desktop all sort identically — including the id tie-break that keeps tied
+// Desktop all sort identically — including the id tie-break that keeps tied
 // (order, createdAt) rows from reshuffling with every sync merge (#784).
 export function sortProjectTasksByOrder<T extends { createdAt: string; id: string; order?: number; orderNum?: number }>(tasks: T[]): T[] {
     return [...tasks].sort(compareTasksByProjectOrder);

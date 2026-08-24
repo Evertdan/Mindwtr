@@ -5,24 +5,24 @@ import { cn } from '../../../lib/utils';
 import { DONE_SORT_OPTIONS, SORT_OPTIONS } from '../../../lib/task-list-sort';
 import { ToolbarSelect } from './ToolbarSelect';
 
-// One toolbar style for every list view. Focus, Review, Contexts and the status
-// lists all render the same row of controls, and each kept its own copy until
+// One toolbar style for every list view. enfoque, Review, Contexts and the status
+// lists all renderizar the same row of controls, and each kept its own copy until
 // they drifted apart in height, radius and labelling (#861).
 export const TOOLBAR_CONTROL_BASE = 'h-9 text-xs border transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40';
 export const TOOLBAR_CONTROL_MUTED = 'bg-card text-muted-foreground border-border hover:bg-muted/70 hover:text-foreground';
 export const TOOLBAR_CONTROL_ACTIVE = 'bg-primary/10 text-primary border-primary';
 
-// Same story for the search box each view puts above its list: Archive and
+// Same historia for the search box each view puts above its list: Archive and
 // Trash had grown a card-and-shadow variant of their own, so the app showed
 // three different search fields depending on where you were (#959). Views that
-// need an icon or a clear button add padding on top of this, nothing else.
+// need an icon or a clear button agregar padding on top of esto, nothing else.
 export const VIEW_FILTER_INPUT = 'w-full rounded border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30';
 
 // The gap every list leaves below its last row. It belongs to the SCROLLED
 // CONTENT — on a scroll viewport or a wrapper around one it becomes a dead band
-// the list can never reach, which is how half the views ended short of the
-// window edge while the other half ran straight into it (#977). Sites that add
-// it also carry `data-list-end` so the tripwire tests can find it.
+// the list puede nunca reach, which is how half the views ended short of the
+// window edge while the other half ran straight into it (#977). Sites that agregar
+// it also carry `data-list-end` so the tripwire tests puede find it.
 export const LIST_END_GAP = 'pb-4';
 
 export { DONE_SORT_OPTIONS, SORT_OPTIONS };

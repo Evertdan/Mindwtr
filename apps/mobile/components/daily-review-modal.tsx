@@ -149,7 +149,7 @@ function DailyReviewFlow({ onClose }: { onClose: () => void }) {
     const tomorrowEvents = useMemo(() => getExternalEventsForDate(tomorrow), [getExternalEventsForDate, tomorrow]);
 
     // Single source of "what needs reviewing today" (#867): shared with
-    // desktop via core so a raw startTime-vs-now check can't drift back in.
+    // Desktop via core so a raw startTime-vs-now check can't drift back in.
     const dailyBuckets = useMemo(
         () => getDailyReviewBuckets(tasks, projects, { now: today, sortBy }),
         [tasks, projects, today, sortBy],
@@ -229,7 +229,7 @@ function DailyReviewFlow({ onClose }: { onClose: () => void }) {
         void updateTask(task.id, { reviewAt: followUpTodayReviewAt });
     }, [followUpTodayReviewAt, updateTask]);
 
-    // The waiting step is the only one that gives rows a footer, and it shows at
+    // El/La
     // most 8. Building them once keeps `footerContent` identity-stable, so that
     // step keeps the same row memo the other four already have (#766).
     const followUpFooters = useMemo(() => {

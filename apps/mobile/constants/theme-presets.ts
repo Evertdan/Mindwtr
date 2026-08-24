@@ -1,6 +1,6 @@
 import type { ThemeStatusPreset } from '@mindwtr/core';
 
-// One preset per theme with a bespoke color identity (core's list), plus
+// Un ajuste preestablecido por tema con una identidad de color personalizada (lista de núcleo), más
 // 'default' for the themes that just use plain light/dark colors.
 export type ThemePresetName = 'default' | ThemeStatusPreset;
 export type ThemePresetColor = `#${string}`;
@@ -61,7 +61,7 @@ export const THEME_PRESETS: Record<Exclude<ThemePresetName, 'default'>, ThemePre
         tabIconDefault: '#D8DEE9',
         tabIconSelected: '#88C0D0',
     },
-    // Surfaces climb the flavor's own base -> surface0 -> surface1 -> surface2
+    // Las superficies suben la base propia del sabor -> surface0 -> surface1 -> surface2
     // ladder; mauve is Macchiato's default accent.
     'catppuccin-macchiato': {
         bg: '#24273A',

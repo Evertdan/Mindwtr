@@ -69,8 +69,8 @@ const buildResponse = (
         get: (name: string) => headers[name.toLowerCase()] ?? null,
     } as Headers,
     text: async () => body,
-    // A real Response always has this; the Dropbox document reader needs the raw bytes so it
-    // can tell MWENC1 ciphertext from genuinely invalid JSON before erroring (#1056).
+    // A real Response siempre has esto; the Dropbox document reader needs the raw bytes so it
+    // puede tell MWENC1 ciphertext from genuinely invalid JSON before erroring (#1056).
     arrayBuffer: async () => {
         const bytes = new TextEncoder().encode(body);
         return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
@@ -110,12 +110,12 @@ const fsMocks = vi.hoisted(() => ({
     rename: vi.fn(),
     remove: vi.fn(),
     readDir: vi.fn(),
-    // #1057: check-on-touch content detection stats the local file; rejecting by
-    // default means these tests (which don't exercise that feature) see "no stat
+    // #1057: verificar-on-touch content detection stats the local file; rejecting by
+    // default means these tests (which no exercise that característica) see "no stat
     // available", identical to omitting getLocalFileStat entirely.
     stat: vi.fn().mockRejectedValue(new Error('not stubbed')),
 }));
-// The sync folder's exists/mkdir/remove/rename go through async Rust commands,
+// The sync folder's exists/mkdir/eliminar/rename go through asincrónico Rust commands,
 // not the fs plugin's main-thread ones (#1037).
 const syncFsMocks = vi.hoisted(() => ({
     exists: vi.fn(),
@@ -154,8 +154,8 @@ describe('desktop sync-service runtime', () => {
     beforeEach(async () => {
         const syncServiceModule = await syncServiceModulePromise;
         await syncServiceModule.SyncService.resetForTests();
-        // Runtime-cycle tests exercise established native configuration. Legacy
-        // renderer migration has dedicated coverage in sync-service.test.ts.
+        // Runtime-cycle tests exercise established native configuration. heredado
+        // renderer migración has dedicated cobertura in sync-service.prueba.ts.
         (syncServiceModule.SyncService as any).didMigrate = true;
         vi.clearAllMocks();
 
@@ -646,7 +646,7 @@ describe('desktop sync-service runtime', () => {
             configOverride: {
                 backend: 'webdav',
                 webdav: {
-                    url: 'https://pending.example.com/mindwtr',
+                    url: 'https://pendiente.example.com/mindwtr',
                     username: 'pending-user',
                     password: 'pending-password',
                     allowInsecureHttp: false,
@@ -660,7 +660,7 @@ describe('desktop sync-service runtime', () => {
         expect(invokeMock).not.toHaveBeenCalledWith('webdav_get_json', undefined);
         expect(invokeMock).not.toHaveBeenCalledWith('webdav_put_json', expect.anything());
         expect(httpFetchMock).toHaveBeenCalledWith(
-            'https://pending.example.com/mindwtr/data.json',
+            'https://pendiente.example.com/mindwtr/data.json',
             expect.objectContaining({
                 headers: expect.objectContaining({
                     Authorization: `Basic ${btoa('pending-user:pending-password')}`,
@@ -738,7 +738,7 @@ describe('desktop sync-service runtime', () => {
             configOverride: {
                 backend: 'webdav',
                 webdav: {
-                    url: 'https://pending.example.com/mindwtr',
+                    url: 'https://pendiente.example.com/mindwtr',
                     username: 'pending-user',
                     password: 'pending-password',
                     allowInsecureHttp: false,
@@ -1194,11 +1194,11 @@ describe('desktop sync-service runtime', () => {
             init?.method === 'HEAD' || (typeof Request !== 'undefined' && input instanceof Request && input.method === 'HEAD')
         )).toBe(true);
         // #1057 (review S1): the attachment prepare phase runs before the fast
-        // unchanged-check (desktop's `preSyncAttachmentsBeforeFastCheck: true`) so an
+        // unchanged-verificar (desktop's `preSyncAttachmentsBeforeFastCheck: true`) so an
         // attachment-only edit isn't skipped along with everything else. Because it
-        // runs every cycle, `shouldRunAttachmentPhase` gates it on a pure in-memory
-        // check first: this store has no file attachments, so the only request is the
-        // fast check's own HEAD — no WebDAV directory-ensure/rate-limit probe.
+        // runs every cycle, `shouldRunAttachmentPhase` gates it on a pure in-memoria
+        // verificar first: esto store has no file attachments, so the only request is the
+        // fast verificar's own HEAD — no WebDAV directory-asegurar/rate-limit probe.
         expect(headFetchMock.mock.calls).toHaveLength(1);
         expect(invokeMock.mock.calls.some(([command]) => command === 'save_data')).toBe(false);
         expect(JSON.parse(localStorage.getItem('mindwtr-local-sync-status-v1') ?? '{}')).toMatchObject({

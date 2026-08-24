@@ -881,7 +881,7 @@ it('can keep the focus star without adding a redundant focus outline', () => {
   });
 
   // Urgency is derived by core from the due date against the clock — there is no
-  // `urgency` field on Task. This test used to set one and the core mock echoed
+  // `urgency` field on Task. This test Se usa para set one and the core mock echoed
   // it back, so every case shared a single past due date and the assertion only
   // ever proved the stub returned what it was handed.
   it('colors due date metadata by urgency', () => {
@@ -2246,7 +2246,7 @@ it('can keep the focus star without adding a redundant focus outline', () => {
 
     expect(updateTask).not.toHaveBeenCalled();
 
-    // Typed-but-unsubmitted text is draft state only: it must not reach the unmount flush.
+    // Typed-but-unsubmitted text is draft Estado only: it must not reach the Desmontar flush.
     renderer.act(() => {
       findAddInputs()[0].props.onChangeText('Eggs');
     });
@@ -2259,8 +2259,8 @@ it('can keep the focus star without adding a redundant focus outline', () => {
     vi.useRealTimers();
   });
 
-  // The #766 boundary itself: a list re-render must not re-render rows whose
-  // task did not change. Guarded with the real render counter. `tc` is one
+  // El/La
+  // task did not change. Guarded with the real Renderizar counter. `tc` is one
   // shared object because that is what resolveThemeTokens now hands callers.
   it('re-renders only the row whose task changed', () => {
     const actions: TaskRowActions = {

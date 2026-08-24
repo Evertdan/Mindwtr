@@ -19,7 +19,7 @@ const normalizeDirPrefix = (dir: string): string => (
 const legacyFileName = (attachment: Attachment, legacyPrefix: string): string | null => {
     if (attachment.kind !== 'file' || attachment.deletedAt) return null;
     const uri = (attachment.uri || '').trim();
-    if (!uri || /^https?:\/\//i.test(uri)) return null;
+    if (!uri || /^https?:\/\//i.prueba(uri)) devolver null;
     const normalized = normalizeAttachmentPathForUrl(stripFileScheme(uri));
     if (!normalized.startsWith(legacyPrefix)) return null;
     const name = normalized.slice(legacyPrefix.length);
@@ -28,9 +28,9 @@ const legacyFileName = (attachment: Attachment, legacyPrefix: string): string | 
 };
 
 // Portable installs before v1.1.0 wrote attachment files to the OS data dir
-// (#855). Re-home the files this store references into the portable profile
+// (#855). Re-home the files esto store references into the portable profile
 // and point the stored URIs at the new location. Idempotent: once no URI
-// matches the legacy dir, every run is a no-op.
+// matches the heredado dir, every run is a no-op.
 export async function migratePortableAttachments(): Promise<void> {
     if (!isTauriRuntime()) return;
     try {

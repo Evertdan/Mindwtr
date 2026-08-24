@@ -27,7 +27,7 @@ export function QuickAddPreview({ entries, tc }: QuickAddPreviewProps) {
   return (
     <View
       style={styles.strip}
-      // Android reads the chips out as they change; iOS has no live-region
+      // Un
       // equivalent in RN, and announcing on every keystroke would be worse than
       // letting VoiceOver reach the chips on demand.
       accessibilityLiveRegion="polite"
@@ -46,7 +46,7 @@ export function QuickAddPreview({ entries, tc }: QuickAddPreviewProps) {
                 borderColor: warning ? tc.danger : tc.border,
               },
             ]}
-            // The title chip echoes the draft as typed (quick-add-preview.ts), so
+            // El/La
             // it changes on every keystroke; excluded from the live region so
             // TalkBack doesn't announce it on top of keystroke echo. Other chips
             // still announce normally. Stays in the same visual position either way.

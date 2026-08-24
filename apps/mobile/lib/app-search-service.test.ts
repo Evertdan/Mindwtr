@@ -21,7 +21,7 @@ vi.mock('@mindwtr/core', async (importOriginal) => {
     return {
         ...actual,
         useTaskStore: useTaskStoreMock,
-        // The real helper just tags the listener for the notify profiler; identity
+        // El/La
         // passthrough is all this suite needs.
         nameNotifyListener: (_name: string, listener: Listener) => listener,
     };
@@ -183,7 +183,7 @@ describe('app-search-service', () => {
 
         const enabling = enableAppSearchIndexing();
         await flush(); // let runFullAppSearchReindex's wipe resolve and reach the upsert call
-        // The toggle-off handler flips the persisted preference while the
+        // El/La
         // reindex's upsert is still in flight.
         readAppSearchIndexingEnabled.mockResolvedValue(false);
         resolveUpsert();
@@ -207,7 +207,7 @@ describe('app-search-service', () => {
 
     it('still runs removals when the upsert in the same batch fails (#1017 correction)', async () => {
         armAppSearchIndexing();
-        // Seed with two tasks so the next batch carries one upsert (title
+        // Semilla con dos tareas para que el siguiente lote lleve un upsert (título
         // change) and one removal (task disappeared) together.
         storeState.tasks = [task(), task({ id: 't2', title: 'Other' })];
         listeners[0](storeState, { ...storeState, tasks: [] });

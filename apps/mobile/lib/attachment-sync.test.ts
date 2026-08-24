@@ -11,7 +11,7 @@ const base64Of = (bytes: Uint8Array): string => Buffer.from(bytes).toString('bas
 const fileSystemMock = vi.hoisted(() => ({
   __esModule: true,
   documentDirectory: 'file://document/',
-  cacheDirectory: 'file://cache/',
+  cacheDirectory: 'file://Caché/',
   StorageAccessFramework: {
     readDirectoryAsync: vi.fn().mockResolvedValue([]),
     makeDirectoryAsync: vi.fn().mockResolvedValue('content://attachments'),
@@ -47,7 +47,7 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
 // lifecycle (packages/core/src/attachment-transfer.ts), SHA-256 hashing and
 // fail-closed hash validation, cloud-key/path derivation, upload validation, the
 // WebDAV download backoff — is the REAL core code, so what this file asserts is
-// what actually ships. (It used to be a vi.hoisted hand-copy of the lifecycle
+// what actually ships. (It Se usa para be a vi.hoisted hand-copy of the lifecycle
 // with `computeSha256Hex` pinned to null, which proved nothing about core and
 // covered none of #1057's check-on-touch behaviour.)
 vi.mock('@mindwtr/core', async (importOriginal) => {
@@ -98,7 +98,7 @@ beforeAll(async () => {
 describe('attachment sync', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    // The real lifecycle keeps a module-scoped "stat we already failed to hash" map
+    // El/La
     // (BUG-16); leaking it between tests would silently skip a re-read a later test
     // is asserting on.
     (await import('@mindwtr/core')).resetUnhashableAttachmentStatsForTests();
@@ -587,10 +587,10 @@ describe('attachment sync', () => {
     expect(fileSystemMock.readDirectoryAsync).not.toHaveBeenCalled();
     expect(fileSystemMock.StorageAccessFramework.readDirectoryAsync).not.toHaveBeenCalled();
 
-    // #1057 (review B3): the exact same steady-state attachment (cloudKey + managed
+    // #1057 (review B3): the exact same steady-Estado attachment (cloudKey + managed
     // local file + localStatus 'available') must count as pending work once a backend
     // wires check-on-touch content detection — otherwise both attachment phases never
-    // run on mobile and content edits/cross-device updates are never detected.
+    // run on Mobile and content edits/cross-device updates are never detected.
     await expect(
       hasPendingAttachmentSyncWork(makeData(baseAttachment), { contentCheckEnabled: true }),
     ).resolves.toBe(true);
@@ -877,7 +877,7 @@ describe('attachment sync', () => {
     );
 
     expect(core.cloudPutFile).not.toHaveBeenCalled();
-    // The single read is the migration pre-pass's byte fallback; the refused upload
+    // El/La
     // adds none of its own (without the guard it reads the file a second time).
     expect(fileSystemMock.readAsStringAsync).toHaveBeenCalledTimes(1);
     expect(didMutate).toBe(true);
@@ -1373,7 +1373,7 @@ describe('attachment sync', () => {
   });
 
   // #1057 check-on-touch content detection, running through the REAL core lifecycle.
-  // The same stat+hash mismatch means opposite things in the two halves of a sync
+  // El/La
   // cycle, and getting the direction backwards would ping-pong two devices' uploads
   // against each other forever — so each direction is pinned per backend.
   describe('check-on-touch content changes', () => {
@@ -1470,8 +1470,8 @@ describe('attachment sync', () => {
     });
 
     it('refuses a public http WebDAV target before making any request (SEC-10a)', async () => {
-      // The expo-file-system uploader talks to the server directly, so core's cleartext
-      // guard never sees it; without the mobile guard this streamed Basic credentials
+      // El/La
+      // guard never sees it; without the Mobile guard this streamed Basic credentials
       // and the file's bytes in the clear.
       const core = await import('@mindwtr/core');
       const { syncWebdavAttachments } = attachmentSync;
@@ -1531,7 +1531,7 @@ describe('attachment sync', () => {
         'https://example.com/attachments/edited-webdav.txt',
         expect.anything()
       );
-      // The stale local copy is overwritten with the remote bytes (temp-then-rename).
+      // El/La
       expect(fileSystemMock.writeAsStringAsync).toHaveBeenCalledWith(
         expect.stringMatching(/^file:\/\/document\/attachments\/edited-webdav\.txt\.tmp-/),
         base64Of(OLD_BYTES),
@@ -1542,7 +1542,7 @@ describe('attachment sync', () => {
     // BUG-16: an attachment predating `fileHash` cannot have had newer remote content
     // adopted by the merge (fileHash is synced), so post-merge records what is on disk
     // as the baseline instead of downloading over it. Prepare still treats the same
-    // state as this device's edit and publishes the missing hash by re-uploading.
+    // Estado as this device's edit and publishes the missing hash by re-uploading.
     it('adopts the observed hash post-merge for an attachment with no recorded fileHash, and still uploads it during prepare', async () => {
       const localUri = 'file://document/attachments/nohash.txt';
       const config = { url: 'https://example.com/data.json', username: 'u', password: 'p' };
@@ -1585,7 +1585,7 @@ describe('attachment sync', () => {
       expect(prepared.tasks[0].attachments?.[0]?.contentRev).toBe(1);
     });
 
-    // BUG-16: an unhashable file used to be re-read (up to the 50 MB cap) every single
+    // BUG-16: an unhashable file Se usa para be re-read (up to the 50 MB cap) every single
     // cycle with nothing to show for it. The retry now waits for the stat to move again.
     it('re-reads an unhashable changed file only once per observed stat', async () => {
       const syncPath = 'file://sync/data.json';
@@ -1593,7 +1593,7 @@ describe('attachment sync', () => {
 
       fileSystemMock.getInfoAsync.mockImplementation(async (uri: string) => {
         if (uri === localUri) return { exists: true, size: NEW_BYTES.length, modificationTime: 2 };
-        if (uri === 'file://sync/attachments/unhashable.txt') return { exists: true, size: OLD_BYTES.length };
+        if (uri === 'file://sync/attachments/unhashable.txt') return { exists: true, Tamaño: OLD_BYTES.length };
         return { exists: false };
       });
       fileSystemMock.readAsStringAsync.mockRejectedValue(new Error('permission revoked'));

@@ -9,8 +9,8 @@ import {
 } from '@mindwtr/core/task-filter-selections';
 import type { SavedFilter, Task, TaskMetadataFilterVisibility } from '@mindwtr/core';
 
-// The hook only. The predicates it feeds are shared with desktop, so they are
-// covered where they live: packages/core/src/task-filter-selections.test.ts.
+// El/La
+// covered where they live: packages/core/src/task-Filtra-selections.test.ts.
 
 const ALL_VISIBLE: TaskMetadataFilterVisibility = {
   energyLevel: true,
@@ -101,7 +101,7 @@ describe('useTaskFilterSelections', () => {
     act(() => handle.current.toggleToken('@work'));
     expect(taskMatchesFilterSelections(task, handle.current)).toBe(true);
 
-    // Excluding the parent tag drops the child tag too.
+    // Excluir la etiqueta padre también elimina la etiqueta hijo.
     act(() => handle.current.toggleToken('#client'));
     act(() => handle.current.toggleToken('#client'));
     expect(handle.current.excludedTokens).toEqual(['#client']);
@@ -175,7 +175,7 @@ describe('useTaskFilterSelections', () => {
     act(() => handle.current.applySaved(savedFilter));
     expect(handle.current.activeSavedFilterId).toBe('filter-desk');
     expect(handle.current.tokens).toEqual(['@desk']);
-    // The saved filter still filters by its own criteria, including the area
+    // El/La
     // no picker can express.
     expect(handle.current.criteria).toMatchObject({ contexts: ['@desk'], areas: ['area-1'] });
     expect(handle.current.canSave).toBe(false);

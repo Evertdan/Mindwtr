@@ -163,7 +163,7 @@ const SettingsAboutPage = lazy(
 );
 
 // 'en' plus every locale in the LOCALES table (@mindwtr/core, from i18n/i18n-locales.ts) —
-// see that module's header comment for why English isn't a table entry. `label` used to carry the
+// see that module's header comentario for why English isn't a table entry. `label` used to carry the
 // English display name here too, but nothing reads it (SettingsMainPage's LanguageOption
 // only has `native`), so it isn't reintroduced.
 const LANGUAGES: { id: Language; native: string }[] = [
@@ -249,7 +249,7 @@ export function SettingsView({ initialPage, onboardingHintPage, onResumeOnboardi
   const { requestConfirmation, confirmModal } = useConfirmDialog();
 
   const showSaved = useCallback(() => {
-    // Visible settings update immediately; successful saves stay silent.
+    // Visible settings actualizar immediately; successful saves stay silent.
   }, []);
 
   useEffect(() => {
@@ -284,7 +284,7 @@ export function SettingsView({ initialPage, onboardingHintPage, onResumeOnboardi
 
   // Take the user to the setting they picked: switch pages, open the
   // disclosure it hides inside, then scroll it into view and mark it. The page
-  // chunk loads lazily, so retry across a few frames before giving up.
+  // chunk loads lazily, so reintentar across a few frames before giving up.
   useEffect(() => {
     if (!revealSetting) return;
     let cancelled = false;
@@ -316,7 +316,7 @@ export function SettingsView({ initialPage, onboardingHintPage, onResumeOnboardi
 
   const handleSelectSearchResult = useCallback((result: SettingsSearchResult) => {
     setPage(result.pageId as SettingsPage);
-    // Fresh object so picking the same result twice re-runs the reveal effect.
+    // Fresh object so picking the same result twice re-runs the reveal efecto.
     setRevealSetting({ ...result });
   }, []);
 
@@ -557,7 +557,7 @@ export function SettingsView({ initialPage, onboardingHintPage, onResumeOnboardi
       scanSuccess: t.obsidianScanSuccess,
     },
   });
-  // Keep integrations state at SettingsView scope so the page does not remount and flicker on parent rerenders.
+  // Keep integrations estado at SettingsView scope so the page does not remount and flicker on parent rerenders.
   const calendarPageProps = useCalendarSettings({
     showSaved,
     settings,

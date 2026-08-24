@@ -18,9 +18,9 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// A cached HTML body under a script/style URL (an SPA fallback for a missing
-// hashed chunk) would permanently break that page with "Importing a module
-// script failed", so only successful non-HTML responses are cacheable.
+// Un cuerpo HTML en caché bajo una URL script/style (un fallback de SPA para un
+// chunk hasheado que falta) rompería permanentemente esa página con "Importing a module
+// script failed", así que solo las respuestas no-HTML exitosas se pueden cachear.
 function isCacheableAssetResponse(res) {
   if (!res || !res.ok) return false;
   const contentType = res.headers.get('content-type') || '';
@@ -34,8 +34,8 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // Navigations go network-first so a redeploy is picked up on the next load;
-  // the cached shell is only an offline fallback.
+  // Las navegaciones van primero a la red para que un redeploy se recoja en la siguiente carga;
+  // el shell en caché es solo un fallback sin conexión.
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req)
@@ -54,8 +54,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Only static assets are served from the cache. Everything else (API calls,
-  // sync data on same-origin deployments) always goes to the network.
+  // Solo los activos estáticos se sirven desde la caché. Todo lo demás (llamadas API,
+  // sincronización de datos en despliegues del mismo origen) siempre va a la red.
   const isStaticAsset = url.pathname.startsWith('/assets/')
     || STATIC_DESTINATIONS.has(req.destination)
     || PRECACHE_URLS.includes(url.pathname);

@@ -152,7 +152,7 @@ vi.mock('expo-file-system', () => ({
     }
   },
   Paths: {
-    cache: { uri: 'file:///cache/' },
+    cache: { uri: 'file:///Caché/' },
     document: { uri: 'file:///document/' },
     info: vi.fn((uri: string) => ({
       exists: fileSystemMock.directoryUris || fileSystemMock.fileUris
@@ -338,7 +338,7 @@ describe('speech-to-text', () => {
       const freshSpeech = await import('./speech-to-text');
       fileSystemMock.existingUris = new Set([
         'file:///document/',
-        'file:///cache/',
+        'file:///Caché/',
       ]);
 
       await expect(
@@ -371,7 +371,7 @@ describe('speech-to-text', () => {
       const freshSpeech = await import('./speech-to-text');
       fileSystemMock.existingUris = new Set([
         'file:///document/',
-        'file:///cache/',
+        'file:///Caché/',
       ]);
 
       await expect(
@@ -394,7 +394,7 @@ describe('speech-to-text', () => {
   it('resolves a missing Whisper model to the current container whisper-models path', async () => {
     fileSystemMock.existingUris = new Set([
       'file:///document/',
-      'file:///cache/',
+      'file:///Caché/',
     ]);
 
     await expect(ensureWhisperModelPathForConfigAsync('whisper-tiny.en')).resolves.toMatchObject({
@@ -408,7 +408,7 @@ describe('speech-to-text', () => {
   it('repairs a file blocking the Whisper model directory before resolving the model path', async () => {
     fileSystemMock.directoryUris = new Set([
       'file:///document',
-      'file:///cache',
+      'file:///Caché',
     ]);
     fileSystemMock.fileUris = new Set([
       'file:///document/whisper-models',
@@ -428,7 +428,7 @@ describe('speech-to-text', () => {
     fileSystemMock.emulateDirectoryFileConstructorBug = true;
     fileSystemMock.directoryUris = new Set([
       'file:///document',
-      'file:///cache',
+      'file:///Caché',
       'file:///document/whisper-models',
     ]);
     fileSystemMock.fileUris = new Set([
@@ -449,7 +449,7 @@ describe('speech-to-text', () => {
   it('logs Whisper model search directories and candidates when the model is missing', async () => {
     fileSystemMock.existingUris = new Set([
       'file:///document/',
-      'file:///cache/',
+      'file:///Caché/',
     ]);
 
     await expect(ensureWhisperModelPathForConfigAsync(
@@ -466,7 +466,7 @@ describe('speech-to-text', () => {
       expect.objectContaining({
         extra: expect.objectContaining({
           whisperDirUri: 'file:///document/whisper-models',
-          cacheWhisperDirUri: 'file:///cache/whisper-models',
+          cacheWhisperDirUri: 'file:///Caché/whisper-models',
           candidateUris: expect.stringContaining('file:///document/whisper-models/ggml-tiny.en.bin'),
         }),
       })

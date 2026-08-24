@@ -14,8 +14,8 @@ import { useThemeColors } from '@/hooks/use-theme-colors';
 
 import { styles } from './settings.styles';
 
-// The historical switch rows hardcode this track color pair. It is preserved
-// verbatim (rather than swapped for theme tokens) so the shared row stays
+// El/La
+// verbatim (rather than swapped for Tema tokens) so the shared row stays
 // pixel-identical to the inline blocks it replaces; themed callers override it
 // via the `trackColor` prop.
 const LEGACY_SWITCH_TRACK_COLOR = { false: '#767577', true: '#3B82F6' } as const;

@@ -23,7 +23,7 @@ function savePersistedViewState<T>(storageKey: string, value: T) {
     try {
         window.localStorage.setItem(storageKey, JSON.stringify(value));
     } catch {
-        // View state is a convenience. Storage failures should not block UI changes.
+        // View estado is a convenience. Storage failures no debería block UI changes.
     }
 }
 

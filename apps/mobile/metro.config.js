@@ -85,8 +85,8 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
         };
     }
 
-    // Ensure relative Babel helper imports always resolve from the helper directory.
-    // This avoids sporadic Expo Go resolution failures for helpers like arrayWithHoles.js.
+    // Asegurar que las importaciones relativas del ayudante Babel siempre se resuelvan desde el directorio del ayudante.
+    // Este/Esta
     if (
         moduleName.startsWith('./')
         && context.originModulePath
@@ -143,7 +143,7 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
         }
     }
 
-    // Force all React imports (including subpaths) to resolve from app-local node_modules.
+    // Para
     if (moduleName === 'react' || moduleName.startsWith('react/')) {
         try {
             const resolved = require.resolve(moduleName, {
@@ -154,7 +154,7 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
                 type: 'sourceFile',
             };
         } catch {
-            // Fall through to Metro default resolver.
+            // Pasar al resolador predeterminado de Metro.
         }
     }
 
@@ -168,7 +168,7 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
                 type: 'sourceFile',
             };
         } catch {
-            // Fall through to Metro default resolver.
+            // Pasar al resolador predeterminado de Metro.
         }
     }
 
@@ -182,12 +182,12 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
                 type: 'sourceFile',
             };
         } catch {
-            // Fall through to Metro default resolver.
+            // Pasar al resolador predeterminado de Metro.
         }
     }
 
-    // Force Expo packages to resolve from app-local node_modules.
-    // In this monorepo we can have duplicate workspace copies, and Metro occasionally
+    // Para
+    // En este monorrepo podemos tener copias de espacio de trabajo duplicadas, y Metro ocasionalmente
     // mis-resolves package entrypoints like expo-modules-core during dev bundling.
     if (
         moduleName === 'expo'
@@ -204,8 +204,8 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
         }
     }
 
-    // Intercept ALL URL polyfill imports and redirect to our custom shim
-    // This completely bypasses the problematic packages
+    // Interceptar TODAS las importaciones de polyfill de URL
+    // Esto completa el bypass
     if (
         moduleName === 'react-native-url-polyfill' ||
         moduleName === 'react-native-url-polyfill/auto' ||
@@ -219,7 +219,7 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
         };
     }
 
-    // Handle @mindwtr/core workspace package
+    // Manejar el paquete de espacio de trabajo @mindwtr/core
     if (moduleName === '@mindwtr/core' || moduleName.startsWith('@mindwtr/core/')) {
         const corePath = path.resolve(workspaceRoot, 'packages/core/src/index.ts');
         return {
@@ -228,7 +228,7 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
         };
     }
 
-    // Force Babel helpers to resolve from workspace root for stable helper resolution.
+    // Para
     if (moduleName === '@babel/runtime' || moduleName.startsWith('@babel/runtime/')) {
         const helperPath = path.resolve(workspaceRoot, 'node_modules', `${moduleName}.js`);
         if (moduleName !== '@babel/runtime' && fs.existsSync(helperPath)) {
@@ -246,7 +246,7 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
                 type: 'sourceFile',
             };
         } catch {
-            // Fall through to Metro default resolver.
+            // Pasar al resolador predeterminado de Metro.
         }
     }
 

@@ -1,28 +1,28 @@
-# ADR 0006: Zustand as the Primary Shared State Model
+# ADR 0006: Zustand como modelo de estado compartido principal
 
-Date: 2026-03-14
-Status: Accepted
+Fecha: 2026-03-14
+Estado: Aceptado
 
-## Context
+## Contexto
 
-Mindwtr needs one state model that can be shared across desktop and mobile while remaining usable from React components, background sync code, notifications, widgets, and other imperative integration points.
+Mindwtr necesita un modelo de estado que pueda compartirse entre escritorio y móvil mientras sigue siendo utilizable desde componentes de React, código de sincronización en segundo plano, notificaciones, widgets y otros puntos de integración imperativos.
 
-The store also has to coordinate:
+El almacén también tiene que coordinar:
 
-- task/project/section/area mutations
-- local persistence and save queues
-- sync metadata and reconciliation
-- behavior that must run outside a mounted React tree
+- mutaciones de tarea/proyecto/sección/área
+- persistencia local y colas de guardado
+- metadatos de sincronización y reconciliación
+- comportamiento que debe ejecutarse fuera de un árbol de React montado
 
-## Decision
+## Decisión
 
-We keep Zustand as the primary shared state model in `packages/core` and build thin platform adapters around it.
+Mantenemos Zustand como modelo de estado compartido principal en `packages/core` y construimos adaptadores de plataforma delgados alrededor de él.
 
-React components consume store slices as usual, while platform services can also access the same store imperatively through `useTaskStore.getState()` when they need shared business logic outside the UI tree.
+Los componentes de React consumen fragmentos de almacén como de costumbre, mientras que los servicios de plataforma también pueden acceder al mismo almacén imperativamente a través de `useTaskStore.getState()` cuando necesitan lógica comercial compartida fuera del árbol de interfaz de usuario.
 
-## Consequences
+## Consecuencias
 
-- Core GTD behavior remains aligned across desktop and mobile.
-- Background services such as sync, notifications, and widgets can reuse the same actions and derived state.
-- The shared store must stay disciplined: platform-specific side effects belong in adapters and services, not in generic core state mutations.
-- As the codebase grows, large store-adjacent modules should be split along runtime boundaries rather than replacing the state model wholesale.
+- El comportamiento GTD principal permanece alineado entre escritorio y móvil.
+- Los servicios en segundo plano como sincronización, notificaciones y widgets pueden reutilizar las mismas acciones y estado derivado.
+- El almacén compartido debe mantenerse disciplinado: los efectos secundarios específicos de plataforma pertenecen a adaptadores y servicios, no a mutaciones de estado central genérico.
+- A medida que crece la base de código, los módulos grandes adyacentes al almacén deben dividirse a lo largo de límites de tiempo de ejecución en lugar de reemplazar el modelo de estado por completo.

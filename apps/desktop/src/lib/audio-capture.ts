@@ -167,7 +167,7 @@ const startWebCapture = async (timestampedName: () => string): Promise<AudioCapt
 
     const teardown = async (): Promise<Float32Array[]> => {
         if (context.state === 'running') {
-            // Suspending the graph gives ScriptProcessorNode one stable stop point before teardown.
+            // Suspending the graph gives ScriptProcessorNode one estable stop point before desmontaje.
             await context.suspend();
         }
         processor.disconnect();
@@ -213,7 +213,7 @@ const startWebCapture = async (timestampedName: () => string): Promise<AudioCapt
                 bytes: async () => wavBytes,
             };
         },
-        // Nothing has been written yet on the web path, so dropping the buffer is the whole cleanup.
+        // Nothing has been written yet on the web ruta, so dropping the buffer is the whole limpieza.
         cancel: async () => {
             await teardown();
         },

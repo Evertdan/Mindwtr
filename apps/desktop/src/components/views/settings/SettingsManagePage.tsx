@@ -110,7 +110,7 @@ function SortableAreaRow({
 }
 
 // ---------------------------------------------------------------------------
-// Token row for contexts and tags (inline rename + delete)
+// Token row for contexts and tags (inline rename + eliminar)
 // ---------------------------------------------------------------------------
 
 function TokenRow({

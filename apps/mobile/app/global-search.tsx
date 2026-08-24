@@ -79,7 +79,7 @@ export default function SearchScreen() {
   const requestedQuery = decodeSearchParam(params.q);
   const [query, setQuery] = useState(requestedQuery);
   const [ftsResults, setFtsResults] = useState<SearchResults | null>(null);
-  // Which query the current ftsResults answer — stale answers must not merge
+  // Qué consulta responde ftsResults actual — las respuestas antiguas no deben fusionarse
   // in front of fresh in-memory results while the user is still typing.
   const [ftsQuery, setFtsQuery] = useState('');
   const [ftsLoading, setFtsLoading] = useState(false);
@@ -161,7 +161,7 @@ export default function SearchScreen() {
         hiddenCompletedCount,
     } = useMemo(
         () => {
-            // These clock hooks deliberately invalidate otherwise unchanged
+            // El/La
             // search inputs at midnight and at the next timed start.
             void futureStartDayKey;
             void futureStartRevealTick;
@@ -212,7 +212,7 @@ export default function SearchScreen() {
         [_allTasks, editingTaskId]
     );
     const taskById = useMemo(() => new Map(_allTasks.map((task) => [task.id, task])), [_allTasks]);
-    // Search rows are SearchTaskResult, which deliberately carries no
+    // Las filas de búsqueda son SearchTaskResult, que deliberadamente no lleva
     // completedAt — the full task behind the row does (#991). The label word is
     // what tells a completion date from a deadline, so neither is ever shown
     // bare; a finished task with no completedAt shows nothing rather than
@@ -230,7 +230,7 @@ export default function SearchScreen() {
             };
         }
         if (!task.dueDate) return null;
-        // Same mapping the task rows use: red is reserved for a date that has
+        // El mismo mapeo que usan las filas de tareas: el rojo está reservado para una fecha que tiene
         // already passed (#640).
         const urgency = getTaskUrgency(task);
         const dueColor = urgency === 'overdue'
@@ -297,7 +297,7 @@ export default function SearchScreen() {
             return;
         }
 
-        // Map status to route
+        // Mapear estado a ruta
         if (status === 'inbox') router.push('/inbox');
         else if (status === 'next') router.push('/focus');
         else if (status === 'waiting') router.push('/waiting');
@@ -315,7 +315,7 @@ export default function SearchScreen() {
         });
     };
 
-    // The row's check icon completes the task in place (#1051) — same
+    // El/La
     // immediate-complete-with-undo-toast contract as the task list rows.
     const completeTaskFromSearch = (result: SearchTaskResult) => {
         const task = _allTasks.find((item) => item.id === result.id && !item.deletedAt);

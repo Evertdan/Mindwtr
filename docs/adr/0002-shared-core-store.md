@@ -1,35 +1,35 @@
-# ADR 0002: Shared Core Store Across Desktop and Mobile
+# ADR 0002: Almacén central compartido entre escritorio y móvil
 
-Date: 2026-03-06
-Status: Accepted
+Fecha: 2026-03-06
+Estado: Aceptado
 
-## Context
+## Contexto
 
-Mindwtr supports desktop and mobile clients with the same GTD concepts, sync rules, and storage model. Duplicating store logic per platform would increase drift risk in critical areas such as:
+Mindwtr admite clientes de escritorio y móvil con los mismos conceptos de GTD, reglas de sincronización y modelo de almacenamiento. Duplicar la lógica del almacén por plataforma aumentaría el riesgo de desviación en áreas críticas como:
 
-- task/project/area mutation behavior
-- recurrence and checklist rules
-- sync normalization and tombstone handling
-- search/query semantics
+- comportamiento de mutación de tarea/proyecto/área
+- reglas de recurrencia y lista de verificación
+- normalización de sincronización y manejo de lápidas
+- semántica de búsqueda/consulta
 
-At the same time, each platform still needs its own shell, UI conventions, and storage/runtime adapters.
+Al mismo tiempo, cada plataforma aún necesita su propio shell, convenciones de interfaz de usuario y adaptadores de almacenamiento/tiempo de ejecución.
 
-## Decision
+## Decisión
 
-We keep the domain model and primary Zustand store in `packages/core`, and treat desktop/mobile as platform shells around that shared core.
+Mantenemos el modelo de dominio y almacén Zustand principal en `packages/core`, y tratamos el escritorio/móvil como shells de plataforma alrededor de ese núcleo compartido.
 
-Platform-specific code is allowed to vary in:
+El código específico de plataforma puede variar en:
 
-- UI components and navigation
-- local storage adapter wiring
-- native integrations
-- diagnostics and packaging behavior
+- componentes de interfaz de usuario y navegación
+- cableado de adaptador de almacenamiento local
+- integraciones nativas
+- comportamiento de diagnósticos y empaque
 
-But the data model, merge rules, and store actions remain shared unless there is a strong platform constraint that forces divergence.
+Pero el modelo de datos, reglas de fusión y acciones del almacén permanecen compartidas a menos que haya una restricción fuerte de plataforma que fuerce la divergencia.
 
-## Consequences
+## Consecuencias
 
-- Data-integrity fixes can usually be implemented once in `packages/core`.
-- Desktop and mobile stay behaviorally aligned for core GTD operations.
-- Platform apps still need adapter glue and targeted tests around local integrations.
-- Large changes in `packages/core` require extra care because they affect every client.
+- Las correcciones de integridad de datos generalmente se pueden implementar una sola vez en `packages/core`.
+- El escritorio y el móvil permanecen alineados conductualmente para operaciones GTD principales.
+- Las aplicaciones de plataforma aún necesitan pegamento de adaptador y pruebas específicas alrededor de integraciones locales.
+- Los cambios grandes en `packages/core` requieren cuidado adicional porque afectan a cada cliente.

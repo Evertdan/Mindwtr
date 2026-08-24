@@ -1,60 +1,60 @@
-# Mindwtr Docker (PWA + Cloud)
+# Mindwtr Docker (PWA + Nube)
 
-This folder contains Dockerfiles and a compose file to run:
-- **mindwtr-app**: the desktop web/PWA build, served by Nginx
-- **mindwtr-cloud**: the lightweight sync server
+Esta carpeta contiene Dockerfiles y un archivo de composición para ejecutar:
+- **mindwtr-app**: la compilación web/PWA de escritorio, servida por Nginx
+- **mindwtr-cloud**: el servidor de sincronización ligero
 
-## Quick start (HTTP compose)
+## Inicio rápido (composición HTTP)
 
-You do not need to clone the repository. Download the Compose file into an empty directory:
+No necesitas clonar el repositorio. Descarga el archivo de Composición en un directorio vacío:
 
 ```bash
 curl -LO https://raw.githubusercontent.com/dongdongbh/Mindwtr/main/docker/compose.yaml
 ```
 
-Create a `.env` file next to it (Compose reads this automatically):
+Crea un archivo `.env` junto a él (Composición lo lee automáticamente):
 
 ```dotenv
 MINDWTR_CLOUD_AUTH_TOKENS=replace_with_a_token_at_least_20_characters_long
 MINDWTR_CLOUD_CORS_ORIGIN=http://localhost:5173
 ```
 
-`MINDWTR_CLOUD_CORS_ORIGIN` must be the exact address you open the PWA at in your browser, including scheme and port. `http://localhost:5173` only works when the browser runs on the Docker host itself. From any other machine, use the host's address, for example `http://192.168.1.20:5173`. Only one origin can be set.
+`MINDWTR_CLOUD_CORS_ORIGIN` debe ser la dirección exacta en la que abres la PWA en tu navegador, incluyendo esquema y puerto. `http://localhost:5173` solo funciona cuando el navegador se ejecuta en el propio host de Docker. Desde cualquier otra máquina, usa la dirección del host, por ejemplo `http://192.168.1.20:5173`. Solo se puede establecer un origen.
 
-Then pull and start the published images:
+Luego descarga e inicia las imágenes publicadas:
 
 ```bash
 docker compose pull
 docker compose up -d
 ```
 
-Then open:
+Luego abre:
 - PWA: `http://localhost:5173`
-- Cloud health: `http://localhost:8787/health`
-- Self-Hosted URL for local testing: `http://localhost:8787`
-- REST API base URL: `http://localhost:8787/v1`
+- Salud de nube: `http://localhost:8787/health`
+- URL autohospedada para pruebas locales: `http://localhost:8787`
+- URL base de API REST: `http://localhost:8787/v1`
 
-From a phone or another computer, replace `localhost` with the Docker host's LAN IP. In Mindwtr, use the cloud port (`http://HOST_IP:8787`) as the Self-Hosted URL, not the PWA port (`:5173`).
+Desde un teléfono u otra computadora, reemplaza `localhost` con la IP de LAN del host de Docker. En Mindwtr, usa el puerto en la nube (`http://HOST_IP:8787`) como URL autohospedada, no el puerto PWA (`:5173`).
 
-To build from source instead, clone the repository and run `docker compose -f docker/compose.yaml up --build -d` from its root.
+Para compilar desde la fuente, clona el repositorio y ejecuta `docker compose -f docker/compose.yaml up --build -d` desde su raíz.
 
-This HTTP compose file is best for local testing. Mindwtr desktop and mobile clients accept HTTP for localhost, private IPs, and local hostnames. Public URLs should use HTTPS.
+Este archivo de composición HTTP es mejor para pruebas locales. Los clientes de escritorio y móvil de Mindwtr aceptan HTTP para localhost, IPs privadas y nombres de host locales. Las URL públicas deben usar HTTPS.
 
-## Dropbox sync and the Docker PWA
+## Sincronización de Dropbox y PWA de Docker
 
-The `mindwtr-app` Docker image serves the browser/PWA build. Native Dropbox OAuth sync is not available in this runtime because Dropbox connection is implemented by the native desktop and mobile apps. Supplying `VITE_DROPBOX_APP_KEY` or `DROPBOX_APP_KEY` through `.env`, `env_file`, or compose runtime environment will not enable Dropbox in Docker.
+La imagen `mindwtr-app` de Docker sirve la compilación del navegador/PWA. La sincronización nativa de Dropbox OAuth no está disponible en este tiempo de ejecución porque la conexión de Dropbox se implementa mediante las aplicaciones nativas de escritorio y móvil. El suministro de `VITE_DROPBOX_APP_KEY` o `DROPBOX_APP_KEY` a través de `.env`, `env_file` o el entorno de ejecución de composición no habilitará Dropbox en Docker.
 
-For Docker-hosted sync, use the bundled self-hosted cloud server or WebDAV. If the self-hosted endpoint is behind Authelia or another interactive SSO proxy, configure the proxy to let the Mindwtr sync/API path use Mindwtr's bearer token directly; the mobile app cannot complete an Authelia browser login in front of `/v1/data`.
+Para sincronización alojada en Docker, usa el servidor en la nube autohospedado incluido o WebDAV. Si el punto final autohospedado está detrás de Authelia u otro proxy SSO interactivo, configura el proxy para permitir que la ruta de sincronización/API de Mindwtr use el token de portador de Mindwtr directamente; la aplicación móvil no puede completar un inicio de sesión en navegador de Authelia enfrente de `/v1/data`.
 
-## HTTPS quick start (Cloud + Caddy)
+## Inicio rápido HTTPS (Nube + Caddy)
 
-Use the HTTPS compose file when syncing real desktop or mobile clients to a self-hosted cloud server:
+Usa el archivo de composición HTTPS al sincronizar clientes reales de escritorio o móvil con un servidor en la nube autohospedado:
 
 ```bash
 cp docker/.env.https.example docker/.env.https.local
 ```
 
-Edit `docker/.env.https.local`:
+Edita `docker/.env.https.local`:
 
 ```dotenv
 MINDWTR_CLOUD_DOMAIN=mindwtr.example.com
@@ -63,29 +63,29 @@ MINDWTR_CLOUD_CORS_ORIGIN=https://mindwtr.example.com
 MINDWTR_CADDYFILE=Caddyfile.https
 ```
 
-Start the HTTPS stack:
+Inicia la pila HTTPS:
 
 ```bash
 docker compose --env-file docker/.env.https.local -f docker/compose.https.yaml up -d
 ```
 
-Then check:
+Luego verifica:
 
 ```bash
 curl https://mindwtr.example.com/health
 ```
 
-In Mindwtr Settings -> Sync -> Self-Hosted, use:
+En Configuración de Mindwtr -> Sincronización -> Autohospedado, usa:
 
 ```text
 https://mindwtr.example.com
 ```
 
-Mindwtr will automatically append `/v1/data`.
+Mindwtr añadirá automáticamente `/v1/data`.
 
-### LAN-only HTTPS
+### HTTPS solo para LAN
 
-For a hostname that only resolves on your home network, change:
+Para un nombre de host que solo se resuelve en tu red local, cambia:
 
 ```dotenv
 MINDWTR_CLOUD_DOMAIN=mindwtr.home.arpa
@@ -93,60 +93,60 @@ MINDWTR_CLOUD_CORS_ORIGIN=https://mindwtr.home.arpa
 MINDWTR_CADDYFILE=Caddyfile.local-https
 ```
 
-This uses Caddy's internal certificate authority. Each client device must trust Caddy's local root certificate before Mindwtr will accept the HTTPS connection. Public Let's Encrypt certificates are the more reliable option for mobile clients.
+Esto usa la autoridad de certificación interna de Caddy. Cada dispositivo cliente debe confiar en el certificado raíz local de Caddy antes de que Mindwtr acepte la conexión HTTPS. Los certificados públicos de Let's Encrypt son la opción más confiable para clientes móviles.
 
-After the LAN-only stack starts, you can export Caddy's local root certificate with:
+Después de que se inicie la pila solo para LAN, puedes exportar el certificado raíz local de Caddy con:
 
 ```bash
 docker compose --env-file docker/.env.https.local -f docker/compose.https.yaml cp caddy:/data/caddy/pki/authorities/local/root.crt ./mindwtr-caddy-root.crt
 ```
 
-Install that certificate as a trusted root on each device that will sync to this hostname.
+Instala ese certificado como raíz de confianza en cada dispositivo que se sincronizará con este nombre de host.
 
-## Configure sync token
+## Configurar token de sincronización
 
-The cloud server expects a token. In `docker/compose.yaml`, set:
+El servidor en la nube espera un token. En `docker/compose.yaml`, establece:
 
 ```
 MINDWTR_CLOUD_AUTH_TOKENS=your_token_here
 ```
 
-`MINDWTR_CLOUD_TOKEN` is still accepted for backward compatibility, but deprecated.
+`MINDWTR_CLOUD_TOKEN` aún se acepta por compatibilidad hacia atrás, pero está deprecado.
 
-For Docker secrets, you can point to a mounted file instead:
+Para secretos de Docker, puedes apuntar a un archivo montado en su lugar:
 
 ```
 MINDWTR_CLOUD_AUTH_TOKENS_FILE=/run/secrets/mindwtr_cloud_tokens
 ```
 
-Use the **same token** in Mindwtr Settings → Sync → Self-Hosted.
-Set the Self-Hosted URL to the **base** endpoint, for example:
+Usa el **mismo token** en Configuración de Mindwtr → Sincronización → Autohospedado.
+Establece la URL autohospedada en el punto final **base**, por ejemplo:
 
 ```
 http://localhost:8787
 ```
 
-Mindwtr will automatically append `/v1/data` and store `data.json` (and attachments) under that endpoint.
+Mindwtr añadirá automáticamente `/v1/data` y almacenará `data.json` (y adjuntos) bajo ese punto final.
 
-Example to generate a token:
+Ejemplo para generar un token:
 
 ```
 cat /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 50 | head -n 1
 ```
 
-Or you can use https://it-tools.tech/token-generator
+O puedes usar https://it-tools.tech/token-generator
 
-## API (task automation)
+## API (automatización de tareas)
 
-The cloud container now exposes the REST API on the same host/port as sync, using the **same Bearer token**.
+El contenedor en la nube ahora expone la API REST en el mismo host/puerto que la sincronización, usando el **mismo token de Portador**.
 
-Base URL:
+URL base:
 
 ```
 http://localhost:8787/v1
 ```
 
-Create a task:
+Crear una tarea:
 
 ```
 curl -X POST \
@@ -156,38 +156,38 @@ curl -X POST \
   http://localhost:8787/v1/tasks
 ```
 
-List tasks:
+Listar tareas:
 
 ```
 curl -H "Authorization: Bearer your_token_here" \
   "http://localhost:8787/v1/tasks?status=next"
 ```
 
-## Volumes
+## Volúmenes
 
-Persist cloud data by mounting a host path:
+Persiste datos en la nube montando una ruta de host:
 
 ```
 ./data:/app/cloud_data
 ```
 
-If you switch to a custom host path, make sure it is writable by the container user (uid 1000):
+Si cambias a una ruta de host personalizada, asegúrate de que sea escribible por el usuario del contenedor (uid 1000):
 
 ```
 sudo chown -R 1000:1000 /path/data_dir
 ```
 
-## Build without compose (optional)
+## Compilar sin composición (opcional)
 
 ```bash
 # PWA
 docker build -f docker/app/Dockerfile -t mindwtr-app .
 
-# Cloud
+# Nube
 docker build -f docker/cloud/Dockerfile -t mindwtr-cloud .
 ```
 
-## Notes
+## Notas
 
-- The PWA uses client-side rendering; Nginx is configured with `try_files` to avoid 404s on refresh.
-- Bun is pinned to `1.3` and the build uses C++20 flags for `better-sqlite3`.
+- La PWA usa representación del lado del cliente; Nginx se configura con `try_files` para evitar 404 en la actualización.
+- Bun se fija en `1.3` y la compilación usa banderas C++20 para `better-sqlite3`.

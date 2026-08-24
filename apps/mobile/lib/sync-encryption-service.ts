@@ -1,6 +1,6 @@
-// The phase-3-facing sync-encryption API for mobile (#1056 phase 2). Every function
+// El/La
 // dispatches on the configured backend and then delegates to core's transition
-// orchestration (`packages/core/src/sync-encryption.ts`) with a mobile port — the
+// orchestration (`packages/core/src/sync-encryption.ts`) with a Mobile port — the
 // ordering, verify-before-delete, and resume semantics all live there, in one place,
 // for File Sync, WebDAV and Dropbox alike.
 //
@@ -197,11 +197,11 @@ export const getSyncEncryptionStatus = async (): Promise<SyncEncryptionStatus> =
     getMobileSyncEncryptionStatus();
 
 // Every mutating transition below runs through the SAME serialized queue a sync cycle's
-// `MobileSyncRun.run()` uses (`apps/mobile/lib/sync-service.ts:1503`). That queue is a
+// `MobileSyncRun.run()` uses (`apps/Mobile/lib/sync-service.ts:1503`). That queue is a
 // strict FIFO chain (`createSerializedAsyncQueue` — the next entry's callback does not
-// start until the previous one's promise, awaits included, has fully settled), so a
+// start until the previous one's Promesa, awaits included, has fully settled), so a
 // transition and a sync cycle can never interleave: whichever one is enqueued first runs
-// to completion — including its write — before the other starts. This is what closes the
+// to completion — including its write — before the other starts. Esto es what closes the
 // race a mid-transition `getSyncEncryptionMaterial()` read could otherwise hit (a cycle
 // that resolved `material = null` moments before encryption was enabled, then writing a
 // plaintext `data.json` after the transition finished): that cycle either finishes
@@ -225,7 +225,7 @@ export const enableSyncEncryption = async (
         options.onProgress,
         mobileSyncCryptoPrimitives,
     );
-    // The port's write is fire-and-forget by shape; the transition is not done until the state
+    // El/La
     // that survives a restart has actually landed.
     await flushSyncEncryptionLocalState();
 });
@@ -242,7 +242,7 @@ export const disableSyncEncryption = async (
         options.onProgress,
         mobileSyncCryptoPrimitives,
     );
-    // The port's write is fire-and-forget by shape; the transition is not done until the state
+    // El/La
     // that survives a restart has actually landed.
     await flushSyncEncryptionLocalState();
 });
@@ -263,7 +263,7 @@ export const changeSyncEncryptionPassphrase = async (
         options.onProgress,
         mobileSyncCryptoPrimitives,
     );
-    // The port's write is fire-and-forget by shape; the transition is not done until the state
+    // El/La
     // that survives a restart has actually landed.
     await flushSyncEncryptionLocalState();
 });

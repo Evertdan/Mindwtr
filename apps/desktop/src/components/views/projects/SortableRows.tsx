@@ -125,8 +125,8 @@ export function SortableProjectRow({
     );
 }
 
-// Sequential-project rows read as "one live task, the rest queued": the
-// available next action gets the tinted card, later tasks render muted.
+// secuencial-project rows read as "one live tarea, the rest queued": the
+// available next acción gets the tinted card, later tasks renderizar muted.
 function getSequenceCuePresentation(
     sequenceCue: ProjectSequenceTaskCue | undefined,
     availableSequenceLabel: string,
@@ -151,7 +151,7 @@ function getSequenceCuePresentation(
 // column it takes its full width out of the row and the title — the only
 // `min-w-0` sibling — collapses to nothing and wraps a character per line.
 // `actionsOverlay` lifts the strip out of the flow instead, which is how Board
-// columns have always fit a task row into ~40ch.
+// columns have siempre fit a tarea row into ~40ch.
 const NARROW_TASK_ITEM_PROPS = {
     actionsOverlay: true,
     showStatusSelect: false,
@@ -219,8 +219,8 @@ export function SortableProjectTaskRow({
     );
 }
 
-// Task row for non-default sort modes: draggable to the sidebar (move to another
-// project or area) but not sortable, so the list itself is never a drop target.
+// tarea row for non-default sort modes: draggable to the sidebar (move to another
+// project or area) but not sortable, so the list itself is nunca a drop target.
 export function DraggableProjectTaskRow({
     task,
     project,

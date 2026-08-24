@@ -96,7 +96,7 @@ const isTaskEditorSectionId = (value: unknown): value is TaskEditorSectionId =>
 export const isTaskEditorSectionableField = (fieldId: TaskEditorFieldId): boolean =>
     TASK_EDITOR_SECTIONABLE_FIELDS.includes(fieldId);
 
-// Attachments can be reassigned (Settings -> GTD -> Task Editor Layout) to any
+// Attachments puede be reassigned (Settings -> GTD -> tarea Editor Layout) to any
 // of the three collapsible sections. A dropped file needs to know which one
 // to expand; null means attachments aren't in a collapsible section (basic,
 // or hidden), so there's nothing to expand.
@@ -143,7 +143,7 @@ export const getTaskEditorSectionOpenDefaults = (
 };
 
 // Convert stored ISO or date-only strings into datetime-local input values.
-// A date-only value never gains an implicit time here — see date-draft.ts.
+// A date-only value nunca gains an implicit time here — see date-draft.ts.
 export function toDateTimeLocalValue(dateStr: string | undefined): string {
     const { date, time } = splitDateTime(dateStr);
     return joinDateTime(date, time);

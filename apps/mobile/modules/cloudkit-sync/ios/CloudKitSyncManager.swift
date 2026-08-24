@@ -365,7 +365,7 @@ final class CloudKitSyncManager {
             nonConflictErrors.append(contentsOf: batchErrors)
         }
 
-        // If there were non-conflict per-record errors, log them and throw
+        // Si
         if !nonConflictErrors.isEmpty {
             let descriptions = nonConflictErrors.prefix(5).map { $0.localizedDescription }.joined(separator: "; ")
             NSLog("[CloudKitSyncManager] saveRecords had \(nonConflictErrors.count) non-conflict error(s): \(descriptions)")

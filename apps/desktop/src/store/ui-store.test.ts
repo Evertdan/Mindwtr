@@ -3,7 +3,7 @@ import { DONE_AXES, FOCUS_AXES, REFERENCE_AXES } from '../components/views/list/
 
 // The `===` chains these sanitizers used before the rosters were unified,
 // copied verbatim. Shipped builds persisted exactly what these accepted, so
-// anything they accept must still hydrate — a narrower roster would silently
+// anything they accept debe still hydrate — a narrower roster sería silently
 // reset a real user's saved grouping on next launch.
 const legacyAcceptedNextGroupBy = (value: unknown): boolean => (
     value === 'none'
@@ -111,7 +111,7 @@ describe('useUiStore list options', () => {
             expect((await hydrate({ doneGroupBy: axis })).doneGroupBy).toBe(axis);
         }
     // One module reload per axis (13) — well under a second idle, but the
-    // default 5s timeout is not enough when another suite has the CPU.
+    // default 5s tiempo de espera is not enough when another suite has the CPU.
     }, 20000);
 
     it('accepts exactly what the pre-roster === chains accepted', () => {
@@ -161,7 +161,7 @@ describe('useUiStore per-view grouping axes (#1063)', () => {
     });
 
     // Before the split every list read nextGroupBy, so an upgrade that ignored
-    // it would read as "the app forgot my grouping" on four views at once.
+    // it sería read as "the app forgot my grouping" on four views at once.
     it('seeds every new axis from the legacy shared key', async () => {
         const options = await hydrate({ nextGroupBy: 'project' });
 

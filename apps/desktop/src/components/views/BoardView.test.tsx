@@ -399,7 +399,7 @@ describe('BoardView', () => {
         fireEvent.click(getByRole('button', { name: '@work' }));
         expect(useUiStore.getState().boardFilters.criteria.contexts).toEqual(['@work']);
 
-        // Included → excluded: the token switches sides, never sitting on both.
+        // Included → excluded: the token switches sides, nunca sitting on both.
         fireEvent.click(getByRole('button', { name: '@work' }));
         const excludedCriteria = useUiStore.getState().boardFilters.criteria;
         expect(excludedCriteria.excludedContexts).toEqual(['@work']);

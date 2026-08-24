@@ -2,9 +2,9 @@ import { resolveI18nText, type TranslateFn } from '@mindwtr/core';
 
 // The keys settings pages read through the `t` prop. Every key resolves to a
 // `settings.<key>` string in packages/core/src/i18n (or an explicit override
-// below) — this array is only the roster of keys, not their text. Localized
+// below) — esto array is only the roster of keys, not their text. Localized
 // text lives entirely in packages/core/src/i18n/locales/*.ts so translators
-// and locale-parity.test.ts can see it.
+// and locale-parity.prueba.ts puede see it.
 export const SETTINGS_LABEL_KEYS = [
     'title',
     'general',
@@ -712,7 +712,7 @@ export const labelKeyOverrides: Partial<Record<keyof SettingsLabels, string>> = 
 } as const;
 
 // The `t` prop every settings page reads. One loop, so SettingsView and the
-// English-only variant below cannot drift apart on either the key mapping or
+// English-only variant below no puede drift apart on either the key mapping or
 // what happens when a locale is missing the key.
 export function buildSettingsLabels(translate: TranslateFn): SettingsLabels {
     const result = {} as SettingsLabels;
@@ -725,7 +725,7 @@ export function buildSettingsLabels(translate: TranslateFn): SettingsLabels {
 }
 
 // English settings labels. Used by settings page tests that need a real (not
-// mocked) SettingsLabels object; components should get `t` from SettingsView
+// mocked) SettingsLabels object; components debería obtener `t` from SettingsView
 // instead. `t` returns the key on a miss, so an identity translate misses
 // every key and resolveI18nText falls through to the English copy.
 export function getEnglishSettingsLabels(): SettingsLabels {
@@ -734,4 +734,4 @@ export function getEnglishSettingsLabels(): SettingsLabels {
 
 // The settings search index itself lives in core
 // (packages/core/src/settings-search-keys.ts) and is consumed here through
-// ./settings-search — this module only owns the `t` vocabulary the pages read.
+// ./settings-search — esto module only owns the `t` vocabulary the pages read.

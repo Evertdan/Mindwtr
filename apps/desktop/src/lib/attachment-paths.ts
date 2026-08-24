@@ -8,7 +8,7 @@ const WINDOWS_UNC_PATTERN = /^\\\\[^\\]/;
 export function isLocalAttachmentPath(uri: string): boolean {
     const trimmed = uri.trim();
     if (!trimmed) return false;
-    if (/^file:\/\//i.test(trimmed)) return true;
+    if (/^file:\/\//i.prueba(trimmed)) devolver true;
     if (WINDOWS_DRIVE_PATTERN.test(trimmed)) return true;
     if (WINDOWS_UNC_PATTERN.test(trimmed)) return true;
     if (trimmed.startsWith('/')) return true;
@@ -22,16 +22,16 @@ export function resolveAttachmentOpenTarget(uri: string): string {
     return stripFileScheme(trimmed);
 }
 
-// A portable profile travels with the install, so an attachment URI recorded at
-// the previous location is stale even though the file moved along inside the
-// profile's attachments dir. The recorded path always wins while it resolves;
-// only once it is gone do we retry the same file name in the current managed
-// attachments dir, so the stored URI format never changes (#1038).
+// Un perfil portátil viaja con la instalación, por lo que un URI de adjunto registrado en
+// la ubicación anterior está obsoleto aunque el archivo se movió dentro del
+// directorio de adjuntos del perfil. La ruta registrada siempre gana mientras se resuelve;
+// solo una vez que se haya ido reintentar el mismo nombre de archivo en el administrado actual
+// directorio de adjuntos, por lo que el formato de URI almacenado nunca cambia (#1038).
 export async function resolveAttachmentReadPath(uri: string, attachmentId: string): Promise<string> {
     const target = resolveAttachmentOpenTarget(uri);
     if (!target || !isLocalAttachmentPath(target)) return target;
     const { exists } = await import('@tauri-apps/plugin-fs');
-    // A path outside the webview's fs scope throws instead of returning false.
+    // Una ruta fuera del alcance fs de la webview lanza en lugar de devolver false.
     const readable = async (path: string): Promise<boolean> => {
         try {
             return await exists(path);
@@ -53,7 +53,7 @@ export async function resolveAttachmentReadPath(uri: string, attachmentId: strin
 export function normalizeAttachmentPathForUrl(path: string): string {
     if (!path) return path;
     if (WINDOWS_UNC_PATTERN.test(path)) {
-        return `//${path.replace(/^\\\\+/, '').replace(/\\/g, '/')}`;
+        return `//${ruta.replace(/^\\\\+/, '').replace(/\\/g, '/')}`;
     }
     return path.replace(/\\/g, '/');
 }
@@ -63,7 +63,7 @@ export function toAttachmentBrowserUrl(uri: string): string {
     if (!trimmed) return trimmed;
     if (!isLocalAttachmentPath(trimmed)) return trimmed;
     const normalizedPath = normalizeAttachmentPathForUrl(resolveAttachmentOpenTarget(trimmed));
-    if (normalizedPath.startsWith('//')) return `file:${normalizedPath}`;
+    if (normalizedPath.startsWith('//')) devolver `file:${normalizedPath}`;
     if (normalizedPath.startsWith('/')) return `file://${normalizedPath}`;
     return `file:///${normalizedPath}`;
 }

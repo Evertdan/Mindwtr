@@ -5,7 +5,7 @@ import { MOBILE_HOME_ROUTE } from '@/lib/home-route';
 import { readRestorableRoute } from '@/lib/session-restore';
 
 export default function Index() {
-    // Reopening shortly after the app closed resumes the interrupted session on
+    // Reapertura poco después de que se cerró la aplicación reanuda la sesión interrumpida en
     // the same screen; a fresh session starts on Focus (#842). Deep links,
     // notifications, and share intents bypass this route entirely.
     const [target, setTarget] = useState<Href | null>(null);

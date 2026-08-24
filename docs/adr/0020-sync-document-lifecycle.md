@@ -1,28 +1,28 @@
-# ADR 0020: Sync Document Lifecycle and Growth
+# ADR 0020: Ciclo de vida y crecimiento del documento de sincronización
 
-Date: 2026-07-02
-Status: Accepted
+Fecha: 2026-07-02
+Estado: Aceptado
 
-## Context
+## Contexto
 
-The same scalability question keeps coming back in community discussions (#629 split archives into `archive.json`, #793 why `data.json` grows and shrinks, #802 append-only time entries): what grows in the synced dataset, what shrinks it, and what is the long-term plan when it gets big?
+La misma pregunta de escalabilidad sigue regresando en discusiones comunitarias (#629 dividir archivos en `archive.json`, #793 por qué `data.json` crece y se encoge, #802 entradas de tiempo solo adición): ¿qué crece en el conjunto de datos sincronizado, qué lo reduce y cuál es el plan a largo plazo cuando se vuelve grande?
 
-The answers exist, but only as scattered discussion replies. Design constraints from earlier ADRs and incidents:
+Las respuestas existen, pero solo como respuestas de discusión dispersas. Restricciones de diseño de ADRs e incidentes anteriores:
 
-- ADR 0008 keeps full-snapshot merge without a delta log.
-- File backends (WebDAV, folder, Dropbox) upload files independently. Splitting the dataset across files turns archive/unarchive into a cross-file transaction and invites split-brain (#629).
-- Legacy fields live in remote payloads for years; removing one without a strip step caused the #698 perpetual-conflict incident.
+- ADR 0008 mantiene la fusión de instantánea completa sin registro de delta.
+- Los backends de archivo (WebDAV, carpeta, Dropbox) cargan archivos independientemente. Dividir el conjunto de datos entre archivos convierte el archivo/desarchivado en una transacción entre archivos e invita a split-brain (#629).
+- Los campos heredados viven en cargas útiles remotas durante años; eliminar uno sin un paso de franja causó el incidente de conflicto perpetuo #698.
 
-## Decision
+## Decisión
 
-1. **One synced document.** The dataset stays a single merge unit. No `archive.json`, no per-entity files, unless a future change brings an atomic multi-file commit protocol with it. Features prefer fields on existing entities over new top-level documents.
-2. **SQLite is the store; `data.json` is a snapshot.** The local source of truth is SQLite. `data.json` is rewritten from the store as a sync/backup snapshot — it is not an append log and needs no manual compaction.
-3. **Growth is bounded by lifecycle rules, declared at design time.** Deleted entities become tombstones and are pruned after the retention window (90 days by default). Trash purge removes entities immediately (keeping a tombstone until retention expires). Attachment metadata and pending remote deletes have bounded retries and ages. Any new synced data must state its growth curve up front; append-forever data is only acceptable with a rollup or retention rule defined at birth, not "later".
-4. **Payload-size optimization direction is record-level incremental sync**, building on `rev`/`revBy` (ADR 0008), not more files. Until then, snapshot size is the accepted trade-off.
-5. **Legacy field trims are migration-gated.** For example, tasks serialize both `order` and its legacy alias `orderNum`. Dropping an alias from payloads requires a strip/normalization step that tolerates old clients (the #698 lesson); it is scheduled work, not a quick cleanup.
+1. **Un documento sincronizado.** El conjunto de datos se mantiene como una unidad de fusión única. Sin `archive.json`, sin archivos por entidad, a menos que un cambio futuro traiga un protocolo de confirmación de múltiples archivos atómico con él. Las características prefieren campos en entidades existentes sobre nuevos documentos de nivel superior.
+2. **SQLite es el almacén; `data.json` es una instantánea.** La fuente local de verdad es SQLite. `data.json` se reescribe del almacén como una instantánea de sincronización/copia de seguridad — no es un registro de adición y no necesita compactación manual.
+3. **El crecimiento está limitado por reglas de ciclo de vida, declaradas en el momento del diseño.** Las entidades eliminadas se convierten en lápidas y se podan después de la ventana de retención (90 días por defecto). La purga de basura elimina entidades inmediatamente (manteniendo una lápida hasta que expira la retención). Los metadatos de archivo adjunto y las eliminaciones remotas pendientes tienen reintentos y edades limitadas. Cualquier dato sincronizado nuevo debe indicar su curva de crecimiento por adelantado; los datos de adición para siempre solo son aceptables con un rollup o regla de retención definida al nacer, no "más tarde".
+4. **La dirección de optimización del tamaño de carga útil es sincronización incremental a nivel de registro**, construida sobre `rev`/`revBy` (ADR 0008), no más archivos. Hasta entonces, el tamaño de la instantánea es el intercambio aceptado.
+5. **Los recortes de campo heredado están cerrados de migración.** Por ejemplo, las tareas serializan tanto `order` como su alias heredado `orderNum`. Soltar un alias de cargas útiles requiere un paso de franja/normalización que tolera clientes antiguos (la lección #698); es trabajo programado, no una limpieza rápida.
 
-## Consequences
+## Consecuencias
 
-- Community questions about file growth can be answered with one docs page instead of per-thread explanations.
-- Proposals that add unbounded synced data (for example per-session time logs) are evaluated against rule 3 before implementation.
-- Sync transport work, when it happens, is scoped to incremental record exchange rather than file layout changes.
+- Las preguntas comunitarias sobre el crecimiento de archivos pueden ser respondidas con una página de documentación en lugar de explicaciones por hilo.
+- Las propuestas que agregan datos sincronizados ilimitados (por ejemplo, registros de tiempo por sesión) se evalúan contra la regla 3 antes de la implementación.
+- El trabajo de transporte de sincronización, cuando sucede, está limitado al intercambio de registro incremental en lugar de cambios de diseño de archivo.

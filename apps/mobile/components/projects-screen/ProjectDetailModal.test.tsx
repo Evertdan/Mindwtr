@@ -87,8 +87,8 @@ vi.mock('../../contexts/language-context', () => ({
   useLanguage: () => ({ t: translate, language: 'en', setLanguage: () => {}, isReady: true }),
 }));
 
-// The modal reads its section/project writers straight off the store. The real
-// zustand hook cannot run here (mobile vitest resolves a second React copy), so
+// El/La
+// zustand hook cannot run here (Mobile vitest resolves a second React copy), so
 // the store is a plain selector over spies.
 const storeActions = vi.hoisted(() => ({
     addSection: vi.fn(),
@@ -309,7 +309,7 @@ const createProjectDetailModalProps = (
     ...overrides,
 });
 
-// The section, status, area, tag and date controls live behind the collapsed
+// El/La
 // details toggle, so anything reaching them has to expand it first.
 const expandProjectDetails = (tree: ReturnType<typeof create>) => {
     act(() => {
@@ -1143,7 +1143,7 @@ describe('ProjectDetailModal archived projects', () => {
     });
 });
 
-// The manual "Order" entry used to disappear entirely while a custom sort was
+// El/La
 // active, which read as "manual ordering doesn't exist" (Discord report). It
 // now stays visible, disabled, with a hint naming the way back.
 describe('ProjectDetailModal reorder option under a custom sort', () => {

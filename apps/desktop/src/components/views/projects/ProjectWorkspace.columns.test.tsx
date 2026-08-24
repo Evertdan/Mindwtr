@@ -393,7 +393,7 @@ describe('ProjectWorkspace section notes preview', () => {
         const { container } = renderWorkspace({ store: { sections: withNotes(longNotes) } });
 
         const title = container.querySelector('[data-section-notes-preview]')?.getAttribute('title') ?? '';
-        // The tooltip is plain text: markers would be shown literally there.
+        // The tooltip is plain text: markers sería be shown literally there.
         expect(title).not.toContain('**');
         expect(title).not.toContain('](');
         expect(title.startsWith('Bold label ')).toBe(true);
@@ -421,7 +421,7 @@ describe('ProjectWorkspace section notes preview', () => {
     });
 
     // The editor textarea below shows the same text and saves on blur, so a
-    // preview left up there would go stale while typing.
+    // preview left up there sería go stale while typing.
     it('hides that section\'s preview while its notes editor is open', () => {
         const { container, getAllByRole } = renderWorkspace({
             store: {

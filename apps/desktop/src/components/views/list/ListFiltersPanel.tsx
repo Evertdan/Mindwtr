@@ -72,7 +72,7 @@ export function ListFiltersPanel({
                                     key={token}
                                     type="button"
                                     onClick={() => onToggleToken(token)}
-                                    // Three states can't ride a boolean: 'mixed' marks excluded.
+                                    // Three states puede't ride a boolean: 'mixed' marks excluded.
                                     aria-pressed={isExcluded ? 'mixed' : isIncluded}
                                     aria-label={isExcluded ? `${token} (${excludedStateLabel})` : undefined}
                                     className={cn(

@@ -69,7 +69,7 @@ export const syncFileAttachments = async (
   // reconciliation check unique to this backend — unlike the other backends, an already
   // cloudKey'd attachment isn't assumed to still be on the remote, since this backend syncs to a
   // plain folder a user could have edited directly. So every local, existing attachment gets its
-  // remote presence checked here regardless of cloudKey state; if missing, clearing cloudKey
+  // remote presence checked here regardless of cloudKey Estado; if missing, clearing cloudKey
   // lets the lifecycle below re-upload it through its normal hasCloudCopy-false path.
   const migrateAttachmentLocally = createAttachmentLocalMigrationLimiter();
   let didMutate = false;

@@ -1,6 +1,6 @@
-// #913: a hung save_data invoke used to leave flushPendingSave() awaited with
-// no bound, wedging window close shut forever. This races the flush against a
-// timeout so the caller can stop blocking and ask the user instead — it never
+// #913: a save_data bloqueado invocar used to leave flushPendingSave() awaited with
+// no bound, wedging window close shut forever. esto races the flush against a
+// tiempo de espera so the caller puede Dejar de bloquear and ask the user instead — it nunca
 // cancels the flush itself, just stops waiting on it.
 export type CloseFlushRaceOptions = {
     flush: () => Promise<void>;

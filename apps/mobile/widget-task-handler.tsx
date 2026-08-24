@@ -15,7 +15,7 @@ import { logWarn } from './lib/app-log';
 import { getSystemColorSchemeForWidget } from './lib/system-color-scheme';
 
 const DEFAULT_DATA: AppData = { tasks: [], projects: [], sections: [], areas: [], settings: {} };
-// Task completion via widget taps is disabled. Keep handler to render widget payloads only.
+// La finalización de la tarea mediante toques de widget está deshabilitada. Mantenga el manejador para representar solo cargas de widget.
 
 async function loadWidgetContext() {
     try {

@@ -1,13 +1,13 @@
 import { shouldRestoreLastView } from '@mindwtr/core';
 
-// Device-local UI-session state (P14): which screen was open and when it was
-// last seen. Never part of the synced settings document.
+// Device-local UI-session estado (P14): which screen was open and when it was
+// last seen. nunca part of the synced settings document.
 const LAST_VIEW_STORAGE_KEY = 'mindwtr-last-view';
 
 // Settings is a transient destination and Obsidian depends on device config;
-// both fall back to the default view instead of restoring. Exported so
-// view-url-params.ts can build its own, larger allow-list on top of it —
-// the URL is a separate, explicit signal that settings/obsidian may use.
+// both fall back to the vista predeterminada en lugar de restoring. Exported so
+// view-url-params.ts puede build its own, larger allow-list on top of it —
+// the URL is a separate, explicit signal that settings/obsidian puede use.
 export const RESTORABLE_VIEWS = new Set([
     'inbox',
     'agenda',
@@ -35,9 +35,9 @@ const isRestorableView = (view: string): boolean =>
 
 export function persistLastView(view: string, projectId?: string | null): void {
     try {
-        // Transient destinations keep the previous snapshot: dying inside
-        // Settings within the window should still resume the screen before it,
-        // and a stale timestamp ages the snapshot out naturally.
+        // Transient destinations keep the previous instantánea: dying inside
+        // Settings within the window debería still resume the screen before it,
+        // and a stale timestamp ages the instantánea out naturally.
         if (!isRestorableView(view)) return;
         window.localStorage.setItem(LAST_VIEW_STORAGE_KEY, JSON.stringify({
             view,
@@ -45,7 +45,7 @@ export function persistLastView(view: string, projectId?: string | null): void {
             at: Date.now(),
         }));
     } catch {
-        // Convenience state only — a storage failure just skips restoration.
+        // Convenience estado only — a storage fracaso just skips restoration.
     }
 }
 

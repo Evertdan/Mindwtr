@@ -121,7 +121,7 @@ function DraggableTask({
       runOnJS(onTap)(task);
     });
 
-  // On mobile the board columns are stacked vertically, so status drag is vertical.
+  // On Mobile the board columns are stacked vertically, so status drag is vertical.
   const panGesture = Gesture.Pan()
     .activateAfterLongPress(180)
     .activeOffsetY([-12, 12])
@@ -419,7 +419,7 @@ export function BoardView() {
     }, {} as Record<string, { title: string; color?: string }>);
   }, [projects, areaById]);
 
-  // Tasks visible after the global area filter, before the board-level filter bar.
+  // Tasks visible after the global area Filtra, before the board-level Filtra bar.
   const areaActiveTasks = useMemo(
     () => visibleTasks.filter((task) => task.status !== 'reference'),
     [visibleTasks],
@@ -445,7 +445,7 @@ export function BoardView() {
   }, [areaActiveTasks, criteria, filtersActive, projects]);
   const normalizedSearch = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery]);
 
-  // Apply the board filter bar (search / contexts / tags / dates / projects) and group by status.
+  // Un
   const tasksByStatus = useMemo(() => {
     const visibleTasks = normalizedSearch
       ? criteriaFilteredTasks.filter((task) => task.title.toLowerCase().includes(normalizedSearch))

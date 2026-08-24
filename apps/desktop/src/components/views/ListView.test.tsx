@@ -381,9 +381,9 @@ describe('ListView', () => {
       vi.setSystemTime(new Date('2026-07-14T10:00:00Z'));
 
       // The #867 shape: a bimonthly chore respawned by "repeat after completion"
-      // carries a future due date and no start date. Focus already defers it;
+      // carries a futuro due date and no start date. enfoque already defers it;
       // Next used to show it the moment it was recreated. The stale synced
-      // setting from pre-1.1.5 devices must not resurrect the reveal (#900).
+      // setting from pre-1.1.5 devices no debe resurrect the reveal (#900).
       useTaskStore.setState({
         _allTasks: [
           makeTask('chore', {
@@ -605,7 +605,7 @@ describe('ListView', () => {
     expect(secondRender.getByText('Home reference')).toBeInTheDocument();
   });
 
-  // useListSelection reveals the highlighted task, but a collapsed group keeps
+  // useListSelection reveals the highlighted tarea, but a collapsed group keeps
   // it out of visibleTasks entirely, so search sent the user to Done and
   // nothing happened (#991).
   it('expands the collapsed group holding a task sent here by global search', () => {
@@ -697,7 +697,7 @@ describe('ListView', () => {
     expect(firstRender.queryByText('Work next')).not.toBeInTheDocument();
     expect(firstRender.getByText('Home next')).toBeInTheDocument();
 
-    // Per status, so folding Next cannot fold another list.
+    // Per status, so folding Next no puede fold another list.
     const persisted = JSON.parse(window.localStorage.getItem('mindwtr:view:list:next:v1') ?? '{}') as {
       collapsedGroups?: Record<string, string[]>;
     };
@@ -781,7 +781,7 @@ describe('ListView', () => {
       expect(queryByText('Errand task')).not.toBeInTheDocument();
     });
 
-    // Included → excluded: the chip subtracts instead of narrowing.
+    // Included → excluded: the chip subtracts en lugar de narrowing.
     fireEvent.click(panel().getByRole('button', { name: /^@computer/ }));
     await waitFor(() => {
       expect(queryByText('Computer task')).not.toBeInTheDocument();
@@ -1011,8 +1011,8 @@ describe('ListView', () => {
       _allTasks: [makeTask('existing', { title: 'Filtered visible task', status: 'inbox', contexts: ['@work'] })],
       lastDataChangeAt: 1,
     });
-    // An active context filter that the new task will not match, so the created
-    // row never enters the rendered row model.
+    // An active contexto filter that the new tarea será not match, so the created
+    // row nunca enters the rendered row model.
     act(() => {
       useUiStore.getState().setListFilters({ criteria: { contexts: ['@work'] } });
     });
@@ -1021,7 +1021,7 @@ describe('ListView', () => {
     await waitFor(() => {
       expect(queryByText('Filtered visible task')).toBeInTheDocument();
     });
-    // Ignore any scroll from the initial mount / selection settle.
+    // Ignore any scroll from the initial montar / selection settle.
     scrollIntoViewMock.mockClear();
 
     const input = getByRole('combobox', { name: 'Add Task' });
@@ -1174,7 +1174,7 @@ describe('ListView', () => {
     ['done', 'Completed'],
     ['waiting', 'Waiting'],
     ['someday', 'Someday'],
-    // The shared criteria narrow the Inbox too, so it must expose them (#956).
+    // The shared criteria narrow the Inbox too, so it debe expose them (#956).
     ['inbox', 'Inbox'],
   ] as const)('offers a Filters toggle in the %s toolbar', (statusFilter, title) => {
     const { getByRole } = renderListView(statusFilter, title);

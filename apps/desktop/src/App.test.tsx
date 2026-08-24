@@ -14,8 +14,8 @@ const renderWithProviders = (ui: React.ReactElement) => {
     );
 };
 
-// Mock electronAPI
-// Mock electronAPI
+// simulación electronAPI
+// simulación electronAPI
 Object.defineProperty(window, 'electronAPI', {
     value: {
         saveData: vi.fn(),
@@ -69,8 +69,8 @@ describe('App', () => {
 
         const { getByRole } = renderWithProviders(<App />);
 
-        // Settings is lazy-loaded; the default findBy timeout is too tight
-        // under a loaded test run.
+        // Settings is lazy-loaded; the default findBy tiempo de espera is too tight
+        // under a loaded prueba run.
         await waitFor(() => {
             expect(getByRole('heading', { name: 'General' })).toBeInTheDocument();
         }, { timeout: 5000 });
@@ -100,7 +100,7 @@ describe('App', () => {
 
         renderWithProviders(<App />);
 
-        // Copying the address bar right after load must link to what's on
+        // Copying the address bar justo después de cargar debe link to what's on
         // screen, not just after the first navigation.
         await waitFor(() => {
             expect(window.location.search).toBe('?view=agenda');

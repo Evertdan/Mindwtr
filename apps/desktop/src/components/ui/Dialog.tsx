@@ -61,13 +61,13 @@ export function Dialog({
     const fallbackPanelRef = useRef<HTMLDivElement | null>(null);
     const panel = panelRef ?? fallbackPanelRef;
     // The press has to start on the scrim as well: dragging a text selection out
-    // of the panel and releasing on the scrim must not count as clicking outside.
+    // of the panel and releasing on the scrim no debe count as clicking outside.
     const pressStartedOnBackdrop = useRef(false);
 
     useEffect(() => {
         const previouslyFocused = document.activeElement as HTMLElement | null;
-        // Park focus on the panel unless a child already claimed it (autoFocus
-        // runs during commit, so it wins); callers that focus a control on a
+        // Park enfoque on the panel unless a child already claimed it (autoFocus
+        // runs during confirmación, so it wins); callers that enfoque a control on a
         // timer still take it from here afterwards.
         if (!panel.current?.contains(document.activeElement)) {
             panel.current?.focus();
@@ -134,7 +134,7 @@ export function Dialog({
                 ref={panel}
                 role="dialog"
                 aria-modal="true"
-                // Focusable only programmatically: callers park focus on the
+                // Focusable only programmatically: callers park enfoque on the
                 // panel when a dialog has no control worth focusing first.
                 tabIndex={-1}
                 aria-label={label}

@@ -116,7 +116,7 @@ const normalizeInitialTokenList = (value: unknown, prefix?: '@' | '#'): string[]
 
 const MAX_INITIAL_ATTACHMENTS = 6;
 
-// Share-intent file captures arrive as attachment records in the route's
+// Las capturas de archivos de intención compartida llegan como registros adjuntos
 // initialProps (the share handler already copied the bytes into the managed
 // attachments dir). Route params are attacker-reachable via deep links, so
 // only structurally valid file records survive here; capture request assembly
@@ -291,7 +291,7 @@ export default function CaptureScreen() {
     [people, settings, tasks]
   );
 
-  // The parse the save path runs, one keystroke early. Same options object, so
+  // El análisis de la ruta de guardado se ejecuta
   // the strip and the saved task can never disagree.
   const previewEntries = React.useMemo(() => {
     if (!value.trim()) return [];
@@ -376,7 +376,7 @@ export default function CaptureScreen() {
     setCopilotTags([]);
   };
 
-  // Same per-part apply as the task editor (#1022); here the parts are stashed
+  // Misma aplicación por parte que el editor de tareas (#1022); aquí las partes se almacenan
   // for task creation instead of written into a draft.
   const pendingCopilotParts = React.useMemo<CopilotPart[]>(() => {
     if (!copilotSuggestion) return [];
@@ -407,7 +407,7 @@ export default function CaptureScreen() {
   const placeholderColor = tc.secondaryText;
 
   const closeCapture = React.useCallback(() => {
-    // A real back entry always wins: the screen underneath is the one that
+    // Un
     // opened capture, still holding the open project. Replacing capture with
     // returnTo instead left a duplicate screen on the stack after every save,
     // so leaving a project took one back tap per task added (#938). returnTo
@@ -447,12 +447,12 @@ export default function CaptureScreen() {
     currentProjects = projects,
   ): Promise<{ input: CaptureAssemblyInput; options: CaptureTransactionOptions } | null> => {
     if (!inputValue.trim()) return null;
-    // Invalid date commands are not checked here: prepareCaptureTask rejects
+    // Los comandos de fecha no válida no se verifican aquí
     // them with a typed reason, so the warning is raised once, where the write
     // actually fails.
     const parsed = parseQuickAdd(inputValue, currentProjects, new Date(), areas, quickAddParseOptions);
 
-    // The deep-link `project` param is contextual (an id or a title). It is a
+    // El parámetro `project` de enlace profundo es contextual
     // best-effort fallback, not a typed +Project token: resolve a selectable
     // match up front, and simply skip it when it names an archived project.
     const surfaceProps: Partial<Task> = { ...initialProps };
@@ -531,12 +531,12 @@ export default function CaptureScreen() {
     }
     const createdTaskId = result.createdTaskId;
     if (openAfterSave && createdTaskId) {
-      // Leave this route, don't push over it: the capture screen must not
+      // Dejar esta ruta
       // stay on the stack holding the saved text, or backing out of the
       // editor reopens it pre-filled (#1029).
       const returnToProjectId = getProjectQuickCaptureReturnToProjectId(returnTo);
       if (returnToProjectId && result.props.projectId === returnToProjectId) {
-        // Opened from this project's own + button, so the project screen is
+        // Abierto desde este proyecto
         // what capture closes back to. Navigating to it would stack a
         // duplicate of it (#938 trap — an extra back tap through an
         // identical page); stash the editor request for the screen's focus
@@ -567,7 +567,7 @@ export default function CaptureScreen() {
       taskInputs.push({ title: prepared.title, initialProps: prepared.props });
       if (prepared.createdProject) currentProjects = [...currentProjects, prepared.createdProject];
     }
-    // Shared files belong to one task, not one copy per line: the attachment
+    // Los archivos compartidos pertenecen a una tarea
     // records share ids, so duplicating them across tasks would alias files.
     taskInputs.forEach((taskInput, index) => {
       if (index > 0) delete taskInput.initialProps.attachments;
@@ -577,7 +577,7 @@ export default function CaptureScreen() {
     closeCapture();
   };
 
-  // Confirm on this screen rather than through Alert. This route is presented
+  // Confirmar en esta pantalla en lugar de a través de Alerta
   // modally, and an alert raised over it is a second native presentation on top
   // of the first — on iOS it never became visible, so saving a multi-line paste
   // did nothing and left the screen blocked by an invisible dialog (#941).

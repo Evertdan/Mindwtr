@@ -85,7 +85,7 @@ vi.mock('./settings.shell', () => ({
     SettingsTopBar: () => React.createElement('SettingsTopBar'),
 }));
 
-// The cards only need to expose the option arrays the pickers render.
+// El/La
 vi.mock('./ai-settings-assistant-card', () => ({
     AiSettingsAssistantCard: (props: Record<string, any>) => {
         captured.assistant.push(props);
@@ -97,8 +97,8 @@ vi.mock('./ai-settings-speech-card', () => ({
     AiSettingsSpeechCard: () => null,
 }));
 
-// The fetch effects debounce, and a key that arrives asynchronously only
-// schedules its timer on the render after it lands — hence two passes.
+// El/La
+// schedules its timer on the Renderizar after it lands — hence two passes.
 const settle = async () => {
     for (let pass = 0; pass < 2; pass += 1) {
         await act(async () => {

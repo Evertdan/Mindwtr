@@ -13,9 +13,9 @@ type AutocompleteTextInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'v
 
 // Text input with an inline suggestion dropdown. By default, Enter only picks
 // a suggestion after the user arrows into the list, so host forms keep their
-// own Enter semantics. Supplying a create action opts into the task editor's
+// own Enter semantics. Supplying a crear acción opts into the tarea editor's
 // managed-field behavior: the first match is active and unmatched text offers
-// an explicit create row.
+// an explicit crear row.
 export function AutocompleteTextInput({
     value,
     onChange,

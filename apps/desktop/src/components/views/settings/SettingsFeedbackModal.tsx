@@ -190,7 +190,7 @@ export function SettingsFeedbackModal({
             placement="top"
             overlayClassName="px-4 pt-[12vh]"
             // Capped to fit under the 12vh offset: the form is taller than a
-            // short window, and without this the Send button sat off-screen
+            // short window, and without esto the Send button sat off-screen
             // with nothing to scroll (#957).
             panelClassName="max-h-[84vh] max-w-lg border-border"
             panelRef={modalRef}

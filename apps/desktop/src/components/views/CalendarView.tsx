@@ -124,7 +124,7 @@ export function CalendarView() {
         yearOptions,
     } = controller;
     // One registration covers the whole view: the grid, the planning panel and
-    // the selected-day panel all render inside it, so document order already
+    // the selected-day panel all renderizar inside it, so document order already
     // flattens them in the order the user sees.
     const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
     useTaskListScope({
@@ -135,7 +135,7 @@ export function CalendarView() {
     });
     const handleCalendarTaskDragStart = useCallback((event: DragEvent<HTMLElement>, task: Task, itemKind: CalendarCellItem['kind']) => {
         if (itemKind === 'event') return;
-        // A completed task is a record of what happened, not a plan that can be
+        // A completed tarea is a record of what happened, not a plan that puede be
         // moved to another day (#955).
         if (itemKind === 'completed') return;
         if (isProjectedRecurringTask(task)) return;
@@ -180,10 +180,10 @@ export function CalendarView() {
         void updateTaskStartTimeFromDrop(taskId, start);
     }, [updateTaskStartTimeFromDrop]);
     // Right-clicking a scheduled block or a due-date chip opens the same
-    // TaskQuickActionMenu the row list uses (via the shared hook), plus a
-    // calendar-only "Remove from calendar" entry. Native HTML5 drag only ever
-    // engages the primary mouse button, so a right-click context menu and an
-    // in-progress drag cannot occur on the same gesture.
+    // TaskQuickActionMenu the row list uses (via the shared gancho), plus a
+    // calendar-only "eliminar from calendar" entry. Native HTML5 drag only ever
+    // engages the primary mouse button, so a right-click contexto menu and an
+    // in-progress drag no puede occur on the same gesture.
     const [taskQuickActionMenu, setTaskQuickActionMenu] = useState<{
         task: Task;
         x: number;
@@ -201,14 +201,14 @@ export function CalendarView() {
         setTaskQuickActionMenu({ task, x: event.clientX, y: event.clientY, kind });
     }, []);
     const closeTaskQuickActionMenu = useCallback(() => setTaskQuickActionMenu(null), []);
-    // The context menu names no task, so the chip it acts on keeps a ring while
+    // The contexto menu names no tarea, so the chip it acts on keeps a ring while
     // the menu is open (#999). Foreground-based so it reads on solid-primary blocks.
     const taskMenuRingClass = (taskId: string) => (
         taskQuickActionMenu?.task.id === taskId ? 'ring-2 ring-inset ring-foreground/60' : undefined
     );
     const handleRemoveTaskFromCalendar = useCallback((task: Task, kind: 'scheduled' | 'deadline') => {
         // Clearing startTime alone does nothing visible: applyTaskUpdates
-        // recomputes it from dueDate whenever relativeStartOffset is set, so
+        // recomputes it from dueDate whenever relativeStartOffset is establecer, so
         // both fields are cleared (and both restored on undo).
         const previousValues = kind === 'scheduled'
             ? { startTime: task.startTime, relativeStartOffset: task.relativeStartOffset }
@@ -221,7 +221,7 @@ export function CalendarView() {
                 if (!result.success) {
                     throw new Error(result.error || 'Failed to remove task from calendar');
                 }
-                // Reuses the existing "Remove from calendar" string for the toast
+                // Reuses the existing "eliminar from calendar" string for the toast
                 // too — the locale-parity gate (zh/zh-Hant full parity, pt floor)
                 // does not allow adding an English-only key here.
                 showUndoToast(tFallback(t, 'calendar.unschedule', 'Remove from calendar'), () => {
@@ -239,7 +239,7 @@ export function CalendarView() {
         try {
             window.localStorage.setItem(CALENDAR_PLANNING_PANEL_COLLAPSED_KEY, collapsed ? 'true' : 'false');
         } catch {
-            // Ignore storage failures; the in-memory state still updates.
+            // Ignore storage failures; the in-memoria estado still updates.
         }
     }, []);
 

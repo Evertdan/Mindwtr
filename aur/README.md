@@ -1,18 +1,18 @@
-# Mindwtr AUR packages
+# Paquetes Mindwtr AUR
 
-Mindwtr recognizes these AUR package identities:
+Mindwtr reconoce estas identidades de paquetes AUR:
 
-| Package                                                                   | Channel | Source                        | Expected owner(s)                                       |
-| ------------------------------------------------------------------------- | ------- | ----------------------------- | ------------------------------------------------------- |
-| [`mindwtr-bin`](https://aur.archlinux.org/packages/mindwtr-bin)           | Stable  | GitHub release `.deb`         | Maintainer `dongdongbh`                                 |
-| [`mindwtr`](https://aur.archlinux.org/packages/mindwtr)                   | Stable  | GitHub release source archive | Maintainer `yochananmarqos`; co-maintainer `dongdongbh` |
-| [`mindwtr-bin-beta`](https://aur.archlinux.org/packages/mindwtr-bin-beta) | RC/beta | GitHub prerelease `.deb`      | Maintainer `dongdongbh`                                 |
+| Paquete                                                                   | Canal   | Fuente                         | Propietario(s) esperado(s)                               |
+| ----------------------------------------------------------------------- | ------- | ------------------------------ | ------------------------------------------------------- |
+| [`mindwtr-bin`](https://aur.archlinux.org/packages/mindwtr-bin)           | Estable | Lanzamiento de GitHub `.deb`   | Mantenedor `dongdongbh`                                 |
+| [`mindwtr`](https://aur.archlinux.org/packages/mindwtr)                   | Estable | Archivo fuente de lanzamiento GitHub | Mantenedor `yochananmarqos`; comantenedor `dongdongbh` |
+| [`mindwtr-bin-beta`](https://aur.archlinux.org/packages/mindwtr-bin-beta) | RC/beta | Prelanzamiento GitHub `.deb`   | Mantenedor `dongdongbh`                                 |
 
-Treat a different upstream URL or an unexpected ownership change as a security event. The machine-readable policy is in [`trusted-packages.json`](trusted-packages.json).
+Trata una URL ascendente diferente o un cambio de propiedad inesperado como un evento de seguridad. La política legible por máquina está en [`trusted-packages.json`](trusted-packages.json).
 
-## Install
+## Instalar
 
-Review every AUR file before building. For example:
+Revisa cada archivo AUR antes de compilar. Por ejemplo:
 
 ```bash
 git clone https://aur.archlinux.org/mindwtr-bin.git
@@ -23,45 +23,45 @@ makepkg --verifysource
 makepkg -sri
 ```
 
-The source URLs must resolve to `https://github.com/dongdongbh/Mindwtr`, executable and source artifacts must have full SHA-256 checksums, and `.SRCINFO` must match `PKGBUILD`. Mindwtr AUR packages must not contain install scripts, remote-shell commands, persistence hooks, or `SKIP` checksums for executable/source content.
+Las URL fuente deben resolverse en `https://github.com/dongdongbh/Mindwtr`, los artefactos ejecutables y fuente deben tener sumas de comprobación SHA-256 completas, y `.SRCINFO` debe coincidir con `PKGBUILD`. Los paquetes Mindwtr AUR no deben contener scripts de instalación, comandos de shell remoto, ganchos de persistencia o sumas de comprobación `SKIP` para contenido ejecutable/fuente.
 
-## Release trust anchor
+## Ancla de confianza de lanzamiento
 
-Mindwtr publishes `SHA256SUMS` with release artifacts and signs new manifests as `SHA256SUMS.asc`. The primary signing-key fingerprint is:
+Mindwtr publica `SHA256SUMS` con artefactos de lanzamiento y firma nuevos manifiestos como `SHA256SUMS.asc`. La huella digital de la clave de firma principal es:
 
 ```text
 0358 999B BE70 4F58 8B90  9497 9E55 3245 CB17 047D
 ```
 
-Verify the fingerprint independently before trusting the key. A typical verification is:
+Verifica la huella digital de forma independiente antes de confiar en la clave. Una verificación típica es:
 
 ```bash
 gpg --verify SHA256SUMS.asc SHA256SUMS
 sha256sum --check SHA256SUMS
 ```
 
-## Publishing policy
+## Política de publicación
 
-All three packages publish directly from release jobs:
+Los tres paquetes se publican directamente desde trabajos de lanzamiento:
 
-1. Generate the package's `PKGBUILD` and `.SRCINFO` from the release tag.
-2. Reject unexpected files, owners, sources, commands, or skipped checksums (`scripts/ci/validate-aur-package.mjs`).
-3. Build in a clean Arch container.
-4. Re-verify the package's maintainer, co-maintainers, and upstream URL against the trusted policy immediately before pushing (`scripts/ci/audit-aur-state.mjs`); ownership drift aborts the push.
-5. Push a single, non-force commit over a dedicated SSH credential.
+1. Genera `PKGBUILD` y `.SRCINFO` del paquete desde la etiqueta de lanzamiento.
+2. Rechaza archivos inesperados, propietarios, fuentes, comandos o sumas de comprobación omitidas (`scripts/ci/validate-aur-package.mjs`).
+3. Compila en un contenedor Arch limpio.
+4. Reverifica el mantenedor del paquete, comantendedores y URL ascendente contra la política de confianza inmediatamente antes de hacer push (`scripts/ci/audit-aur-state.mjs`); la deriva de propiedad aborta el push.
+5. Impulsa una única confirmación sin fuerza sobre una credencial SSH dedicada.
 
-A recognized AUR maintenance response (pushes disabled) marks the channel delayed rather than failing the job; an unexpected rejection fails it.
+Una respuesta reconocida de mantenimiento de AUR (pushes deshabilitados) marca el canal como retrasado en lugar de fallar el trabajo; un rechazo inesperado falla.
 
-`mindwtr` (the source package, co-maintained with `yochananmarqos`) additionally runs a full clean-container build of the package before pushing, and its release job still saves the exact published files, base commit, all-package ownership/history snapshot, review diff, and diff checksum as a 90-day workflow artifact — now as a publish record rather than a pending proposal.
+`mindwtr` (el paquete fuente, comantenido con `yochananmarqos`) además ejecuta una compilación completa de contenedor limpio del paquete antes de hacer push, y su trabajo de lanzamiento aún guarda los archivos exactos publicados, confirmación base, instantánea de propiedad/historial de todos los paquetes, diferencia de revisión y suma de comprobación de diferencia como un artefacto de flujo de trabajo de 90 días — ahora como un registro de publicación en lugar de una propuesta pendiente.
 
-The manual `Publish reviewed AUR proposal` workflow (`publish-aur.yml`), protected by the `aur-publish` GitHub Environment, publishes such a saved artifact and remains available as an incident-mode fallback for all three packages, for out-of-band publication when direct pushes are unavailable or extra review is warranted.
+El flujo de trabajo manual `Publicar propuesta AUR revisada` (`publish-aur.yml`), protegido por el Entorno de GitHub `aur-publish`, publica tal artefacto guardado y permanece disponible como alternativa en modo de incidente para los tres paquetes, para publicación fuera de banda cuando los empujes directos no están disponibles o se justifica revisión adicional.
 
-## Maintainer security
+## Seguridad del mantenedor
 
-- Keep `dongdongbh` as maintainer or co-maintainer of all recognized packages.
-- Use a dedicated, passphrase-protected Ed25519 AUR key that is not shared with GitHub, servers, or general build machines.
-- Store the publishing key only as the `AUR_SSH_PRIVATE_KEY` secret in the protected `aur-publish` Environment.
-- Require a human review of the proposal artifact before approving the Environment deployment.
-- Never orphan a package for temporary maintenance convenience and never force-push AUR history.
+- Mantén `dongdongbh` como mantenedor o comantenedor de todos los paquetes reconocidos.
+- Usa una clave AUR Ed25519 dedicada y protegida con frase de contraseña que no se comparta con GitHub, servidores o máquinas de compilación general.
+- Almacena la clave de publicación solo como el secreto `AUR_SSH_PRIVATE_KEY` en el Entorno protegido `aur-publish`.
+- Requiere una revisión humana del artefacto de propuesta antes de aprobar la implementación del Entorno.
+- Nunca abandones un paquete por conveniencia de mantenimiento temporal y nunca hagas push forzado del historial de AUR.
 
-The AUR is unofficial. Automation catches policy drift, but it does not replace reviewing the actual package diff and build behavior.
+El AUR es no oficial. La automatización detecta la deriva de política, pero no reemplaza la revisión de la diferencia real del paquete y el comportamiento de compilación.

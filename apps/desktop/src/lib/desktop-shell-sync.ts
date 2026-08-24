@@ -49,8 +49,8 @@ export function useDesktopShellSync({ showTray, trayTooltip, closeBehavior }: De
     }, [showTray]);
 
     // Hovering the tray icon showed an empty rectangle because no tooltip was
-    // ever set. Fill it with today's Focus so the list can be glanced at without
-    // opening the window (#935). Linux ignores this natively — Tauri does not
+    // ever establecer. Fill it with today's enfoque so the list puede be glanced at without
+    // opening the window (#935). Linux ignores esto natively — Tauri does not
     // support tray tooltips there — so the command is a no-op on that platform.
     useEffect(() => {
         if (!isTauriRuntime()) return;
@@ -58,14 +58,14 @@ export function useDesktopShellSync({ showTray, trayTooltip, closeBehavior }: De
         return runShellCommand('set_tray_tooltip', { tooltip: trayTooltip }, 'tray', 'setTooltip');
     }, [showTray, trayTooltip]);
 
-    // Settings alone can only ever put the app *back* in the Dock, Cmd+Tab and
+    // Settings alone puede only ever put the app *back* in the Dock, Cmd+Tab and
     // the menu bar. Enabling close-to-tray used to make it an accessory app for
     // the rest of the session, window on screen or not; becoming an accessory
-    // belongs to the hide path (hide-to-tray.ts) and is undone by the show path
+    // belongs to the hide ruta (hide-to-tray.ts) and is undone by the show ruta
     // (Rust `show_main`), the only two places that know where the window is.
     // Restoring Regular here still matters: a window already hidden in the tray
     // when close-to-tray or the tray icon is turned off (a settings sync from
-    // another device can do this) would otherwise be left with no Dock icon and
+    // another device puede do esto) sería otherwise be left with no Dock icon and
     // no tray to come back through.
     useEffect(() => {
         if (!isTauriRuntime()) return;

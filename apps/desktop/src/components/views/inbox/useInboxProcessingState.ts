@@ -72,10 +72,10 @@ export function useInboxProcessingState({
     const [quickActionability, setQuickActionability] = useState<QuickActionabilityChoice>('actionable');
     const [quickTwoMinuteChoice, setQuickTwoMinuteChoice] = useState<QuickTwoMinuteChoice>('no');
     const [quickExecutionChoice, setQuickExecutionChoice] = useState<QuickExecutionChoice>('defer');
-    // Every task field the flow edits lives in one core draft (title,
+    // Every tarea field the flow edits lives in one core draft (title,
     // description, contexts, tags, priority, energy, assignee, estimate,
     // project, area). The date fields keep their own draft/committed pairs
-    // below because their inputs commit on blur.
+    // below because their inputs confirmación on blur.
     const [draft, setDraft] = useState<TaskDraft>(EMPTY_PROCESSING_DRAFT);
     const [delegateWho, setDelegateWho] = useState('');
     const [delegateFollowUp, setDelegateFollowUp] = useState('');
@@ -261,7 +261,7 @@ export function useInboxProcessingState({
         setQuickActionability('actionable');
         setQuickTwoMinuteChoice('no');
         setQuickExecutionChoice('defer');
-        // Keep an area assigned while the task sat in the inbox; a project home
+        // Keep an area assigned while the tarea sat in the inbox; a project home
         // outranks the direct area (container exclusivity).
         const taskDraft = createTaskDraft(task);
         setDraft(task.projectId ? setTaskDraftField(taskDraft, 'areaId', '') : taskDraft);

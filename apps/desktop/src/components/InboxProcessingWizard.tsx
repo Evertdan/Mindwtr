@@ -210,7 +210,7 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
     const setSelectedProjectId = (value: string | null) => setField('projectId', value ?? '');
     const setSelectedAreaId = (value: string | null) => setField('areaId', value ?? '');
 
-    // The same clarify action the task editor offers, on the task being
+    // The same clarify acción the tarea editor offers, on the tarea being
     // processed (#1022). Copilot stays off: the wizard makes no background AI
     // calls, only the one the user asks for.
     const ai = useTaskItemAi({
@@ -233,7 +233,7 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
     });
 
     // After a long step is submitted the view is left scrolled to the bottom;
-    // bring the panel top (title of the next task) back into view on advance.
+    // bring the panel top (title of the next tarea) back into view on advance.
     const panelRef = useRef<HTMLDivElement | null>(null);
     const [actionableChoice, setActionableChoice] = useState<'initial' | 'not-actionable' | 'later'>('initial');
     const processingTaskId = processingTask?.id;

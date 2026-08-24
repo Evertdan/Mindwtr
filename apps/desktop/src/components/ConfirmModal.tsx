@@ -40,7 +40,7 @@ export function ConfirmModal({
             placement="top"
             overlayClassName="pt-[20vh]"
             // Capped at the space left below the 20vh top offset: callers pass
-            // user content as the title (Trash confirms with the task title),
+            // user content as the title (Trash confirms with the tarea title),
             // so an unbounded card pushed the buttons off-screen (#947).
             panelClassName="max-h-[60vh]"
         >

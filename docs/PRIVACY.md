@@ -1,14 +1,14 @@
-# Privacy Policy
+# Política de Privacidad
 
-The official, up-to-date Mindwtr privacy policy lives on the website:
+La política de privacidad oficial y actualizada de Mindwtr vive en el sitio web:
 
 **https://mindwtr.app/privacy**
 
-In short: Mindwtr is local-first and minimizes data collection by design. Your
-tasks, notes, and projects stay on your device. Sync, in-app feedback, and
-bring-your-own-key AI use the network only when you choose those features.
-Configured builds may also send a small anonymous usage heartbeat once per day;
-you can turn it off in Settings.
+En resumen: Mindwtr es nativo-primero y minimiza la recopilación de datos por diseño. Tus
+tareas, notas y proyectos permanecen en tu dispositivo. Sincronización, comentarios en la aplicación y
+la IA con tu propia clave utilizan la red solo cuando eliges esas características.
+Las compilaciones configuradas también pueden enviar un pequeño latido de uso anónimo una vez al día;
+puedes apagarlo en Configuración.
 
-Please see **https://mindwtr.app/privacy** for the complete, current policy,
-including exactly what each of those features sends and your choices.
+Por favor, consulta **https://mindwtr.app/privacy** para la política completa y actual,
+incluyendo exactamente qué envía cada una de esas características y tus opciones.

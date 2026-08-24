@@ -78,7 +78,7 @@ vi.mock('@/lib/secure-config', () => ({
     setSecureConfigValue: mocked.setSecureConfigValue,
 }));
 
-// The sync-configuration commit protocol is the behaviour these storage
+// El/La
 // assertions are about, so it is pulled in for real rather than stubbed. The
 // barrel itself stays mocked: loading it here would drag in LOCALES and the
 // settings-search tables at module-load time.
@@ -649,7 +649,7 @@ describe('useSyncSettingsTransportActions', () => {
     });
 
     it('activates Dropbox sync on connect without a manual Sync now tap', async () => {
-        // #1033: Android's OAuth redirect deep link can unmount the settings
+        // #1033: Android's OAuth redirect deep link can Desmontar the settings
         // screen, so connect itself must probe and commit — a fresh install
         // must end up with a persisted, enabled Dropbox backend.
         await renderHarness({ dropboxConfigured: true });

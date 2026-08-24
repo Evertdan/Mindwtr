@@ -62,8 +62,8 @@ vi.mock('../../../lib/update-service', () => ({
 vi.mock('./SettingsUpdateModal', () => ({ SettingsUpdateModal: () => null }));
 
 // Only the sidebar (the search UI) and the GTD page (the collapsed card the
-// reporter's setting hides in) are real here; the rest would drag in Tauri
-// plumbing this test doesn't exercise.
+// reporter's setting hides in) are real here; the rest sería drag in Tauri
+// plumbing esto prueba doesn't exercise.
 vi.mock('./useSyncSettings', () => ({
     useSyncSettings: () => ({
         syncPageProps: { syncError: null },
@@ -85,7 +85,7 @@ vi.mock('./SettingsIntegrationsPage', () => ({ SettingsIntegrationsPage: () => <
 import { SettingsView } from '../SettingsView';
 
 // The sidebar's small-screen page <select> also exposes `option` roles, so
-// results are always queried inside the results listbox.
+// results are siempre queried inside the results listbox.
 function resultOptions(): HTMLElement[] {
     const list = document.getElementById('settings-search-results');
     return list ? within(list).queryAllByRole('option') : [];

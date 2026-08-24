@@ -54,9 +54,9 @@ vi.mock('@mindwtr/core', async () => {
   return {
     ...actual,
     shallow: Object.is,
-    // Run the real selector: the screen reads through
-    // `useTaskStore((state) => ({…}), shallow)`, so a mock that ignores the
-    // selector never executes the projection it is meant to cover.
+    // Ejecuta el selector real: la pantalla lee a través de
+    // `useTaskStore((state) => ({…}), shallow)`, por lo que una simulación que ignora el
+    // el selector nunca ejecuta la proyección que se supone debe cubrir.
     useTaskStore: (selector?: (state: unknown) => unknown) => (
       selector ? selector(mocks.storeState) : mocks.storeState
     ),
@@ -172,7 +172,7 @@ describe('TrashScreen', () => {
       tree = renderer.create(<TrashScreen />);
     });
 
-    // The project has no area, so including "Work" leaves only the task.
+    // El proyecto no tiene un área, por lo que incluir 'Work' deja solo la tarea.
     expect(timelineIds(tree)).toEqual(['recent-task']);
   });
 

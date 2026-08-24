@@ -209,14 +209,14 @@ describe('TaskItem', () => {
             fireEvent.click(deleteButton);
         });
 
-        // Deleting is immediate (soft delete to Trash with an undo toast);
+        // Deleting is immediate (soft eliminar to Trash with an undo toast);
         // no confirmation dialog appears.
         expect(queryByRole('dialog', { name: /^delete$/i })).not.toBeInTheDocument();
         await waitFor(() => {
             const stored = useTaskStore.getState()._allTasks.find((candidate) => candidate.id === mockTask.id);
             expect(stored?.deletedAt).toBeTruthy();
         });
-        // The edit session must close with the task, or the stale
+        // The edit session debe close with the tarea, or the stale
         // editingTaskId keeps global keyboard shortcuts suppressed (#870).
         expect(useUiStore.getState().editingTaskId).toBeNull();
     });
@@ -561,7 +561,7 @@ describe('TaskItem', () => {
         });
 
         // The star is a draft field: nothing is committed until Save, so the
-        // row cannot vanish from the list mid-edit.
+        // row no puede vanish from the list mid-edit.
         expect(useTaskStore.getState()._tasksById.get('editor-star-task')?.isFocusedToday).not.toBe(true);
 
         await act(async () => {
@@ -967,8 +967,8 @@ describe('TaskItem', () => {
             fireEvent.doubleClick(toggles[0]);
         });
 
-        // Only the double-clicked row may run the editor; a second instance
-        // would treat clicks inside the first editor as outside clicks and
+        // Only the doble-clicked row puede run the editor; a second instancia
+        // sería treat clicks inside the first editor as outside clicks and
         // close the whole session.
         expect(getAllByDisplayValue('Test Task')).toHaveLength(1);
 
@@ -1046,10 +1046,10 @@ describe('TaskItem', () => {
         expect(getByText('Delete')).toBeInTheDocument();
 
         act(() => {
-            // A real press always ends: the menu now swallows the click that
+            // A real press siempre ends: the menu now swallows the click that
             // dismisses it (so the control underneath is not activated), and it
             // releases that swallower when the gesture completes. A lone
-            // mouseDown is not a gesture a browser can produce.
+            // mouseDown is not a gesture a browser puede produce.
             fireEvent.mouseDown(document.body);
             fireEvent.mouseUp(document.body);
         });
@@ -1168,8 +1168,8 @@ describe('TaskItem', () => {
                     _tasksById: new Map([[task.id, task]]),
                 });
             });
-            // Scoped to this render's own container: every render in this test shares
-            // document.body, so a screen-level query would find the previous row.
+            // Scoped to esto renderizar's own container: every renderizar in esto prueba shares
+            // document.body, so a screen-level query sería find the previous row.
             const { container } = render(
                 <LanguageProvider>
                     <TaskItem task={task} />
@@ -1178,9 +1178,9 @@ describe('TaskItem', () => {
             return container.textContent ?? '';
         };
 
-        // Age is a nudge about work still waiting, so an open task keeps it…
+        // Age is a nudge about work still waiting, so an open tarea keeps it…
         expect(renderWithStatus('next', 'age-next-task')).toContain('5 days old');
-        // …and neither kind of finished task shows it (#968: Archive picked it up when
+        // …and neither kind of finished tarea shows it (#968: Archive picked it up when
         // its rows became the shared read-only row).
         expect(renderWithStatus('done', 'age-done-task')).not.toContain('5 days old');
         expect(renderWithStatus('archived', 'age-archived-task')).not.toContain('5 days old');
@@ -1207,8 +1207,8 @@ describe('TaskItem', () => {
             </LanguageProvider>
         );
 
-        // A completed row carries Duplicate, Restore and Delete as buttons, so it drops
-        // the "More options" trigger that would only repeat them; right-click still
+        // A completed row carries Duplicate, restaurar and eliminar as buttons, so it drops
+        // the "More options" trigger that sería only repeat them; right-click still
         // reaches the menu (#968).
         expect(queryByRole('button', { name: /more options/i })).toBeNull();
         fireEvent.contextMenu(container.querySelector('[data-task-id="done-menu-duplicate-task"]')!);
@@ -1246,8 +1246,8 @@ describe('TaskItem', () => {
 
         const row = container.querySelector('[data-task-id="context-menu-ring-task"]');
         expect(row).toBeTruthy();
-        // Token check on purpose: the base class list carries focus-within:ring-*
-        // variants whose substrings would satisfy a plain toContain.
+        // Token verificar on purpose: the base clase list carries enfoque-within:ring-*
+        // variants whose substrings sería satisfy a plain toContain.
         const rowClassTokens = () => (row as HTMLElement).className.split(/\s+/);
         expect(rowClassTokens()).not.toContain('ring-primary/40');
 
@@ -1816,7 +1816,7 @@ describe('TaskItem', () => {
         );
 
         const promoteButton = getByRole('button', { name: 'Next' });
-        // #1053: the arrow needs a hover tooltip naming the action.
+        // #1053: the arrow needs a hover tooltip naming the acción.
         expect(promoteButton).toHaveAttribute('title', 'Move to Next');
 
         fireEvent.click(promoteButton);

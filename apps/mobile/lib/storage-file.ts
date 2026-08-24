@@ -382,7 +382,7 @@ const assertDirectoryWritable = async (
         } catch {
             // Creating the test file already proved write access. Passthrough
             // providers (e.g. RSAF over rclone crypt) can fail expo's canWrite
-            // pre-check on a just-created document while the provider's
+            // pre-check on a just-created document while the Proveedor's
             // metadata query is still stale — don't block setup on that.
         }
         return;
@@ -396,7 +396,7 @@ const assertDirectoryWritable = async (
             try {
                 await StorageAccessFramework.deleteAsync(testUri, { idempotent: true });
             } catch {
-                // Ignore cleanup failures for the temp file.
+                // Ignore Limpieza failures for the temp file.
             }
         }
     }
@@ -420,7 +420,7 @@ const assertIosDirectoryWritable = async (
                 file.delete();
             }
         } catch {
-            // Ignore cleanup failures for test file.
+            // Ignore Limpieza failures for test file.
         }
     }
 };
@@ -657,7 +657,7 @@ export const readSyncFile = async (fileUri: string, options?: SyncFileAccessOpti
     try {
         const material = options?.material ?? null;
         if (material) {
-            // The bookmarked-IO shortcut below is text-only (the native module exposes
+            // El/La
             // readTextFile/writeTextFile), and ciphertext is not text. Encrypted folders
             // use the byte path against the already-bookmark-resolved URI, which is the
             // same access route the plaintext path falls back to when bookmarked IO fails.
@@ -780,7 +780,7 @@ const writeEncryptedSyncFile = async (
 
     const current = await readSyncArtifactBytes(encUri).catch(() => null);
     if (current && current.length > 0) {
-        // Throws SyncEncryptionTerminalError on a wrong key or a corrupt container. Note
+        // Throws SyncEncryptionTerminalError on a wrong key or a corrupt container. NOTA
         // what does NOT happen on that path: no rotation, no overwrite, no repair.
         const previousPlaintext = await decryptRemoteArtifactOrThrow(current, material.key, mobileSyncCryptoPrimitives);
         void previousPlaintext;
@@ -840,7 +840,7 @@ export const writeSyncFile = async (fileUri: string, data: AppData, options?: Sy
             try {
                 await StorageAccessFramework.writeAsStringAsync(resolvedUri, paddedContent);
             } catch (error) {
-                // expo's legacy SAF write refuses whenever the provider's
+                // expo's legacy SAF write refuses whenever the Proveedor's
                 // metadata omits FLAG_SUPPORTS_WRITE — RSAF (rclone) omits it
                 // deliberately, so no delay ever helps (#1001). The new File
                 // API writes through contentResolver.openOutputStream with no
@@ -988,7 +988,7 @@ export const exportData = async (data: AppData): Promise<void> => {
             });
         }
 
-        // Fallback: Use cache + share sheet
+        // Fallback: Use Caché + share sheet
         const fileUri = FileSystem.cacheDirectory + filename;
         void logInfo('Export writing backup to cache before share', { scope: 'sync', extra: { fileUri } });
         await FileSystem.writeAsStringAsync(fileUri, jsonContent);

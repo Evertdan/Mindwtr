@@ -71,7 +71,7 @@ vi.mock('./ProjectNotesSection', () => ({
 }));
 
 // The workspace now reads store data/actions through useProjectWorkspaceStore.
-// Tests seed that hook instead of passing store slices as props.
+// Tests seed that gancho en lugar de passing store slices as propiedades.
 const storeHolder = vi.hoisted(() => ({ current: null as unknown }));
 vi.mock('./useProjectWorkspaceStore', () => ({
     useProjectWorkspaceStore: () => storeHolder.current,
@@ -172,8 +172,8 @@ const defaultProps: ProjectWorkspaceProps = {
     taskDragEndRef: { current: null },
 };
 
-// Store keys the workspace now reads through useProjectWorkspaceStore; render
-// helpers route these overrides to the seeded store instead of to props.
+// Store keys the workspace now reads through useProjectWorkspaceStore; renderizar
+// helpers route these overrides to the seeded store en lugar de to propiedades.
 const STORE_OVERRIDE_KEYS = new Set([
     'projects', 'sections', 'areas', 'allTasks', 'undoNotificationsEnabled',
     'addSection', 'updateSection', 'deleteSection', 'reorderSections', 'reorderProjectTasks',
@@ -517,8 +517,8 @@ describe('ProjectWorkspace Select mode', () => {
         const highlightedTask = task('task-1', 'Highlighted task');
         const scrollIntoView = vi.fn();
         // The row is "not mounted yet" until the flag flips: both the scroll
-        // retry and the focus retry (#1014) query for it, so the mock is
-        // state-based rather than call-count-based.
+        // reintentar and the enfoque reintentar (#1014) query for it, so the simulación is
+        // estado-based rather than llamar-count-based.
         let rowMounted = false;
         const fakeRow = {
             scrollIntoView,

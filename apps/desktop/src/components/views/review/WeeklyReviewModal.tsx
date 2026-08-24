@@ -137,7 +137,7 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
     const projectEntries = weeklyBuckets.projectEntries;
     const contextReviewGroups = weeklyBuckets.contextGroups;
     const calendarReviewItems = weeklyBuckets.calendarItems;
-    // Only used for the "nothing waiting/someday at all" empty state; the
+    // Only used for the "nothing waiting/someday at all" empty estado; the
     // step content itself renders due+unscheduled and a collapsible
     // "not due yet" section from waitingGroups/somedayGroups directly.
     const waitingTasks = useMemo(
@@ -332,8 +332,8 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
         try {
             const provider = createAIProvider(await buildAIConfig(settings, apiKey));
             const response = await provider.analyzeReview({ items: staleItems });
-            // Filter here, not in the apply path, so what is displayed and what
-            // can be written never diverge.
+            // Filter here, not in the apply ruta, so what is displayed and what
+            // puede be written nunca diverge.
             const suggestions = filterReviewSuggestionsToKnownIds(
                 response.suggestions || [],
                 staleItems.map((item) => item.id),
@@ -423,9 +423,9 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
         const trimmed = value.trim();
         if (!trimmed) return null;
 
-        // Same quick-add grammar as the quick-add box, matching the project
-        // next-action prompt (#859). Read people lazily: the prompt is rare
-        // and the modal shouldn't subscribe to more of the store for it.
+        // Same quick-agregar grammar as the quick-agregar box, matching the project
+        // next-acción prompt (#859). Read people lazily: the prompt is rare
+        // and the modal shouldn't suscribirse a more of the store for it.
         const state = useTaskStore.getState();
         const { title, props, invalidDateCommands } = parseProjectNextActionInput(trimmed, {
             projectId: targetProject.projectId,
@@ -453,7 +453,7 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
 
     const saveAndEditProjectTask = (value: string) => {
         void createProjectTaskFromPrompt(value).then((taskId) => {
-            // The new task renders as a TaskItem in the project step; claiming
+            // The new tarea renders as a TaskItem in the project step; claiming
             // editingTaskId opens its inline editor without leaving the review.
             if (taskId) setEditingTaskId(taskId);
         });

@@ -366,7 +366,7 @@ export default function FocusScreen() {
     selections.criteria,
     projects,
   ]);
-  // The Upcoming preview draws from baseActiveTasks: the deferral filter that
+  // El/La
   // produced activeTasks is exactly what hides these rows today (#1061).
   const upcomingEntries = useMemo(() => {
     void localDayKey;
@@ -380,7 +380,7 @@ export default function FocusScreen() {
     () => upcomingEntries.map((entry) => entry.task),
     [upcomingEntries],
   );
-  // The date a deferred row surfaces on is the section's whole point, so it rides
+  // El/La
   // the row itself rather than the meta line. Built once per list so the footer
   // node stays identity-stable and the row keeps its memo boundary (#766).
   const upcomingAppearsAtFooters = useMemo(() => {
@@ -821,7 +821,7 @@ export default function FocusScreen() {
         })
         : sortBySavedPerspective(nextItems),
       reviewDue: effectiveFocusSortBy === DEFAULT_FOCUS_SORT_BY ? reviewDueItems : sortBySavedPerspective(reviewDueItems),
-      // The forecast keeps reveal-date order even under a custom sort — the
+      // El/La
       // date a task appears is the only ordering that means anything here.
       upcoming: upcomingCandidates.filter((task) => !isSequentialBlocked(task)),
       projectDeadlineBoosts: nextProjectDeadlineBoosts,

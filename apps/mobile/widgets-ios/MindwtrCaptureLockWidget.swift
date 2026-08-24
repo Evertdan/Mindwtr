@@ -5,8 +5,8 @@ import WidgetKit
 private let mindwtrCaptureLockWidgetKind = "MindwtrCaptureLockWidget"
 private let mindwtrCaptureControlKind = "MindwtrCaptureControl"
 
-// Lock screen (accessory family) widget that opens quick capture (#1066).
-// Reuses MindwtrTasksWidgetProvider like the Focus lock widget: the payload
+// Widget de pantalla de bloqueo (familia de accesorios) que abre captura rápida (#1066).
+// Reutiliza MindwtrTasksWidgetProvider
 // carries the localized capture label and the quick-capture URI, so the
 // launcher stays a dumb button whose strings and route live in JS.
 struct MindwtrCaptureLockWidget: Widget {
@@ -41,7 +41,7 @@ private struct MindwtrCaptureLockWidgetEntryView: View {
     }
 }
 
-// Lock screen widgets render in the system's monochrome/vibrant style, so the
+// Los widgets de pantalla de bloqueo se renderizan
 // theme palette deliberately does not apply here.
 @available(iOSApplicationExtension 16.0, *)
 private struct MindwtrCaptureLockView: View {
@@ -84,7 +84,7 @@ private struct MindwtrCaptureLockView: View {
     }
 }
 
-// Control Center / Lock Screen bottom-slot control (iOS 18+): the same
+// Centro de Control / Pantalla de Bloqueo
 // quick-capture launch as the accessory widget, placeable where the
 // flashlight and camera controls live (#1066).
 @available(iOSApplicationExtension 18.0, iOS 18.0, *)
@@ -100,7 +100,7 @@ struct MindwtrCaptureControl: ControlWidget {
     }
 }
 
-// Lives in the widget extension because the control's action must be
+// Vive en la extensión del widget
 // resolvable in this target; the app's Siri capture intents are a separate
 // surface and stay in ios-app-intents.
 @available(iOSApplicationExtension 18.0, iOS 18.0, *)
@@ -122,7 +122,7 @@ struct MindwtrOpenQuickCaptureIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & OpensIntent {
-        // The fallback payload is the Swift-side home of the quick-capture URI
+        // El/La
         // (mirrors WIDGET_QUICK_CAPTURE_URI in apps/mobile/lib/widget-data.ts).
         let uri = MindwtrTasksWidgetPayload.fallback.quickCaptureUri
         return .result(opensIntent: OpenURLIntent(URL(string: uri) ?? URL(fileURLWithPath: "/")))

@@ -18,7 +18,7 @@ vi.mock('@tauri-apps/api/path', () => ({
 
 vi.mock('@tauri-apps/api/core', () => ({
     invoke: (...args: unknown[]) => invokeMock(...args),
-    convertFileSrc: (path: string) => `asset://${path}`,
+    convertFileSrc: (path: string) => `asset://${ruta}`,
 }));
 
 vi.mock('@tauri-apps/plugin-fs', () => ({
@@ -133,7 +133,7 @@ describe('useTaskItemAttachments addDroppedFileAttachments', () => {
         invokeMock.mockReset();
         mkdirMock.mockClear();
         writeFileMock.mockClear();
-        // No Rust "get_managed_data_dir" command in this test environment;
+        // No Rust "get_managed_data_dir" command in esto prueba environment;
         // getManagedDataDir() falls back to dataDir() + "mindwtr".
         invokeMock.mockRejectedValue(new Error('get_managed_data_dir not supported'));
     });
@@ -206,8 +206,8 @@ describe('useTaskItemAttachments resetAttachmentState orphan cleanup', () => {
     });
 
     it('removes the managed copy when a converted link persists, keeps it on cancel', async () => {
-        // #913/#1001 follow-up: converting a pre-fix file-kind link to a
-        // pointer must clean up the copy the app restored into data/attachments
+        // #913/#1001 seguimiento: converting a pre-fix file-kind link to a
+        // pointer debe limpiar the copy the app restored into data/attachments
         // — but only once the conversion actually saves.
         const legacy = {
             id: 'legacy-1',
@@ -220,7 +220,7 @@ describe('useTaskItemAttachments resetAttachmentState orphan cleanup', () => {
         };
         const { result } = renderHook(() => useTaskItemAttachments({ task, t }));
 
-        // Round 1: convert, then cancel — the copy must survive.
+        // Round 1: convert, then cancel — the copy debe survive.
         act(() => {
             result.current.resetAttachmentState([legacy]);
         });
@@ -276,7 +276,7 @@ describe('useTaskItemAttachments resetAttachmentState orphan cleanup', () => {
 
     it('never removes an orphaned file in a sibling directory that merely shares the managed dir prefix', async () => {
         // e.g. `/data/mindwtr/attachments-old/x.pdf` — `startsWith('/data/mindwtr/attachments')`
-        // would wrongly match this without a path-separator boundary.
+        // sería wrongly match esto without a ruta-separator límite.
         const siblingAttachment = {
             id: 'sibling-1',
             kind: 'file' as const,
@@ -289,9 +289,9 @@ describe('useTaskItemAttachments resetAttachmentState orphan cleanup', () => {
         };
         const { result } = renderHook(() => useTaskItemAttachments({ task, t }));
         act(() => {
-            // Simulate the sibling-dir attachment having entered edit state
-            // this session (e.g. imported/synced data), so cancelling treats
-            // it as orphaned relative to the saved (empty) task.attachments.
+            // Simulate the sibling-dir attachment having entered edit estado
+            // esto session (e.g. imported/synced data), so cancelling treats
+            // it as orphaned relative to the saved (empty) tarea.attachments.
             result.current.setEditAttachments([siblingAttachment]);
         });
 
@@ -324,7 +324,7 @@ describe('useTaskItemAttachments resetAttachmentState orphan cleanup', () => {
     });
 
     it('keeps a local file path added through the link prompt a pointer', async () => {
-        // #1001: "Add link" and "Link to file…" promise a reference, no copy.
+        // #1001: "agregar link" and "Link to file…" promesa a reference, no copy.
         // A kind:'file' record here hands the user's own file to attachment
         // sync, which uploads the bytes and re-homes the attachment onto its
         // own copy the first time the original moves.
@@ -347,9 +347,9 @@ describe('useTaskItemAttachments resetAttachmentState orphan cleanup', () => {
     });
 
     it('converts a pre-fix file-kind link back to a pointer via edit', () => {
-        // #1001 follow-up: "Add link" items recorded before the pointer fix
-        // carry kind:'file' plus managed-copy bookkeeping. Editing one must be
-        // allowed and re-saving must produce a clean pointer.
+        // #1001 seguimiento: "agregar link" items recorded before the pointer fix
+        // carry kind:'file' plus managed-copy bookkeeping. Editing one debe be
+        // allowed and re-saving debe produce a clean pointer.
         const legacy = {
             id: 'legacy-1',
             kind: 'file',
@@ -386,8 +386,8 @@ describe('useTaskItemAttachments resetAttachmentState orphan cleanup', () => {
     });
 });
 
-// The overlays take the hook's result whole, so they can be rendered over the
-// real hook instead of a wall of hand-built props.
+// The overlays take the gancho's result whole, so they puede be rendered over the
+// real gancho en lugar de a wall of hand-built propiedades.
 function OverlaysHarness({ openTarget }: { openTarget?: Attachment }) {
     const attachments = useTaskItemAttachments({ task, t });
     return (

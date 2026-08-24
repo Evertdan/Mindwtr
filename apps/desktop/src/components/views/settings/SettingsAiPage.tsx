@@ -704,7 +704,7 @@ export function SettingsAiPage({
                                 {speechDownloadProgressView}
                             </SettingField>
                         ) : (
-                            // The speech provider's key, separate from the
+                            // The speech proveedor's key, separate from the
                             // assistant's indexed `aiApiKey` field above.
                             <SettingField settingsKey={null} title={t.aiApiKey}>
                                 <input

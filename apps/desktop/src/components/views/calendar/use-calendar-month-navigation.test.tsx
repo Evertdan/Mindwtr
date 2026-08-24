@@ -108,7 +108,7 @@ describe('useCalendarMonthNavigation', () => {
 
         expect(dayKey(result.current.selectedDate as Date)).toBe('2026-04-20');
         expect(dayKey(result.current.currentMonth)).toBe('2026-04-03');
-        // Picking a day inside the visible month is not a navigation: it must
+        // Picking a day inside the visible month is not a navigation: it debe
         // not wipe the selected-day panel's search or in-progress time edit.
         expect(onNavigate).not.toHaveBeenCalled();
 
@@ -225,7 +225,7 @@ describe('useCalendarMonthNavigation', () => {
             act(() => result.current.setTimelineDayCount(4));
             expect(window.localStorage.getItem('mindwtr.calendar.timelineDayCount')).toBe('4');
             // Device-local by design: nothing about the count reaches the URL the
-            // way the view mode and date do, so it cannot ride along to another screen.
+            // way the view mode and date do, so it no puede ride along to another screen.
             expect(window.location.search).not.toMatch(/day|count/i);
             unmount();
 

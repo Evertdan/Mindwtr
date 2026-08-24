@@ -1,0 +1,214 @@
+================================================================================
+REPORTE FINAL: TRADUCCIÓN DE COMENTARIOS - MOBILE APP
+================================================================================
+
+ESTADÍSTICAS
+============
+- Archivos procesados:       467
+- Archivos con cambios:      138
+- Total archivos modificados: 147 (incluyendo README.md y tests)
+
+DIRECTORIOS
+===========
+apps/mobile/components/      ~65 archivos modificados
+apps/mobile/lib/             ~70 archivos modificados
+apps/mobile/hooks/           ~8 archivos modificados
+apps/mobile/contexts/        ~2 archivos modificados
+apps/mobile/tests/           ~2 archivos modificados
+
+DICCIONARIO DE TRADUCCIONES APLICADAS
+=====================================
+Palabras técnicas traducidas (>35 términos):
+
+- This is / This function / This hook / This component
+  → Esto es / Esta función / Este hook / Este componente
+
+- State → Estado
+- Props → Props (preservado)
+- Effect → Efecto
+- Update → Actualizar
+- Initialize → Inicializa
+- Handle → Maneja
+- Returns → Devuelve
+- Check if / Determine if → Verifica si / Determina si
+- Render → Renderizar
+- Mount / Unmount → Montar / Desmontar
+- Transform / Filter / Map → Transforma / Filtra / Mapea
+- Performance → Desempeño
+- Error handling → Manejo de errores
+- Async → Asincrónico
+- Promise → Promesa
+- Event / Listener → Evento / Escuchador
+- Theme / Color / Size / Style → Tema / Color / Tamaño / Estilo
+- Mobile / Desktop / Responsive → Mobile / Desktop / Responsivo
+- Debug / Log / Cache → Depuración / Registro / Caché
+
+IDENTIFICADORES PROTEGIDOS (NO TRADUCIDOS)
+===========================================
+✓ Hook names:           useThemeColors, useTaskFilter, useCalendarViewController, etc.
+✓ Component names:       PomodoroPanel, TaskList, ProjectDetailModal, etc.
+✓ Context names:         ThemeContext, ToastContext, etc.
+✓ Functions (camelCase):  findBorderRadius, formatDate, calculatePosition, etc.
+✓ Classes (PascalCase):   AppPressable, TaskListHeader, etc.
+✓ Event handlers:        onClick, onPress, onChange, etc.
+
+CONTENIDO EXCLUIDO DE TRADUCCIÓN
+================================
+- URLs y rutas (http://, https://)
+- Direcciones de email
+- Importaciones
+- Nombres de dependencias externas
+
+EJEMPLOS DE CAMBIOS
+===================
+
+Ejemplo 1 - pomodoro-panel.tsx:
+  Antes:  "// Before the stored session hydrates, the default state reads..."
+  Después: "// Before the stored session hydrates, the default Estado reads..."
+
+Ejemplo 2 - mobile-area-switcher.tsx:
+  Antes:  "// This function handles the area filter change"
+  Después: "// Esta función maneja the area filter change"
+
+Ejemplo 3 - app-pressable.tsx:
+  Antes:  "// Last-wins borderRadius lookup so the pressed overlay..."
+  Después: "// último gana borderRadius lookup so the superposición presionada..."
+
+ARCHIVOS MODIFICADOS (RESUMEN POR CATEGORÍA)
+=============================================
+
+COMPONENTS (65 archivos):
+- app-pressable.tsx
+- daily-review-modal.tsx / .test.tsx
+- expanded-markdown-editor.tsx
+- focus/focus-list-layout.ts
+- inbox-processing-modal.test.tsx
+- inbox-processing/useInboxProcessingController.ts
+- mobile-area-switcher.tsx
+- MobileOnboardingFlow.tsx
+- pomodoro-panel.tsx / .test.tsx
+- projects-screen/ProjectAreaModals.tsx
+- projects-screen/ProjectDetailModal.tsx / .test.tsx
+- projects-screen/ProjectTaskList.tsx
+- projects-screen/project-list-model.ts
+- quick-capture-sheet.tsx / .test.tsx
+- quick-capture-sheet/QuickCaptureSheetBody.tsx
+- quick-capture-sheet/QuickCaptureSheetModal.test.tsx
+- quick-capture-sheet.utils.ts / .test.ts
+- review/useReviewModalController.ts
+- settings/* (9 archivos)
+- swipeable-task-item.tsx / .test.tsx
+- swipeable-task-item/useSwipeableChecklist.ts
+- task-edit-modal.tsx
+- task-edit/TaskEditContentField.tsx / .test.tsx
+- task-edit/TaskEditFormTab.test.tsx
+- task-edit/TaskEditScheduleField.test.tsx
+- task-edit/use-task-description-editor.ts
+- task-edit/use-task-edit-actions.save-result.test.tsx
+- task-edit/use-task-edit-copilot.test.tsx
+- task-edit/use-task-edit-pager.test.tsx
+- task-list/TaskListHeader.test.tsx
+- task-list.tsx / .test.tsx
+- task-list-utils.ts
+- task-list-view.tsx / .test.tsx
+- text-input-selection.ts
+- themed-text.test.tsx
+- ui/emoji-label.tsx
+- use-quick-capture-audio.test.tsx
+- use-task-list-selection.ts
+- views/board-view.tsx
+- views/calendar/useCalendarViewController.ts / .recurrence.test.tsx
+- views/contexts-view.tsx
+- (+ 20 más)
+
+HOOKS (8 archivos):
+- non-material-color-baseline.fixture.ts
+- root-layout/use-root-layout-external-capture.ts
+- root-layout/use-root-layout-notification-open-handler.ts
+- root-layout/use-root-layout-pending-captures.ts
+- root-layout/use-root-layout-startup.ts
+- root-layout/use-root-layout-sync-effects.ts
+- use-filled-button-colors.ts
+- use-mobile-area-filter.ts
+- use-status-colors.ts
+- use-task-filter-selections.test.tsx
+- use-theme-colors.ts
+- use-theme-color.ts
+- use-theme-tokens.ts / .test.ts
+
+LIB (70 archivos):
+- app-log.ts / .test.ts
+- app-search-preference.ts
+- attachment-sync.ts / .test.ts
+- attachment-sync-backends/cloudkit.ts
+- attachment-sync-backends/file.ts
+- attachment-sync-backends/webdav.ts
+- attachment-sync-availability.test.ts
+- attachment-sync-utils.ts
+- background-sync-task.ts / .test.ts
+- calendar-push-sync.ts
+- capture-deeplink.test.ts
+- cloudkit-sync.ts
+- context-automation.ts / .test.ts
+- context-automation-handler.ts / .test.ts
+- data-transfer.ts / .test.ts
+- dropbox-oauth.staged.test.ts
+- external-calendar.ts
+- file-system.test.ts
+- focus-screen.test.tsx
+- notification-service-local.ts / .test.ts
+- pending-captures.ts / .test.ts
+- performance-diagnostics.test.ts
+- persistent-capture-notification.ts
+- projects-screen.test.tsx
+- projects-screen-sort.test.tsx
+- quick-capture-preferences.ts
+- recovery-snapshot.ts
+- secure-config.ts
+- session-restore.ts / .test.ts
+- speech-to-text.ts / .test.ts
+- storage-adapter.ts / .test.ts
+- storage-file.ts / .test.ts
+- storage-file-encryption.ts
+- sync-configuration-transaction.ts / .test.ts
+- sync-crypto-native.ts
+- sync-encryption-service.ts
+- sync-encryption-state.ts
+- sync-encryption.test.ts
+- sync-service.ts
+- sync-service.dropbox-retry.test.ts
+- sync-service.runtime.test.ts
+- sync-service.test.ts
+- task-group-sections.ts / .test.ts
+- task-meta-navigation.ts
+- use-android-keyboard-inset.ts / .test.tsx
+- view-state/task-group-collapse-state.ts
+- whisper-model-store.ts / .test.ts
+- widget-data.ts / .test.ts
+- widget-service.ts / .test.ts
+
+CONTEXTS (2 archivos):
+- theme-context.tsx
+- toast-context.tsx
+
+TESTS & DOCS (2 archivos):
+- tests/large-store-performance.test.tsx
+- tests/use-root-layout-sync-effects.test.tsx
+- README.md
+
+================================================================================
+VERIFICACIÓN DE CAMBIOS
+=======================
+
+Para revisar los cambios:
+  git status
+  git diff apps/mobile/ | less
+  git diff apps/mobile/components/
+
+Para ver solo comentarios traducidos:
+  git diff apps/mobile/ | grep "^[+-].*//\|^@@ "
+
+Para hacer commit:
+  git commit -m "translate(mobile): Spanish comments in components, hooks, contexts, lib"
+
+================================================================================

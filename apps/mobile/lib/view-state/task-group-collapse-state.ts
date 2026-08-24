@@ -50,7 +50,7 @@ export function useCollapsedTaskGroups(listKey: string, groupBy: string) {
     void AsyncStorage.getItem(getTaskGroupCollapseStorageKey(listKey))
       .then((raw) => {
         // Nothing stored is the common case; re-setting an empty object then would
-        // re-render every list on mount for no change.
+        // re-Renderizar every list on Montar for no change.
         if (!raw || !active || touchedRef.current) return;
         setState(readTaskGroupCollapseState(raw));
       })

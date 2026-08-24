@@ -46,7 +46,7 @@ describe('useTaskEditPager focus scroll target (#921)', () => {
       api.current!.registerScrollTaskFormToEnd(scrollToEnd);
     });
 
-    // Description focus provides an anchor handle, then its caret-placement selection
+    // Description focus provides an anchor Maneja, then its caret-placement selection
     // change immediately reports undefined. The target must survive until the keyboard opens.
     act(() => {
       api.current!.handleInputFocus(4242);

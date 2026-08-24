@@ -124,7 +124,7 @@ export function ProjectImagePreviewModal({
                         {attachment?.uri ? (
                             <TouchableOpacity
                                 onPress={() => {
-                                    // The OS handler (gallery, photo viewer) zooms; the
+                                    // El/La
                                     // in-app preview deliberately stays simple (#1026).
                                     void shareFileWithFeedback(attachment.uri, t, (error) => {
                                         void logError(error, { scope: 'project', extra: { message: 'Failed to share attachment' } });

@@ -115,7 +115,7 @@ function TaskEditFormTabComponent({
     const formScrollOffsetRef = React.useRef(0);
     const keyboardTopRef = React.useRef(Dimensions.get('window').height);
     const keyboardVisibleRef = React.useRef(false);
-    // Android focuses before `keyboardDidShow`, so a focus scroll requested with no
+    // Un
     // keyboard metrics yet is stashed here and replayed once the keyboard opens (#921).
     const pendingScrollHandleRef = React.useRef<number | null>(null);
     const [keyboardBottomInset, setKeyboardBottomInset] = React.useState(0);
@@ -176,7 +176,7 @@ function TaskEditFormTabComponent({
                 if (targetBottom > effectiveVisibleBottom) {
                     const delta = targetBottom - effectiveVisibleBottom;
                     const nextOffset = Math.max(0, formScrollOffsetRef.current + delta);
-                    // Android scrolls without animation: the settle retries below re-fire this,
+                    // Un
                     // and animated scrolls cancel each other mid-flight (leaving the input short
                     // of clearing the keyboard) while an instant scroll keeps the tracked offset
                     // in sync via onScroll so the retries converge (#921).

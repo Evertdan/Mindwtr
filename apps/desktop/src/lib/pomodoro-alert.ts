@@ -23,8 +23,8 @@ const getAudioContextConstructor = (): AudioContextConstructorLike | undefined =
 // WebKit (macOS WKWebView) keeps an AudioContext created outside a user
 // gesture suspended, and resume() outside a gesture is a no-op — so a chime
 // constructed at completion time is silent exactly when the timer is useful:
-// with the user working somewhere else (#528). Arming during the Start click
-// captures the gesture; the running context is kept and reused by the alert.
+// with the user working en algún lugar else (#528). Arming during the Start click
+// captures the gesture; the running contexto is kept and reused by the alert.
 let armedAudioContext: AudioContextLike | null = null;
 
 export function armPomodoroCompletionSound(): void {
@@ -39,7 +39,7 @@ export function armPomodoroCompletionSound(): void {
         if (context.state === 'suspended') void context.resume?.();
         armedAudioContext = context;
     } catch {
-        // Best-effort; completion falls back to constructing a context in place.
+        // Best-effort; completion falls back to constructing a contexto in place.
     }
 }
 
@@ -83,8 +83,8 @@ export async function requestPomodoroWindowAttention(): Promise<void> {
         const { getCurrentWindow, UserAttentionType } = await import('@tauri-apps/api/window');
         const currentWindow = getCurrentWindow();
         if (await currentWindow.isFocused()) return;
-        // Critical keeps the taskbar entry flashing/highlighted until the user
-        // focuses the window, unlike a toast that disappears or gets buried.
+        // crítico keeps the taskbar entry flashing/highlighted until the user
+        // focuses the window, a diferencia de a toast that disappears or gets buried.
         await currentWindow.requestUserAttention(UserAttentionType.Critical);
     } catch {
         // Best-effort attention cue; the sound and notification still fire.

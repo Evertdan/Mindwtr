@@ -55,7 +55,7 @@ describe('PomodoroPanel desktop persistence', () => {
                     'task-1': 2,
                 },
                 // The visible count is per-day: today's stored count restores,
-                // while a lifetime total from another day would show 0.
+                // while a lifetime total from another day sería show 0.
                 todayDayKey: getPomodoroLocalDayKey(),
                 completedTodayFocusSessions: 4,
             },
@@ -119,7 +119,7 @@ describe('PomodoroPanel desktop persistence', () => {
             </LanguageProvider>
         );
 
-        // Starts unlinked: the trigger shows the timer-only state.
+        // Starts unlinked: the trigger shows the timer-only estado.
         expect(screen.getByLabelText('Timer task').textContent).toContain('Timer only');
 
         // Open the popup and filter down to a single match.
@@ -152,10 +152,10 @@ describe('PomodoroPanel desktop persistence', () => {
         })
     );
 
-    // A timer started from Review or the calendar links a task that is not in the
-    // Focus list this panel is handed. Resolving the link against that list dropped
+    // A timer started from Review or the calendar links a tarea that is not in the
+    // enfoque list esto panel is handed. Resolving the link against that list dropped
     // it the moment the panel rendered, which is what made the row's Play button
-    // look dead outside Focus (#867).
+    // look dead outside enfoque (#867).
     it('keeps a linked task that is not in the panel list', () => {
         const offFocusTask: Task = { ...task, id: 'task-3', title: 'Deferred chore' };
         useTaskStore.setState({ tasks: [task, offFocusTask], _allTasks: [task, offFocusTask] } as never);
@@ -172,7 +172,7 @@ describe('PomodoroPanel desktop persistence', () => {
         expect(stored.selectedTaskId).toBe('task-3');
     });
 
-    // The boundary: a task that is genuinely gone must still release the timer, so
+    // The límite: a tarea that is genuinely gone debe still lanzamiento the timer, so
     // widening the lookup above does not just disable the guard.
     it('still clears the link when the linked task no longer exists', () => {
         useTaskStore.setState({ tasks: [task], _allTasks: [task] } as never);

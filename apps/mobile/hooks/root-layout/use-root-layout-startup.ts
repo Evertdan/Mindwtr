@@ -54,7 +54,7 @@ const applyStartupSnapshotToStore = (data: AppData): void => {
     const allAreas = Array.isArray(data.areas) ? data.areas : [];
     const settings = data.settings && typeof data.settings === 'object' ? data.settings : {};
 
-    // Keep lastDataChangeAt untouched so the canonical storage fetch can still apply.
+    // Mantenga lastDataChangeAt sin tocar para que la búsqueda de almacenamiento canónica pueda aplicarse.
     useTaskStore.setState({
         settings,
         _allTasks: allTasks,
@@ -171,7 +171,7 @@ export function useRootLayoutStartup({
                             );
                         });
                     } catch {
-                        // Keep analytics heartbeat failures silent on mobile.
+                        // Mantener los fallos del latido analítico silenciosos en Móvil.
                     }
                 }
                 if (hasActiveMobileNotificationFeature(loadedStore.settings)) {

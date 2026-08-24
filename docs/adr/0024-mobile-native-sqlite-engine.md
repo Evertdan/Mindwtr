@@ -1,56 +1,56 @@
-# 24. Mobile native SQLite engine (op-sqlite)
+# 24. Motor SQLite nativo móvil (op-sqlite)
 
-Date: 2026-07-12
+Fecha: 2026-07-12
 
-## Status
+## Estado
 
-Accepted
+Aceptado
 
-## Context
+## Contexto
 
-The mobile app runs UI, storage, and the whole sync cycle on the single React
-Native JS thread (#853, evidence in #766). The #766 beta logs show the JS thread
-— not SQLite — as the bottleneck: `BEGIN` awaited up to 16s with
-`busy_timeout=5000` and `rowsWritten 0`, while the statements' own SQL time
-stayed in the low hundreds of milliseconds. expo-sqlite's modern async API
-already executes SQL on a native queue, but every statement round-trips through
-Expo Modules' async layer, result conversion lands on the JS thread, and the
-engine is only reachable from the main JS runtime — so no part of the
-read→merge→write cycle can ever leave that thread.
+La aplicación móvil ejecuta la interfaz de usuario, el almacenamiento y todo el ciclo de sincronización en el único subproceso de React
+Native JS (#853, evidencia en #766). Los registros beta de #766 muestran el subproceso de JS
+— no SQLite — como el cuello de botella: `BEGIN` esperó hasta 16s con
+`busy_timeout=5000` y `rowsWritten 0`, mientras que el tiempo SQL propio de las declaraciones
+se mantuvo en los cientos bajos de milisegundos. La API async moderna de expo-sqlite
+ya ejecuta SQL en una cola nativa, pero cada declaración hace un viaje redondo a través de
+la capa async de Expo Modules, la conversión de resultados aterriza en el subproceso de JS, y el
+motor solo es accesible desde el tiempo de ejecución principal de JS — así que no hay parte del
+ciclo de lectura→fusión→escritura que pueda salir de ese subproceso.
 
-Issue #853 ranks three options: (1) off-thread JS for the sync cycle,
-(2) a native JSI SQLite engine, (3) a shared Rust storage/merge core. Forking
-the merge algorithm (option 3) is the main correctness risk and is deliberately
-deferred until 1+2 are measured.
+El problema #853 clasifica tres opciones: (1) JS fuera de subproceso para el ciclo de sincronización,
+(2) un motor JSI SQLite nativo, (3) un núcleo compartido de almacenamiento/fusión de Rust. Bifurcar
+el algoritmo de fusión (opción 3) es el principal riesgo de corrección y se difiere deliberadamente
+hasta que se midan 1+2.
 
-## Decision
+## Decisión
 
-Replace expo-sqlite with `@op-engineering/op-sqlite` behind the existing
-`SqliteClient` seam; the core `SqliteAdapter` (rev-guarded upserts, fingerprint
-cache, FTS) is untouched. The client opens the same file expo-sqlite created
-(`<documentDirectory>/SQLite/mindwtr.db`), so existing installs upgrade in
-place with no migration. FTS5 is enabled via the `op-sqlite` package.json
-config (off by default). expo-sqlite is removed entirely rather than kept as a
-fallback: op-sqlite documents iOS pod conflicts with other packages that link
-SQLite, and Expo Go already runs the JSON/AsyncStorage path
-(`Constants.appOwnership === 'expo'`), which stays the fallback when the native
-module is unavailable.
+Reemplazar expo-sqlite con `@op-engineering/op-sqlite` detrás de la
+costura `SqliteClient` existente; el `SqliteAdapter` principal (inserciones guardadas por revisión, caché de
+huella digital, FTS) no se toca. El cliente abre el mismo archivo que creó expo-sqlite
+(`<documentDirectory>/SQLite/mindwtr.db`), por lo que las instalaciones existentes se actualizan
+en su lugar sin migración. FTS5 se habilita a través de la
+configuración `op-sqlite` package.json (desactivado de forma predeterminada). expo-sqlite fue
+eliminado completamente en lugar de mantenerse como respaldo: op-sqlite documenta conflictos
+de pod de iOS con otros paquetes que vinculan SQLite, y Expo Go ya ejecuta la ruta JSON/AsyncStorage
+(`Constants.appOwnership === 'expo'`), que se mantiene como respaldo cuando el módulo nativo
+no está disponible.
 
-Planned follow-up phases under #853, in order: stage the sync cycle's CPU work
-(remote payload parse, merge, serialization) on a background JS runtime via
-`react-native-worklets` (already a dependency through Reanimated 4), gated on
-the rc.6 diagnostics confirming where the refresh/merge time goes; port storage
-and merge to a shared Rust core only if that still misses the <100ms
-tap-during-sync goal on a 5k-task library.
+Las fases de seguimiento planeadas bajo #853, en orden: encaminar el trabajo de CPU del ciclo de sincronización
+(análisis de carga útil remota, fusión, serialización) en un tiempo de ejecución de JS de fondo a través de
+`react-native-worklets` (ya una dependencia a través de Reanimated 4), cerrado en
+los diagnósticos de rc.6 confirmando dónde va el tiempo de actualización/fusión; transportar almacenamiento
+y fusión a un núcleo compartido de Rust solo si eso aún pierde el objetivo
+de <100ms pulsar durante sincronización en una biblioteca de 5k tareas.
 
-## Consequences
+## Consecuencias
 
-SQL execution runs on op-sqlite's dedicated per-database native thread with a
-cheaper JSI call path than the Expo Modules bridge, and the engine is a plain
-JSI host object — the property the phase-2 background-runtime work needs.
-Statement semantics are unchanged: one connection, FIFO per database, manual
-`BEGIN IMMEDIATE…COMMIT` from the adapter still serializes exactly as before.
-The costs: Android/iOS builds now compile SQLite from source (same build class
-as whisper.rn, fine for F-Droid), the mobile web/Expo Go targets have no SQLite
-at all (JSON path, unchanged in practice), and op-sqlite major upgrades track
-React Native majors more aggressively than Expo packages do.
+La ejecución SQL se ejecuta en el subproceso nativo dedicado por base de datos de op-sqlite con un
+camino de llamada JSI más barato que el puente de Expo Modules, y el motor es un objeto
+anfitrión JSI plano — la propiedad que necesita el trabajo de tiempo de ejecución de fondo de fase 2.
+La semántica de la declaración no cambia: una conexión, FIFO por base de datos, manual
+`BEGIN IMMEDIATE…COMMIT` del adaptador sigue serializando exactamente como antes.
+Los costos: las compilaciones de Android/iOS ahora compilan SQLite desde la fuente (la misma clase de compilación
+que whisper.rn, bien para F-Droid), los objetivos web/Expo Go móviles no tienen SQLite
+en absoluto (ruta JSON, sin cambios en la práctica), y las actualizaciones principales de op-sqlite rastrean
+principales de React Native más agresivamente que lo hacen los paquetes de Expo.

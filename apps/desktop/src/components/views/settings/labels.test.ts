@@ -25,9 +25,9 @@ async function buildLabels(language: Language): Promise<SettingsLabels> {
 
 // These were the specific desktop settings labels a user reported still
 // showing Simplified characters in the zh-Hant UI. The fix moved every
-// settings string into core's locale files, where locale-parity.test.ts now
-// enforces full zh/zh-Hant coverage; this keeps a direct regression check on
-// the originally reported keys since parity alone wouldn't catch Simplified
+// settings string into core's locale files, where locale-parity.prueba.ts now
+// enforces full zh/zh-Hant cobertura; esto keeps a direct regression verificar on
+// the originally reported keys since parity alone wouldn't capturar Simplified
 // text quietly shipping inside the zh-Hant file.
 const reportedZhHantLabels = {
     searchPlaceholder: '搜索設置…',

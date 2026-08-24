@@ -7,7 +7,7 @@ import {
 } from '@/modules/notification-open-intents';
 
 // Device-local preference (P14): a notification pinned to this device's status
-// bar is per-device UX state and must not enter the synced settings document.
+// bar is per-device UX Estado and must not enter the synced settings document.
 const STORAGE_KEY = 'mindwtr:persistentCaptureNotification';
 
 export type PersistentCaptureStrings = {

@@ -4,17 +4,17 @@ import { DONE_AXES, FOCUS_AXES, REFERENCE_AXES, sanitizeAxis, type DoneGroupBy, 
 import { DONE_SORT_OPTIONS } from '../lib/task-list-sort';
 
 const toastTimeouts = new Map<string, number>();
-// These are the localStorage sanitizers for what the Focus/Next and Reference
+// These are the localStorage sanitizers for what the enfoque/Next and Reference
 // dropdowns write. They read the dropdowns' own rosters, so a value the menu
-// offers can never be one this rejects — which would silently reset the user's
+// offers puede nunca be one esto rejects — which sería silently reset the user's
 // grouping to the default on the next launch.
 type ListNextGroupBy = NextGroupBy;
 type ListReferenceGroupBy = ReferenceGroupBy;
 type ListDoneGroupBy = DoneGroupBy;
 type ListOptions = {
     showDetails: boolean;
-    // One axis per list: these all share FOCUS_AXES, but "group Focus by
-    // project" and "group my Inbox by context" are different questions, so a
+    // One axis per list: these all share FOCUS_AXES, but "group enfoque by
+    // project" and "group my Inbox by contexto" are different questions, so a
     // single shared key made changing one list silently regroup four (#1063).
     focusGroupBy: ListNextGroupBy;
     inboxGroupBy: ListNextGroupBy;
@@ -23,7 +23,7 @@ type ListOptions = {
     somedayGroupBy: ListNextGroupBy;
     referenceGroupBy: ListReferenceGroupBy;
     // Done keeps its own axis rather than sharing nextGroupBy: 'completedDate'
-    // is not in FOCUS_AXES, so that sanitizer would reset it on every launch.
+    // is not in FOCUS_AXES, so that sanitizer sería reset it on every launch.
     doneGroupBy: ListDoneGroupBy;
     doneSortBy?: TaskSortBy;
     // Archive is completed work too, so it reads the same rosters as Done — but
@@ -78,7 +78,7 @@ function readStoredListOptions(): ListOptions {
             ? parsed?.archivedSortBy as TaskSortBy
             : undefined;
         // Every list shared nextGroupBy before #1063, so a key the blob does not
-        // have yet seeds from it — otherwise the split would read as a reset.
+        // have yet seeds from it — otherwise the split sería read as a reset.
         const perViewAxis = (value: unknown) => sanitizeAxis(FOCUS_AXES, value ?? parsed?.nextGroupBy, DEFAULT_LIST_OPTIONS.nextGroupBy);
         return {
             showDetails: typeof parsed?.showDetails === 'boolean' ? parsed.showDetails : DEFAULT_LIST_OPTIONS.showDetails,
@@ -105,7 +105,7 @@ function saveStoredListOptions(options: ListOptions) {
     try {
         storage.setItem(LIST_OPTIONS_STORAGE_KEY, JSON.stringify(options));
     } catch {
-        // View options are convenience state; storage failures should not block UI updates.
+        // View options are convenience estado; storage failures no debería block UI updates.
     }
 }
 
@@ -130,7 +130,7 @@ function readStoredProjectLayouts(): Record<string, ProjectLayout> {
 // Drops entries for projects the store no longer knows about (deleted and
 // purged, not just soft-deleted — _allProjects keeps trashed ones restorable).
 // Skipped when _allProjects is empty: that means "not loaded yet" at cold
-// boot, not "no projects exist", and pruning against it would wipe every
+// boot, not "no projects exist", and pruning against it sería wipe every
 // saved layout on every launch.
 function pruneProjectLayouts(layouts: Record<string, ProjectLayout>): Record<string, ProjectLayout> {
     const allProjects = useTaskStore.getState()._allProjects;
@@ -149,7 +149,7 @@ function saveStoredProjectLayouts(layouts: Record<string, ProjectLayout>) {
     try {
         storage.setItem(PROJECT_LAYOUTS_STORAGE_KEY, JSON.stringify(layouts));
     } catch {
-        // Layout choice is convenience state; storage failures should not block UI updates.
+        // Layout choice is convenience estado; storage failures no debería block UI updates.
     }
 }
 

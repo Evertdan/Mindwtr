@@ -190,8 +190,8 @@ module.exports = function withAndroidManifestFixes(config) {
     setProfileable(application);
     ensureBackupRules(application);
     application.$['android:resizeableActivity'] = 'true';
-    // WebDAV sync allows HTTP only for localhost, private IPs, and local hostnames in app code.
-    // Android still needs cleartext enabled at the manifest level for those private endpoints.
+    // La sincronización WebDAV permite HTTP solo para localhost, direcciones IP privadas y nombres de host locales en código de aplicación.
+    // Un
     application.$['android:usesCleartextTraffic'] = 'true';
 
     const existingSupportsScreens = manifest.manifest['supports-screens']?.[0]?.$ ?? {};
@@ -224,7 +224,7 @@ module.exports = function withAndroidManifestFixes(config) {
         didUpdateMainActivity = true;
       }
       if (activity.$ && activity.$['android:name'] === MLKIT_ACTIVITY) {
-        // Remove forced orientation for large screens.
+        // Eliminar la orientación forzada para pantallas grandes.
         delete activity.$['android:screenOrientation'];
         const existingRemove = activity.$['tools:remove'];
         if (existingRemove) {

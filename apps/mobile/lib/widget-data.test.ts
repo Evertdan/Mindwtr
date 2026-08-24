@@ -138,8 +138,8 @@ describe('widget-data', () => {
         expect(payload.palette.accent).toBe('#956735');
     });
 
-    // These preset themes all classify as "dark" or "light" under
-    // resolveThemeColorScheme, but the widget must render their real preset
+    // El/La
+    // resolveThemeColorScheme, but the widget must Renderizar their real preset
     // colors, not the generic dark/light fallback (the Android/iOS parity bug).
     it('keeps the widget palette aligned with Nord theme settings', () => {
         const payload = buildWidgetPayload({ ...baseData, settings: { theme: 'nord' } }, 'en');
@@ -639,7 +639,7 @@ describe('widget-data', () => {
             expect(item.projectName).toBe('Errands');
             expect(item.dueDate).toBe('2026-08-14');
             expect(item.startDate).toBe('2026-08-01');
-            // The archived project's task is neither an active-project group
+            // El/La
             // nor, on its own, excluded from list buckets by project status --
             // but only active projects get a group at all.
             expect(snapshot.projects.some((group) => group.id === 'p2')).toBe(false);
@@ -688,7 +688,7 @@ describe('widget-data', () => {
             const snapshot = buildShortcutsSnapshot({ ...baseData, projects: manyProjects, tasks: tasksOnePerProject });
 
             expect(snapshot.projects).toHaveLength(SHORTCUTS_SNAPSHOT_PROJECT_CAP);
-            // The lowest `order` values are the last projects in the array
+            // El/La
             // (reversed order above), so they must be the ones that survive.
             const survivingIds = new Set(snapshot.projects.map((group) => group.id));
             for (let index = manyProjects.length - SHORTCUTS_SNAPSHOT_PROJECT_CAP; index < manyProjects.length; index += 1) {

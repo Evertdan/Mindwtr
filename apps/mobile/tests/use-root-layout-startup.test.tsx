@@ -71,7 +71,7 @@ vi.mock('expo-application', () => ({
 
 vi.mock('@mindwtr/core', async () => {
   // hasActiveMobileNotificationFeature is a pure predicate (packages/core/src/schedule-utils.ts):
-  // passthrough the real implementation rather than re-stub it here.
+  // pasar por la implementación real en lugar de re-stubearlo aquí.
   const { hasActiveMobileNotificationFeature } = await vi.importActual<typeof import('@mindwtr/core')>('@mindwtr/core');
   return {
     generateUUID: () => 'generated-id',

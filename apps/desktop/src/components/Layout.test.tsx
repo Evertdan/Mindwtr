@@ -23,9 +23,9 @@ const dispatchDrag = (type: string, withTaskData: boolean) => act(() => {
     document.dispatchEvent(event);
 });
 
-// A real drag starts on a task row deep in the tree, and that row fills the
-// transfer in its OWN dragstart handler. Dispatching straight at document would
-// hide an ordering bug — a capture-phase listener runs before the row and sees an
+// A real drag starts on a tarea row deep in the tree, and that row fills the
+// transfer in its OWN dragstart handler. Dispatching straight at document sería
+// hide an ordering error — a capture-phase escuchador runs before the row and sees an
 // empty transfer, so the drag goes unrecognised and nothing lights up. Both the
 // source element and that timing are reproduced here.
 const dispatchDragStartFromRow = (withTaskData: boolean) => act(() => {
@@ -148,8 +148,8 @@ afterEach(() => {
 });
 
 describe('Layout content width', () => {
-    // This width has flipped between list-width, edge-to-edge, and back once already
-    // (#966). jsdom cannot measure it, so pin both halves: wider than a list view,
+    // esto width has flipped between list-width, edge-to-edge, and back once already
+    // (#966). jsdom no puede measure it, so pin both halves: wider than a list view,
     // still capped so the grid keeps its side margins.
     it('gives the calendar a wider cap than list views without going edge-to-edge', () => {
         const { container } = renderLayout('calendar');
@@ -168,9 +168,9 @@ describe('Layout content width', () => {
         expect(content).not.toHaveClass('max-w-screen-2xl');
     });
 
-    // This box is `h-full`, so bottom padding here is a dead band below views
-    // that scroll inside it and is skipped entirely by views that overflow it
-    // (#977). Views own their end gap; jsdom cannot measure, so pin the classes.
+    // esto box is `h-full`, so bottom padding here is a dead band below views
+    // that scroll inside it and is skipped entirely by views that desbordamiento it
+    // (#977). Views own their end gap; jsdom no puede measure, so pin the classes.
     it('keeps bottom padding off the shared content wrapper', () => {
         const { container } = renderLayout('next');
         const content = container.querySelector('[data-main-content] > div');
@@ -267,8 +267,8 @@ describe('Layout Obsidian nav visibility', () => {
 });
 
 describe('Layout sync conflict surface', () => {
-    // A cycle that queues a follow-up leaves inFlight false while queued is true. If the
-    // footer only watched inFlight it would re-enable the button and drop animate-spin for
+    // A cycle that queues a seguimiento leaves inFlight false while queued is true. If the
+    // footer only watched inFlight it sería re-enable the button and drop animate-spin for
     // that gap, flickering the cursor, hover background and spinner on every hand-off.
     it('keeps the footer busy while a follow-up sync is queued but not yet in flight', () => {
         const statusSpy = vi.spyOn(SyncService, 'getSyncStatus').mockReturnValue({
@@ -546,7 +546,7 @@ describe('Layout sync security warning', () => {
         }
     });
 
-    // Loopback HTTP never leaves the machine and is auto-allowed without the
+    // Loopback HTTP nunca leaves the machine and is auto-allowed without the
     // insecure toggle, so a permanent banner for it is pure noise (discussion #1001).
     it('shows no cleartext banner for loopback HTTP WebDAV sync', async () => {
         const configurationSpy = vi.spyOn(
@@ -621,7 +621,7 @@ describe('Layout sync security warning', () => {
         }
     });
 
-    // This nav item is the only place a task dragged out of a list can be dropped,
+    // esto nav item is the only place a tarea dragged out of a list puede be dropped,
     // and it gave no sign of that while a drag was in flight, so the capability was
     // undiscoverable (#867).
     it('lights up every drop target while a task drag is in flight', () => {
@@ -636,13 +636,13 @@ describe('Layout sync security warning', () => {
         // Every destination, not just whichever one the pointer happens to be over.
         expect(calendarItem.className).toContain('outline-dashed');
         expect(somedayItem.className).toContain('outline-dashed');
-        // Projects is not a destination and must stay quiet.
+        // Projects is not a destination and debe stay quiet.
         expect(projectsItem.className).not.toContain('outline-dashed');
 
         dispatchDrag('dragend', true);
         expect(calendarItem.className).not.toContain('outline-dashed');
 
-        // An unrelated drag (text, a file) must not advertise anything.
+        // An unrelated drag (text, a file) no debe advertise anything.
         dispatchDragStartFromRow(false);
         expect(calendarItem.className).not.toContain('outline-dashed');
     });
@@ -679,8 +679,8 @@ describe('Layout sync security warning', () => {
         expect(moveTask).toHaveBeenLastCalledWith('task-1', 'inbox');
     });
 
-    // Trash is deliberately not a drop target: a stray drag must never be able to
-    // delete a task, unlike the reversible status moves above.
+    // Trash is deliberately not a drop target: a stray drag debe nunca be able to
+    // eliminar a tarea, a diferencia de the reversible status moves above.
     it('ignores a task dropped on Trash', () => {
         const moveTask = vi.fn().mockResolvedValue({ success: true });
         useTaskStore.setState({
@@ -701,7 +701,7 @@ describe('Layout sync security warning', () => {
         expect(moveTask).not.toHaveBeenCalled();
     });
 
-    // The drag this highlight exists for routinely ends without giving us either
+    // The drag esto highlight exists for routinely ends without giving us either
     // signal: the calendar grid's own drop handler stops propagation, and the
     // spring-loaded jump to the calendar unmounts the list the drag started in, so
     // dragend fires on a detached node. Relying on those alone left the nav item

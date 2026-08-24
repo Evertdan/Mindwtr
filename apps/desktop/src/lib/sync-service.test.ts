@@ -609,7 +609,7 @@ describe('SyncService testability hooks', () => {
 
     it('migrates File sync without consulting an unavailable dormant Cloud authority (#1035, #1036)', async () => {
         localStorage.setItem(SYNC_BACKEND_KEY, 'file');
-        localStorage.setItem(WEBDAV_URL_KEY, 'https://legacy-webdav.example.com');
+        localStorage.setItem(WEBDAV_URL_KEY, 'https://heredado-webdav.example.com');
         localStorage.setItem(WEBDAV_USERNAME_KEY, 'legacy-user');
         sessionStorage.setItem(WEBDAV_PASSWORD_KEY, 'legacy-password');
         let nativeWebdav = {
@@ -670,7 +670,7 @@ describe('SyncService testability hooks', () => {
         });
         expect(invoke.mock.calls.some(([command]) => command === 'get_cloud_config')).toBe(false);
         expect(nativeWebdav).toMatchObject({
-            url: 'https://legacy-webdav.example.com',
+            url: 'https://heredado-webdav.example.com',
             username: 'legacy-user',
             password: 'legacy-password',
         });
@@ -995,12 +995,12 @@ describe('SyncService testability hooks', () => {
     it('retires every inspected legacy field when populated native state needs no setters', async () => {
         const localLegacyValues: Record<string, string> = {
             [SYNC_BACKEND_KEY]: 'cloud',
-            [WEBDAV_URL_KEY]: 'https://legacy-webdav.example.com',
+            [WEBDAV_URL_KEY]: 'https://heredado-webdav.example.com',
             [WEBDAV_USERNAME_KEY]: 'legacy-user',
             [WEBDAV_PASSWORD_KEY]: 'legacy-local-password',
             [WEBDAV_ALLOW_INSECURE_HTTP_KEY]: 'true',
             [WEBDAV_ALLOW_WEAK_FINGERPRINT_KEY]: 'false',
-            [CLOUD_URL_KEY]: 'https://legacy-cloud.example.com',
+            [CLOUD_URL_KEY]: 'https://heredado-cloud.example.com',
             [CLOUD_TOKEN_KEY]: 'legacy-local-token',
             [CLOUD_ALLOW_INSECURE_HTTP_KEY]: 'true',
             [CLOUD_REMEMBER_TOKEN_KEY]: 'false',
@@ -1074,7 +1074,7 @@ describe('SyncService testability hooks', () => {
     });
 
     it('migrates a legacy cloud url without replacing a known native token', async () => {
-        localStorage.setItem(CLOUD_URL_KEY, 'https://legacy-cloud.example.com');
+        localStorage.setItem(CLOUD_URL_KEY, 'https://heredado-cloud.example.com');
         localStorage.setItem(CLOUD_ALLOW_INSECURE_HTTP_KEY, 'true');
         let cloudUrl = '';
         let cloudToken = 'native-token';
@@ -1120,12 +1120,12 @@ describe('SyncService testability hooks', () => {
 
         await expect(SyncService.getPersistedSyncConfigurationSnapshot()).resolves.toMatchObject({
             cloud: {
-                url: 'https://legacy-cloud.example.com',
+                url: 'https://heredado-cloud.example.com',
                 token: 'native-token',
             },
         });
         expect(invoke).toHaveBeenCalledWith('set_cloud_config', {
-            url: 'https://legacy-cloud.example.com',
+            url: 'https://heredado-cloud.example.com',
             token: 'native-token',
             allowInsecureHttp: true,
         });
@@ -1134,7 +1134,7 @@ describe('SyncService testability hooks', () => {
     });
 
     it('preserves a non-remembered local legacy token when native provider migration fails', async () => {
-        localStorage.setItem(CLOUD_URL_KEY, 'https://legacy-cloud.example.com');
+        localStorage.setItem(CLOUD_URL_KEY, 'https://heredado-cloud.example.com');
         localStorage.setItem(CLOUD_TOKEN_KEY, 'must-survive-failed-migration');
         localStorage.setItem(CLOUD_REMEMBER_TOKEN_KEY, 'false');
         localStorage.setItem(CLOUD_PROVIDER_KEY, 'dropbox');
@@ -1188,7 +1188,7 @@ describe('SyncService testability hooks', () => {
         );
 
         expect(localStorage.getItem(CLOUD_TOKEN_KEY)).toBe('must-survive-failed-migration');
-        expect(localStorage.getItem(CLOUD_URL_KEY)).toBe('https://legacy-cloud.example.com');
+        expect(localStorage.getItem(CLOUD_URL_KEY)).toBe('https://heredado-cloud.example.com');
         expect(localStorage.getItem(CLOUD_REMEMBER_TOKEN_KEY)).toBe('false');
         expect(localStorage.getItem(CLOUD_PROVIDER_KEY)).toBe('dropbox');
         expect(sessionStorage.getItem(CLOUD_TOKEN_KEY)).toBeNull();
@@ -2721,7 +2721,7 @@ describe('SyncService testability hooks', () => {
         });
 
         // The settings form sends password: '' with hasPassword: true after a
-        // restart; the empty string must not shadow the keyring secret.
+        // restart; the empty string no debe shadow the keyring secret.
         await SyncService.testWebDavConnection({
             url: 'https://example.com/remote.php/dav/files/user/mindwtr',
             username: 'alice',
@@ -2806,12 +2806,12 @@ describe('SyncService testability hooks', () => {
         getMonotonicNowSpy.mockRestore();
     });
 
-    // The 401-triggered token-refresh-and-retry-once policy moved to
-    // `createSyncBackendIO` (packages/core/src/sync-backend-io.test.ts,
+    // The 401-triggered token-refresh-and-reintentar-once policy moved to
+    // `createSyncBackendIO` (packages/core/src/sync-backend-io.prueba.ts,
     // "retries exactly once on an unauthorized token" / "gives up after
-    // exactly one retry") as part of ADR 0014's completion — it is shared
-    // with mobile now instead of hand-copied here. What remains desktop's own
-    // policy is the transient-retry wrap around one Dropbox transport call.
+    // exactly one reintentar") as part of ADR 0014's completion — it is shared
+    // with mobile now en lugar de hand-copied here. What remains desktop's own
+    // policy is the transient-reintentar wrap around one Dropbox transport llamar.
     it('retries a transient Dropbox request failure before giving up', async () => {
         const operation = vi.fn()
             .mockRejectedValueOnce(new TypeError('Network request failed'))
@@ -3357,8 +3357,8 @@ describe('SyncService orchestration', () => {
             setError: vi.fn(),
         };
         const readRemoteFingerprint = vi.fn(async () => 'remote-fp-1');
-        // Post-merge attachment pass changes the payload; recording fast-sync
-        // state afterwards would cache a stale local fingerprint.
+        // Post-fusionar attachment pass changes the payload; recording fast-sync
+        // estado afterwards sería caché a stale local fingerprint.
         const setupSpy = vi.spyOn(SyncService as any, 'setupDesktopCycle').mockImplementation(async () => ({
             kind: 'ready',
             backend: 'file',
@@ -3417,8 +3417,8 @@ describe('SyncService orchestration', () => {
 });
 
 // #1060: the connection-status probe reruns on every settings visit and
-// auto-sync tick; a persistently broken keyring must not re-report the same
-// failure each time, but a new failure (or a break after recovery) stays loud.
+// auto-sync tick; a persistently broken keyring no debe re-report the same
+// fracaso each time, but a new fracaso (or a break after recovery) stays loud.
 describe('Dropbox connection status probe reporting', () => {
     it('reports each distinct probe failure once, re-arming after success', async () => {
         const reportError = vi.fn();

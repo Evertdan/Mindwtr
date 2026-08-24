@@ -51,7 +51,7 @@ vi.mock('expo-router', () => ({
 }));
 
 vi.mock('@mindwtr/core', async () => {
-  // The shared capture transaction runs real; only its store actions are substituted.
+  // La transacción de captura compartida se ejecuta real; solo sus acciones de almacén se sustituyen.
   const actual = await vi.importActual<typeof import('@mindwtr/core')>('@mindwtr/core');
   return {
   executeCaptureTransaction: actual.executeCaptureTransaction,
@@ -205,7 +205,7 @@ describe('CaptureScreen', () => {
     const strip = tree.root.findByProps({ testID: 'quick-add-preview' });
     const chipText = strip.findAllByType(Text).map((node) => node.props.children);
     expect(chipText).toContain('@errands');
-    // The resolved date the task will store, formatted for reading.
+    // La fecha resuelta que la tarea almacenará, formateado para lectura.
     expect(chipText.some((text) => typeof text === 'string' && /2026/.test(text))).toBe(true);
   });
 
@@ -367,7 +367,7 @@ describe('CaptureScreen', () => {
       tree = create(<CaptureScreen />);
     });
 
-    // The pending attachment is visible on the sheet before saving.
+    // El archivo adjunto pendiente es visible en la hoja antes de guardar.
     expect(tree.root.findAllByType(Text).some((node) => node.props.children === 'report.pdf')).toBe(true);
 
     const saveButton = findTouchableByText(tree, 'Save');
@@ -390,10 +390,10 @@ describe('CaptureScreen', () => {
     });
   });
 
-  // This route is presented modally, so an Alert raised over it is a second
-  // native presentation on the first. On iOS it never showed: saving a
+  // Esta ruta se presenta modalmente, por lo que una alerta elevada sobre él es una segunda
+  // presentación nativa en la primera. En iOS nunca se mostró: saving a
   // multi-line paste did nothing and left the screen blocked (#941). The
-  // confirmation is drawn on the screen itself now, and no Alert is raised.
+  // confirmation is drawn on the screen itself now, y no se lanza ninguna alerta.
   it('dismisses multiline confirmation with hardware Back before creating one task per line', async () => {
     routeParams.current = {
       initialValue: encodeURIComponent('Email Bob\n\nCall Alice /next'),
@@ -451,7 +451,7 @@ describe('CaptureScreen', () => {
       await findTouchableByText(tree, 'Save').props.onPress();
     });
 
-    // The confirmation is on screen, reachable as ordinary rendered content.
+    // La confirmación está en pantalla, alcanzable como contenido renderizado ordinario.
     const confirmButton = findTouchableByText(tree, 'Create tasks');
     await act(async () => {
       await confirmButton.props.onPress();
@@ -534,9 +534,9 @@ describe('CaptureScreen', () => {
   });
 
   it('pops back to the project instead of stacking a duplicate screen per saved task (#938)', async () => {
-    // The project add-task flow pushes capture on top of the project screen, so
+    // El flujo de agregar tarea del proyecto empuja la captura en la parte superior de la pantalla del proyecto, so
     // replacing capture with returnTo left one extra screen on the stack per
-    // save: leaving the project then took one back tap per task added.
+    // save: dejar el proyecto luego tomó un tap atrás por tarea agregada.
     routerMocks.canGoBack.mockReturnValue(true);
     routeParams.current = {
       initialValue: encodeURIComponent('Project task'),
@@ -698,8 +698,8 @@ describe('CaptureScreen', () => {
       status: 'next',
       projectId: 'project-1',
     });
-    // replace, not push: the capture route must leave the stack when it hands
-    // off to the editor, or backing out reopens it pre-filled (#1029).
+    // reemplaza, no empuja: la ruta de captura debe dejar la pila cuando entrega
+    // al editor, o retroceder lo reabre previamente rellenado (#1029).
     expect(openTaskScreen).toHaveBeenCalledWith('task-new', 'project-1', 'task', { replace: true });
     expect(routerMocks.replace).not.toHaveBeenCalledWith('/inbox');
   });
@@ -733,9 +733,9 @@ describe('CaptureScreen', () => {
       await saveAndEditButton.props.onPress();
     });
 
-    // The project screen is directly underneath: navigating to it would stack
-    // a duplicate of it, so the editor request is stashed for its focus
-    // effect and the capture closes exactly like a plain save (#1029).
+    // La pantalla del proyecto está directamente debajo: navegar a él apilaría
+    // un duplicado de él, por lo que la solicitud del editor se almacena para su enfoque
+    // efecto y la captura se cierra exactamente como un guardado simple (#1029).
     expect(stashPendingCaptureTaskOpen).toHaveBeenCalledWith({
       taskId: 'task-new',
       projectId: 'project-1',
@@ -759,7 +759,7 @@ describe('CaptureScreen', () => {
       await act(async () => {
         tree = create(<CaptureScreen />);
       });
-      // The debounced copilot request plus the promise it awaits.
+      // La solicitud del asistente debounceda más la promesa que espera.
       await act(async () => {
         await vi.advanceTimersByTimeAsync(900);
       });

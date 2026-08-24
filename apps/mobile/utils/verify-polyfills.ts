@@ -31,11 +31,11 @@ export function verifyPolyfills() {
             if (params.get('foo') !== '1') errors.push('URLSearchParams.get failed');
             if (!params.has('bar')) errors.push('URLSearchParams.has failed');
 
-            // Critical check: .keys() support (often missing in native Hermes 101 checks)
+            // Verificación crítica: soporte de .keys() (frecuentemente faltante en verificaciones nativas de Hermes 101)
             if (typeof (params as any).keys !== 'function') {
                 errors.push('URLSearchParams.keys() is missing (Shim failed?)');
             } else {
-                // Verify iteration
+                // Verificar iteración
                 const keys = Array.from((params as any).keys());
                 if (!keys.includes('foo')) errors.push('URLSearchParams iteration failed');
             }
@@ -45,11 +45,11 @@ export function verifyPolyfills() {
     }
 
     // 3. Verify createObjectURL (should throw or be supported, depending on shim)
-    // Our shim throws 'not supported' which is expected/handled
+    // Nuestro shim lanza 'no soportado' que es lo esperado/manejado
     try {
         if (typeof URL.createObjectURL === 'undefined') {
-            // This is fine if we don't need it, but the user mentioned it causing crashes.
-            // Our shim defines it but it throws.
+            // Este/Esta
+            // Nuestro shim lo define pero lanza.
             // errors.push('URL.createObjectURL is undefined');
         }
     } catch (e) {

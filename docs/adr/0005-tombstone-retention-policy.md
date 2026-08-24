@@ -1,28 +1,28 @@
-# ADR 0005: Tombstone Retention and Purge Policy
+# ADR 0005: Política de retención y purga de lápidas
 
-Date: 2026-03-14
-Status: Accepted
+Fecha: 2026-03-14
+Estado: Aceptado
 
-## Context
+## Contexto
 
-Mindwtr uses soft-delete tombstones so deletions can sync safely across devices and providers. If tombstones disappear too early, an offline client can resurrect deleted records during a later merge. If they are kept forever, local data and sync payloads grow without bound.
+Mindwtr utiliza lápidas de eliminación suave para que las eliminaciones se puedan sincronizar de forma segura entre dispositivos y proveedores. Si las lápidas desaparecen demasiado pronto, un cliente sin conexión puede resucitar registros eliminados durante una fusión posterior. Si se mantienen para siempre, los datos locales y las cargas útiles de sincronización crecen sin límite.
 
-The system therefore needs a retention policy that keeps deletes long enough for normal multi-device recovery while still allowing eventual cleanup.
+El sistema, por lo tanto, necesita una política de retención que mantenga eliminadas el tiempo suficiente para la recuperación normal de múltiples dispositivos mientras sigue permitiendo la limpieza eventual.
 
-## Decision
+## Decisión
 
-We retain tombstoned records in persisted data for a bounded window and only purge them after the retention period has elapsed.
+Retenemos registros marcados como eliminados en datos persistidos durante una ventana limitada y solo los purgamos después de que ha transcurrido el período de retención.
 
-Current policy:
+Política actual:
 
-- deletes are represented as tombstones, not immediate hard deletes
-- tombstones stay in persisted snapshots and sync payloads during the retention window
-- purge happens as an explicit cleanup step after the retention window, not as part of ordinary reads
-- retention is measured conservatively so a recently deleted item is never dropped during normal sync churn
+- las eliminaciones se representan como lápidas, no como eliminaciones duras inmediatas
+- las lápidas permanecen en instantáneas persistidas y cargas útiles de sincronización durante la ventana de retención
+- la purga ocurre como un paso de limpieza explícito después de la ventana de retención, no como parte de las lecturas ordinarias
+- la retención se mide de forma conservadora para que un elemento recientemente eliminado nunca se pierda durante el churn de sincronización normal
 
-## Consequences
+## Consecuencias
 
-- Delete propagation stays deterministic for offline and intermittently connected clients.
-- Storage growth is bounded instead of permanently accumulating deleted records.
-- Save/export paths must preserve tombstones until cleanup runs; filtering them out early is a data-loss bug.
-- Any future change to the retention window or purge timing must be treated as a sync-behavior decision, not just a storage optimization.
+- La propagación de eliminación permanece determinista para clientes sin conexión e intermitentemente conectados.
+- El crecimiento de almacenamiento está limitado en lugar de acumular permanentemente registros eliminados.
+- Las rutas de guardado/exportación deben preservar lápidas hasta que se ejecute la limpieza; filtrarlas temprano es un error de pérdida de datos.
+- Cualquier cambio futuro a la ventana de retención o al momento de purga debe tratarse como una decisión de comportamiento de sincronización, no solo una optimización de almacenamiento.

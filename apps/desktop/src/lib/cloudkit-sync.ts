@@ -1,9 +1,9 @@
 /**
- * CloudKit sync orchestrator for macOS desktop (Tauri).
+ * Orquestador de sincronización de CloudKit para desktop macOS (Tauri).
  *
- * Mirrors the mobile's cloudkit-sync.ts but uses Tauri `invoke` instead of
- * Expo native modules. Provides readRemote/writeRemote functions that plug
- * into the existing SyncService sync cycle.
+ * Espeja el cloudkit-sync.ts móvil pero usa Tauri `invoke` en lugar de
+ * módulos nativos de Expo. Proporciona funciones readRemote/writeRemote que se conectan
+ * al ciclo de sincronización SyncService existente.
  */
 import { CLOUDKIT_ATTACHMENT_RECORD_TYPE, type AppData } from '@mindwtr/core';
 import { isTauriRuntime } from './runtime';
@@ -37,7 +37,7 @@ export type CloudKitAttachmentMetadata = {
     filePath?: string;
 };
 
-// Record type names (must match the ObjC bridge / CloudKitRecordMapper)
+// Nombres de tipo de registro (debe coincidir con el puente ObjC / CloudKitRecordMapper)
 const RECORD_TYPES = {
     task: 'MindwtrTask',
     project: 'MindwtrProject',
@@ -47,13 +47,13 @@ const RECORD_TYPES = {
     settings: 'MindwtrSettings',
 } as const;
 
-// LocalStorage keys (same semantics as mobile's AsyncStorage keys)
+// localStorage keys (same semantics as mobile's AsyncStorage keys)
 const CLOUDKIT_CHANGE_TOKEN_KEY = '@mindwtr_cloudkit_change_token';
 const CLOUDKIT_SEEDED_KEY = '@mindwtr_cloudkit_seeded';
 const CLOUDKIT_ZONE_CREATED_KEY = '@mindwtr_cloudkit_zone_created';
 
 // ---------------------------------------------------------------------------
-// Tauri invoke helper
+// Tauri invocar helper
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -71,7 +71,7 @@ export const isCloudKitAvailable = (): boolean => {
 };
 
 // ---------------------------------------------------------------------------
-// Account check
+// Account verificar
 // ---------------------------------------------------------------------------
 
 export const getCloudKitAccountStatus = async (): Promise<AccountStatus> => {
@@ -84,7 +84,7 @@ export const getCloudKitAccountStatus = async (): Promise<AccountStatus> => {
 };
 
 // ---------------------------------------------------------------------------
-// Setup
+// configuración
 // ---------------------------------------------------------------------------
 
 export const ensureCloudKitReady = async (): Promise<void> => {
@@ -121,7 +121,7 @@ export const readRemoteCloudKit = async (): Promise<AppData | null> => {
     try {
         const changeToken = localStorage.getItem(CLOUDKIT_CHANGE_TOKEN_KEY);
 
-        // Try incremental fetch first
+        // Try incremental traer first
         if (changeToken) {
             const result = await invokeNative<ChangeResult>('cloudkit_fetch_changes', {
                 changeToken,
@@ -140,18 +140,18 @@ export const readRemoteCloudKit = async (): Promise<AppData | null> => {
                 localStorage.setItem(CLOUDKIT_CHANGE_TOKEN_KEY, result.changeToken);
             }
 
-            // If no changes, return null to skip merge
+            // If no changes, devolver null to saltar fusionar
             const hasChanges =
                 Object.values(result.records).some((arr) => arr.length > 0) ||
                 Object.values(result.deletedIDs).some((arr) => arr.length > 0);
 
             if (!hasChanges) return null;
 
-            // For incremental changes we still need full remote state for three-way merge
+            // For incremental changes we still need full remote estado for three-way fusionar
             return await fullFetch();
         }
 
-        // No token — first sync, do full fetch
+        // No token — first sync, do full traer
         return await fullFetch();
     } catch (error) {
         void logError(error instanceof Error ? error : new Error(String(error)), {
@@ -246,7 +246,7 @@ export const writeRemoteCloudKit = async (data: AppData): Promise<void> => {
             });
         }
 
-        // Delete purged records from CloudKit
+        // eliminar purged records from CloudKit
         await deletePurgedRecords(data);
 
         // Advance change token only if no conflicts
@@ -335,7 +335,7 @@ export const seedCloudKitFromLocal = async (data: AppData): Promise<void> => {
 };
 
 // ---------------------------------------------------------------------------
-// Push notification polling
+// empujar notification polling
 // ---------------------------------------------------------------------------
 
 export const consumePendingRemoteChange = async (): Promise<boolean> => {
@@ -372,7 +372,7 @@ async function fullFetch(): Promise<AppData> {
         }
     }
 
-    // After a full fetch, get the current token for future incremental fetches
+    // After a full traer, obtener the current token for futuro incremental fetches
     const changeToken = localStorage.getItem(CLOUDKIT_CHANGE_TOKEN_KEY);
     if (!changeToken) {
         try {
@@ -383,7 +383,7 @@ async function fullFetch(): Promise<AppData> {
                 localStorage.setItem(CLOUDKIT_CHANGE_TOKEN_KEY, result.changeToken);
             }
         } catch {
-            // Non-fatal — we'll get the token on next sync
+            // Non-fatal — we'll obtener the token on next sync
         }
     }
 

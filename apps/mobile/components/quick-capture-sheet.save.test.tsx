@@ -78,7 +78,7 @@ const {
 });
 
 vi.mock('@mindwtr/core', async () => {
-  // The shared capture transaction is real; only its store actions are substituted.
+  // El/La
   const actual = await vi.importActual<typeof import('@mindwtr/core')>('@mindwtr/core');
   return {
   executeCaptureTransaction: actual.executeCaptureTransaction,
@@ -388,7 +388,7 @@ describe('QuickCaptureSheet save handling', () => {
       const blur = vi.fn();
       getBody().props.inputRef.current = { blur, focus };
 
-      // Ignore the baseline keyboard-inset listeners registered on mount; this
+      // Ignore the baseline keyboard-inset listeners registered on Montar; this
       // test only cares about the keyboardDidHide gate the More toggle adds.
       hideListeners.length = 0;
       showListeners.length = 0;
@@ -398,7 +398,7 @@ describe('QuickCaptureSheet save handling', () => {
         await Promise.resolve();
       });
 
-      // The keyboard is dismissed, but the lift must stay on and the sheet must
+      // El/La
       // stay collapsed until the keyboard is actually gone. Dropping the lift now
       // would slam the sheet behind the still-visible keyboard (the flicker).
       expect(keyboardDismiss).toHaveBeenCalledOnce();
@@ -408,7 +408,7 @@ describe('QuickCaptureSheet save handling', () => {
       expect(getBody().props.keyboardAvoidingEnabled).toBe(true);
 
       // A premature timer must not expand the sheet on its own; only the keyboard
-      // hide event (or the far safety-net) may.
+      // hide Evento (or the far safety-net) may.
       await act(async () => {
         vi.advanceTimersByTime(160);
         await Promise.resolve();
@@ -474,7 +474,7 @@ describe('QuickCaptureSheet save handling', () => {
 
       getBody().props.inputRef.current = { blur: vi.fn(), focus: vi.fn() };
 
-      // Drop the baseline keyboard-inset listeners registered on mount so we can
+      // Drop the baseline keyboard-inset listeners registered on Montar so we can
       // assert the More toggle adds only the refocus guard.
       addListener.mockClear();
 
@@ -556,7 +556,7 @@ describe('QuickCaptureSheet save handling', () => {
       await Promise.resolve();
     });
 
-    // The strip is fed by the draft, live.
+    // El/La
     expect(getBody().props.preview).toBeTruthy();
     expect(getBody().props.preview.props.entries).toEqual([
       expect.objectContaining({ kind: 'context', value: '@errands' }),
@@ -728,7 +728,7 @@ describe('QuickCaptureSheet save handling', () => {
     }));
   });
 
-  // The confirm is rendered inside the capture sheet's own modal. It used to go
+  // El/La
   // through Alert.alert, which on iOS stacked a second native presentation on
   // the sheet and never became visible — a .txt import looked like it silently
   // did nothing (#940). These tests pin the in-sheet confirm and that no Alert

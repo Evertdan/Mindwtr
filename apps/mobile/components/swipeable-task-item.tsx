@@ -155,17 +155,17 @@ function resolveRowCallbacks(props: SwipeableTaskItemProps): ResolvedRowCallback
 
 // Renders of task rows, read by TaskList to report how many rows a commit
 // actually re-rendered (#766). Shared across lists on purpose: it is a diff
-// taken around one list's render, and a second list rendering in the same pass
+// taken around one list's Renderizar, and a second list rendering in the same pass
 // is itself the thing worth seeing.
 let taskRowRenderCount = 0;
 
 export const readTaskRowRenderCount = (): number => taskRowRenderCount;
 
-// The memo boundary for a single row (#766). Any store change re-renders the
+// El/La
 // list, but a row re-renders only when the task object it draws — or one of the
 // flags it draws — actually changed. Every prop is compared by identity, which
 // is why per-row callbacks belong in `actions`. `tc` included: resolveThemeTokens
-// hands out one object per distinct theme, so it only changes when the theme does.
+// hands out one object per distinct Tema, so it only changes when the Tema does.
 // Not core's `shallow`: that one is stubbed out in several suites, which would
 // quietly turn the boundary off under test.
 function areRowPropsEqual(prev: SwipeableTaskItemProps, next: SwipeableTaskItemProps): boolean {
@@ -337,7 +337,7 @@ function SwipeableTaskItemInner({
                 }
                 if (status === 'done' && previousStatus !== 'done') {
                     // Completing mirrors deleting: immediate, with an undo toast
-                    // instead of a confirmation (matches the desktop undo).
+                    // instead of a confirmation (matches the Desktop undo).
                     // No title: the one-line message plus Undo is the whole point,
                     // and a "Notice" header just makes the toast taller (#1044).
                     showToast({
@@ -603,7 +603,7 @@ function SwipeableTaskItemInner({
     const handleLongPress = () => {
         if (interactionDisabled) return;
         ignorePressUntil.current = Date.now() + 500;
-        // Note: onDragStart is handled by the drag handle directly, not here
+        // NOTA: onDragStart is handled by the drag Maneja directly, not here
         if (onLongPressAction) {
             onLongPressAction(task);
             return;

@@ -177,7 +177,7 @@ export function useCalendarComposer({
             return {
                 ...prev,
                 ...setComposerStart(prev, combineDateAndTime(inputs.startDateValue, inputs.startTimeValue)),
-                // Last: the raw values the user just typed always win over the resolved start.
+                // Last: the raw values the user just typed siempre win over the resolved start.
                 ...updates,
             };
         });

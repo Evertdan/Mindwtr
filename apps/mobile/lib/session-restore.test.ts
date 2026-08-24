@@ -51,7 +51,7 @@ describe('mobile session restore', () => {
     });
 
     it('carries the open project from the screen mirror when the route has no param', async () => {
-        // Tapping a project row opens it via component state only (#842) —
+        // Tocar una fila del proyecto la abre a través del componente Estado solo (#842) —
         // the mirrored id must land in the snapshot without a route param.
         setSessionRestoreOpenProject('project-2');
         await persistLastRoute('/projects-screen');
@@ -60,11 +60,11 @@ describe('mobile session restore', () => {
             params: { projectId: 'project-2' },
         });
 
-        // Off the projects surfaces the mirror must not leak into snapshots.
+        // Fuera de las superficies de los proyectos, el espejo no debe filtrarse en instantáneas.
         await persistLastRoute('/focus');
         expect(await readRestorableRoute()).toEqual({ pathname: '/focus' });
 
-        // Closing the project clears the mirror.
+        // Cerrar el proyecto limpia el espejo.
         setSessionRestoreOpenProject(null);
         await persistLastRoute('/projects-screen');
         expect(await readRestorableRoute()).toEqual({ pathname: '/projects-screen' });

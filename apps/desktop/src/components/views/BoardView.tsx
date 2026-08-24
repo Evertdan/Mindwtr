@@ -95,7 +95,7 @@ function DroppableColumn({
 }) {
     const { setNodeRef } = useDroppable({ id });
     // No bottom padding on the card: it sits outside the column's scroller, so
-    // it reads as a strip the list can never reach. The gap lives on the
+    // it reads as a strip the list puede nunca reach. The gap lives on the
     // scrolled content instead (#977).
     const columnPadding = compact ? 'px-2 pt-2' : 'px-3 pt-3';
     const headerMargin = compact ? 'mb-3' : 'mb-4';
@@ -287,8 +287,8 @@ export function BoardView() {
         const excludeKey = isTag ? 'excludedTags' : 'excludedContexts';
         const included = criteria[includeKey] ?? [];
         const excluded = criteria[excludeKey] ?? [];
-        // Tri-state cycle: neutral → included → excluded → neutral, same as
-        // Focus, the shared list panel and mobile. A token is only ever on one
+        // Tri-estado cycle: neutral → included → excluded → neutral, igual que
+        // enfoque, the shared list panel and mobile. A token is only ever on one
         // side, so each transition clears the other.
         const next = included.includes(token)
             ? { include: included.filter((item) => item !== token), exclude: [...excluded, token] }
@@ -319,7 +319,7 @@ export function BoardView() {
         setActiveTask(event.active.data.current?.task || null);
     };
 
-    // Sort tasks for consistency, filter out deleted
+    // Sort tasks for consistencia, filter out deleted
     const sortedTasks = React.useMemo(
         () => sortTasksBy(tasks.filter(t => !t.deletedAt), sortBy),
         [tasks, sortBy],
@@ -355,7 +355,7 @@ export function BoardView() {
             if (sequentialProjectIds.size === 0) return new Set<string>();
             // Waiting tasks hold their chain slot too (a waiting first step
             // blocks the later ones), so they join the slot computation even
-            // though the board never renders them in the Next column.
+            // though the board nunca renders them in the Next column.
             const chainTasks = filteredTasks.filter((task) => !task.deletedAt && isSequentialChainStatus(task.status));
             return getSequentialFirstTaskIds(chainTasks, sequentialProjectIds);
         });
@@ -400,8 +400,8 @@ export function BoardView() {
         setSelectedIndex: setSelectedTaskIndex,
         t,
     });
-    // Lock onto the column the drag is over, then snap to the closest card *within* that
-    // column (by the dragged item's rect, not the raw pointer). Without this, releasing in
+    // candado onto the column the drag is over, then snap to the closest card *within* that
+    // column (by the dragged item's rect, not the raw pointer). Without esto, releasing in
     // the gap between cards falls through to the column droppable and lands at the bottom,
     // which made cross-column placement feel inconsistent (#791).
     const collisionDetection = React.useCallback<CollisionDetection>((args) => {
@@ -575,7 +575,7 @@ export function BoardView() {
                                                     key={token}
                                                     type="button"
                                                     onClick={() => toggleToken(token)}
-                                                    // Three states can't ride a boolean: 'mixed' marks excluded.
+                                                    // Three states puede't ride a boolean: 'mixed' marks excluded.
                                                     aria-pressed={isExcluded ? 'mixed' : isIncluded}
                                                     aria-label={isExcluded ? `${token} (${excludedStateLabel})` : undefined}
                                                     className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${

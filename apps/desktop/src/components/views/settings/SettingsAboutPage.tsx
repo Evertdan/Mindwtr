@@ -150,7 +150,7 @@ export function SettingsAboutPage({
                 <div data-settings-key="privacy" className="flex justify-between items-center">
                     <span className="text-muted-foreground">{t.privacy}</span>
                     <button
-                        onClick={() => onOpenLink('https://mindwtr.app/privacy')}
+                        onClick={() => onOpenLink('https://mindwtr.app/privacidad')}
                         className="text-primary hover:underline flex items-center gap-1"
                     >
                         mindwtr.app/privacy

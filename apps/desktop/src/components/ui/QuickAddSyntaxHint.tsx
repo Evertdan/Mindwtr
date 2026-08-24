@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-// Splits the translated quick-add help line so entry tokens (/start:, @context,
+// Splits the translated quick-agregar help line so entry tokens (/start:, @contexto,
 // #tag, +Project, %Person, !Area) read as typable input while <placeholder>
 // parts recede. Parses whatever the locale string contains, so untranslated
 // syntax tokens style consistently in every language and unmatched text

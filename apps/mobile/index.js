@@ -1,6 +1,6 @@
 require('./polyfills');
 
-// Background task modules import Expo packages at module scope. Load Metro's
+// Los módulos de tareas en segundo plano importan paquetes Expo en el alcance del módulo. Carga de Metro
 // runtime first so React Native installs globals like FormData before Expo
 // patches them.
 require('@expo/metro-runtime');

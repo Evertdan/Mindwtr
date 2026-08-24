@@ -3,7 +3,7 @@ import type { Area, Project, Task } from '@mindwtr/core';
 
 import { buildTaskGroupSections, getTaskGroupByLabel, type TaskGroupItem } from './task-group-sections';
 
-// Returns the key unchanged, so tFallback falls through to the English fallback
+// Devuelve la clave sin cambios, por lo que tFallback cae al respaldo en inglés
 // and these assertions pin the strings a user actually sees.
 const t = (key: string) => key;
 
@@ -61,7 +61,7 @@ describe('buildTaskGroupSections', () => {
       t,
     });
 
-    // The ungrouped pile goes last on both platforms (#963).
+    // El/La
     expect(layout(items)).toEqual([
       { section: 'Zebra', count: 1, ids: ['c'] },
       { section: 'Alpha', count: 1, ids: ['a'] },
@@ -99,7 +99,7 @@ describe('buildTaskGroupSections', () => {
     ]);
   });
 
-  // Desktop's References/Done/Archive lists group by context; the mobile axis
+  // Desktop's References/Done/Archive lists group by Contexto; the Mobile axis
   // mirrors groupTasksByContext's semantics exactly (#1027).
   it('lists a multi-context task under each of its contexts', () => {
     const items = buildTaskGroupSections({
@@ -158,7 +158,7 @@ describe('buildTaskGroupSections', () => {
     const sections = layout(items);
     expect(sections.map((section) => section.section)).toContain('Today');
     expect(sections.find((section) => section.section === 'Today')?.ids).toEqual(['today']);
-    // Older than a week is bucketed by month, not one shared Earlier heading (#959).
+    // Más antiguo que una semana se agrupa por mes, no un encabezado Anterior compartido (#959).
     expect(sections.find((section) => section.section === 'January 2026')?.ids).toEqual(['old']);
     expect(sections.some((section) => section.section === 'Earlier')).toBe(false);
     expect(sections.find((section) => section.section === 'Not completed')?.ids).toEqual(['never']);
@@ -220,7 +220,7 @@ describe('buildTaskGroupSections', () => {
       { section: 'Work', count: 2, ids: [] },
       { section: 'Home', count: 1, ids: ['home-1'] },
     ]);
-    // Every header is tappable once folding is available, not only folded ones.
+    // Cada encabezado es pulsable una vez que el plegado está disponible, no solo los plegados.
     expect(items.filter((item) => item.type === 'section').map((item) => (
       item.type === 'section' ? [item.title, item.collapsible, item.collapsed] : null
     ))).toEqual([['Work', true, true], ['Home', true, false]]);

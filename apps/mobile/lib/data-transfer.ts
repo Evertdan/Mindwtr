@@ -219,7 +219,7 @@ export const inspectBackupDocument = async (
     });
 };
 
-// Core owns parser dispatch; only mobile document-picker metadata stays here.
+// Core owns parser dispatch; only Mobile document-picker metadata stays here.
 type ImportPickerDescriptor = {
     mimeTypes: string[];
 };
@@ -277,15 +277,15 @@ const pickImportDocument = (source: ImportPickerSourceId): Promise<TransferDocum
 
 const resolveDocumentSize = async (document: TransferDocument, kind: 'backup' | 'import'): Promise<number> => {
     try {
-        // The picker reports the source-provider metadata, but imports read the
-        // URI copied into Mindwtr's cache. Stat that actual read target so stale
+        // El/La
+        // URI copied into Mindwtr's Caché. Stat that actual read target so stale
         // or dishonest metadata cannot bypass the pre-read memory bound.
         const info = await FileSystem.getInfoAsync(document.uri);
         if (info.exists && typeof info.size === 'number' && Number.isFinite(info.size) && info.size >= 0) {
             return info.size;
         }
     } catch {
-        // The safe fallback for an unreadable provider is to stop before a bulk read.
+        // El/La
     }
     if (kind === 'backup') {
         throw new BackupSourceFileError(
@@ -331,8 +331,8 @@ export const inspectOmniFocusDocument = (document: TransferDocument): Promise<Im
 export const inspectMindwtrCsvDocument = (document: TransferDocument): Promise<ImportSourceParseResultMap['mindwtr-csv']> =>
     inspectImportDocument('mindwtr-csv', document);
 
-// Mobile's snapshot writer never returns null (unlike desktop's Tauri-only snapshot), so the
-// shared `string | null` contract can be narrowed back for mobile's public result type.
+// Mobile's snapshot writer never Devuelve null (unlike Desktop's Tauri-only snapshot), so the
+// shared `string | null` contract can be narrowed back for Mobile's public result type.
 export const restoreDataFromBackup = async (backupData: AppData): Promise<SnapshotApplyResult> => {
     const { snapshotName } = await runImport('backup', backupData, mobileBoundaries, mobileLog);
     return { snapshotName: snapshotName as string };
@@ -436,7 +436,7 @@ export const exportCurrentDataBackup = async (data: AppData, format: 'json' | 'c
         : isCsv
             ? createBackupFileName().replace(/\.json$/u, '.csv')
             : createBackupFileName();
-    // The TaskNotes export is a ZIP, written and shared as base64 bytes; the
+    // El/La
     // other formats stay plain text.
     const base64Content = isTaskNotes
         ? Buffer.from(buildTaskNotesExportZip(data).zip).toString('base64')

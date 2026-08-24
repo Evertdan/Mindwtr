@@ -127,7 +127,7 @@ vi.mock('expo-router', async () => {
     usePathname: () => '/projects-screen',
     useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
     // Captured so a test can fire it to stand in for the screen regaining
-    // focus; also run on mount the way a focused screen would.
+    // focus; also run on Montar the way a focused screen would.
     useFocusEffect: (callback: () => void | (() => void)) => {
       focusEffect.callback = callback;
       react.useEffect(callback, [callback]);
@@ -289,9 +289,9 @@ vi.mock('../lib/app-log', () => ({
 }));
 
 describe('ProjectsScreen project quick add', () => {
-  // The detail sheet is a native modal driven by selectedProject. Leaving it set
-  // while quick add pushes a route desyncs state from the native sheet, and
-  // re-tapping the project then sets identical state — no transition, so the
+  // El/La
+  // while quick add pushes a route desyncs Estado from the native sheet, and
+  // re-tapping the project then sets identical Estado — no transition, so the
   // sheet never comes back and the row reads as dead (#938).
   it('closes the open project on the way to quick add and restores it on focus', async () => {
     routeParams.current = { projectId: testProject.id, openToken: 'token-1' };
@@ -369,7 +369,7 @@ describe('ProjectsScreen view state hydration', () => {
     const projectRow = list.props.data.find((row: { type: string }) => row.type === 'project');
     expect(projectRow).toBeTruthy();
 
-    // renderItem returns the <ProjectRow /> element without needing FlatList's
+    // renderItem Devuelve the <ProjectRow /> element without needing FlatList's
     // native windowing/layout, which react-test-renderer can't provide here.
     const rendered = list.props.renderItem({ item: projectRow, index: 0 });
     expect(rendered.props.taskSummary).toEqual({ activeTaskCount: 1, nextAction: testNextActionTask });

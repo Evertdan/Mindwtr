@@ -109,8 +109,8 @@ function localDateKey(date: Date): string {
     return `${year}-${month}-${day}`;
 }
 
-// Moved to core (`buildReminderNotificationBody`) so mobile can share the same labelled,
-// markdown-stripped body instead of showing raw description text (#reminder-schedule).
+// Moved to core (`buildReminderNotificationBody`) so mobile puede share the same labelled,
+// markdown-stripped body en lugar de showing raw description text (#reminder-schedule).
 export const buildDesktopTaskNotificationBody = buildReminderNotificationBody;
 
 async function loadTauriNotificationApi(): Promise<TauriNotificationApi | null> {
@@ -241,14 +241,14 @@ function checkDueAndNotify() {
     void loadTranslations(lang);
     const tr = getTranslationsSync(lang);
     // resolveI18nText, not a raw `tr[key]`: an override locale legitimately omits any key whose
-    // translation equals English (digest.focus in nl and it), and the raw read renders those as
+    // translation equals English (digest.enfoque in nl and it), and the raw read renders those as
     // "undefined" in the notification title.
     const translator = getTranslator(lang);
     const text = (key: string, fallback: string) => resolveI18nText(translator, key, { fallback });
 
-    // How much of the past this poll is answerable for. Anchoring the reminder lookup at that
-    // moment instead of `now` is what keeps a just-missed reminder visible. notifiedAtByTask/
-    // repeatNotifiedByTask/notifiedAtByProject dedupe, so a late fire is never a second fire.
+    // How much of the past esto poll is answerable for. Anchoring the reminder lookup at that
+    // moment en lugar de `now` is what keeps a just-missed reminder visible. notifiedAtByTask/
+    // repeatNotifiedByTask/notifiedAtByProject dedupe, so a late fire is nunca a second fire.
     const catchUpMs = resolvePollCatchUpMs(now.getTime(), lastPollAt);
     lastPollAt = now.getTime();
     const lookbackFrom = new Date(now.getTime() - catchUpMs);
@@ -258,9 +258,9 @@ function checkDueAndNotify() {
     const gates = resolveDesktopReminderGates(settings, digest);
     const includeDueDate = areDueDateRemindersEnabled(settings);
 
-    // Due-time repeats resolve on their own bounded chain, independent of the "next" occurrence
-    // below: a task whose due time already passed has no future "next", but its remaining
-    // repeat occurrences must still fire (#905).
+    // Due-time repeats resolver on their own bounded chain, independent of the "next" occurrence
+    // below: a tarea whose due time already passed has no futuro "next", but its remaining
+    // repeat occurrences debe still fire (#905).
     tasks.forEach((task: Task) => {
         const repeat = resolveDueRepeatToFire(task, now, repeatNotifiedByTask.get(task.id), { includeDueDate, catchUpMs });
         if (!repeat) return;
@@ -268,9 +268,9 @@ function checkDueAndNotify() {
         repeatNotifiedByTask.set(task.id, repeat.key);
     });
 
-    // Everything else -- each task's next start/due/review reminder, each project's review
+    // Everything else -- each tarea's next start/due/review reminder, each project's review
     // reminder -- comes from core's buildReminderSchedule (the same module mobile pre-arms
-    // alarms from), windowed to what this poll is answerable for (#962).
+    // alarms from), windowed to what esto poll is answerable for (#962).
     const dueReminders = resolveDueReminders(
         { settings, tasks, projects, translations: tr },
         { from: lookbackFrom, to: lookaheadTo },
@@ -354,7 +354,7 @@ export async function startDesktopNotifications() {
         intervalId = window.setInterval(checkDueAndNotify, CHECK_INTERVAL_MS);
         checkDueAndNotify();
 
-        // Re-check on data changes.
+        // Re-verificar on data changes.
         storeSubscription?.();
         storeSubscription = useTaskStore.subscribe((state, prevState) => {
             if (state.lastDataChangeAt === prevState.lastDataChangeAt) return;

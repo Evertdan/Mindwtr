@@ -17,7 +17,7 @@ type MockCalendarStoreState = {
 };
 
 // ---------------------------------------------------------------------------
-// Hoisted mocks — must be set up before any imports that reference them
+// Simulaciones elevadas — deben configurarse antes de cualquier importación que las hacen referencia
 // ---------------------------------------------------------------------------
 
 const {
@@ -151,7 +151,7 @@ vi.mock('@/lib/app-log', () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Subject under test — imported AFTER mocks are established
+// Objeto bajo prueba — importado DESPUÉS de que se establezcan las simulaciones
 // ---------------------------------------------------------------------------
 
 import {
@@ -166,7 +166,7 @@ import {
 } from '@/lib/calendar-push-sync';
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Un
 // ---------------------------------------------------------------------------
 
 function makeTask(overrides: Partial<{
@@ -277,9 +277,9 @@ beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     mockPlatform.OS = 'ios';
-    // Default: the stored calendar still exists
+    // Predeterminado: el calendario almacenado aún existe
     mockGetCalendarsAsync.mockResolvedValue([{ id: 'cal-1', title: 'Mindwtr' }]);
-    // Default: no prior sync entries
+    // Predeterminado: sin entradas de sincronización anteriores
     mockGetCalendarSyncEntry.mockResolvedValue(null);
     mockGetAllCalendarSyncEntries.mockResolvedValue([]);
     mockEnsureCalendarSyncStorageReady.mockResolvedValue(undefined);
@@ -291,7 +291,7 @@ afterEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests
+// Pruebas
 // ---------------------------------------------------------------------------
 
 describe('calendar sync storage readiness', () => {
@@ -422,7 +422,7 @@ describe('calendar push color', () => {
         expect(updated).toBe(true);
         expect(mockSetItem).toHaveBeenCalledWith('mindwtr:calendar-push-sync:color', '#059669');
         expect(mockUpdateCalendarAsync).toHaveBeenCalledWith('cal-1', { color: '#059669' });
-        // iOS updates the calendar in place — it must not recreate it.
+        // iOS actualiza el calendario en su lugar — no debe recrearlo.
         expect(mockDeleteCalendarAsync).not.toHaveBeenCalled();
         expect(mockCreateCalendarAsync).not.toHaveBeenCalled();
     });
@@ -436,7 +436,7 @@ describe('calendar push color', () => {
 
         expect(updated).toBe(true);
         expect(mockSetItem).toHaveBeenCalledWith('mindwtr:calendar-push-sync:color', '#059669');
-        // expo-calendar cannot change a calendar's color in place on Android, so
+        // expo-calendar no puede cambiar el color de un calendario en su lugar en Android, so
         // the managed calendar is deleted and recreated with the new color.
         expect(mockUpdateCalendarAsync).not.toHaveBeenCalled();
         expect(mockDeleteCalendarAsync).toHaveBeenCalledWith('cal-old');
@@ -674,9 +674,9 @@ describe('deleteMindwtrCalendar', () => {
 describe('buildEventDetails — date-only calendar events stay on the intended day', () => {
     it('exports a YYYY-MM-DD due date as an all-day event ending inside the same day on iOS', async () => {
         setupEnabled();
-        // Use a fixed date-only string — no time, no timezone suffix.
-        // new Date('2026-04-20') parses as UTC midnight and shifts to Apr 19
-        // in US time zones; safeParseDate('2026-04-20') must produce Apr 20.
+        // Usa una cadena de solo fecha fija — sin hora, sin sufijo de zona horaria.
+        // new Date('2026-04-20') se analiza como medianoche UTC y se desplaza al 19 de abril
+        // en zonas horarias de EE.UU.; safeParseDate('2026-04-20') debe producir el 20 de abril.
         const task = makeTask({ dueDate: '2026-04-20' });
         setStoreTasks([task]);
         mockGetCalendarSyncEntry.mockResolvedValue(null);
@@ -694,9 +694,9 @@ describe('buildEventDetails — date-only calendar events stay on the intended d
         expect(eventData.startDate.getDate()).toBe(20);
         expect(eventData.startDate.getHours()).toBe(0);
 
-        // EventKit counts every day the range touches: a next-midnight end made
-        // the event span two days in Calendar and in Google accounts synced
-        // through iOS (#1065). The end must stay inside the same local day.
+        // EventKit cuenta cada día que toca el rango: un final de próxima medianoche realizado
+        // el evento abarca dos días en Calendario y en cuentas de Google sincronizadas
+        // a través de iOS (#1065). El final debe permanecer dentro del mismo día local.
         expect(eventData.endDate.getFullYear()).toBe(2026);
         expect(eventData.endDate.getMonth()).toBe(3);
         expect(eventData.endDate.getDate()).toBe(20);

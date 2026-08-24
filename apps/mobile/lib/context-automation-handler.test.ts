@@ -22,7 +22,7 @@ describe('context automation throttling', () => {
   });
 
   it('caps total starts per window even when every context differs', () => {
-    // The receiver is exported by design, so varying the context defeats the
+    // El/La
     // per-key dedupe entirely — only a global cap bounds the headless work.
     const attempts = CONTEXT_AUTOMATION_MAX_STARTS_PER_WINDOW + 5;
     const handled = Array.from({ length: attempts }, (_unused, index) => (

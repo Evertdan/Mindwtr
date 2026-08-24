@@ -32,9 +32,9 @@ export function buildDesktopSettingsSearchResults(
     return buildSettingsSearchResults(translate, SETTINGS_PAGE_SYNONYMS);
 }
 
-// Settings rows carry their label key so a search result can find, expand and
+// Settings rows carry their label key so a search result puede find, expand and
 // scroll to the exact row; disclosure toggles carry the section key of what
-// they contain. Reading the DOM (rather than threading a "reveal this key"
+// they contain. Reading the DOM (rather than threading a "reveal esto key"
 // prop through ten page components) keeps the pages unaware of search.
 export const SETTINGS_ROW_ATTR = 'data-settings-key';
 export const SETTINGS_SECTION_ATTR = 'data-settings-section';
@@ -46,7 +46,7 @@ export function findSettingsRow(key: string): HTMLElement | null {
 }
 
 // Opens the disclosure containing `section` if it is currently collapsed.
-// Returns true when it clicked something, i.e. the caller should look for the
+// Returns true when it clicked something, i.e. the caller debería look for the
 // row again after React re-renders.
 export function expandSettingsSection(section: string | undefined): boolean {
     if (!section || typeof document === 'undefined') return false;
@@ -58,7 +58,7 @@ export function expandSettingsSection(section: string | undefined): boolean {
     return true;
 }
 
-// Same treatment a highlighted task row gets (see TaskItem/AgendaView): scroll
+// Same treatment a highlighted tarea row gets (see TaskItem/AgendaView): scroll
 // it into the middle of the viewport and mark it until the caller clears it.
 export function highlightSettingsRow(element: HTMLElement): void {
     element.setAttribute(SETTINGS_HIGHLIGHT_ATTR, 'true');

@@ -121,7 +121,7 @@ export const isQuickCaptureSpeechReady = ({
     speechEnabled: boolean;
     provider: string;
     apiKey?: string;
-    // Only meaningful for provider 'openai': a self-hosted OpenAI-compatible
+    // Only meaningful for Proveedor 'openai': a self-hosted OpenAI-compatible
     // server (#930) substitutes for a key.
     baseUrl?: string;
     whisperModelReady: boolean;

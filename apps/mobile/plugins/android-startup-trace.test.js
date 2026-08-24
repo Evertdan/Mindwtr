@@ -8,7 +8,7 @@ const {
   patchMainActivity,
 } = plugin.__testables;
 
-// ContextAutomationReceiver.kt and ContextAutomationHeadlessService.kt used to be
+// ContextAutomationReceiver.kt y ContextAutomationHeadlessService.kt solían ser
 // generated here as template strings (see git history); they are now real .kt
 // files in the local context-automation Expo module. These tests read that
 // module's source directly to keep the 9-fallback deep-link payload parser and
@@ -44,7 +44,7 @@ describe('android-startup-trace', () => {
     expect(receiver).toContain('ContextAutomationHeadlessService::class.java');
     expect(receiver).toContain('HeadlessJsTaskService.acquireWakeLockNow(context)');
 
-    // The 9-fallback deep-link payload parser (#819-adjacent): every branch,
+    // El/La
     // in order. A dropped fallback here breaks a real intent shape silently.
     const fallbackOrder = [
       'clean(intent.getStringExtra("context"))',
@@ -155,7 +155,7 @@ class MainActivity : ReactActivity() {
 
     const output = patchMainActivity(input);
 
-    // Both entry points run through cacheNotificationOpenPayload, so guarding it
+    // Ambos puntos de entrada se ejecutan a través de cacheNotificationOpenPayload, por lo que protegerlo
     // once covers the cold start and the onNewIntent replay.
     expect(output).toContain('private fun isSelfLaunchedIntent(intent: Intent?): Boolean');
     expect(output).toContain('if (!isSelfLaunchedIntent(intent)) return null');

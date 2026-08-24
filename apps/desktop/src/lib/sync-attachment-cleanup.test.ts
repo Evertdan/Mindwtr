@@ -88,8 +88,8 @@ describe('deleteAttachmentFile', () => {
     });
 
     it('removes the profile copy a relocated portable install left under a stale path', async () => {
-        // #1038: the recorded path names the previous profile location, so the
-        // managed-dir check missed the copy and it stayed there forever.
+        // #1038: the recorded ruta names the previous profile location, so the
+        // managed-dir verificar missed the copy and it stayed there forever.
         fsMocks.remove.mockReset();
         fsMocks.exists.mockImplementation(async (path: string) => path === '/new-profile/attachments/a1.pdf');
 

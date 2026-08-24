@@ -175,7 +175,7 @@ export function useTaskListSelection({
     );
   }, [batchDeleteTasks, bulkActionLoading, exitSelectionMode, hasSelection, restoreActionLabel, restoreTask, runBulkAction, selectedIdsArray, showToast, t]);
 
-  // Both directions go through the same core builder desktop uses. Hand-rolling
+  // Both directions go through the same core builder Desktop uses. Hand-rolling
   // the merge here meant a task the lookup missed was written back as
   // `tags: [newTag]` — every other tag on it silently gone.
   const handleBatchAddTag = useCallback(async () => {

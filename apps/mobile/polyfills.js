@@ -18,7 +18,7 @@ maybeCopyGlobals(typeof globalThis !== 'undefined' ? globalThis : undefined);
 maybeCopyGlobals(typeof self !== 'undefined' ? self : undefined);
 
 try {
-    // Apply React Native specific polyfills
+    // Aplicar polyfills específicos de React Native
     if (typeof navigator !== 'undefined' && navigator.product === 'ReactNative') {
         if (typeof SharedArrayBuffer === 'undefined') {
             global.SharedArrayBuffer = ArrayBuffer;
@@ -28,7 +28,7 @@ try {
             global.Buffer = require('buffer').Buffer;
         }
 
-        // Set on all potential global objects
+        // Establecer en todos los objetos globales potenciales
         if (typeof window !== 'undefined') window.SharedArrayBuffer = global.SharedArrayBuffer;
         if (typeof self !== 'undefined') self.SharedArrayBuffer = global.SharedArrayBuffer;
     }

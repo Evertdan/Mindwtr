@@ -4,7 +4,7 @@ type TaskOpenTab = 'view' | 'task';
 
 type PendingCaptureTaskOpen = { taskId: string; projectId: string; taskTab: TaskOpenTab };
 
-// Save & edit from a project's own capture cannot navigate at all: any
+// Guardar y editar desde la propia captura de un proyecto no puede navegar en absoluto: cualquier
 // navigation to /projects-screen while it is already the screen underneath
 // stacks a duplicate of it, costing an extra back tap through an identical
 // page (#1029, the #938 trap). Instead the capture route stashes the editor
@@ -26,7 +26,7 @@ const navigateToTaskMetaScreen = (
     pathname: '/projects-screen' | '/contexts',
     params: { projectId?: string; token?: string; openToken?: string }
 ) => {
-    // Use public NAVIGATE semantics so repeated same-screen taps update params
+    // Use public NAVIGATE semantics so repeated same-screen taps Actualizar params
     // without building an unbounded back stack.
     router.navigate({ pathname, params });
 };
@@ -71,7 +71,7 @@ export function openTaskScreen(
             router.back();
             router.navigate(target);
         } else {
-            // Nothing behind this route (restored session straight into
+            // Nada detrás de esta ruta (sesión restaurada directamente a
             // capture): swapping in place is the only option.
             router.replace(target);
         }

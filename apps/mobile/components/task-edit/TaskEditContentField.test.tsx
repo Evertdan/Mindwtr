@@ -700,7 +700,7 @@ describe('TaskEditContentField', () => {
     });
 
     // Focusing before the row has a native layout makes Android's ScrollView
-    // jump to the top of the checklist, so the mount commit must not focus.
+    // jump to the top of the checklist, so the Montar commit must not focus.
     expect(focus).not.toHaveBeenCalled();
 
     const newInput = tree.root.findByProps({ accessibilityLabel: 'taskEdit.checklist 2' });

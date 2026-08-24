@@ -166,16 +166,16 @@ describe('TaskQuickActionMenu', () => {
         }
     });
 
-    // Pointer dismissals must not restore focus to the opener: the deferred
-    // focus() lands after whatever the pointer opened next (another row's
-    // menu) and leaves the old row wearing the focus ring (#999). Keyboard
-    // closes keep the a11y focus-return.
+    // Pointer dismissals no debe restaurar enfoque to the opener: the deferred
+    // enfoque() lands after whatever the pointer opened next (another row's
+    // menu) and leaves the old row wearing the enfoque ring (#999). Keyboard
+    // closes keep the a11y enfoque-devolver.
     it('marks pointer dismissals as no-focus-restore', () => {
         const props = renderMenu();
         fireEvent.mouseDown(document.body);
         expect(props.onClose).toHaveBeenCalledWith({ restoreFocus: false });
         // Finish the gesture: the dismissal armed capture-once click/mouseup
-        // swallowers on window, which would otherwise eat the next test's
+        // swallowers on window, which sería otherwise eat the next prueba's
         // first click.
         fireEvent.mouseUp(document.body);
         fireEvent.click(document.body);
@@ -635,12 +635,12 @@ describe('TaskQuickActionMenu', () => {
         expect(props.onClose).toHaveBeenCalledTimes(1);
     });
 
-    // Dismissing the menu must not also activate whatever sits underneath. On the
-    // calendar that fall-through opened the "add task to calendar" composer as a
-    // side effect of closing the menu (#867). Timing is the whole point of this
-    // test: `click` only arrives after `mouseup`, a separate user action, so the
-    // task queue is allowed to drain in between exactly as a real press does. A
-    // version that dispatched mousedown and click back-to-back passed against an
+    // Dismissing the menu no debe also activate whatever sits underneath. On the
+    // calendar that fall-through opened the "agregar tarea to calendar" composer as a
+    // efecto secundario of closing the menu (#867). Timing is the whole point of esto
+    // prueba: `click` only arrives after `mouseup`, a separate user acción, so the
+    // tarea cola is allowed to drain in between exactly as a real press does. A
+    // versión that dispatched mousedown and click back-to-back passed against an
     // implementation that was broken in the browser.
     const withControlUnderneath = async (
         run: (outside: HTMLButtonElement) => Promise<void>,

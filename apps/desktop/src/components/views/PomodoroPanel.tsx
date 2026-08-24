@@ -25,12 +25,12 @@ export function PomodoroPanel({ tasks }: PomodoroPanelProps) {
     const updateTask = useTaskStore((state) => state.updateTask);
     const customDurations = useTaskStore((state) => state.settings.gtd?.pomodoro?.customDurations);
     const linkTaskEnabled = useTaskStore((state) => state.settings.gtd?.pomodoro?.linkTask === true);
-    // The tasks prop is the Focus list, which is what the picker below offers. It
-    // must not decide whether a link survives: resolving against it cleared the
-    // link the instant the task was not in Focus, so a timer started from Review
-    // or the calendar dropped its task immediately and the row's Play button
-    // looked dead. Link resolution uses every live task instead; state.tasks
-    // already excludes tombstones, so a deleted task still clears the link (#867).
+    // The tasks prop is the enfoque list, which is what the picker below offers. It
+    // no debe decide whether a link survives: resolving against it cleared the
+    // link the instant the tarea was not in enfoque, so a timer started from Review
+    // or the calendar dropped its tarea immediately and the row's Play button
+    // looked dead. Link resolution uses every live tarea instead; estado.tasks
+    // already excludes tombstones, so a deleted tarea still clears the link (#867).
     const liveTasks = useTaskStore((state) => state.tasks);
     const autoStartBreaks = useTaskStore((state) => state.settings.gtd?.pomodoro?.autoStartBreaks === true);
     const autoStartFocus = useTaskStore((state) => state.settings.gtd?.pomodoro?.autoStartFocus === true);
@@ -49,7 +49,7 @@ export function PomodoroPanel({ tasks }: PomodoroPanelProps) {
     const commitSnapshot = usePomodoroStore((state) => state.commitPomodoro);
 
     useEffect(() => {
-        // Re-read persisted state on mount, including any session that completed while the app was closed.
+        // Re-read persisted estado on montar, including any session that completed while the app was closed.
         hydratePomodoro(autoStartOptions);
     }, []);
 
@@ -63,7 +63,7 @@ export function PomodoroPanel({ tasks }: PomodoroPanelProps) {
     }, [commitSnapshot, linkTaskEnabled, snapshot.selectedTaskId, liveTasks]);
 
     // The clock tick and the completion alert live in usePomodoroAlerts, mounted
-    // by App: this panel only exists inside Agenda, so running them here meant a
+    // by App: esto panel only exists inside Agenda, so running them here meant a
     // timer stopped ticking and stopped alerting the moment the user left the
     // view (#528).
 
@@ -76,10 +76,10 @@ export function PomodoroPanel({ tasks }: PomodoroPanelProps) {
         () => (linkTaskEnabled && selectedTaskId ? liveTasks.find((task) => task.id === selectedTaskId) : undefined),
         [linkTaskEnabled, selectedTaskId, liveTasks]
     );
-    // The picker offers Focus tasks, but a task linked from Review or the calendar
-    // will not be among them. Include it so the trigger can name what is linked and
-    // the dropdown can unlink it, instead of reading "Timer only" while a timer runs
-    // against a task the panel refuses to show (#867).
+    // The picker offers enfoque tasks, but a tarea linked from Review or the calendar
+    // será not be among them. Include it so the trigger puede name what is linked and
+    // the dropdown puede unlink it, en lugar de reading "Timer only" while a timer runs
+    // against a tarea the panel refuses to show (#867).
     const pickerTasks = useMemo(
         () => (selectedTask && !tasks.some((task) => task.id === selectedTask.id)
             ? [selectedTask, ...tasks]

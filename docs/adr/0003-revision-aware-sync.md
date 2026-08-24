@@ -1,37 +1,37 @@
-# ADR 0003: Revision-Aware Sync With Deterministic Tombstone Resolution
+# ADR 0003: Sincronización consciente de revisiones con resolución determinista de lápidas
 
-Date: 2026-03-06
-Status: Superseded by ADR 0007
+Fecha: 2026-03-06
+Estado: Superado por ADR 0007
 
-## Context
+## Contexto
 
-Mindwtr is local-first and syncs across multiple devices and providers. Sync conflicts must converge deterministically without central coordination, while still preserving deletes safely.
+Mindwtr es nativo-primero y se sincroniza entre múltiples dispositivos y proveedores. Los conflictos de sincronización deben converger de forma determinista sin coordinación central, mientras que aún se preservan las eliminaciones de forma segura.
 
-Pure timestamp-based last-write-wins is not sufficient on its own because:
+El último-a-escribir-gana basado en marca de tiempo pura no es suficiente por sí solo porque:
 
-- device clocks can drift
-- deletes must not disappear during merges
-- equal timestamps still need deterministic resolution
+- los relojes del dispositivo pueden desviarse
+- las eliminaciones no deben desaparecer durante fusiones
+- las marcas de tiempo iguales aún necesitan resolución determinista
 
-This ADR captures the original delete-vs-live ambiguity rule that shipped before Mindwtr 0.8.2. ADR 0007 supersedes the delete-vs-live winner rule while keeping the rest of the revision-aware merge approach in place.
+Este ADR captura la regla de ambigüedad de eliminación-vs-activa original que se envió antes de Mindwtr 0.8.2. ADR 0007 reemplaza la regla de ganador de eliminación-vs-activa mientras mantiene el resto del enfoque de fusión consciente de revisiones en su lugar.
 
-## Decision
+## Decisión
 
-We use revision-aware merge metadata (`rev`, `revBy`) together with timestamps and tombstones.
+Utilizamos metadatos de fusión consciente de revisión (`rev`, `revBy`) junto con marcas de tiempo y lápidas.
 
-The merge strategy is:
+La estrategia de fusión es:
 
-1. Normalize entities before merge.
-2. Prefer higher revision metadata when available.
-3. Use timestamps as the next ordering signal.
-4. Historical rule at the time: when delete-vs-live operation times are equal, prefer the tombstone.
-5. Fall back to deterministic tie-breakers so every client converges on the same winner.
+1. Normalizar entidades antes de fusión.
+2. Preferir metadatos de revisión más alta cuando estén disponibles.
+3. Usar marcas de tiempo como siguiente señal de ordenamiento.
+4. Regla histórica en ese momento: cuando los tiempos de operación de eliminación-vs-activa son iguales, preferir la lápida.
+5. Retroceder a desempates deterministas para que cada cliente converja en el mismo ganador.
 
-This intentionally favors safe deletion propagation over keeping a live record when the operation times are indistinguishable.
+Esto favorece intencionalmente la propagación segura de eliminación sobre mantener un registro activo cuando los tiempos de operación son indistinguibles.
 
-## Consequences
+## Consecuencias
 
-- Sync remains deterministic across clients and providers.
-- Equal-time delete/live races resolve consistently instead of depending on iteration order.
-- Tombstones remain a core part of the data model and must be preserved until retention rules allow purge.
-- Any future change to delete/live ambiguity rules must be treated as a behavioral sync migration, not a cosmetic tweak.
+- La sincronización permanece determinista entre clientes y proveedores.
+- Las carreras de eliminación-vs-activa de tiempo igual se resuelven consistentemente en lugar de depender del orden de iteración.
+- Las lápidas permanecen como parte central del modelo de datos y deben preservarse hasta que las reglas de retención permitan la purga.
+- Cualquier cambio futuro en las reglas de ambigüedad de eliminación-vs-activa debe tratarse como una migración de comportamiento de sincronización, no un ajuste cosmético.

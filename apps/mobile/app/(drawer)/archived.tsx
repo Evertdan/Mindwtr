@@ -388,7 +388,7 @@ export default function ArchivedScreen() {
     const groupBy = viewState.groupBy;
     const { collapsedGroupIds, toggleGroup } = useCollapsedTaskGroups('archived', groupBy);
     const localDayKey = useLocalDayKey(groupBy === 'completedDate');
-    // Always the grouped row shape, even ungrouped: one list type keeps the FlatList
+    // Un
     // monomorphic instead of switching its data/renderItem/keyExtractor together.
     const listItems = useMemo<TaskGroupItem[]>(() => {
         if (groupBy === 'none') {

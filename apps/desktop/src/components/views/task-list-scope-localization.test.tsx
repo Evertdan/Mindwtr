@@ -9,7 +9,7 @@ import { useUiStore } from '../../store/ui-store';
 import { AgendaView } from './AgendaView';
 import { ListView } from './ListView';
 
-// The desktop LanguageProvider pins tests to English, so the locale under test
+// The desktop LanguageProvider pins tests to English, so the locale under prueba
 // is injected through useLanguage — with the strings actually shipped for
 // Simplified Chinese ('zh'), not a stand-in.
 const zh = await loadTranslations('zh');
@@ -66,9 +66,9 @@ beforeEach(() => {
 });
 
 // The two views used to reach the keyboard "marked Done" toast through
-// different code: ListView localized it in one branch and hardcoded English in
-// the other, while Focus went through the DOM fallback. Both now register the
-// same scope, so both must speak the user's language.
+// different code: ListView localized it in one rama and hardcoded English in
+// the other, while enfoque went through the DOM fallback. Both now register the
+// same scope, so both debe speak the user's language.
 describe.each([
     {
         name: 'Focus (AgendaView)',

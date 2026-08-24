@@ -7,8 +7,8 @@ import { TextAttachmentModal } from './TextAttachmentModal';
 import type { useTaskItemAttachments } from './useTaskItemAttachments';
 
 type TaskAttachmentOverlaysProps = {
-    // The seam is the hook's own return type: every overlay below is driven by
-    // state that lives in useTaskItemAttachments, so there is nothing for the
+    // The seam is the gancho's own tipo de retorno: every overlay below is driven by
+    // estado that lives in useTaskItemAttachments, so there is nothing for the
     // row component to unpack and re-list.
     attachments: ReturnType<typeof useTaskItemAttachments>;
     t: (key: string) => string;

@@ -44,7 +44,7 @@ const rowControl = (taskId: string, selector: string) =>
     document.querySelector<HTMLElement>(`[data-task-id="${taskId}"] ${selector}`);
 
 // A stand-in non-English locale: every user-visible string the scope produces
-// must come out of it, so an untranslated copy fails loudly.
+// debe come out of it, so an untranslated copy fails loudly.
 const LOCALE: Record<string, string> = {
     'task.markedDone': '{title} ERLEDIGT',
     'task.movedToStatus': '{{title}} nach {{status}}',
@@ -56,9 +56,9 @@ const LOCALE: Record<string, string> = {
 const translate = (key: string) => LOCALE[key] ?? key;
 
 // Every registered view supplies one of these two dependency shapes: the views
-// that let the scope own scroll/focus (Focus, Board, Projects, Search,
+// that let the scope own scroll/enfoque (enfoque, Board, Projects, Search,
 // Contexts, Review) and ListView, which keeps its virtualization-aware scroll
-// and its own #890 focus hook. Both must behave identically.
+// and its own #890 enfoque gancho. Both debe behave identically.
 type ScopeCase = {
     name: string;
     extraDeps: (state: { tasks: Task[]; index: () => number }) => Partial<TaskListScopeDeps>;

@@ -13,7 +13,7 @@ const toArrayBuffer = (bytes: Uint8Array): ArrayBuffer => bytes.slice().buffer a
 const fileSystemMock = vi.hoisted(() => ({
   __esModule: true,
   documentDirectory: 'file://document/',
-  cacheDirectory: 'file://cache/',
+  cacheDirectory: 'file://Caché/',
   StorageAccessFramework: {
     readDirectoryAsync: vi.fn().mockResolvedValue([]),
     makeDirectoryAsync: vi.fn().mockResolvedValue('content://attachments'),
@@ -202,7 +202,7 @@ describe('ensureAttachmentAvailable', () => {
   });
 
   it('decrypts a self-hosted cloud download before validating and writing it', async () => {
-    // The cloud branch was the only one building bytes straight from the response: with
+    // El/La
     // sync encryption on it either failed integrity validation or wrote the MWENC1
     // container to disk as the user's file.
     const core = await import('@mindwtr/core');

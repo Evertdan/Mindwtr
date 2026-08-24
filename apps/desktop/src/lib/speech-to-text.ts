@@ -23,7 +23,7 @@ export type SpeechToTextConfig = SpeechToTaskCaptureConfig & {
     model: string;
     parseModel?: string;
     modelPath?: string;
-    // Only meaningful for provider 'openai' — see resolveOpenAITranscribeEndpoint.
+    // Only meaningful for proveedor 'openai' — see resolveOpenAITranscribeEndpoint.
     baseUrl?: string;
 };
 
@@ -53,7 +53,7 @@ export async function resolveSpeechCapture(settings: AiSettings | undefined): Pr
     );
     const apiSpeechProvider = provider === 'openai' || provider === 'gemini' ? provider : null;
     const modelPath = apiSpeechProvider ? undefined : speech?.offlineModelPath;
-    // A self-hosted OpenAI-compatible server (#930) usually has no key; Gemini
+    // A uno mismo-hosted OpenAI-compatible server (#930) generalmente has no key; Gemini
     // has no such escape hatch and keeps requiring one.
     const baseUrl = provider === 'openai' ? (speech?.baseUrl?.trim() || undefined) : undefined;
     const baseConfig = {
@@ -67,7 +67,7 @@ export async function resolveSpeechCapture(settings: AiSettings | undefined): Pr
         parseModel: provider === 'openai' && settings?.provider === 'openai' ? settings?.model : undefined,
     };
     if (!speech?.enabled) {
-        // Skip the key lookup entirely when the feature is off — no reason to
+        // saltar the key lookup entirely when the característica is off — no reason to
         // touch the keychain/Tauri IPC on every record-button press.
         return { ready: false, reason: 'disabled', config: { ...baseConfig, apiKey: '' } };
     }

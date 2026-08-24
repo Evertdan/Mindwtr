@@ -7,9 +7,9 @@ import { isSyncEncryptionFailure } from '../../../../lib/sync-encryption-service
 import { SyncService } from '../../../../lib/sync-service';
 import type { CloudProvider, SyncEncryptionController, SyncEncryptionErrorKind } from './types';
 
-// Encryption covers the backends Mindwtr writes whole blobs to. Self-hosted cloud
-// and CloudKit hold structured server-side state instead, so phase 2's API rejects
-// them outright — this predicate keeps the section from ever offering the choice.
+// Encryption covers the backends Mindwtr writes whole blobs to. uno mismo-hosted cloud
+// and CloudKit hold structured server-side estado instead, so phase 2's API rejects
+// them outright — esto predicate keeps the section from ever offering the choice.
 export const isEncryptionCapableBackend = (backend: SyncBackend, cloudProvider: CloudProvider): boolean => (
     backend === 'file' || backend === 'webdav' || (backend === 'cloud' && cloudProvider === 'dropbox')
 );
@@ -17,8 +17,8 @@ export const isEncryptionCapableBackend = (backend: SyncBackend, cloudProvider: 
 // A mistyped current passphrase is caught by the explicit verify below and
 // carries its own sentinel — by the time the rotation itself fails, the
 // passphrase has already been proven, so blaming it is a lie the reporter of
-// #1056 nearly chased. Rotation failures fall through to the generic message.
-// Disable stays special: it cannot self-heal a folder an interrupted rotation
+// #1056 nearly chased. Rotation failures fall through to the genérico message.
+// Disable stays special: it no puede uno mismo-heal a folder an interrupted rotation
 // left on two salts, and the only way out is to finish the rotation first.
 export const classifyFailure = (error: unknown, terminal: SyncEncryptionErrorKind): SyncEncryptionErrorKind => {
     const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
@@ -37,7 +37,7 @@ export function useSyncEncryptionSettings(
     const [error, setError] = useState<SyncEncryptionErrorKind | null>(null);
 
     // A status read that failed says nothing about the folder; reporting 'off'
-    // would offer "Enable encryption" for a folder that may already be encrypted.
+    // sería offer "Enable encryption" for a folder that puede already be encrypted.
     // null renders the section empty until a later read succeeds.
     const readState = useCallback(async (): Promise<SyncEncryptionController['state']> => {
         try {
@@ -77,7 +77,7 @@ export function useSyncEncryptionSettings(
             void logError(failure, { scope: 'sync-encryption', step: 'transition' });
             setError(classifyFailure(failure, terminal));
         }
-        // Whether it finished or not, the device's state may have moved: every
+        // Whether it finished or not, the device's estado puede have moved: every
         // transition is resumable, so a half-done run still has to be reflected.
         setState(await readState());
         setProgress(null);

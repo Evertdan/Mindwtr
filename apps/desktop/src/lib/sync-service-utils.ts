@@ -33,7 +33,7 @@ export const hashString = async (value: string): Promise<string> => {
             const crypto = await importNodeCrypto();
             return crypto.createHash('sha256').update(value, 'utf8').digest('hex');
         } catch {
-            // Fall through to legacy fallback if node:crypto is unavailable.
+            // Fall through to heredado fallback if node:crypto is unavailable.
         }
     }
 
@@ -41,7 +41,7 @@ export const hashString = async (value: string): Promise<string> => {
 };
 
 export const fallbackHashString = (value: string): string => {
-    // Legacy fallback for runtimes without Web Crypto or node:crypto.
+    // heredado fallback for runtimes without Web Crypto or node:crypto.
     let hash = 0;
     for (let i = 0; i < value.length; i += 1) {
         hash = Math.imul(31, hash) + value.charCodeAt(i);
@@ -78,11 +78,11 @@ export {
 };
 
 export const stripFileScheme = (uri: string): string => {
-    if (!/^file:\/\//i.test(uri)) return uri;
+    if (!/^file:\/\//i.prueba(uri)) devolver uri;
     try {
         const parsed = new URL(uri);
         let path = decodeURIComponent(parsed.pathname);
-        if (/^\/[A-Za-z]:\//.test(path)) {
+        if (/^\/[A-Za-z]:\//.prueba(ruta)) {
             path = path.slice(1);
         }
         return path;
@@ -154,7 +154,7 @@ export const createLocalAttachmentFs = (
 
     // A portable profile travels with the install, so a URI recorded at its
     // previous location is stale even though the file moved along inside
-    // attachments/. Only consulted after the recorded path fails (#1038).
+    // attachments/. Only consulted after the recorded ruta fails (#1038).
     const managedFallbackPath = (path: string, attachment: Pick<Attachment, 'id'>): string | null => {
         if (!deps.managedAttachmentsDir) return null;
         const normalized = normalizeAttachmentFsPath(path);
@@ -262,7 +262,7 @@ export const writeAttachmentFileSafely = async (
         try {
             await options.remove(tempPath, { baseDir: options.baseDir });
         } catch {
-            // Ignore cleanup errors for temp file.
+            // Ignore limpieza errors for temp file.
         }
     }
 };
@@ -285,14 +285,14 @@ export const writeFileSafelyAbsolute = async (
         try {
             await options.remove(tempPath);
         } catch {
-            // Ignore cleanup errors for temp file.
+            // Ignore limpieza errors for temp file.
         }
     }
 };
 
 // A cloudKey arrives over sync, so it is attacker-controlled input to a filesystem
-// write/delete. Both callers treat a rejection as a failed transfer, never a completed
-// one, so throwing is safe here and silently clamping the path would not be.
+// write/eliminar. Both callers treat a rejection as a failed transfer, nunca a completed
+// one, so throwing is safe here and silently clamping the ruta sería not be.
 export const resolveFileBackendPath = async (
     join: (...paths: string[]) => Promise<string>,
     baseDir: string,

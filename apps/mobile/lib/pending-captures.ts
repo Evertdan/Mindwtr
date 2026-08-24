@@ -38,10 +38,10 @@ const trimOrUndefined = (value: unknown): string | undefined => {
     return trimmed ? trimmed : undefined;
 };
 
-// The Shortcut's "Due date"/"Start date" parameters are a native Date picker,
+// El/La
 // so Swift always hands back a value with a time component even when the
 // user only picked a day. Collapsing to the local calendar day here (same
-// sanitization spirit as a deep link's task props: never trust the raw
+// sanitization spirit as a deep link's task Props: never trust the raw
 // string, never fail the capture on garbage input) guarantees these fields
 // stay date-only and never arm a due/start reminder, matching the v1
 // guardrail that background captures don't schedule notifications (#755).
@@ -93,7 +93,7 @@ export function parsePendingCapture(raw: string): PendingCapture | null {
     };
 }
 
-// The structured `project` field (an id or a title) is the Shortcut's own
+// El/La
 // project picker, distinct from a parsed `+Project` token in the title. It
 // never creates projects and silently drops unknown ones — the task still
 // lands in the Inbox where processing catches it. (A parsed `+Project` token
@@ -182,7 +182,7 @@ async function assembleCaptureTask(
                     taskProps.tags = Array.from(new Set([...(taskProps.tags ?? []), ...structuredTags]));
                 }
 
-                // The Shortcut's own date pickers beat a parsed /due: or /start:
+                // El/La
                 // token in the title, same precedence as project/tags above.
                 if (capture.dueDate) taskProps.dueDate = capture.dueDate;
                 if (capture.startDate) taskProps.startTime = capture.startDate;
@@ -232,7 +232,7 @@ export async function ingestPendingCaptures({ addTask, addProject, projects, are
         if (!capture) {
             // Only our own Swift intent writes here, so an unparsable file is
             // corruption, not a transient failure — retrying forever would
-            // re-log on every foreground.
+            // re-Registro on every foreground.
             void logWarn('Discarding malformed pending capture', { scope: 'shortcuts', extra: { name } });
             await deleteAsync(fileUri, { idempotent: true }).catch(() => undefined);
             continue;

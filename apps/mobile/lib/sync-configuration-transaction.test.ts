@@ -188,7 +188,7 @@ describe('commitProvenMobileSyncConfiguration', () => {
         );
     });
 
-    // Desktop verifies its whole persisted configuration after disabling the
+    // Escritorio verifica su configuración persistida completa después de deshabilitar el
     // backend, so a disable that perturbs a transport aborts before any
     // credential is written. Mobile proves the same over the snapshot's own key
     // footprint.
@@ -221,7 +221,7 @@ describe('commitProvenMobileSyncConfiguration', () => {
             },
         }, harness.dependencies)).rejects.toThrow(/Disabling sync changed the persisted transport configuration/);
 
-        // Asserting the stored values alone would also pass if rollback had
+        // Un
         // rewritten every slot, so pin the scoping directly: the candidate's
         // secret never reaches the store, and the untouched cloud bundle is never
         // written. The webdav secret IS rewritten — the perturbed url marks that
@@ -274,7 +274,7 @@ describe('commitProvenMobileSyncConfiguration', () => {
         expect(harness.storage.get(SYNC_BACKEND_KEY)).toBe('webdav');
     });
 
-    // Settings restore keys off the literal 'cloudkit' in the provider slot
+    // La restauración de configuración clave fuera de la 'cloudkit' literal en la ranura Proveedor
     // (use-sync-settings-transport-actions.ts), which the canonical
     // 'dropbox' | 'selfhosted' union cannot express.
     it.each<{ label: string; stored: Record<string, string> }>([
@@ -327,10 +327,10 @@ describe('commitProvenMobileSyncConfiguration', () => {
     });
 });
 
-// Characterization goldens for the sync-configuration commit protocol, matching
-// the desktop golden scenario matrix step for step so the two platforms'
+// Estándares de caracterización para el protocolo de confirmación de sincronización-configuración, coincidencia
+// the Desktop golden scenario matrix step for step so the two platforms'
 // protocols can be compared directly. Treat a change here as a protocol change,
-// not a test update.
+// not a test Actualizar.
 describe('mobile commit protocol goldens', () => {
     type GoldenFailure = {
         /** Throw on the candidate's transport write (before it is verified). */
@@ -341,7 +341,7 @@ describe('mobile commit protocol goldens', () => {
         transportRestore?: boolean;
     };
 
-    // Decorates the shared harness so reads are recorded too — desktop's golden
+    // Decora el arnés compartido para que las lecturas también se registren — el estándar de Escritorio
     // records every verification read, and the verify steps are the part of the
     // protocol being compared.
     const goldenHarness = (

@@ -206,7 +206,7 @@ async function ensureLogFile(): Promise<boolean> {
     try {
       LOG_FILE.create({ intermediates: true, overwrite: true });
     } catch (error) {
-      // If a directory exists where the log file should be, remove it and retry.
+      // Si
       const fs = await getExpoFileSystem();
       if (LOG_FILE_URI && LOG_DIR_URI && LOG_FILE_URI !== fs?.Paths?.document?.uri && fs) {
         const strayDir = new fs.Directory(LOG_FILE_URI);
@@ -254,7 +254,7 @@ async function ensureLegacyLogFilePath(): Promise<string | null> {
 
 export function isLoggingEnabled(): boolean {
   // settings can be briefly undefined (store still hydrating, partial test
-  // stores); a log call must never throw over it.
+  // stores); a Registro call must never throw over it.
   return useTaskStore.getState().settings?.diagnostics?.loggingEnabled === true;
 }
 
@@ -345,7 +345,7 @@ async function appendLogLine(entry: LogEntry, options?: { force?: boolean }): Pr
     }
   });
   // Several notification-path callers intentionally do not await diagnostics.
-  // Keep their file-handle offsets and read-modify-write fallbacks ordered so
+  // Keep their file-Maneja offsets and read-modify-write fallbacks ordered so
   // adjacent receipt/outcome evidence cannot overwrite an earlier line (#1028).
   logWriteQueue = pendingWrite.then(() => undefined, () => undefined);
   return pendingWrite;
@@ -443,7 +443,7 @@ export async function readRecentLogText(maxChars = RECENT_LOG_MAX_CHARS): Promis
 export async function collectFeedbackDiagnostics(maxChars = RECENT_LOG_MAX_CHARS): Promise<string | null> {
   const breadcrumbs = getBreadcrumbs();
   // Feedback attachment is an explicit, one-time opt-in. Build the snapshot in
-  // memory so checking the box does not persist a log when detailed logging is
+  // memory so checking the box does not persist a Registro when detailed logging is
   // disabled, while still explaining the recent app flow.
   const snapshot = JSON.stringify({
     ts: new Date().toISOString(),

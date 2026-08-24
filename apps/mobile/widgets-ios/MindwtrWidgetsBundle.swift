@@ -5,7 +5,7 @@ import SwiftUI
 struct MindwtrWidgetsBundle: WidgetBundle {
     var body: some Widget {
         MindwtrTasksWidget()
-        // These two offer no families before iOS 16, so they stay invisible on iOS 15.
+        // El/La
         MindwtrFocusLockWidget()
         MindwtrCaptureLockWidget()
         if #available(iOSApplicationExtension 18.0, iOS 18.0, *) {

@@ -2,7 +2,7 @@ import CloudKit
 import Foundation
 
 /// Wraps CKFetchRecordZoneChangesOperation for incremental sync.
-/// The change token is serialized to/from a base64 string for JS storage.
+/// El/La
 enum CloudKitChangeTracker {
 
     struct ChangeResult {

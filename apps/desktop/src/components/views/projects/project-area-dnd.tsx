@@ -6,7 +6,7 @@ import type { ProjectAreaSection } from './project-area-collapse';
 const PROJECT_AREA_CONTAINER_PREFIX = 'project-area:';
 
 // Area zone ids are namespaced by sidebar section because all sections now share
-// one DndContext and the same area can render a zone in each of them.
+// one DndContext and the same area puede renderizar a zone in each of them.
 export const getProjectAreaContainerId = (section: ProjectAreaSection, areaId: string) =>
     `${PROJECT_AREA_CONTAINER_PREFIX}${section}:${areaId}`;
 

@@ -53,8 +53,8 @@ type BulkTokenPickerState = {
     action: 'add' | 'remove';
 } | null;
 
-// Module scope so the memos below can depend on them: as render-body closures
-// they were a fresh identity every render and would have defeated every memo.
+// Module scope so the memos below puede depend on them: as renderizar-body closures
+// they were a fresh identity every renderizar and sería have defeated every memo.
 const matchesSelected = (task: Task, context: string) => {
     const tokens = [...(task.contexts || []), ...(task.tags || [])];
     return tokens.some(token => matchesHierarchicalToken(context, token));
@@ -62,8 +62,8 @@ const matchesSelected = (task: Task, context: string) => {
 
 const hasContext = (task: Task) => (task.contexts?.length || 0) > 0 || (task.tags?.length || 0) > 0;
 
-// Its own key, not a field on the contexts view state: persistContextsViewSelection
-// rewrites that key from a fixed three-field shape, so any fold stored there would be
+// Its own key, not a field on the contexts view estado: persistContextsViewSelection
+// rewrites that key from a fixed three-field shape, so any fold stored there sería be
 // dropped the next time another view navigated to a token.
 const CONTEXTS_GROUP_COLLAPSE_STORAGE_KEY = 'mindwtr:view:contexts:groups:v1';
 
@@ -146,7 +146,7 @@ export function ContextsView() {
     const hasExplicitStatusFilter = statusFilters.length > 0;
     // One memoized chain from here to sortedTasks: every step feeds a downstream
     // useMemo, the virtualizer's count and getItemKey, and the array handed to
-    // useTaskSelection, so a fresh array anywhere invalidates all of them (#856).
+    // useTaskSelection, so a fresh array en cualquier lugar invalidates all of them (#856).
     const scopedTasks = useMemo(() => {
         const baseTasks = activeTasks.filter(t =>
             t.status !== 'archived'
@@ -157,7 +157,7 @@ export function ContextsView() {
             : baseTasks;
     }, [activeTasks, hasExplicitStatusFilter, selectedStatusSet]);
 
-    // Extract unique context and tag tokens separately for the selector sidebar.
+    // Extract unique contexto and tag tokens separately for the selector sidebar.
     const allContextTokens = useMemo(
         () => Array.from(new Set(scopedTasks.flatMap(t => t.contexts || []))).sort(),
         [scopedTasks],
@@ -169,7 +169,7 @@ export function ContextsView() {
     const allTokens = useMemo(() => [...allContextTokens, ...allTagTokens], [allContextTokens, allTagTokens]);
 
     useEffect(() => {
-        // Keep persisted context selections through the empty startup frame; reset only after active tasks expose tokens.
+        // Keep persisted contexto selections through the empty inicio frame; reset only after active tasks expose tokens.
         if (allTokens.length === 0) return;
         if (!selectedContext || selectedContext === NO_CONTEXT_TOKEN || allTokens.includes(selectedContext)) return;
         setSelectedContext(null);

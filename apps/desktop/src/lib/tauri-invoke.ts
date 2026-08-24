@@ -1,8 +1,8 @@
 import { isTauriRuntime } from './runtime';
 
 /**
- * The transport that actually reaches Rust. Swappable so callers get a seam
- * without each adapter growing its own dependency-injection scaffolding.
+ * El transporte que realmente llega a Rust. Intercambiable para que las personas que llaman obtengan una costura
+ * sin que cada adaptador desarrolle su propio andamiaje de inyección de dependencias.
  */
 export type NativeInvokeTransport = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
@@ -11,22 +11,22 @@ const tauriTransport: NativeInvokeTransport = async <T>(
     args?: Record<string, unknown>,
 ): Promise<T> => {
     const { invoke } = await import('@tauri-apps/api/core');
-    // An argument-less command stays argument-less on the wire.
+    // Un comando sin argumentos permanece sin argumentos en el cable.
     return args === undefined ? invoke<T>(command) : invoke<T>(command, args);
 };
 
 let transport: NativeInvokeTransport = tauriTransport;
 
-/** Replaces the transport (tests, fakes). Pass `null` to restore the real one. */
+/** Reemplaza el transporte (pruebas, falsificaciones). Pase `null` para restaurar el real. */
 export function setNativeInvokeTransport(next: NativeInvokeTransport | null): void {
     transport = next ?? tauriTransport;
 }
 
 /**
- * Resolves the transport module up front, so a later `invokeNative` pays only
- * the call. Startup paths whose invoke is timed — `notify_ui_ready` fires after
- * two animation frames and is what reveals the window (#936) — preload before
- * the wait rather than resolving the module on the timed call itself.
+ * Resuelve el módulo de transporte por adelantado, para que un `invokeNative` posterior solo pague
+ * la llamada. Las rutas de inicio cuya invocación tiene un tiempo limitado — `notify_ui_ready` se dispara después
+ * de dos fotogramas de animación y es lo que revela la ventana (#936) — precargar antes
+ * de la espera en lugar de resolver el módulo en la llamada cronometrada en sí.
  */
 export async function preloadNativeTransport(): Promise<void> {
     if (!isTauriRuntime()) return;
@@ -34,9 +34,9 @@ export async function preloadNativeTransport(): Promise<void> {
 }
 
 /**
- * Invokes a Rust command. Rejects when there is no Tauri runtime — use this
- * when the caller has already established it is running in the desktop shell,
- * or when failing is the correct outcome elsewhere.
+ * Invoca un comando de Rust. Rechaza cuando no hay tiempo de ejecución de Tauri — use esto
+ * cuando la persona que llama ya haya establecido que se está ejecutando en el shell de escritorio,
+ * o cuando fallar es el resultado correcto en otro lugar.
  */
 export async function invokeNative<T>(command: string, args?: Record<string, unknown>): Promise<T> {
     if (!isTauriRuntime()) {
@@ -46,8 +46,8 @@ export async function invokeNative<T>(command: string, args?: Record<string, unk
 }
 
 /**
- * Invokes a Rust command, resolving to `fallback` when there is no Tauri
- * runtime (web/dev builds), so the caller does not need its own guard.
+ * Invoca un comando de Rust, resolviéndose a `fallback` cuando no hay Tauri
+ * runtime (compilaciones web/dev), por lo que el llamador no necesita su propia guardia.
  */
 export async function invokeNativeOr<T>(
     fallback: T,

@@ -285,7 +285,7 @@ export function InboxProcessingQuickPanel({
     }, [onSubmit]);
 
     // After a long form is submitted the view is left scrolled to the bottom;
-    // bring the panel top (title of the next task) back into view on advance.
+    // bring the panel top (title of the next tarea) back into view on advance.
     const panelRef = useRef<HTMLDivElement | null>(null);
     useEffect(() => {
         panelRef.current?.scrollIntoView?.({ block: 'start' });

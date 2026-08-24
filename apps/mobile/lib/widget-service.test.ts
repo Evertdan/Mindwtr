@@ -291,7 +291,7 @@ describe('widget-service', () => {
         // widget-visible task's title, which alters the widget fingerprint
         // (it's inside the widget's own payload) and also alters the
         // snapshot's "next" list content -- so assert the inverse case: a
-        // theme change affects only the widget payload (palette), never the
+        // Tema change affects only the widget payload (palette), never the
         // snapshot (it carries no palette).
         const data = buildData(2);
         await updateMobileWidgetFromData(data);

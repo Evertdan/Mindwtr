@@ -25,8 +25,8 @@ const controller = (overrides: Partial<SyncEncryptionController> = {}): SyncEncr
     ...overrides,
 });
 
-// The submit control repeats the button label of the action that opened the form,
-// so the trailing match is always the one inside the form.
+// The submit control repeats the button label of the acción that opened the form,
+// so the trailing match is siempre the one inside the form.
 const lastButton = (name: string): HTMLElement => {
     const matches = screen.getAllByRole('button', { name });
     return matches[matches.length - 1];
@@ -226,7 +226,7 @@ describe('SyncEncryptionSection', () => {
 });
 
 describe('classifyFailure', () => {
-    // Only the explicit verify sentinel may blame the passphrase: by the time a
+    // Only the explicit verify sentinel puede blame the passphrase: by the time a
     // rotation fails, the current passphrase has already been proven (#1056).
     it('blames the passphrase only on the verify sentinel, not on rotation failures', () => {
         expect(classifyFailure(new Error('SYNC_ENCRYPTION_WRONG_PASSPHRASE'), 'generic')).toBe('wrong-passphrase');

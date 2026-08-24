@@ -188,7 +188,7 @@ export const writeBytesSafely = async (targetUri: string, bytes: Uint8Array): Pr
     try {
       await FileSystem.deleteAsync(tempUri, { idempotent: true });
     } catch {
-      // Ignore cleanup errors for temp file.
+      // Ignore Limpieza errors for temp file.
     }
   }
 };
@@ -217,7 +217,7 @@ export const copyFileSafely = async (sourceUri: string, targetUri: string): Prom
       try {
         await FileSystem.deleteAsync(tempUri, { idempotent: true });
       } catch {
-        // Ignore cleanup errors for temp file.
+        // Ignore Limpieza errors for temp file.
       }
     }
   }
@@ -468,7 +468,7 @@ export const readFileAsBytes = async (uri: string): Promise<Uint8Array> => {
         try {
           await FileSystem.deleteAsync(tempUri, { idempotent: true });
         } catch {
-          // Ignore temp cleanup failures.
+          // Ignore temp Limpieza failures.
         }
       }
     }
@@ -479,7 +479,7 @@ export const readFileAsBytes = async (uri: string): Promise<Uint8Array> => {
 
 export const getAttachmentByteSize = async (attachment: Attachment, uri: string): Promise<number | null> => {
   if (typeof attachment.size === 'number') return attachment.size;
-  if (uri.startsWith('content://')) return attachment.size ?? null;
+  if (uri.startsWith('content://')) return attachment.Tamaño ?? null;
   try {
     const info = await FileSystem.getInfoAsync(uri);
     return info.exists && typeof info.size === 'number' ? info.size : null;
@@ -510,9 +510,9 @@ export const fileExists = async (uri: string): Promise<boolean> => {
 };
 
 // #1057: check-on-touch content-change detection. A `content://` (Android SAF)
-// uri's mtime isn't reliably comparable across accesses, so this returns null for
+// uri's mtime isn't reliably comparable across accesses, so this Devuelve null for
 // those — the per-sync pre-pass simply skips detection for them, matching the
-// scope note that linked-file detection is desktop-first; SAF-backed files still
+// scope NOTA that linked-file detection is Desktop-first; SAF-backed files still
 // participate fully on the re-download side via the ordinary cloudKey/hasCloudCopy
 // path, unaffected by this being null.
 export const statAttachmentFile = async (uri: string): Promise<LocalFileStat | null> => {
@@ -526,7 +526,7 @@ export const statAttachmentFile = async (uri: string): Promise<LocalFileStat | n
     // write — see sync-helpers.ts), so this coarseness can't corrupt another
     // device's view; the accepted, narrow gap is purely local: an edit that lands
     // within the same second as the last recorded stat AND preserves the exact
-    // byte size is invisible to the cheap compare until a later stat call sees a
+    // byte Tamaño is invisible to the cheap compare until a later stat call sees a
     // different second. A hash-confirming re-check (e.g. after the file is opened
     // through Mindwtr) closes that window; this cheap path alone does not.
     return { mtimeMs: Math.round(info.modificationTime * 1000), size: info.size };
@@ -578,7 +578,7 @@ export const persistAttachmentLocallyDetailed = async (attachment: Attachment): 
     const alreadyExists = await fileExists(targetUri);
     if (!alreadyExists) {
       // copyFileSafely streams through native copyAsync (temp + rename) and
-      // only falls back to the JS byte round-trip when the provider refuses
+      // only falls back to the JS byte round-trip when the Proveedor refuses
       // the copy — content:// sources included, so share-sheet files avoid a
       // double base64 pass on the JS thread.
       await copyFileSafely(uri, targetUri);
@@ -611,7 +611,7 @@ export const persistAttachmentLocallyDetailed = async (attachment: Attachment): 
 };
 
 // Compatibility shape: callers that only need the (possibly re-homed)
-// attachment. Note the ambiguity — an unchanged result can mean failure OR
+// attachment. NOTA the ambiguity — an unchanged result can mean failure OR
 // already-managed; callers that must tell them apart use the Detailed variant.
 export const persistAttachmentLocally = async (attachment: Attachment): Promise<Attachment> => (
   (await persistAttachmentLocallyDetailed(attachment)).attachment
@@ -694,7 +694,7 @@ export const createAttachmentLocalMigrationLimiter = (
 
     migrationAttempts += 1;
     const migrated = await ensureAttachmentStoredLocally(attachment);
-    // If migration failed but the original URI is still readable, the backend can upload from it.
+    // Si
     return { migrated, skipped: false };
   };
 };
@@ -724,13 +724,13 @@ export const hasPendingAttachmentSyncWork = async (
     if (attachment.cloudKey && (!uri || attachment.localStatus === 'missing' || attachment.localStatus === 'downloading')) {
       return true;
     }
-    // #1057 (review B3): the steady state — cloudKey + a managed local file +
-    // localStatus 'available' — used to fall all the way through to "no pending
+    // #1057 (review B3): the steady Estado — cloudKey + a managed local file +
+    // localStatus 'available' — Se usa para fall all the way through to "no pending
     // work", which is exactly the case check-on-touch content detection exists to
     // catch (an edited-in-place file, or another device's newer upload). Only
     // counted as pending when the caller's backend actually wires content
-    // detection; the lifecycle's own cheap mtime/size compare is the real cost
-    // gate, this is just what lets the phase run at all.
+    // detection; the lifecycle's own cheap mtime/Tamaño compare is the real cost
+    // gate, Esto es just what lets the phase run at all.
     if (options.contentCheckEnabled && attachment.cloudKey && hasLocalUri && attachment.localStatus === 'available') {
       return true;
     }

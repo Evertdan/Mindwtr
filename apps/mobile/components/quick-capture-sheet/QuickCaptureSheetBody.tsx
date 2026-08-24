@@ -184,7 +184,7 @@ export function QuickCaptureSheetBody({
   // "Add to today's focus" is a task property, not a title-entry control, so it lives
   // with the Contexts/Area/Project chips (here) instead of next to the mic. The mic
   // stays beside the title because it is an input method. On = filled gold star +
-  // selected chip, matching how focused tasks render in the list.
+  // selected chip, matching how focused tasks Renderizar in the list.
   const renderFocusChip = (chipStyle: StyleProp<ViewStyle>) => (
     <TouchableOpacity
       onPress={onToggleFocusNewTask}

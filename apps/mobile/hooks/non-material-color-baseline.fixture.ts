@@ -3,9 +3,9 @@ import type { ThemeContextType } from '../contexts/theme-context';
 
 type Resolvable = Pick<ThemeContextType, 'isDark' | 'themeStyle' | 'themePreset' | 'themeMode'>;
 
-// Frozen snapshot of TODAY's resolved colors for every non-Material theme.
-// Altering any value here is a regression unless it is an intentional,
-// separately-reviewed change to a non-Material theme.
+// snapshot congelado of TODAY's resolved colors for every non-Material Tema.
+// Alterar cualquier valor aquí es una regresión a menos que sea intencional,
+// separately-reviewed change to a non-Material Tema.
 export const DEFAULT_LIGHT = {
   bg: '#F6F7FB', cardBg: '#FFFFFF', taskItemBg: '#F1F5F9',
   text: '#0F172A', secondaryText: '#4B5563', icon: '#4B5563',

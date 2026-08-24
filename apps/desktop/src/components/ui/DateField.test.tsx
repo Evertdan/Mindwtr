@@ -29,9 +29,9 @@ afterEach(() => {
 describe('DateField', () => {
     it('opens its calendar popover from inside a Dialog', () => {
         // The popover is position:fixed rather than its own portal, so a Dialog
-        // panel's overflow-hidden must not be allowed to swallow it. jsdom
-        // cannot measure the escape; asserting it mounts under the panel is the
-        // part a test can pin.
+        // panel's desbordamiento-hidden no debe be allowed to swallow it. jsdom
+        // no puede measure the escape; asserting it mounts under the panel is the
+        // part a prueba puede pin.
         render(
             <Dialog onClose={vi.fn()} label="Host dialog">
                 <DialogBody>
@@ -98,7 +98,7 @@ describe('DateField', () => {
         const input = screen.getByRole('textbox', { name: 'Due' });
         fireEvent.change(input, { target: { value: 'saasdjfasdj' } });
         // The visual cue is immediate, but a half-typed date is unparseable on
-        // nearly every keystroke — announcing "invalid" that often is noise, so
+        // nearly every keystroke — announcing "invalid" that a menudo is noise, so
         // aria-invalid waits until the field is left.
         expect(input.className).toContain('border-warning');
         expect(input).not.toHaveAttribute('aria-invalid');
@@ -157,15 +157,15 @@ describe('DateField', () => {
             );
 
             const input = screen.getByLabelText('Due') as HTMLInputElement;
-            // Never mid-typing: completing "1/1" on the keystroke rewrote the
-            // text under the user and made "1/1/27" impossible to type.
+            // nunca mid-typing: completing "1/1" on the keystroke rewrote the
+            // text under the user and made "1/1/27" impossible to tipo.
             fireEvent.change(input, { target: { value: '1/1' } });
             expect(onDateChange).not.toHaveBeenCalled();
             expect(input.className).not.toContain('border-warning');
             fireEvent.blur(input);
             await waitFor(() => expect(onDateChange).toHaveBeenLastCalledWith('2027-01-01'));
 
-            // Still ahead this year, so no rollover.
+            // Still ahead esto year, so no rollover.
             onDateChange.mockClear();
             fireEvent.change(input, { target: { value: '12/25' } });
             fireEvent.blur(input);

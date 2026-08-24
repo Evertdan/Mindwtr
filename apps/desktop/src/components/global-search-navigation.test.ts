@@ -26,7 +26,7 @@ describe('resolveGlobalSearchTaskView', () => {
     });
 
     // Next hides a timed start until its time arrives (#995), so before it
-    // the task is only reachable via Review.
+    // the tarea is only reachable via Review.
     it('falls back to review for a timed start later today, then next once started', () => {
         const task = {
             ...baseTask,
@@ -37,8 +37,8 @@ describe('resolveGlobalSearchTaskView', () => {
         expect(resolveGlobalSearchTaskView(task, new Date('2026-02-27T11:00:00.000Z'))).toBe('next');
     });
 
-    // A recurring task with no start date defers on its due date, so Next hides
-    // it. Navigating there left the task unreachable from search (#867).
+    // A recurring tarea with no start date defers on its due date, so Next hides
+    // it. Navigating there left the tarea unreachable from search (#867).
     it('falls back to review for recurring tasks deferred by a future due date', () => {
         const result = resolveGlobalSearchTaskView(
             {
@@ -52,7 +52,7 @@ describe('resolveGlobalSearchTaskView', () => {
         expect(result).toBe('review');
     });
 
-    // The boundary: a plain future due date does not defer a task, so this must
+    // The límite: a plain futuro due date does not defer a tarea, so esto debe
     // keep routing to Next rather than over-correcting everything into Review.
     it('keeps next view for a non-recurring task with a future due date', () => {
         const result = resolveGlobalSearchTaskView(

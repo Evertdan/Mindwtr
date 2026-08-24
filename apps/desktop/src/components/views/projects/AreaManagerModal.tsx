@@ -57,8 +57,8 @@ export function AreaManagerModal({
             labelledBy={titleId}
             placement="top"
             overlayClassName="pt-[15vh]"
-            // Capped so a long area list scrolls instead of running off the
-            // bottom of the window (#957). overflow stays visible: the row and
+            // Capped so a long area list scrolls en lugar de running off the
+            // bottom of the window (#957). desbordamiento stays visible: the row and
             // new-area colour pickers are absolutely positioned menus that have
             // to escape the panel.
             panelClassName="max-w-lg max-h-[70vh] overflow-visible"

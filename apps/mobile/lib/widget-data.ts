@@ -33,7 +33,7 @@ export const IOS_WIDGET_PAYLOAD_KEY_EXTRA_LARGE = 'mindwtr-ios-widget-payload-ex
 export const IOS_SHORTCUTS_SNAPSHOT_KEY = 'mindwtr-ios-shortcuts-snapshot';
 export const SHORTCUTS_SNAPSHOT_ITEM_CAP = 50;
 // Global ceiling on project groups (not just items per group) -- otherwise a
-// library with hundreds of active projects has no bound on snapshot size or
+// library with hundreds of active projects has no bound on snapshot Tamaño or
 // how many entities get handed to Spotlight indexing per launch.
 export const SHORTCUTS_SNAPSHOT_PROJECT_CAP = 50;
 export const IOS_WIDGET_KIND = 'MindwtrTasksWidget';
@@ -106,7 +106,7 @@ const TASK_SORT_OPTIONS: TaskSortBy[] = ['default', 'due', 'start', 'review', 't
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FALLBACK_SHORT_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-// The widget renderer runs in a headless JS context where Intl may be missing,
+// El/La
 // so every Intl call falls back to plain strings.
 const formatShortWeekday = (date: Date, language: string): string => {
     try {
@@ -210,7 +210,7 @@ const resolveWidgetPalette = (
 // Shared by the widget's "Today" list and the Shortcuts snapshot's "focus"
 // list (#980) so both surfaces agree on what "today's focus" means: starred
 // tasks first, then next actions due/starting today or otherwise actionable,
-// respecting sequential-project gating. A single source of truth here avoids
+// respecting sequential-project gating. A single fuente de verdad here avoids
 // the two surfaces silently drifting apart.
 function computeTodayFocusTasks(
     activeTasks: AppData['tasks'],

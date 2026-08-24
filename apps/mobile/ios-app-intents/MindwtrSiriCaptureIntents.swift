@@ -54,7 +54,7 @@ private enum MindwtrSiriCaptureLauncher {
 
     @MainActor
     static func open(_ url: URL) {
-        // React Native may still be attaching its Linking listener on a cold Siri launch.
+        // React Native aún podría estar adjuntando su oyente de Enlace en un lanzamiento frío de Siri.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
             UIApplication.shared.open(url, options: [:], completionHandler: nil)
         }
@@ -225,7 +225,7 @@ struct MindwtrOpenListIntent: AppIntent {
     }
 }
 
-// Background captures never touch the app database from Swift. The intent
+// Las capturas de fondo nunca tocan la base de datos de la aplicación desde Swift. La intención
 // appends a JSON payload to Documents/pending-captures/ and the React Native
 // side ingests it through the normal store/sync write path on next launch or
 // foreground (#845).
@@ -372,15 +372,15 @@ struct MindwtrBackgroundCaptureIntent: AppIntent {
         ) else {
             throw MindwtrBackgroundCaptureError.writeFailed
         }
-        // The drain decides where the task actually lands (project match or
-        // Inbox fallback), so the dialog never promises a specific placement.
+        // El/La
+        // Respaldo de Bandeja de entrada), por lo que el diálogo nunca promete una ubicación específica.
         return .result(dialog: "Added to Mindwtr.")
     }
 }
 
 // MARK: - Shortcuts snapshot (Get Tasks + Spotlight)
 //
-// The snapshot is app-maintained, read-only, derived data: RN refreshes it
+// El/La
 // alongside the widget payload (widget-service.ts `updateMobileWidgetFromData`
 // -> `buildShortcutsSnapshot`) into the same shared App Group UserDefaults the
 // widget already writes to. Background intents and Spotlight indexing here
@@ -402,7 +402,7 @@ private enum MindwtrShortcutsSnapshotStore {
         return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 
-    /// All snapshot items, deduped by id (a task can appear both in its list
+    /// Todos los elementos de instantánea, deduplicados por id (una tarea puede aparecer tanto en su lista
     /// bucket and its project bucket).
     static func loadAllItems() -> [MindwtrShortcutsSnapshotItem] {
         guard let root = rawSnapshot() else { return [] }
@@ -497,7 +497,7 @@ enum MindwtrGetTasksList: String, AppEnum {
 }
 
 // A task's stored dueDate can be date-only ("yyyy-MM-dd", e.g. from the
-// Shortcuts date params above) or a full ISO datetime (from anywhere else in
+// Parámetros de fecha de Atajos arriba) o una fecha/hora ISO completa (desde cualquier otro lugar en
 // the app). Display must not just interpolate whichever raw string it is --
 // date-only stays date-only, a timed value renders a localized short
 // date+time instead of raw ISO text.

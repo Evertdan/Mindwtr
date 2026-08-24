@@ -63,8 +63,8 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 vi.mock('@mindwtr/core', async () => {
-  // The real cooldown maths, not a stub: leaving it off the mock meant every
-  // failed-sync path threw here, so no test could reach the cooldown at all.
+  // Las matemáticas de enfriamiento reales, no un stub: dejarlo fuera de la simulación significaba cada
+  // ruta de sincronización fallida lanzada aquí, entonces ninguna prueba podría alcanzar el enfriamiento en absoluto.
   const { resolveSyncFailureCooldownMs } = await vi.importActual<typeof import('@mindwtr/core')>('@mindwtr/core');
   return {
     flushPendingSave,
@@ -228,8 +228,8 @@ describe('useRootLayoutSyncEffects', () => {
       return vi.fn();
     });
 
-    // Sync status stamps (lastSyncAt/lastSyncStatus/...) are never part of a sync
-    // payload, so the core change fingerprint returns the same value across them;
+    // Las marcas de estado de sincronización (lastSyncAt/lastSyncStatus/...) nunca son parte de una sincronización
+    // payload, so the core change fingerprint returns the same value a través de ellas;
     // core's own test covers which fields it ignores.
     getInMemorySyncChangeFingerprint.mockReturnValue('sync-change:stable');
 
@@ -275,8 +275,8 @@ describe('useRootLayoutSyncEffects', () => {
     const storeListener = storeListeners.find((callback) => callback.length >= 2);
     expect(storeListener).toBeTypeOf('function');
 
-    // The fingerprint is a full-dataset serialize; running it synchronously in
-    // the store listener put ~0.4s inside every done/save tap on large libraries.
+    // El/La
+    // el oyente de almacén puso ~0.4s dentro de cada tap hecho/guardar en bibliotecas grandes.
     await act(async () => {
       storeListener?.({ lastDataChangeAt: 2 }, { lastDataChangeAt: 1 });
       storeListener?.({ lastDataChangeAt: 3 }, { lastDataChangeAt: 2 });
@@ -358,7 +358,7 @@ describe('useRootLayoutSyncEffects', () => {
     vi.useRealTimers();
   });
 
-  // A throttled device used to fire again on the very next foreground/background
+  // Un dispositivo acelerado solía dispararse de nuevo en el siguiente foreground/background
   // switch, because those call requestSync(0) and explicit-0 skipped the failure
   // cooldown. That is what kept re-tripping CloudKit's limit (#948).
   it('holds off app-state sync triggers while a failure cooldown is active', async () => {
@@ -383,7 +383,7 @@ describe('useRootLayoutSyncEffects', () => {
     const attemptsAfterFailure = performMobileSync.mock.calls.length;
     expect(attemptsAfterFailure).toBeGreaterThan(0);
 
-    // A rapid round trip through active is deduped. It must not cancel the
+    // Un viaje rápido a través de activo es deduplicado. No debe cancelar el
     // failure-owned retry timer while clearing ordinary lifecycle pacing.
     await act(async () => {
       listener('active');
@@ -446,7 +446,7 @@ describe('useRootLayoutSyncEffects', () => {
     });
     expect(performMobileSync).toHaveBeenCalledTimes(2);
 
-    // The repeated failure doubles CloudKit's requested 1s delay.
+    // El/La
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1_999);
       await flushMicrotasks();
@@ -501,7 +501,7 @@ describe('useRootLayoutSyncEffects', () => {
     });
     expect(performMobileSync).toHaveBeenCalledTimes(1);
 
-    // A manual sync runs outside this hook. Its status update is the recovery
+    // Una sincronización manual se ejecuta fuera de este gancho. Su actualización de estado es la recuperación
     // signal that cancels the retry owned here.
     await act(async () => {
       storeListener?.(
@@ -572,7 +572,7 @@ describe('useRootLayoutSyncEffects', () => {
     });
     let fingerprintVersion = 0;
     getInMemorySyncChangeFingerprint.mockImplementation(() => `sync-change:${fingerprintVersion}`);
-    // Each sync cycle takes 20s, so the adaptive interval becomes 40s from cycle end.
+    // Cada ciclo de sincronización toma 20 segundos, por lo que el intervalo adaptativo se convierte en 40 segundos desde el final del ciclo.
     performMobileSync.mockImplementation(
       () => new Promise((resolve) => setTimeout(() => resolve({ success: true }), 20_000)),
     );
@@ -598,7 +598,7 @@ describe('useRootLayoutSyncEffects', () => {
     await act(async () => {
       fingerprintVersion += 1;
       storeListener?.({ lastDataChangeAt: 3 }, { lastDataChangeAt: 2 });
-      // Well past the 5s base interval, but within the 40s adaptive interval.
+      // Muy más allá del intervalo base de 5 segundos, pero dentro del intervalo adaptativo de 40 segundos.
       await vi.advanceTimersByTimeAsync(20_000);
       await flushMicrotasks();
     });

@@ -23,16 +23,16 @@ const fsMocks = vi.hoisted(() => ({
     readFile: vi.fn(),
     remove: vi.fn(),
     rename: vi.fn(),
-    // #1057: check-on-touch content detection stats the local file; default to a
-    // rejection so tests that don't care about it see "no stat available" (the
+    // #1057: verificar-on-touch content detection stats the local file; default to a
+    // rejection so tests that no care about it see "no stat available" (the
     // lifecycle treats that as if getLocalFileStat were omitted) rather than a
     // silently-resolved bogus value.
     stat: vi.fn().mockRejectedValue(new Error('not stubbed')),
     writeFile: vi.fn(),
 }));
 
-// #1037: the file backend must reach the sync folder through the async Rust
-// commands, never the fs plugin's main-thread exists/mkdir/remove/rename.
+// #1037: the file backend debe reach the sync folder through the asincrónico Rust
+// commands, nunca the fs plugin's main-thread exists/mkdir/eliminar/rename.
 const syncFsMocks = vi.hoisted(() => ({
     exists: vi.fn(),
     mkdir: vi.fn(),
@@ -347,8 +347,8 @@ describe('desktop sync attachment backends', () => {
             expect.stringMatching(/^\/candidate-sync\/attachments\/attachment-1\.txt\.tmp-/),
             bytes,
         );
-        // Never the fs plugin's rename: it is a main-thread command and the
-        // sync folder may be a slow mount (#1037).
+        // nunca the fs plugin's rename: it is a main-thread command and the
+        // sync folder puede be a slow montar (#1037).
         expect(fsMocks.rename).not.toHaveBeenCalled();
         expect(syncFsMocks.rename).toHaveBeenCalledWith(
             expect.stringMatching(/^\/candidate-sync\/attachments\/attachment-1\.txt\.tmp-/),
@@ -478,7 +478,7 @@ describe('desktop sync attachment backends', () => {
     });
 
     it('caps WebDAV uploads per sync run and logs once when the limit is reached', async () => {
-        // WEBDAV_ATTACHMENT_MAX_UPLOADS_PER_SYNC is 10; one attachment over that must be skipped.
+        // WEBDAV_ATTACHMENT_MAX_UPLOADS_PER_SYNC is 10; one attachment over that debe be skipped.
         const attachmentCount = 11;
         const bytes = new Uint8Array([1, 2, 3]);
         const fetcher = vi.fn(async (_url: string, _init?: RequestInit) => new Response(null, { status: 200 }));
@@ -570,8 +570,8 @@ describe('desktop sync attachment backends', () => {
     });
 
     it('never reads or uploads an attachment whose uri points outside the profile (SEC-07)', async () => {
-        // A hostile sync document can put any absolute path in `uri` — it survives the
-        // merge sanitizer, which only rejects traversal segments.
+        // A hostile sync document puede put any absolute ruta in `uri` — it survives the
+        // fusionar sanitizer, which only rejects traversal segments.
         const fetcher = vi.fn(async (_url: string, _init?: RequestInit) => new Response(null, { status: 200 }));
         const appData = createCandidateAttachmentData();
         appData.tasks[0].attachments![0].uri = '/home/alice/.ssh/id_rsa';
@@ -649,7 +649,7 @@ describe('desktop sync attachment backends', () => {
     describe('check-on-touch content change detection (#1057)', () => {
         const bytes = new Uint8Array([1, 2, 3]);
         // Real SHA-256 of `bytes` above — computed once so "hash matches" and "hash
-        // differs" tests can both use realistic hashes rather than a stubbed hasher.
+        // differs" tests puede both use realistic hashes rather than a stubbed hasher.
         const BYTES_HASH = '039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81';
 
         const prepareHelpers = () => ({
@@ -723,7 +723,7 @@ describe('desktop sync attachment backends', () => {
                 expect.objectContaining({ method: 'PUT' }),
             );
             const merged = result?.tasks[0].attachments?.[0];
-            // Same cloudKey — re-upload overwrites in place, never renames (identity keying).
+            // Same cloudKey — re-upload overwrites in place, nunca renames (identity keying).
             expect(merged?.cloudKey).toBe('attachments/attachment-1.txt');
             expect(merged?.contentRev).toBe(3);
             expect(merged?.fileHash).toBe(BYTES_HASH);

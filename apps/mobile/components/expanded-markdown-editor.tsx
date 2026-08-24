@@ -391,8 +391,8 @@ export function ExpandedMarkdownEditor({
         setEditorValue(nextValue);
         onChange(nextValue);
     }, [onChange, onSelectionChange, restoreEditorFocus]);
-    // Auto-pairing intentionally lives only in the text-change handler. On Android the
-    // keyPress event is synthesized from the same native edit as the text change (and
+    // Un
+    // keyPress Evento is synthesized from the same native edit as the text change (and
     // preventDefault cannot cancel it), so pairing here too processes one keystroke
     // twice — IME-specific echo orders then double the pair (#565).
     const handleKeyPress = React.useCallback((event: NativeSyntheticEvent<TextInputKeyPressEventData>) => {

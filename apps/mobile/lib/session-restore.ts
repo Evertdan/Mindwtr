@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { shouldRestoreLastView } from '@mindwtr/core';
 
-// Device-local UI-session state (P14): which screen was open and when it was
+// Device-local UI-session Estado (P14): which screen was open and when it was
 // last seen, so reopening shortly after Android kills the app resumes the
 // interrupted session (#842). Never part of the synced settings document.
 const LAST_ROUTE_STORAGE_KEY = 'mindwtr:session:lastRoute';
@@ -32,10 +32,10 @@ const RESTORABLE_PATHS = new Set([
 const isRestorablePath = (pathname: string): boolean =>
     RESTORABLE_PATHS.has(pathname) || pathname.startsWith('/saved-search/');
 
-// Routes whose snapshot may carry an open-project context.
+// Routes whose snapshot may carry an open-project Contexto.
 const PROJECT_CONTEXT_PATHS = new Set(['/projects-screen', '/projects']);
 
-// Tapping a project row opens it via component state without touching the
+// Tapping a project row opens it via component Estado without touching the
 // route, so the route params alone can't tell which project is open — the
 // projects screen mirrors it here for snapshots (#842).
 let sessionOpenProjectId: string | null = null;
@@ -55,7 +55,7 @@ export async function persistLastRoute(pathname: string, params?: Record<string,
         // previous snapshot: dying inside one should still resume the screen
         // beneath it, and a stale timestamp ages the snapshot out naturally.
         if (!isRestorablePath(pathname)) return;
-        // Only the project context is worth carrying across a restart; other
+        // Only the project Contexto is worth carrying across a restart; other
         // params (open tokens, one-shot focus requests) must not replay.
         const explicitProjectId = typeof params?.projectId === 'string' ? params.projectId : undefined;
         const projectId = PROJECT_CONTEXT_PATHS.has(pathname)
@@ -67,7 +67,7 @@ export async function persistLastRoute(pathname: string, params?: Record<string,
             at: Date.now(),
         }));
     } catch {
-        // Convenience state only — a storage failure just skips restoration.
+        // Convenience Estado only — a storage failure just skips restoration.
     }
 }
 

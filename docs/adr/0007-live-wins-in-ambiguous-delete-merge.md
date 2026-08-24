@@ -1,27 +1,27 @@
-# ADR 0007: Prefer Live Data in Ambiguous Delete-vs-Live Merges
+# ADR 0007: Preferir datos activos en fusiones ambiguas de eliminación-vs-activa
 
-Date: 2026-04-14
-Status: Accepted
+Fecha: 2026-04-14
+Estado: Aceptado
 
-## Context
+## Contexto
 
-ADR 0003 established revision-aware sync with tombstones and deterministic tie-breakers. Its original delete-vs-live rule preferred the tombstone when operation times were equal.
+ADR 0003 estableció sincronización consciente de revisiones con lápidas y desempates deterministas. Su regla original de eliminación-vs-activa prefería la lápida cuando los tiempos de operación eran iguales.
 
-After more real-world sync traffic, that rule proved too aggressive around close-together edits and clock-skewed devices. Mindwtr 0.8.2 changed the shipped behavior and release notes to prefer live data in ambiguous delete-vs-live merges.
+Después de más tráfico de sincronización del mundo real, esa regla resultó demasiado agresiva alrededor de ediciones muy juntas y dispositivos sesgados de reloj. Mindwtr 0.8.2 cambió el comportamiento enviado y las notas de lanzamiento para preferir datos activos en fusiones ambiguas de eliminación-vs-activa.
 
-## Decision
+## Decisión
 
-We keep revision-aware sync, tombstones, and deterministic tie-breakers from ADR 0003, but change the delete-vs-live ambiguity rule:
+Mantenemos la sincronización consciente de revisiones, lápidas y desempates deterministas de ADR 0003, pero cambiamos la regla de ambigüedad de eliminación-vs-activa:
 
-1. Compare delete-vs-live conflicts using operation time (`max(updatedAt, deletedAt)` for tombstones).
-2. If the two operations are more than 30 seconds apart, the newer operation wins.
-3. If the two operations fall within the 30-second ambiguity window and one side has a higher revision number, the higher revision wins.
-4. Otherwise, preserve the live item instead of letting the tombstone win by default.
+1. Comparar conflictos de eliminación-vs-activa usando tiempo de operación (`max(updatedAt, deletedAt)` para lápidas).
+2. Si las dos operaciones están separadas por más de 30 segundos, la operación más nueva gana.
+3. Si las dos operaciones caen dentro de la ventana de ambigüedad de 30 segundos y un lado tiene un número de revisión más alto, la revisión más alta gana.
+4. De lo contrario, preservar el elemento activo en lugar de dejar que la lápida gane de forma predeterminada.
 
-This supersedes the delete-vs-live winner rule in ADR 0003.
+Esto reemplaza la regla de ganador de eliminación-vs-activa en ADR 0003.
 
-## Consequences
+## Consecuencias
 
-- The ADR set now matches the shipped 0.8.2 sync behavior and release notes.
-- Near-simultaneous delete/live races are less likely to discard a valid live edit because of clock skew or stale delete propagation.
-- Delete/live ambiguity remains a behavioral sync rule: future changes still require explicit ADR and test updates.
+- El conjunto de ADR ahora coincide con el comportamiento de sincronización de 0.8.2 enviado y las notas de lanzamiento.
+- Las carreras de eliminación-vs-activa casi simultáneas tienen menos probabilidad de descartar una edición activa válida debido al sesgo de reloj o propagación de eliminación anticuada.
+- La ambigüedad de eliminación-vs-activa sigue siendo una regla de comportamiento de sincronización: los cambios futuros aún requieren actualizaciones explícitas de ADR y pruebas.

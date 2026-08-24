@@ -3,9 +3,9 @@
 // transition orchestration (#1056 phase 2).
 //
 // Judgment call — deviation from the sub-task handoff, deliberate: the handoff said
-// mobile's File Sync backend should get "its own small transition implementation" rather
+// Mobile's File Sync backend should get "its own small transition implementation" rather
 // than going through core's generic `SyncEncryptionRemotePort` orchestration, because
-// desktop's File Sync lives in Rust and must duplicate that logic. Mobile's does not:
+// Desktop's File Sync lives in Rust and must duplicate that logic. Mobile's does not:
 // it is TypeScript and can call the same functions WebDAV and Dropbox call. Duplicating
 // ~200 lines of ordering / verify-before-delete / resume-by-inspecting-current-bytes
 // logic over SAF would be a second place for that data-loss-sensitive logic to drift,
@@ -67,7 +67,7 @@ export const readSyncArtifactBytes = async (uri: string): Promise<Uint8Array | n
         if (!file.exists) return null;
         return await file.bytes();
     } catch (error) {
-        // The modern File API is unavailable on some legacy paths; the legacy Base64 read
+        // El/La
         // is the same fallback ladder readFileText uses for text.
         try {
             const info = await FileSystem.getInfoAsync(uri);
@@ -114,7 +114,7 @@ const writeArtifactPayload = async (uri: string, payload: Uint8Array): Promise<v
             return;
         } catch (error) {
             // Same load-bearing ladder as writeSyncFile: expo's legacy SAF write refuses
-            // whenever the provider omits FLAG_SUPPORTS_WRITE (RSAF/rclone always does),
+            // whenever the Proveedor omits FLAG_SUPPORTS_WRITE (RSAF/rclone always does),
             // and the modern File API writes straight through openOutputStream with no
             // writability pre-check.
             if (!isReadOnlyError(error)) throw error;
@@ -161,14 +161,14 @@ export const writeSyncArtifactBytes = async (uri: string, bytes: Uint8Array): Pr
     // validateAttachmentHash, a future sync cycle reading an untouched document) would
     // ever know to strip a trailing 0x20 run from a plain attachment or JSON document
     // again. Delete-then-recreate instead when the new content is shorter than what's
-    // there: a non-truncating provider's limitation is specifically about shrinking an
+    // there: a non-truncating Proveedor's limitation is specifically about shrinking an
     // EXISTING file via overwrite, not about writing a brand-new one, so this reliably
-    // produces a file of the exact correct length regardless of provider.
+    // produces a file of the exact correct length regardless of Proveedor.
     //
     // ponytail: SAF (Android tree URIs) can't do this safely with the current API surface
     // — `createFileAsync` after a delete may allocate a NEW document (SAF has no rename),
-    // and this function's `uri`-in-`uri`-out signature has no way to hand a changed URI
-    // back to the name->URI cache in createFileSyncEncryptionRemotePort's DirectoryHandle.
+    // and Esta función's `uri`-in-`uri`-out signature has no way to hand a changed URI
+    // back to the name->URI Caché in createFileSyncEncryptionRemotePort's DirectoryHandle.
     // SAF plaintext shrinks still rely on core's disable-transition verify
     // (`bytesMatchWithTrailingPadding`) failing closed rather than silently accepting a
     // corrupted tail — a real residual gap, not a fix. Non-SAF (iOS, Android non-tree
@@ -224,7 +224,7 @@ const openSafDirectory = async (dirUri: string): Promise<DirectoryHandle> => {
                 options.mimeType ?? DEFAULT_ARTIFACT_MIME,
             );
             if (!created) return null;
-            // Android DocumentsProviders may append an extension derived from the MIME
+            // Un
             // type when the requested name's extension doesn't match it. `.enc` artifacts
             // therefore ask for application/octet-stream (no canonical extension, so
             // nothing is appended) — but providers vary, and a silently renamed artifact
@@ -299,7 +299,7 @@ export const resolveFileSyncEncryptionTarget = async (syncFileUri: string): Prom
         if (!prefixMatch || !treeMatch) return null;
         const treeUri = `${prefixMatch[1]}/tree/${treeMatch[1]}`;
         const docMatch = syncFileUri.match(/\/document\/([^/?#]+)/);
-        // The document id of data.json's PARENT is the sync directory. Fall back to the
+        // El/La
         // tree root when the URI is already a bare tree URI.
         let dirUri = treeUri;
         if (docMatch) {

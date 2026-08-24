@@ -6,9 +6,9 @@ import { useTaskStore } from '@mindwtr/core';
 import { logError } from '@/lib/app-log';
 import { ingestPendingCaptures } from '@/lib/pending-captures';
 
-// Drains background Shortcuts captures (#845) into the store on startup and
+// Drena las capturas de Atajos en segundo plano (#845) en la tienda al inicio y
 // on every return to the foreground; the queue directory is empty on every
-// platform and flow that never enqueues, so this is a single stat call.
+// platform and flow that never enqueues, so Esto es a single stat call.
 export function useRootLayoutPendingCaptures({ dataReady }: { dataReady: boolean }) {
     const runningRef = useRef(false);
 

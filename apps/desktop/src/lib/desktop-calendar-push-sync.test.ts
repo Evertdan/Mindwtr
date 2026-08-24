@@ -116,8 +116,8 @@ describe('desktop calendar push sync', () => {
             allDay: true,
         }));
         // EventKit counts every day the [start, end] range touches, so the
-        // instant end must stay inside the same local day (#1065) while the
-        // exclusive date-only endDate above keeps the Linux ICS path correct.
+        // instant end debe stay inside the same local day (#1065) while the
+        // exclusive date-only endDate above keeps the Linux ICS ruta correct.
         const details = createEvent.mock.calls[0][0];
         const endInstant = new Date(details.end);
         expect(endInstant.getFullYear()).toBe(2026);

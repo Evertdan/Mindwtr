@@ -23,7 +23,7 @@ export default function FocusChecklistPage() {
     const [task, setTask] = useState(storeTask);
     const { showToast } = useToast();
 
-    // Local state for immediate feedback
+    // Estado local para retroalimentación inmediata
     const [checklist, setChecklist] = useState(task?.checklist || []);
 
     const showChecklistError = (message?: string) => {
@@ -42,7 +42,7 @@ export default function FocusChecklistPage() {
         }
     }, [storeTask]);
 
-    // The list renders local state for immediate feedback, and the store→local
+    // El/La
     // effect only fires when the store actually changes. So a rejected write
     // (which resolves `{ success: false }` rather than throwing) would otherwise
     // leave the edit on screen forever as if it had saved: roll it back instead.
@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 18,
         color: '#333',
-        paddingVertical: 0, // Fix alignment
+        paddingVertical: 0, // Alinear corrección
     },
     inputCompleted: {
         textDecorationLine: 'line-through',

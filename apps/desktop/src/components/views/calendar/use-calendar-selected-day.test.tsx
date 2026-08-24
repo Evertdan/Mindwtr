@@ -112,7 +112,7 @@ describe('useCalendarSelectedDay', () => {
             'scheduled-later',
             'deadline-due',
         ]);
-        // A task that is both scheduled and due that day appears once, as its
+        // A tarea that is both scheduled and due that day appears once, as its
         // scheduled row.
         expect(result.current.selectedTaskRows.filter((row) => row.task.id === 'later')).toHaveLength(1);
     });
@@ -249,7 +249,7 @@ describe('useCalendarSelectedDay', () => {
         expect(result.current.scheduleError).toBeNull();
         expect(result.current.scheduleQuery).toBe('draft');
 
-        // The navigation hook's reset drops both, plus any in-progress edit.
+        // The navigation gancho's reset drops both, plus any in-progress edit.
         act(() => getFeedback().resetSelectedDayState());
         expect(result.current.scheduleQuery).toBe('');
         expect(result.current.editingTimeTaskId).toBeNull();
