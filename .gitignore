@@ -89,7 +89,6 @@ build-dir/
 
 # Agent files
 AGENT.md
-AGENTS.md
 .codex
 .codegraph/
 .agents
