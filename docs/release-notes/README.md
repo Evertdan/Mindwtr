@@ -1,8 +1,8 @@
-# Release Notes
+# Notas de lanzamiento
 
 Versioned notes for desktop/mobile/core/cloud releases live in this folder.
 
-## Versions
+## Versiones
 
 - [Unreleased](./unreleased.md)
 - [v0.4.2](./0.4.2.md)
