@@ -115,3 +115,10 @@ pnpm-workspace.yaml
 
 # Brainstorming/implementation working files (decisions distilled to docs/adr/)
 docs/superpowers/
+.bmad-loop/runs/
+.bmad-loop/cache/
+.bmad-loop/policy.toml
+_bmad/render/
+
+# Graphify analysis output (generated, not contributor material)
+graphify-out/
