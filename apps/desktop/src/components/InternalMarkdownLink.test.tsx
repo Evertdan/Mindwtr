@@ -97,7 +97,7 @@ describe('InternalMarkdownLink', () => {
         try {
             const { getByRole, getByText } = render(
                 <LanguageProvider>
-                    <InternalMarkdownLink href="mindwtr://tarea/tarea-1" linkContext={currentLinkContext()}>Deleted tarea</InternalMarkdownLink>
+                    <InternalMarkdownLink href="mindwtr://task/task-1" linkContext={currentLinkContext()}>Deleted task</InternalMarkdownLink>
                 </LanguageProvider>
             );
 
