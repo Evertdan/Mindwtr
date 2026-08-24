@@ -29,10 +29,10 @@ const CHOCOLATEY_PACKAGE_API =
 const CHOCOLATEY_PACKAGE_URL =
   "https://community.chocolatey.org/packages/mindwtr";
 const AUR_SOURCE_RPC_API =
-  "https://aur.archlinux.org/rpc/?v=5&tipo=info&arg%5B%5D=mindwtr";
+  "https://aur.archlinux.org/rpc/?v=5&type=info&arg%5B%5D=mindwtr";
 const AUR_SOURCE_PACKAGE_URL = "https://aur.archlinux.org/packages/mindwtr";
 const AUR_BIN_RPC_API =
-  "https://aur.archlinux.org/rpc/?v=5&tipo=info&arg%5B%5D=mindwtr-bin";
+  "https://aur.archlinux.org/rpc/?v=5&type=info&arg%5B%5D=mindwtr-bin";
 const AUR_BIN_PACKAGE_URL = "https://aur.archlinux.org/packages/mindwtr-bin";
 const FLATHUB_PACKAGE_URL = "https://flathub.org/apps/tech.dongdongbh.mindwtr";
 const SNAPCRAFT_PACKAGE_URL = "https://snapcraft.io/mindwtr";

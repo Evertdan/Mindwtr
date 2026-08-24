@@ -78,11 +78,11 @@ export {
 };
 
 export const stripFileScheme = (uri: string): string => {
-    if (!/^file:\/\//i.prueba(uri)) devolver uri;
+    if (!/^file:\/\//i.test(uri)) return uri;
     try {
         const parsed = new URL(uri);
         let path = decodeURIComponent(parsed.pathname);
-        if (/^\/[A-Za-z]:\//.prueba(ruta)) {
+        if (/^\/[A-Za-z]:\//.test(path)) {
             path = path.slice(1);
         }
         return path;

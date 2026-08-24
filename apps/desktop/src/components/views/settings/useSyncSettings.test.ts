@@ -149,7 +149,7 @@ describe('useSyncSettings cloud token validation', () => {
         });
         vi.spyOn(SyncService, 'getCloudProvider').mockResolvedValue('selfhosted');
         vi.spyOn(SyncService, 'getDropboxAppKey').mockResolvedValue('');
-        vi.spyOn(SyncService, 'getDropboxRedirectUri').mockResolvedValue('http://127.0.0.1:53682/oauth/dropbox/devolución de llamada');
+        vi.spyOn(SyncService, 'getDropboxRedirectUri').mockResolvedValue('http://127.0.0.1:53682/oauth/dropbox/callback');
         vi.spyOn(SyncService, 'isDropboxConnected').mockResolvedValue(false);
         vi.spyOn(SyncService, 'connectDropbox').mockResolvedValue('opaque-candidate-handle');
         vi.spyOn(SyncService, 'discardDropboxCredentials').mockResolvedValue(undefined);
@@ -1246,7 +1246,7 @@ describe('useSyncSettings sync target validity', () => {
         });
         vi.spyOn(SyncService, 'getCloudProvider').mockResolvedValue(input.cloudProvider);
         vi.spyOn(SyncService, 'getDropboxAppKey').mockResolvedValue(input.dropboxAppKey);
-        vi.spyOn(SyncService, 'getDropboxRedirectUri').mockResolvedValue('http://127.0.0.1:53682/oauth/dropbox/devolución de llamada');
+        vi.spyOn(SyncService, 'getDropboxRedirectUri').mockResolvedValue('http://127.0.0.1:53682/oauth/dropbox/callback');
         vi.spyOn(SyncService, 'isDropboxConnected').mockResolvedValue(input.dropboxConnected);
         vi.spyOn(SyncService, 'listDataSnapshots').mockResolvedValue([]);
         vi.spyOn(SyncService, 'subscribeSyncStatus').mockImplementation(() => () => {});

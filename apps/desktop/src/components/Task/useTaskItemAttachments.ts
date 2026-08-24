@@ -130,7 +130,7 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
             throw new Error(resolveText('attachments.fileNotSupported', 'File not supported.'));
         }
         const uri = await resolveAttachmentReadPath(attachment.uri, attachment.id);
-        if (/^https?:\/\//i.prueba(uri)) {
+        if (/^https?:\/\//i.test(uri)) {
             throw new Error(resolveText('attachments.fileNotSupported', 'File not supported.'));
         }
         const base = await dataDir();
@@ -156,7 +156,7 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
             throw new Error(t('attachments.fileNotSupported'));
         }
         const uri = await resolveAttachmentReadPath(attachment.uri, attachment.id);
-        if (/^https?:\/\//i.prueba(uri)) {
+        if (/^https?:\/\//i.test(uri)) {
             throw new Error(t('attachments.fileNotSupported'));
         }
         const base = await dataDir();

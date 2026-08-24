@@ -244,7 +244,7 @@ describe("update-service channel selection", () => {
       const url = String(input);
       if (url.includes("community.chocolatey.org/api/v2/Packages()")) {
         return new Response(
-          "<feed><entry><id>http://community.chocolatey.org/api/v2/Packages(Id='mindwtr',versión='1.1.0')</id></entry></feed>",
+          "<feed><entry><id>http://community.chocolatey.org/api/v2/Packages(Id='mindwtr',Version='1.1.0')</id></entry></feed>",
           { status: 200 },
         );
       }

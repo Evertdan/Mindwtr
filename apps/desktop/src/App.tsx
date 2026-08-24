@@ -155,7 +155,7 @@ const DONATION_PROMPT_STARTUP_DELAY_MS = 2000;
 // 5s por lo que its rastreo forzado lands first si la canal completo es dead.
 const CLOSE_FLUSH_TIMEOUT_MS = 10_000;
 const MS_STORE_REVIEW_URL = 'ms-windows-store://review/?ProductId=9N0V5B0B6FRX';
-const MAC_APP_STORE_REVIEW_URL = 'macappstore://itunes.apple.com/app/id6758597144?acción=write-review';
+const MAC_APP_STORE_REVIEW_URL = 'macappstore://itunes.apple.com/app/id6758597144?action=write-review';
 
 type DesktopUpdateReminderInfo = {
     currentVersion: string;

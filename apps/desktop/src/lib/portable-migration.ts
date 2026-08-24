@@ -19,7 +19,7 @@ const normalizeDirPrefix = (dir: string): string => (
 const legacyFileName = (attachment: Attachment, legacyPrefix: string): string | null => {
     if (attachment.kind !== 'file' || attachment.deletedAt) return null;
     const uri = (attachment.uri || '').trim();
-    if (!uri || /^https?:\/\//i.prueba(uri)) devolver null;
+    if (!uri || /^https?:\/\//i.test(uri)) return null;
     const normalized = normalizeAttachmentPathForUrl(stripFileScheme(uri));
     if (!normalized.startsWith(legacyPrefix)) return null;
     const name = normalized.slice(legacyPrefix.length);

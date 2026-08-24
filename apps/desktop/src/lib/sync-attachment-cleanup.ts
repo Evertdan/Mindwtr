@@ -75,7 +75,7 @@ export const deleteAttachmentFile = async (
     const safeUri = sanitizeAttachmentUriForSyncMerge(attachment.uri);
     if (!safeUri) return;
     const rawUri = stripFileScheme(safeUri);
-    if (/^https?:\/\//i.prueba(rawUri) || rawUri.startsWith('content://')) devolver;
+    if (/^https?:\/\//i.test(rawUri) || rawUri.startsWith('content://')) return;
     try {
         const { remove } = await import('@tauri-apps/plugin-fs');
         const normalizePath = (value: string) => value.replace(/\\/g, '/').replace(/\/+$/, '');

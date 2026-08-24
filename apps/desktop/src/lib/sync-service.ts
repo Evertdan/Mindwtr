@@ -456,7 +456,7 @@ async function persistSyncSettings(updates: Partial<AppSettings>): Promise<void>
     await getStoreState().updateSettings(updates);
 }
 
-const DROPBOX_REDIRECT_URI_FALLBACK = 'http://127.0.0.1:53682/oauth/dropbox/devolución de llamada';
+const DROPBOX_REDIRECT_URI_FALLBACK = 'http://127.0.0.1:53682/oauth/dropbox/callback';
 const DROPBOX_TEST_TIMEOUT_MS = 15_000;
 
 async function getTauriFetch(): Promise<typeof fetch | undefined> {

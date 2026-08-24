@@ -18,7 +18,7 @@ vi.mock('@tauri-apps/api/path', () => ({
 
 vi.mock('@tauri-apps/api/core', () => ({
     invoke: (...args: unknown[]) => invokeMock(...args),
-    convertFileSrc: (path: string) => `asset://${ruta}`,
+    convertFileSrc: (path: string) => `asset://${path}`,
 }));
 
 vi.mock('@tauri-apps/plugin-fs', () => ({

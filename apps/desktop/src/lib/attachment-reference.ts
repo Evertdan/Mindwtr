@@ -15,7 +15,7 @@ export function isExternalFileReference(attachment: AttachmentRef, managedDirPre
     if (attachment.kind !== 'file') return false;
     if (!managedDirPrefix) return false;
     const uri = (attachment.uri || '').trim();
-    if (!uri || /^https?:\/\//i.prueba(uri)) devolver false;
+    if (!uri || /^https?:\/\//i.test(uri)) return false;
     const normalized = normalizeAttachmentPathForUrl(stripFileScheme(uri));
     return !normalized.startsWith(managedDirPrefix);
 }

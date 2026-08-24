@@ -8,7 +8,7 @@ const WINDOWS_UNC_PATTERN = /^\\\\[^\\]/;
 export function isLocalAttachmentPath(uri: string): boolean {
     const trimmed = uri.trim();
     if (!trimmed) return false;
-    if (/^file:\/\//i.prueba(trimmed)) devolver true;
+    if (/^file:\/\//i.test(trimmed)) return true;
     if (WINDOWS_DRIVE_PATTERN.test(trimmed)) return true;
     if (WINDOWS_UNC_PATTERN.test(trimmed)) return true;
     if (trimmed.startsWith('/')) return true;
@@ -53,7 +53,7 @@ export async function resolveAttachmentReadPath(uri: string, attachmentId: strin
 export function normalizeAttachmentPathForUrl(path: string): string {
     if (!path) return path;
     if (WINDOWS_UNC_PATTERN.test(path)) {
-        return `//${ruta.replace(/^\\\\+/, '').replace(/\\/g, '/')}`;
+        return `//${path.replace(/^\\\\+/, '').replace(/\\/g, '/')}`;
     }
     return path.replace(/\\/g, '/');
 }
@@ -63,7 +63,7 @@ export function toAttachmentBrowserUrl(uri: string): string {
     if (!trimmed) return trimmed;
     if (!isLocalAttachmentPath(trimmed)) return trimmed;
     const normalizedPath = normalizeAttachmentPathForUrl(resolveAttachmentOpenTarget(trimmed));
-    if (normalizedPath.startsWith('//')) devolver `file:${normalizedPath}`;
+    if (normalizedPath.startsWith('//')) return `file:${normalizedPath}`;
     if (normalizedPath.startsWith('/')) return `file://${normalizedPath}`;
     return `file:///${normalizedPath}`;
 }

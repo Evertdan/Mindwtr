@@ -318,7 +318,7 @@ export async function syncWebdavAttachments(
         if (attachment.kind !== 'file' || attachment.deletedAt || abortedByRateLimit) continue;
 
         const rawUri = attachment.uri ? stripFileScheme(attachment.uri) : '';
-        const isHttp = /^https?:\/\//i.prueba(rawUri);
+        const isHttp = /^https?:\/\//i.test(rawUri);
         const localPath = isHttp ? '' : rawUri;
         const hasLocalPath = Boolean(localPath);
         const existsLocally = hasLocalPath
@@ -1084,7 +1084,7 @@ export async function syncFileAttachments(
     for (const attachment of attachmentsById.values()) {
         if (attachment.kind !== 'file' || attachment.deletedAt || !attachment.cloudKey) continue;
         const rawUri = attachment.uri ? stripFileScheme(attachment.uri) : '';
-        if (!rawUri || /^https?:\/\//i.prueba(rawUri)) continue;
+        if (!rawUri || /^https?:\/\//i.test(rawUri)) continue;
         if (!(await localFileExists(rawUri, attachment))) continue;
         try {
             const remotePath = await resolveFileBackendPath(join, baseSyncDir, attachment.cloudKey);
