@@ -8,7 +8,7 @@ describe('quick-add', () => {
     it('splits bulk quick-add text into trimmed nonblank lines', () => {
         expect(splitQuickAddBulkLines('  Email Bob  \r\nCall Alice\nReview notes +Work  ')).toEqual([
             'Email Bob',
-            'Llamada Alice',
+            'Call Alice',
             'Review notes +Work',
         ]);
         expect(splitQuickAddBulkLines('WeCom message one\r\n  \r\nWeCom message two')).toEqual([
@@ -48,7 +48,7 @@ describe('quick-add', () => {
     });
 
     it('parses energy quick-add commands', () => {
-        const result = parseQuickAdd('Draft proposal /energy:Alto /next');
+        const result = parseQuickAdd('Draft proposal /energy:High /next');
 
         expect(result.title).toBe('Draft proposal');
         expect(result.props.energyLevel).toBe('high');

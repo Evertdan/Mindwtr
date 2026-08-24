@@ -383,7 +383,7 @@ describe('buildReminderSchedule', () => {
         const task = buildTask({
             id: 'task-1',
             title: 'Pay rent',
-            description: '**Importante**',
+            description: '**Important**',
             dueDate: '2026-06-17T09:00:00.000Z',
             repeatReminderMinutes: 30,
         });

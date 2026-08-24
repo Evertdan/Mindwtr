@@ -368,12 +368,12 @@ describe('findLiveAttachmentResourceReferences', () => {
 
     it('matches percent-encoded and decoded spellings of the same local uri', () => {
         expect(isAttachmentLocalResourceReferenced(
-            orphanWithUri('/a/My Archivo.pdf'),
+            orphanWithUri('/a/My File.pdf'),
             buildLiveReferences('file:///a/My%20File.pdf'),
         )).toBe(true);
         expect(isAttachmentLocalResourceReferenced(
             orphanWithUri('file:///a/My%20File.pdf'),
-            buildLiveReferences('/a/My Archivo.pdf'),
+            buildLiveReferences('/a/My File.pdf'),
         )).toBe(true);
     });
 

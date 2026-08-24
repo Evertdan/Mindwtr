@@ -82,7 +82,7 @@ const buildSampleExport = () => ({
             ID: 15,
             TITLE: 'Weekly review',
             TYPE: 0,
-            REPEAT_NEW: 'Cada 6 Weeks',
+            REPEAT_NEW: 'Every 6 Weeks',
             DUE_DATE: '2026-04-13 13:00',
             DUE_TIME_SET: 1,
         },
