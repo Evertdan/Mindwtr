@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
@@ -403,7 +403,22 @@ export function useSyncSettingsTransportActions({
 
     const handleSetSyncPath = useCallback(async () => {
         try {
-            const result = await pickAndParseSyncFolder();
+            // iOS: providers whose Files app integration can't offer folders
+            // (Google Drive, OneDrive, ownCloud…) still work through a backup
+            // JSON picked in place — but only if the user knows the second
+            // sheet exists and what to put in it (#1068).
+            const confirmFileFallback = () => new Promise<boolean>((resolve) => {
+                Alert.alert(
+                    tr('settings.syncMobile.iosFolderFallbackTitle'),
+                    tr('settings.syncMobile.iosFolderFallbackMessage'),
+                    [
+                        { text: tr('common.cancel'), style: 'cancel', onPress: () => resolve(false) },
+                        { text: tr('settings.syncMobile.iosFolderFallbackConfirm'), onPress: () => resolve(true) },
+                    ],
+                    { cancelable: true, onDismiss: () => resolve(false) },
+                );
+            });
+            const result = await pickAndParseSyncFolder({ confirmFileFallback });
             if (!result) return;
             const fileUri = (result as { __fileUri: string }).__fileUri;
             const fileBookmark = (result as { __fileBookmark?: string }).__fileBookmark?.trim() ?? null;

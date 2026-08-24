@@ -443,8 +443,20 @@ const assertIosFileWritable = async (fileUri: string): Promise<void> => {
     }
 };
 
-const pickAndParseIosSyncFolder = async (): Promise<PickResult | null> => {
+export type PickSyncFolderOptions = {
+    /** iOS only: asked before falling back from the folder picker to the
+     *  backup-file picker (providers like Google Drive, OneDrive, and ownCloud
+     *  gray out folder selection). The fallback sheet looks identical to the
+     *  one just dismissed, so without an explanation users never discover it —
+     *  or get an uninvited second picker on a plain cancel (#1068, #210). */
+    confirmFileFallback?: () => Promise<boolean>;
+};
+
+const pickAndParseIosSyncFolder = async (options?: PickSyncFolderOptions): Promise<PickResult | null> => {
     const pickFolderFromExistingFile = async (): Promise<PickResult | null> => {
+        if (options?.confirmFileFallback && !(await options.confirmFileFallback())) {
+            return null;
+        }
         const result = await DocumentPicker.getDocumentAsync({
             type: 'application/json',
             copyToCacheDirectory: false,
@@ -520,10 +532,10 @@ const pickAndParseIosSyncFolder = async (): Promise<PickResult | null> => {
     }
 };
 
-export const pickAndParseSyncFolder = async (): Promise<PickResult | null> => {
+export const pickAndParseSyncFolder = async (options?: PickSyncFolderOptions): Promise<PickResult | null> => {
     if (Platform.OS === 'ios' && typeof ExpoDirectory.pickDirectoryAsync === 'function') {
         try {
-            return await pickAndParseIosSyncFolder();
+            return await pickAndParseIosSyncFolder(options);
         } catch (error) {
             void logError(error, { scope: 'sync', extra: { operation: 'import', message: 'Failed to import data from iOS folder' } });
             throw error;

@@ -242,6 +242,27 @@ describe('iOS sync file bookmarks', () => {
     expect(result?.__fileUri).toBe('file:///gdrive/Mindwtr/backup.json');
   });
 
+  // The fallback sheet looks identical to the folder sheet it follows, so the
+  // caller explains it first; declining must not open an uninvited second
+  // picker (#1068).
+  it('asks before the file fallback and stops when the user declines', async () => {
+    (Directory as unknown as { pickDirectoryAsync: ReturnType<typeof vi.fn> })
+      .pickDirectoryAsync.mockRejectedValue(new Error('Operation was canceled'));
+    (DocumentPicker.getDocumentAsync as ReturnType<typeof vi.fn>).mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///owncloud/Mindwtr/backup.json' }],
+    });
+    bookmarkMocks.createSyncPathBookmark.mockResolvedValue('bm-token');
+    expoFilesMock.set('file:///owncloud/Mindwtr/backup.json', JSON.stringify(appData({})));
+
+    const declined = await pickAndParseSyncFolder({ confirmFileFallback: async () => false });
+    expect(declined).toBeNull();
+    expect(DocumentPicker.getDocumentAsync).not.toHaveBeenCalled();
+
+    const accepted = await pickAndParseSyncFolder({ confirmFileFallback: async () => true });
+    expect(accepted?.__fileUri).toBe('file:///owncloud/Mindwtr/backup.json');
+  });
+
   it('writes the sync file through the bookmarked native path when available', async () => {
     bookmarkMocks.supportsBookmarkedSyncFileIO.mockReturnValue(true);
     bookmarkMocks.writeBookmarkedSyncFileText.mockResolvedValue(undefined);

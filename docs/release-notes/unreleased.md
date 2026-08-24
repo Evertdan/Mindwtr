@@ -6,6 +6,7 @@ Changes collected after `v1.2.1` and before the next version tag.
 
 ## Full Change List
 
+- iOS: when a storage app (Google Drive, OneDrive, ownCloud…) grays out folder selection, canceling the folder screen now explains the alternative — selecting an exported Mindwtr backup file in that app — instead of silently opening a second identical-looking picker. The in-app File Sync instructions now describe this route too. (#1068)
 - Desktop: a task's quick-action menu no longer closes itself — killing the click — when the tap nudges the menu's own contents into view; taps on menu entries like Duplicate could silently do nothing. Scrolling the list behind the menu still dismisses it.
 - Desktop: hand-editing `config.toml` or `secrets.toml` no longer stops the app from starting. The integrity check that guards against half-written config transactions treated any outside edit as corruption; an edited file that still reads cleanly is now accepted as the new state, and one that doesn't parse is reported with the file's name. (#1064)
 - Mobile: tapping "More options" while processing the inbox now scrolls down to the options it reveals, the same way answering a processing question already follows the next step down.

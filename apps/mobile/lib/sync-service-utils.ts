@@ -36,7 +36,7 @@ export const formatSyncErrorMessage = (error: unknown, backend: SyncBackend): st
   const raw = sanitizeSyncErrorMessage(String(error));
   if (backend === 'file') {
     if (IOS_TEMP_INBOX_PATTERN.test(raw) && READONLY_ERROR_PATTERN.test(raw)) {
-      return 'Selected iOS sync file is a temporary Files copy. Google Drive and OneDrive are not reliable for file sync here yet. Use iCloud Drive or WebDAV instead.';
+      return 'Selected iOS sync file is a temporary Files copy. Re-select it in Settings → Sync so Mindwtr can store durable access, or use iCloud Drive or WebDAV instead.';
     }
   }
   return formatCoreSyncErrorMessage(error, backend);
