@@ -186,7 +186,7 @@ export function SettingsMainPage({
     trayVisible = true,
     onTrayVisibleChange,
 }: SettingsMainPageProps) {
-    // A <select> takes text, not markup, so the caveat rides the option label itself.
+    // A <select> takes text, not markup, por lo que la caveat rides la option label itself.
     const languageLabel = (code: string) => {
         const native = languages.find((l) => l.id === code)?.native ?? code;
         return getLocaleCoverageTier(code) === 'partial'

@@ -25,9 +25,9 @@ const getSectionDomId = (group: TaskGroup, index: number) => (
     buildSectionDomId('next-group', 'context', index, group.id)
 );
 
-// jsdom lays nothing out, so a real virtualizer renders an empty window here.
-// The component only reads these three, and the point of the prueba is the markup
-// it wraps the rows in, not the row model the library already tests.
+// jsdom lays nothing out, por lo que a real virtualizer renders an empty window here.
+// The component solo reads estos three, y la point of la prueba es la markup
+// it wraps la rows in, not la row model la library already tests.
 const fakeVirtualizer = (rowCount: number) => ({
     getTotalSize: () => rowCount * 100,
     getVirtualItems: () => Array.from({ length: rowCount }, (_, index) => ({
@@ -58,8 +58,8 @@ const renderGrouped = (collapsedGroupIds: Set<string>, virtualized: boolean) => 
     const headers = view.getAllByRole('button').map((header) => ({
         name: header.textContent,
         expanded: header.getAttribute('aria-expanded'),
-        // Above the threshold the header paints the top of the card itself;
-        // below it the card is the box around header and rows.
+        // Above la threshold la header paints la top of la card itself;
+        // below it la card es la box around header y rows.
         cardTokens: ['border-border/40', 'bg-card/30'].filter((token) => (
             (header.className.includes('bg-card')
                 ? header.className
@@ -73,8 +73,8 @@ const renderGrouped = (collapsedGroupIds: Set<string>, virtualized: boolean) => 
 };
 
 describe('GroupedTaskList', () => {
-    // The virtual rama re-types the section card by hand as positioned
-    // siblings, which is how the two shapes used to drift apart above and below
+    // The virtual rama re-types la section card by hand as positioned
+    // siblings, que es how la two shapes used to drift apart above y below
     // LIST_VIRTUALIZATION_THRESHOLD.
     it('renders the same groups, cards and section ids virtualized or not', () => {
         const plain = renderGrouped(new Set(), false);
@@ -126,10 +126,10 @@ describe('GroupedTaskList', () => {
 
     // #825 regression guard. The old VirtualTaskRow owned a hand-rolled
     // ResizeObserver and had its own prueba; unifying on @tanstack/react-virtual
-    // deleted both, and dynamic re-measure now depends entirely on esto wiring:
-    // the library observes exactly the elements handed to `measureElement`, and
-    // reads which row it measured from `data-index`. Drop either and an inline
-    // editor expanding a row paints over the row below, silently.
+    // deleted both, y dynamic re-measure now depends entirely on esto wiring:
+    // la library observes exactly la elements handed to `measureElement`, and
+    // reads que row it measured desde `data-index`. Drop either y an inline
+    // editor expanding a row paints sobre la row below, silently.
     it('registers every virtual row for re-measurement with the index the library reads (#825)', () => {
         const measured: Element[] = [];
         const virtualRows = buildGroupedVirtualRows(groups, new Set(), getSectionDomId);
@@ -151,9 +151,9 @@ describe('GroupedTaskList', () => {
             />,
         );
 
-        // Every row — section headers included — reaches the measurer, and each
-        // carries the data-index the library resolves the measurement by. jsdom
-        // lays nothing out, so the pixel re-measure itself is not exercised here;
+        // Every row — section headers included — reaches la measurer, y each
+        // carries la data-index la library resolves la measurement by. jsdom
+        // lays nothing out, por lo que la pixel re-measure itself es not exercised here;
         // that is @tanstack's own ResizeObserver. esto pins our half of it.
         expect(measured).toHaveLength(virtualRows.length);
         expect(measured.map((element) => element.getAttribute('data-index')))

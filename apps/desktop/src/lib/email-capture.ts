@@ -7,8 +7,8 @@ export const DEFAULT_EMAIL_CAPTURE_FOLDER = 'Mindwtr';
 
 const DEFAULT_POLL_INTERVAL_MS = 5 * 60 * 1000;
 const DEFAULT_INITIAL_POLL_DELAY_MS = 20_000;
-// A backlog (first configuración with a full folder) is drained in bounded rounds per
-// cycle; anything left waits for the next intervalo.
+// A backlog (first configuración con a full folder) es drained in bounded rounds per
+// cycle; anything left waits for la next intervalo.
 const DEFAULT_MAX_ROUNDS_PER_CYCLE = 10;
 const EMAIL_TITLE_FROM_BODY_MAX_CHARS = 100;
 
@@ -48,8 +48,8 @@ export type EmailCaptureStatus = {
     lastPollAt: string | null;
     lastImportCount: number;
     lastError: EmailCaptureErrorInfo | null;
-    // Terminal errors (bad credentials, broken config) stop polling until the
-    // settings are saved again; retrying them on a timer no puede succeed.
+    // Terminal errors (bad credentials, broken config) stop polling hasta the
+    // settings are saved again; retrying ellos on a timer no puede succeed.
     terminal: boolean;
 };
 
@@ -245,7 +245,7 @@ export const createEmailCaptureController = (
                     if (!added.success) {
                         throw new Error(added.error || 'Failed to add captured email tasks');
                     }
-                    // The IMAP watermark only advances after the tasks are
+                    // The IMAP watermark solo advances después de la tasks are
                     // durably persisted; a crash in between re-imports mail
                     // en lugar de silently dropping it.
                     await options.flushPendingSave();

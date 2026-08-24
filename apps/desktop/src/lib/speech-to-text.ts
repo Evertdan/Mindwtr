@@ -54,7 +54,7 @@ export async function resolveSpeechCapture(settings: AiSettings | undefined): Pr
     const apiSpeechProvider = provider === 'openai' || provider === 'gemini' ? provider : null;
     const modelPath = apiSpeechProvider ? undefined : speech?.offlineModelPath;
     // A uno mismo-hosted OpenAI-compatible server (#930) generalmente has no key; Gemini
-    // has no such escape hatch and keeps requiring one.
+    // has no tal escape hatch y keeps requiring one.
     const baseUrl = provider === 'openai' ? (speech?.baseUrl?.trim() || undefined) : undefined;
     const baseConfig = {
         provider,
@@ -67,8 +67,8 @@ export async function resolveSpeechCapture(settings: AiSettings | undefined): Pr
         parseModel: provider === 'openai' && settings?.provider === 'openai' ? settings?.model : undefined,
     };
     if (!speech?.enabled) {
-        // saltar the key lookup entirely when the característica is off — no reason to
-        // touch the keychain/Tauri IPC on every record-button press.
+        // saltar la key lookup entirely cuando la característica es off — no reason to
+        // touch la keychain/Tauri IPC on cada record-button press.
         return { ready: false, reason: 'disabled', config: { ...baseConfig, apiKey: '' } };
     }
     const apiKey = apiSpeechProvider ? await loadAIKey(apiSpeechProvider).catch(() => '') : '';

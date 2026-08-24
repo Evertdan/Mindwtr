@@ -351,7 +351,7 @@ final class CloudKitSyncManager {
                         case .failure(let error):
                             if let ckError = error as? CKError,
                                ckError.code == .partialFailure {
-                                // Partial failure: per-record callbacks already captured details
+                                // Fallo parcial: per-record callbacks already captured details
                                 continuation.resume(returning: (conflicts, perRecordErrors))
                             } else {
                                 continuation.resume(throwing: error)
@@ -423,7 +423,7 @@ final class CloudKitSyncManager {
                     case .failure(let error):
                         if let ckError = error as? CKError,
                            ckError.code == .partialFailure {
-                            // Some records may be unknownItem (new records) — ignore only those.
+                            // Algunos registros pueden ser unknownItem (new records) — ignore only those.
                             if perRecordErrors.isEmpty {
                                 continuation.resume(returning: results)
                             } else {
@@ -480,7 +480,7 @@ final class CloudKitSyncManager {
                         case .failure(let error):
                             if let ckError = error as? CKError,
                                ckError.code == .partialFailure {
-                                // Only suppress if every per-record error was unknownItem
+                                // Solo suprimir si every per-record error was unknownItem
                                 if realErrors.isEmpty {
                                     continuation.resume()
                                 } else {

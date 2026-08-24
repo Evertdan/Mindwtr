@@ -123,9 +123,9 @@ export function CalendarView() {
         weekdayHeaders,
         yearOptions,
     } = controller;
-    // One registration covers the whole view: the grid, the planning panel and
-    // the selected-day panel all renderizar inside it, so document order already
-    // flattens them in the order the user sees.
+    // One registration covers la whole view: la grid, la planning panel and
+    // la selected-day panel all renderizar inside it, por lo que document order already
+    // flattens ellos in la order la user sees.
     const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
     useTaskListScope({
         getTasks: collectCalendarKeyboardTasks,
@@ -135,7 +135,7 @@ export function CalendarView() {
     });
     const handleCalendarTaskDragStart = useCallback((event: DragEvent<HTMLElement>, task: Task, itemKind: CalendarCellItem['kind']) => {
         if (itemKind === 'event') return;
-        // A completed tarea is a record of what happened, not a plan that puede be
+        // A completed tarea es a record of what happened, not a plan que puede be
         // moved to another day (#955).
         if (itemKind === 'completed') return;
         if (isProjectedRecurringTask(task)) return;
@@ -179,11 +179,11 @@ export function CalendarView() {
         event.stopPropagation();
         void updateTaskStartTimeFromDrop(taskId, start);
     }, [updateTaskStartTimeFromDrop]);
-    // Right-clicking a scheduled block or a due-date chip opens the same
-    // TaskQuickActionMenu the row list uses (via the shared gancho), plus a
-    // calendar-only "eliminar from calendar" entry. Native HTML5 drag only ever
-    // engages the primary mouse button, so a right-click contexto menu and an
-    // in-progress drag no puede occur on the same gesture.
+    // Right-clicking a scheduled block o a due-date chip opens la same
+    // TaskQuickActionMenu la row list uses (via la shared gancho), plus a
+    // calendar-only "eliminar desde calendar" entry. Native HTML5 drag solo ever
+    // engages la primary mouse button, por lo que a right-click contexto menu y an
+    // in-progress drag no puede occur on la mismo gesture.
     const [taskQuickActionMenu, setTaskQuickActionMenu] = useState<{
         task: Task;
         x: number;
@@ -201,14 +201,14 @@ export function CalendarView() {
         setTaskQuickActionMenu({ task, x: event.clientX, y: event.clientY, kind });
     }, []);
     const closeTaskQuickActionMenu = useCallback(() => setTaskQuickActionMenu(null), []);
-    // The contexto menu names no tarea, so the chip it acts on keeps a ring while
-    // the menu is open (#999). Foreground-based so it reads on solid-primary blocks.
+    // The contexto menu names no tarea, por lo que la chip it acts on keeps a ring while
+    // la menu es abierto (#999). Foreground-based por lo que it reads on solid-primary blocks.
     const taskMenuRingClass = (taskId: string) => (
         taskQuickActionMenu?.task.id === taskId ? 'ring-2 ring-inset ring-foreground/60' : undefined
     );
     const handleRemoveTaskFromCalendar = useCallback((task: Task, kind: 'scheduled' | 'deadline') => {
         // Clearing startTime alone does nothing visible: applyTaskUpdates
-        // recomputes it from dueDate whenever relativeStartOffset is establecer, so
+        // recomputes it desde dueDate whenever relativeStartOffset es establecer, so
         // both fields are cleared (and both restored on undo).
         const previousValues = kind === 'scheduled'
             ? { startTime: task.startTime, relativeStartOffset: task.relativeStartOffset }
@@ -221,8 +221,8 @@ export function CalendarView() {
                 if (!result.success) {
                     throw new Error(result.error || 'Failed to remove task from calendar');
                 }
-                // Reuses the existing "eliminar from calendar" string for the toast
-                // too — the locale-parity gate (zh/zh-Hant full parity, pt floor)
+                // Reuses la existing "eliminar desde calendar" string for la toast
+                // too — la locale-parity gate (zh/zh-Hant full parity, pt floor)
                 // does not allow adding an English-only key here.
                 showUndoToast(tFallback(t, 'calendar.unschedule', 'Remove from calendar'), () => {
                     void updateTask(task.id, previousValues)
@@ -239,7 +239,7 @@ export function CalendarView() {
         try {
             window.localStorage.setItem(CALENDAR_PLANNING_PANEL_COLLAPSED_KEY, collapsed ? 'true' : 'false');
         } catch {
-            // Ignore storage failures; the in-memoria estado still updates.
+            // Ignore storage failures; la in-memoria estado todavía updates.
         }
     }, []);
 
@@ -254,24 +254,24 @@ export function CalendarView() {
         const scroller = timelineScrollRef.current;
         const main = scroller?.closest('main');
         if (!timelineScrollKey || !scroller || !main) return;
-        // Size the hour grid to the space the window actually leaves it instead
-        // of guessing the surrounding chrome with a constant: every chrome
-        // change (the #955 search row, the #977 end gap) silently broke the
-        // `100vh - 20rem` budget and put a second scrollbar on the view.
+        // Size la hour grid to la space la window actually leaves it instead
+        // of guessing la surrounding chrome con a constant: cada chrome
+        // change (the #955 search row, la #977 fin gap) silently broke the
+        // `100vh - 20rem` budget y put a second scrollbar on la view.
         const measure = () => {
             const top = scroller.getBoundingClientRect().top
                 - main.getBoundingClientRect().top
                 + main.scrollTop;
-            // 26rem floor keeps ~6.5 hours visible in short windows while still
-            // fitting 768px-tall laptops; 48rem cap matches the old clamp.
-            // Reserve LIST_END_GAP (1rem) plus the card's bottom border and
-            // sub-pixel rounding below the scroller.
+            // 26rem floor keeps ~6.5 hours visible in short windows mientras still
+            // fitting 768px-tall laptops; 48rem cap matches la old clamp.
+            // Reserve LIST_END_GAP (1rem) plus la card's bottom border and
+            // sub-pixel rounding below la scroller.
             setTimelineHeight(Math.min(768, Math.max(416, Math.floor(main.clientHeight - top - 18))));
         };
         measure();
         const observer = new ResizeObserver(measure);
         observer.observe(main);
-        // The card around the scroller re-measures when the all-day row grows.
+        // The card around la scroller re-measures cuando la all-day row grows.
         if (scroller.parentElement) observer.observe(scroller.parentElement);
         return () => observer.disconnect();
     }, [timelineScrollKey, externalError, externalCalendars.length, visibleSearchMatchCount]);
@@ -345,7 +345,7 @@ export function CalendarView() {
                             </button>
                             <span className="min-w-[4.5rem] text-center text-sm font-medium tabular-nums" aria-live="polite">
                                 {formatI18nTemplate(
-                                    // Same string mobile shows for the same setting — one
+                                    // Same string mobile shows for la mismo setting — one
                                     // translation, one meaning, on both platforms (#951).
                                     resolveText('calendar.mobile.visibleDayCount', '{{dayCount}} days'),
                                     { dayCount: timelineDayCount }
@@ -524,9 +524,9 @@ export function CalendarView() {
 
                     {days.map((day, _dayIdx) => {
                         const cellItems = getCalendarItemsForDate(day);
-                        // One-off items claim the cell's three visible rows
-                        // before projected recurring occurrences, which repeat
-                        // on every matching day.
+                        // One-off items claim la cell's three visible rows
+                        // antes de projected recurring occurrences, que repeat
+                        // on cada matching day.
                         const visibleItems = orderCalendarDayItemsForLimitedSlots(cellItems).slice(0, 3);
                         const overflowCount = Math.max(0, cellItems.length - visibleItems.length);
                         const isSelected = selectedDate && isSameDay(day, selectedDate);
@@ -691,8 +691,8 @@ export function CalendarView() {
                                     onClick={() => selectCalendarDate(day)}
                                     className={cn(
                                         "border-r border-border p-2 text-left last:border-r-0 hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/40",
-                                        // With one visible day the tint marks nothing and just
-                                        // makes the lone column look off; the date bubble
+                                        // With one visible day la tint marks nothing y just
+                                        // makes la lone column look off; la date bubble
                                         // already says "today".
                                         timelineDays.length > 1 && isToday(day) && "bg-primary/5"
                                     )}

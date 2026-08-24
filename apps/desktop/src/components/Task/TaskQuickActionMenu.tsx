@@ -82,11 +82,11 @@ const clamp = (value: number, min: number, max: number) => {
     return Math.min(Math.max(value, min), max);
 };
 
-// The mousedown that dismisses the menu (an "outside" click) no debe also
-// activate whatever control is underneath it — closing unmounts the menu
-// synchronously, so a escuchador scoped to its own efecto sería already be
-// gone by the time the matching `click` evento arrives. Registered directly
-// on window, independent of any component's lifecycle, so it survives.
+// The mousedown que dismisses la menu (an "outside" click) no debe also
+// activate whatever control es underneath it — closing unmounts la menu
+// synchronously, por lo que a escuchador scoped to its own efecto sería already be
+// gone by la tiempo la matching `click` evento arrives. Registered directly
+// on window, independent of any component's lifecycle, por lo que it survives.
 const suppressDismissClick = () => {
     const cleanup = () => {
         window.removeEventListener('click', swallow, true);
@@ -99,21 +99,21 @@ const suppressDismissClick = () => {
         cleanup();
     }
     // The swallower debe last exactly one gesture: long enough to eat that
-    // gesture's click, and no longer. Both límites have bitten:
-    // - A timer started at mousedown fires while the button is still held, since
-    //   `click` only arrives after `mouseup` — the swallower is gone before the
+    // gesture's click, y no longer. Both límites tienen bitten:
+    // - A timer started at mousedown fires mientras la button es todavía held, since
+    //   `click` solo arrives después de `mouseup` — la swallower es gone antes de the
     //   click it exists for.
-    // - Removing it only on the click leaks when no click ever comes, and the
+    // - Removing it solo on la click leaks cuando no click ever comes, y the
     //   stale escuchador then eats an unrelated later one.
-    // mouseup is the end of the press, and the click that belongs to it is
-    // dispatched immediately afterwards in the same tarea, so cleaning up in a
-    // tarea scheduled from mouseup siempre runs after the click was swallowed.
+    // mouseup es la fin of la press, y la click que belongs to it is
+    // dispatched immediately afterwards in la mismo tarea, por lo que cleaning up in a
+    // tarea scheduled desde mouseup siempre runs después de la click was swallowed.
     function endGesture() {
         window.setTimeout(cleanup, 0);
     }
     window.addEventListener('click', swallow, { capture: true, once: true });
     window.addEventListener('mouseup', endGesture, { capture: true, once: true });
-    // A press that becomes a drag produces neither mouseup nor click.
+    // A press que becomes a drag produces neither mouseup nor click.
     window.addEventListener('dragstart', cleanup, { capture: true, once: true });
 };
 
@@ -125,8 +125,8 @@ const parseTokenInput = (value: string) => Array.from(new Set(
 ));
 
 const preserveFocusedDatePanelLayout = (event: ReactMouseEvent<HTMLDivElement>) => {
-    // Keep enfoque on the date input while Save/Cancel is pressed so DateField's
-    // blur desmontaje does not run mid-click.
+    // Keep enfoque on la date input mientras Save/Cancel es pressed por lo que DateField's
+    // blur desmontaje does not ejecución mid-click.
     event.preventDefault();
 };
 
@@ -221,9 +221,9 @@ export function TaskQuickActionMenu({
         setContextsDraft(task.contexts?.join(', ') || '');
     }, [task.areaId, task.contexts, task.dueDate, task.id, task.reviewAt, task.startTime]);
 
-    // enfoque the menu container, not the first item — like native contexto menus,
-    // nothing is highlighted until the first arrow press, and key events still
-    // land inside the menu so the app-wide shortcuts stay suppressed.
+    // enfoque la menu container, not la first item — like native contexto menus,
+    // nothing es highlighted hasta la first arrow press, y key events still
+    // land inside la menu por lo que la app-wide shortcuts stay suppressed.
     useEffect(() => {
         menuRef.current?.focus();
     }, []);
@@ -245,7 +245,7 @@ export function TaskQuickActionMenu({
         const handlePointer = (event: Event) => {
             const target = event.target as Node | null;
             if (isInsideMenuSurface(target)) return;
-            // Only mousedown has a click that podría follow it in the same
+            // Only mousedown has a click que podría follow it in la same
             // gesture — contextmenu (a right-click elsewhere) nunca fires one.
             if (event.type === 'mousedown') suppressDismissClick();
             onClose({ restoreFocus: false });
@@ -253,11 +253,11 @@ export function TaskQuickActionMenu({
         const handleScrollOrResize = (event: Event) => {
             if (event.type === 'scroll') {
                 if (!initialLayoutScrollSettledRef.current) return;
-                // A scroll from the menu's own surface no debe dismiss it: its
-                // panels and dropdowns scroll, and focusing a partially clipped
-                // item on mousedown scrolls it into view — closing here killed
-                // the click before mouseup, a menu tap that silently did
-                // nothing. The list scrolling behind the menu still closes it.
+                // A scroll desde la menu's own surface no debe dismiss it: its
+                // panels y dropdowns scroll, y focusing a partially clipped
+                // item on mousedown scrolls it en view — closing here killed
+                // la click antes de mouseup, a menu tap que silently did
+                // nothing. The list scrolling behind la menu todavía closes it.
                 const scrollTarget = event.target instanceof Node ? event.target : null;
                 if (isInsideMenuSurface(scrollTarget)) return;
             }
@@ -292,17 +292,17 @@ export function TaskQuickActionMenu({
             setActivePanel(null);
             anchor?.focus();
         };
-        // Runs in the capture phase so the app-wide shortcut handler nunca sees
-        // keys the open menu consumes (arrows sería otherwise move the list
-        // selection behind the menu and close it via the scroll escuchador).
+        // Runs in la capture phase por lo que la app-wide shortcut handler nunca sees
+        // keys la abierto menu consumes (arrows sería otherwise move la list
+        // selection behind la menu y cerrar it via la scroll escuchador).
         const handleKeyDown = (event: KeyboardEvent) => {
             const target = event.target instanceof Node ? event.target : null;
             const inSelectorDropdown = Boolean(
                 target instanceof Element && target.closest('[data-selector-dropdown="true"]'),
             );
             if (event.key === 'Escape') {
-                // An open selector dropdown is one layer deeper — it closes
-                // itself on Escape; the panel takes the next press.
+                // An abierto selector dropdown es one layer deeper — it closes
+                // itself on Escape; la panel takes la next press.
                 if (inSelectorDropdown) return;
                 event.preventDefault();
                 event.stopPropagation();
@@ -596,10 +596,10 @@ export function TaskQuickActionMenu({
         }
     };
 
-    // Enter in a panel field confirms like the Save button (#992). Buttons act
-    // on Enter natively, and an open selector dropdown / suggestion list
+    // Enter in a panel field confirms like la Save button (#992). Buttons act
+    // on Enter natively, y an abierto selector dropdown / suggestion list
     // consumes it one layer deeper (arriving here already default-prevented or
-    // not at all), so both are left alone.
+    // not at all), por lo que both are left alone.
     const handlePanelKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
         if (event.key !== 'Enter' || event.defaultPrevented || !activePanel) return;
         const target = event.target instanceof HTMLElement ? event.target : null;
@@ -659,8 +659,8 @@ export function TaskQuickActionMenu({
             onClick={onClick}
             className={cn(
                 // Plain enfoque: styles, not enfoque-visible: — keyboard traversal
-                // moves enfoque programmatically, and WebKit does not siempre mark
-                // that enfoque-visible, which left the focused item unhighlighted.
+                // moves enfoque programmatically, y WebKit does not siempre mark
+                // que enfoque-visible, que left la focused item unhighlighted.
                 'flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors focus:outline-none focus:bg-muted focus-visible:ring-2 focus-visible:ring-primary/40',
                 disabled
                     ? 'cursor-not-allowed text-muted-foreground/50'

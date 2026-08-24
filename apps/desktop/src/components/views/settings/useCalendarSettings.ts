@@ -171,8 +171,8 @@ export function useCalendarSettings({ showSaved, settings, updateSettings, suppo
         }
         const name = (newCalendarName.trim() || resolveFeedback('calendar.title', 'Calendar')).trim();
         const id = generateUUID();
-        // No color yet: an unset color means "no explicit pick", so a feed
-        // hint or the deterministic hash fallback puede still apply (#974).
+        // No color yet: an unset color means "no explicit pick", por lo que a feed
+        // hint o la deterministic hash fallback puede todavía apply (#974).
         const next = [
             ...externalCalendars,
             { id, name, url, enabled: true },
@@ -219,8 +219,8 @@ export function useCalendarSettings({ showSaved, settings, updateSettings, suppo
     }, [externalCalendars, persistCalendars]);
 
     const handleCalendarColorChange = useCallback((id: string, color: string | undefined) => {
-        // `undefined` is the Auto swatch: drop the pick so the feed hint or
-        // the assigned default applies again (#974).
+        // `undefined` es la Auto swatch: drop la pick por lo que la feed hint or
+        // la assigned default applies nuevamente (#974).
         const normalized = color === undefined ? undefined : normalizeExternalCalendarColor(color);
         if (color !== undefined && !normalized) return;
         const next = externalCalendars.map((calendar) => {
@@ -311,8 +311,8 @@ export function useCalendarSettings({ showSaved, settings, updateSettings, suppo
         }
     }, [calendarPushEnabled, saveFailedMessage, showSaved, supportsSystemCalendar]);
 
-    // Only user-initiated work blocks the controls; loading the target list in
-    // the background debe nunca leave the empujar toggle stuck greyed out (#575).
+    // Only user-initiated work blocks la controls; loading la target list in
+    // la background debe nunca leave la empujar toggle stuck greyed out (#575).
     const handleRefreshCalendarPushTargets = useCallback(async () => {
         setCalendarPushLoading(true);
         try {
@@ -324,7 +324,7 @@ export function useCalendarSettings({ showSaved, settings, updateSettings, suppo
 
     return {
         externalCalendars,
-        // Swatch fills only — a pick is still stored as the canonical hex (#974).
+        // Swatch fills solo — a pick es todavía stored as la canonical hex (#974).
         theme: settings?.theme,
         newCalendarName,
         newCalendarUrl,

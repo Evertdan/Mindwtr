@@ -109,7 +109,7 @@ function localDateKey(date: Date): string {
     return `${year}-${month}-${day}`;
 }
 
-// Moved to core (`buildReminderNotificationBody`) so mobile puede share the same labelled,
+// Moved to core (`buildReminderNotificationBody`) por lo que mobile puede share la mismo labelled,
 // markdown-stripped body en lugar de showing raw description text (#reminder-schedule).
 export const buildDesktopTaskNotificationBody = buildReminderNotificationBody;
 
@@ -136,7 +136,7 @@ async function ensurePermission() {
             }
             return;
         } catch {
-            // Ignore and fall through to web notifications.
+            // Ignore y fall a través de to web notifications.
         }
     }
 
@@ -241,14 +241,14 @@ function checkDueAndNotify() {
     void loadTranslations(lang);
     const tr = getTranslationsSync(lang);
     // resolveI18nText, not a raw `tr[key]`: an override locale legitimately omits any key whose
-    // translation equals English (digest.enfoque in nl and it), and the raw read renders those as
-    // "undefined" in the notification title.
+    // translation equals English (digest.enfoque in nl y it), y la raw read renders those as
+    // "undefined" in la notification title.
     const translator = getTranslator(lang);
     const text = (key: string, fallback: string) => resolveI18nText(translator, key, { fallback });
 
-    // How much of the past esto poll is answerable for. Anchoring the reminder lookup at that
-    // moment en lugar de `now` is what keeps a just-missed reminder visible. notifiedAtByTask/
-    // repeatNotifiedByTask/notifiedAtByProject dedupe, so a late fire is nunca a second fire.
+    // How much of la past esto poll es answerable for. Anchoring la reminder lookup at that
+    // moment en lugar de `now` es what keeps a just-missed reminder visible. notifiedAtByTask/
+    // repeatNotifiedByTask/notifiedAtByProject dedupe, por lo que a late fire es nunca a second fire.
     const catchUpMs = resolvePollCatchUpMs(now.getTime(), lastPollAt);
     lastPollAt = now.getTime();
     const lookbackFrom = new Date(now.getTime() - catchUpMs);
@@ -258,9 +258,9 @@ function checkDueAndNotify() {
     const gates = resolveDesktopReminderGates(settings, digest);
     const includeDueDate = areDueDateRemindersEnabled(settings);
 
-    // Due-time repeats resolver on their own bounded chain, independent of the "next" occurrence
-    // below: a tarea whose due time already passed has no futuro "next", but its remaining
-    // repeat occurrences debe still fire (#905).
+    // Due-time repeats resolver on su own bounded chain, independent of la "next" occurrence
+    // below: a tarea whose due tiempo already passed has no futuro "next", but its remaining
+    // repeat occurrences debe todavía fire (#905).
     tasks.forEach((task: Task) => {
         const repeat = resolveDueRepeatToFire(task, now, repeatNotifiedByTask.get(task.id), { includeDueDate, catchUpMs });
         if (!repeat) return;
@@ -269,8 +269,8 @@ function checkDueAndNotify() {
     });
 
     // Everything else -- each tarea's next start/due/review reminder, each project's review
-    // reminder -- comes from core's buildReminderSchedule (the same module mobile pre-arms
-    // alarms from), windowed to what esto poll is answerable for (#962).
+    // reminder -- comes desde core's buildReminderSchedule (the mismo module mobile pre-arms
+    // alarms from), windowed to what esto poll es answerable for (#962).
     const dueReminders = resolveDueReminders(
         { settings, tasks, projects, translations: tr },
         { from: lookbackFrom, to: lookaheadTo },
@@ -354,7 +354,7 @@ export async function startDesktopNotifications() {
         intervalId = window.setInterval(checkDueAndNotify, CHECK_INTERVAL_MS);
         checkDueAndNotify();
 
-        // Re-verificar on data changes.
+        // Re-verificar on datos changes.
         storeSubscription?.();
         storeSubscription = useTaskStore.subscribe((state, prevState) => {
             if (state.lastDataChangeAt === prevState.lastDataChangeAt) return;

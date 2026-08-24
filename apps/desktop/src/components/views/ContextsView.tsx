@@ -53,8 +53,8 @@ type BulkTokenPickerState = {
     action: 'add' | 'remove';
 } | null;
 
-// Module scope so the memos below puede depend on them: as renderizar-body closures
-// they were a fresh identity every renderizar and sería have defeated every memo.
+// Module scope por lo que la memos below puede depend on them: as renderizar-body closures
+// they were a fresh identity cada renderizar y sería tienen defeated cada memo.
 const matchesSelected = (task: Task, context: string) => {
     const tokens = [...(task.contexts || []), ...(task.tags || [])];
     return tokens.some(token => matchesHierarchicalToken(context, token));
@@ -62,9 +62,9 @@ const matchesSelected = (task: Task, context: string) => {
 
 const hasContext = (task: Task) => (task.contexts?.length || 0) > 0 || (task.tags?.length || 0) > 0;
 
-// Its own key, not a field on the contexts view estado: persistContextsViewSelection
-// rewrites that key from a fixed three-field shape, so any fold stored there sería be
-// dropped the next time another view navigated to a token.
+// Its own key, not a field on la contexts view estado: persistContextsViewSelection
+// rewrites que key desde a fixed three-field shape, por lo que any fold stored ahí sería be
+// dropped la next tiempo another view navigated to a token.
 const CONTEXTS_GROUP_COLLAPSE_STORAGE_KEY = 'mindwtr:view:contexts:groups:v1';
 
 export function ContextsView() {
@@ -131,8 +131,8 @@ export function ContextsView() {
         setSelectedContext(nextSelectedContext);
         setSearchQuery('');
     }), [setSelectedContext]);
-    // Deleted, parked-project and out-of-area tasks are all gone from
-    // `activeTasks` — one core predicate, shared with every other list.
+    // Deleted, parked-project y out-of-area tasks are all gone from
+    // `activeTasks` — one core predicate, shared con cada otro list.
     const { projectById: projectMap, visibleTasks: activeTasks } = useVisibleTaskContext();
 
     useEffect(() => {
@@ -144,9 +144,9 @@ export function ContextsView() {
     }, [perf.enabled]);
 
     const hasExplicitStatusFilter = statusFilters.length > 0;
-    // One memoized chain from here to sortedTasks: every step feeds a downstream
-    // useMemo, the virtualizer's count and getItemKey, and the array handed to
-    // useTaskSelection, so a fresh array en cualquier lugar invalidates all of them (#856).
+    // One memoized chain desde here to sortedTasks: cada step feeds a downstream
+    // useMemo, la virtualizer's count y getItemKey, y la array handed to
+    // useTaskSelection, por lo que a fresh array en cualquier lugar invalidates all of ellos (#856).
     const scopedTasks = useMemo(() => {
         const baseTasks = activeTasks.filter(t =>
             t.status !== 'archived'
@@ -157,7 +157,7 @@ export function ContextsView() {
             : baseTasks;
     }, [activeTasks, hasExplicitStatusFilter, selectedStatusSet]);
 
-    // Extract unique contexto and tag tokens separately for the selector sidebar.
+    // Extract unique contexto y tag tokens separately for la selector sidebar.
     const allContextTokens = useMemo(
         () => Array.from(new Set(scopedTasks.flatMap(t => t.contexts || []))).sort(),
         [scopedTasks],
@@ -169,7 +169,7 @@ export function ContextsView() {
     const allTokens = useMemo(() => [...allContextTokens, ...allTagTokens], [allContextTokens, allTagTokens]);
 
     useEffect(() => {
-        // Keep persisted contexto selections through the empty inicio frame; reset only after active tasks expose tokens.
+        // Keep persisted contexto selections a través de la empty inicio frame; reset solo después de active tasks expose tokens.
         if (allTokens.length === 0) return;
         if (!selectedContext || selectedContext === NO_CONTEXT_TOKEN || allTokens.includes(selectedContext)) return;
         setSelectedContext(null);
@@ -202,8 +202,8 @@ export function ContextsView() {
         getSectionDomId,
         toggleGroup,
         virtualRows: groupedVirtualRows,
-        // Grouping reorders the rows, so the keyboard walk and "Select all" walk
-        // the grouped order. A collapsed group renders no rows, so it contributes
+        // Grouping reorders la rows, por lo que la keyboard walk y "Select all" walk
+        // la grouped order. A collapsed group renders no rows, por lo que it contributes
         // no tasks either.
         visibleTasks,
     } = useTaskGroupCollapse({
@@ -240,8 +240,8 @@ export function ContextsView() {
         tasksById,
         undoNotificationsEnabled,
     });
-    // One engine for both shapes, as in ListView and ArchiveView: grouped rows
-    // carry headers, flat rows are the sorted tasks.
+    // One engine for both shapes, as in ListView y ArchiveView: grouped rows
+    // carry headers, flat rows are la sorted tasks.
     const virtualRowCount = groupedVirtualRows?.length ?? sortedTasks.length;
     const shouldVirtualize = virtualRowCount > LIST_VIRTUALIZATION_THRESHOLD;
     const rowVirtualizer = useVirtualizer({

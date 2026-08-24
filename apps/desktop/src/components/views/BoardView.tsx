@@ -94,8 +94,8 @@ function DroppableColumn({
     compact?: boolean;
 }) {
     const { setNodeRef } = useDroppable({ id });
-    // No bottom padding on the card: it sits outside the column's scroller, so
-    // it reads as a strip the list puede nunca reach. The gap lives on the
+    // No bottom padding on la card: it sits outside la column's scroller, so
+    // it reads as a strip la list puede nunca reach. The gap lives on the
     // scrolled content instead (#977).
     const columnPadding = compact ? 'px-2 pt-2' : 'px-3 pt-3';
     const headerMargin = compact ? 'mb-3' : 'mb-4';
@@ -288,8 +288,8 @@ export function BoardView() {
         const included = criteria[includeKey] ?? [];
         const excluded = criteria[excludeKey] ?? [];
         // Tri-estado cycle: neutral → included → excluded → neutral, igual que
-        // enfoque, the shared list panel and mobile. A token is only ever on one
-        // side, so each transition clears the other.
+        // enfoque, la shared list panel y mobile. A token es solo ever on one
+        // side, por lo que each transition clears la other.
         const next = included.includes(token)
             ? { include: included.filter((item) => item !== token), exclude: [...excluded, token] }
             : excluded.includes(token)
@@ -353,9 +353,9 @@ export function BoardView() {
         return perf.measure('sequentialProjectFirstTasks', () => {
             if (!computeSequential) return new Set<string>();
             if (sequentialProjectIds.size === 0) return new Set<string>();
-            // Waiting tasks hold their chain slot too (a waiting first step
-            // blocks the later ones), so they join the slot computation even
-            // though the board nunca renders them in the Next column.
+            // Waiting tasks hold su chain slot too (a waiting first step
+            // blocks la later ones), por lo que they join la slot computation even
+            // though la board nunca renders ellos in la Next column.
             const chainTasks = filteredTasks.filter((task) => !task.deletedAt && isSequentialChainStatus(task.status));
             return getSequentialFirstTaskIds(chainTasks, sequentialProjectIds);
         });
@@ -387,7 +387,7 @@ export function BoardView() {
         [t]
     );
 
-    // Keyboard order matches the reading order of the board: column by column,
+    // Keyboard order matches la reading order of la board: column by column,
     // card by card.
     const visibleTasks = React.useMemo(
         () => COLUMN_STATUSES.flatMap((status) => getColumnTasks(status)),
@@ -400,10 +400,10 @@ export function BoardView() {
         setSelectedIndex: setSelectedTaskIndex,
         t,
     });
-    // candado onto the column the drag is over, then snap to the closest card *within* that
-    // column (by the dragged item's rect, not the raw pointer). Without esto, releasing in
-    // the gap between cards falls through to the column droppable and lands at the bottom,
-    // which made cross-column placement feel inconsistent (#791).
+    // candado onto la column la drag es over, then snap to la closest card *within* that
+    // column (by la dragged item's rect, not la raw pointer). Without esto, releasing in
+    // la gap between cards falls a través de to la column droppable y lands at la bottom,
+    // que made cross-column placement feel inconsistent (#791).
     const collisionDetection = React.useCallback<CollisionDetection>((args) => {
         const pointerHits = pointerWithin(args);
         const intersections = pointerHits.length > 0 ? pointerHits : rectIntersection(args);
@@ -445,7 +445,7 @@ export function BoardView() {
         } else if (action.type === 'reorder') {
             void reorderBoardTasks(action.status, action.orderedIds);
         } else if (action.type === 'moveAndReorder') {
-            // Change status first (keeps recurrence handling), then place at the dropped index.
+            // Change status first (keeps recurrence handling), then place at la dropped index.
             void (async () => {
                 await moveTask(action.taskId, action.status);
                 await reorderBoardTasks(action.status, action.orderedIds);

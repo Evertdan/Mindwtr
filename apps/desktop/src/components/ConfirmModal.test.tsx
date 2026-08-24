@@ -64,11 +64,11 @@ describe('ConfirmModal', () => {
     });
 
     it('keeps the buttons reachable when the title is very long (#947)', () => {
-        // Trash confirms a permanent eliminar with the tarea title as the dialog
-        // title, so a pasted-paragraph title used to grow the card past the
-        // bottom of the screen. jsdom has no layout, so pin the structure that
+        // Trash confirms a permanent eliminar con la tarea title as la dialog
+        // title, por lo que a pasted-paragraph title used to grow la card past the
+        // bottom of la screen. jsdom has no layout, por lo que pin la structure that
         // makes it impossible: a height-capped card whose header scrolls on its
-        // own, with the buttons outside that scroll area.
+        // own, con la buttons outside que scroll area.
         const { getByRole } = render(
             <ConfirmModal
                 isOpen

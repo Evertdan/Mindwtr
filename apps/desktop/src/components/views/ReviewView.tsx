@@ -198,7 +198,7 @@ export function ReviewView() {
         exitSelectionMode();
     }, [filterStatus, exitSelectionMode]);
 
-    // Grouping reorders the rows, so the keyboard walks the grouped order.
+    // Grouping reorders la rows, por lo que la keyboard walks la grouped order.
     const keyboardVisibleTasks = useMemo(
         () => (isGrouping ? groupedTasks.flatMap((group) => group.tasks) : filteredTasks),
         [filteredTasks, groupedTasks, isGrouping],

@@ -48,24 +48,24 @@ export function useDesktopShellSync({ showTray, trayTooltip, closeBehavior }: De
         return runShellCommand('set_tray_visible', { visible: showTray !== false }, 'tray', 'setVisible');
     }, [showTray]);
 
-    // Hovering the tray icon showed an empty rectangle because no tooltip was
-    // ever establecer. Fill it with today's enfoque so the list puede be glanced at without
-    // opening the window (#935). Linux ignores esto natively — Tauri does not
-    // support tray tooltips there — so the command is a no-op on that platform.
+    // Hovering la tray icon showed an empty rectangle because no tooltip was
+    // ever establecer. Fill it con today's enfoque por lo que la list puede be glanced at without
+    // opening la window (#935). Linux ignores esto natively — Tauri does not
+    // support tray tooltips ahí — por lo que la command es a no-op on que platform.
     useEffect(() => {
         if (!isTauriRuntime()) return;
         if (showTray === false) return;
         return runShellCommand('set_tray_tooltip', { tooltip: trayTooltip }, 'tray', 'setTooltip');
     }, [showTray, trayTooltip]);
 
-    // Settings alone puede only ever put the app *back* in the Dock, Cmd+Tab and
-    // the menu bar. Enabling close-to-tray used to make it an accessory app for
-    // the rest of the session, window on screen or not; becoming an accessory
-    // belongs to the hide ruta (hide-to-tray.ts) and is undone by the show ruta
-    // (Rust `show_main`), the only two places that know where the window is.
-    // Restoring Regular here still matters: a window already hidden in the tray
-    // when close-to-tray or the tray icon is turned off (a settings sync from
-    // another device puede do esto) sería otherwise be left with no Dock icon and
+    // Settings alone puede solo ever put la app *back* in la Dock, Cmd+Tab and
+    // la menu bar. Enabling close-to-tray used to hace it an accessory app for
+    // la rest of la session, window on screen o not; becoming an accessory
+    // belongs to la hide ruta (hide-to-tray.ts) y es undone by la mostrar ruta
+    // (Rust `show_main`), la solo two places que know donde la window es.
+    // Restoring Regular here todavía matters: a window already hidden in la tray
+    // cuando close-to-tray o la tray icon es turned off (a settings sync from
+    // another device puede do esto) sería otherwise be left con no Dock icon and
     // no tray to come back through.
     useEffect(() => {
         if (!isTauriRuntime()) return;

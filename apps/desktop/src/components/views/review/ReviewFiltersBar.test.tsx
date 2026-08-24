@@ -31,7 +31,7 @@ describe('ReviewFiltersBar', () => {
         expect(activeFilterStyle).toContain('color: hsl(var(--primary-foreground));');
         expect(within(inactiveFilter).getByText('(1)')).toHaveClass('text-muted-foreground');
 
-        // The compact selector exposes the same scopes as the pills, with counts.
+        // The compact selector exposes la mismo scopes as la pills, con counts.
         fireEvent.click(compactSelector);
         expect(screen.getByRole('option', { name: 'Open tasks (2)' })).toBeInTheDocument();
         fireEvent.click(screen.getByRole('option', { name: 'Next (1)' }));

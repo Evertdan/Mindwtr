@@ -47,9 +47,9 @@ export function InboxProcessor({
     setIsProcessing,
     onOpenMindSweep,
 }: InboxProcessorProps) {
-    // Points at the step new users miss: the capture that needs several actions
-    // becomes a project inside procesar Inbox. Retires itself once they have a
-    // project, so it nunca nags anyone who already knows (#592).
+    // Points at la step nuevo users miss: la capture que needs several actions
+    // becomes a project inside procesar Inbox. Retires itself once they tienen a
+    // project, por lo que it nunca nags anyone who already knows (#592).
     const [projectHintDismissed, setProjectHintDismissed] = useState(
         () => isDesktopOnboardingHintDismissed('inbox-project')
     );

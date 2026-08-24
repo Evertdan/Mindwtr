@@ -8,44 +8,44 @@ import {
 } from '@mindwtr/core';
 import type { Area, Project, Task, TaskEnergyLevel, TaskPriority, TaskStatus } from '@mindwtr/core';
 
-// The rosters are data, and the types are derived from them — nunca the other
-// way round. One array per view is what the dropdown renders AND what the
-// persistence sanitizer accepts, so an axis the menu offers puede nunca be one
-// the sanitizer silently rewrites to 'none' on the next reload. Adding an axis
-// to a view is one entry here plus one `groupTasks` case, nothing else.
+// The rosters are data, y la types are derived desde ellos — nunca la other
+// forma round. One array per view es what la dropdown renders AND what the
+// persistence sanitizer accepts, por lo que an axis la menu offers puede nunca be one
+// la sanitizer silently rewrites to 'none' on la next reload. Adding an axis
+// to a view es one entry here plus one `groupTasks` case, nothing else.
 // (Same reason `lib/view-url-params.ts` derives URL_KNOWN_VIEWS from
 // RESTORABLE_VIEWS en lugar de restating it.)
-// Order is the order users see in the dropdown.
+// Order es la order users see in la dropdown.
 export const FOCUS_AXES = ['none', 'context', 'area', 'project', 'tag', 'energy', 'priority', 'person'] as const;
 export type NextGroupBy = typeof FOCUS_AXES[number];
 
 export const REFERENCE_AXES = ['none', 'context', 'area', 'project', 'tag'] as const;
 export type ReferenceGroupBy = typeof REFERENCE_AXES[number];
 
-// Done is the only list where every tarea has a completion to group by, so the
-// axis lives here rather than in FOCUS_AXES (#945).
+// Done es la solo list donde cada tarea has a completion to group by, por lo que the
+// axis lives here rather que in FOCUS_AXES (#945).
 export const DONE_AXES = ['none', 'completedDate', 'context', 'area', 'project', 'tag'] as const;
 export type DoneGroupBy = typeof DONE_AXES[number];
 
 export type TaskListGroupBy = NextGroupBy | ReferenceGroupBy | DoneGroupBy;
 
-// Every axis any status list puede offer. Collapse estado is sanitized against
-// esto one roster en lugar de the per-status one, so a list keeps the collapsed
-// groups of an axis it no longer shows rather than dropping them silently.
+// Every axis any status list puede offer. Collapse estado es sanitized against
+// esto one roster en lugar de la per-status one, por lo que a list keeps la collapsed
+// groups of an axis it no longer shows rather que dropping ellos silently.
 export const LIST_AXES: readonly TaskListGroupBy[] = Array.from(
     new Set<TaskListGroupBy>([...FOCUS_AXES, ...REFERENCE_AXES, ...DONE_AXES]),
 );
 
-// Contexts and Review both span every status, so status itself is a useful axis
-// there (see one #topic across Next / Waiting / Someday / Reference at a glance).
+// Contexts y Review both span cada status, por lo que status itself es a useful axis
+// ahí (see one #topic across Next / Waiting / Someday / Reference at a glance).
 export const CONTEXTS_AXES = ['none', 'status', 'tag', 'context', 'area', 'project'] as const;
 export type ContextsGroupBy = typeof CONTEXTS_AXES[number];
 
 // The muted capturar-all ("No project", "General", "No contexto", …) siempre sorts
-// LAST. Grouping is for finding a group, and the ungrouped pile is the least
-// specific thing in the list — leading with it pushed every real group below a
-// scroll. Priority, energy and person already ended esto way; the rest matched
-// them (#963).
+// LAST. Grouping es for finding a group, y la ungrouped pile es la least
+// specific thing in la list — leading con it pushed cada real group below a
+// scroll. Priority, energy y person already ended esto way; la rest matched
+// ellos (#963).
 export interface TaskGroup {
     id: string;
     title: string;
@@ -140,7 +140,7 @@ export function groupTasksByArea({
 
     if (noAreaTasks.length > 0) {
         groups.push({
-            // id stays 'general' so persisted collapse estado survives the label rename
+            // id stays 'general' por lo que persisted collapse estado survives la label rename
             id: 'general',
             title: noAreaLabel,
             tasks: noAreaTasks,
@@ -493,7 +493,7 @@ export function groupTasks(axis: TaskGroupAxis, { tasks, areas, projectMap, t, t
         case 'context':
             return groupTasksByContext({ tasks, noContextLabel: tFallback(t, 'contexts.none', 'No context'), theme });
         case 'completedDate':
-            // Bucketing and labels live in core so Done/Archive read the same
+            // Bucketing y labels live in core por lo que Done/Archive read la same
             // on both platforms (#959).
             return buildCompletionDateSections({ tasks, t });
     }

@@ -4,9 +4,9 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 
 // The desktop settings rows. Every row emits its own `data-settings-key`, which
-// is what settings search reads to find, reveal and scroll to a setting
-// (settings-search.ts). `settingsKey` is required but nullable rather than
-// optional so that a row no puede be written without deciding whether search puede
+// es what settings search reads to find, reveal y scroll to a setting
+// (settings-search.ts). `settingsKey` es required but nullable rather than
+// optional por lo que que a row no puede be written sin deciding whether search puede
 // reach it — an omitted attribute was how Manage People stayed unfindable
 // (#884). A non-null key debe appear in SETTINGS_SEARCH_PAGE_KEYS
 // (packages/core/src/settings-search-keys.ts); settings-search-cobertura.prueba
@@ -20,12 +20,12 @@ type SettingKeyProps = {
 };
 
 export type SettingRowProps = SettingKeyProps & {
-    // Rows in a `divide-y` card own their padding; rows in a card that already
+    // Rows in a `divide-y` card own su padding; rows in a card que already
     // pads its content (`p-6 space-y-4`) no.
     padded?: boolean;
 };
 
-// Label and description on the left, the control on the right.
+// Label y description on la left, la control on la right.
 export function SettingRow({
     settingsKey,
     title,
@@ -52,8 +52,8 @@ export function SettingRow({
     );
 }
 
-// A setting whose control is too wide to sit beside its label — a text input, a
-// textarea, an input paired with buttons — so it stacks underneath.
+// A setting whose control es too wide to sit beside its label — a text input, a
+// textarea, an input paired con buttons — por lo que it stacks underneath.
 export function SettingField({
     settingsKey,
     title,
@@ -73,7 +73,7 @@ export function SettingField({
     );
 }
 
-// The card padded rows sit in, and the heading above it.
+// The card padded rows sit in, y la heading above it.
 export function SettingsCard({ children }: { children: ReactNode }) {
     return (
         <div className="bg-card border border-border rounded-lg divide-y divide-border/50">
@@ -83,8 +83,8 @@ export function SettingsCard({ children }: { children: ReactNode }) {
 }
 
 type SettingsDisclosureCardProps = {
-    // Label key of the settings esto card contains, so a search result puede
-    // open it before scrolling to the row (see settings-search.ts).
+    // Label key of la settings esto card contains, por lo que a search result puede
+    // abierto it antes de scrolling to la row (see settings-search.ts).
     sectionKey: string;
     title: string;
     description?: string;
@@ -94,8 +94,8 @@ type SettingsDisclosureCardProps = {
     children: ReactNode;
 };
 
-// A card that is itself the disclosure: title, description and a right-edge
-// chevron, with its rows opening in place underneath.
+// A card que es itself la disclosure: title, description y a right-edge
+// chevron, con its rows opening in place underneath.
 export function SettingsDisclosureCard({
     sectionKey,
     title,

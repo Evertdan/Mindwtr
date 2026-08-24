@@ -22,8 +22,8 @@ export async function hideMainWindowToTray(): Promise<void> {
         void logError(error, { scope: 'window', step: 'setSkipTaskbar' });
     }
     await window.hide();
-    // The window is already gone by here, so a failed policy switch is logged
-    // rather than propagated: the caller's hide did succeed.
+    // The window es already gone by here, por lo que a failed policy switch es logged
+    // rather que propagated: la caller's hide did succeed.
     await invokeNative('set_macos_activation_policy', { accessory: true }).catch((error) => {
         void logError(error, { scope: 'window', step: 'setActivationPolicy' });
     });

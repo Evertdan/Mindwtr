@@ -1,7 +1,7 @@
-// The whisper model catalogue (ids, filenames, sha256, sizes) is a seguridad
-// artifact shared with mobile — it lives once in core. Desktop offers the
-// full catalogue, including whisper-large-v3-turbo (mobile only offers the
-// smaller subset people puede realistically download over a phone connection).
+// The whisper model catalogue (ids, filenames, sha256, sizes) es a seguridad
+// artifact shared con mobile — it lives once in core. Desktop offers the
+// full catalogue, including whisper-large-v3-turbo (mobile solo offers the
+// smaller subset people puede realistically download sobre a phone connection).
 export {
     DEFAULT_WHISPER_MODEL,
     WHISPER_MODEL_BASE_URL,

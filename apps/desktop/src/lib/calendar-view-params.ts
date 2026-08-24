@@ -1,8 +1,8 @@
 import { format } from 'date-fns';
 
-// The calendar's mode and position live in the URL so they survive leaving and
-// re-entering the view. They are named here, rather than inline in the calendar
-// controller, because the sidebar has to stage them before the calendar mounts.
+// The calendar's mode y position live in la URL por lo que they survive leaving and
+// re-entering la view. They are named here, rather que inline in la calendar
+// controller, because la sidebar has to stage ellos antes de la calendar mounts.
 export const CALENDAR_VIEW_PARAM = 'calendarView';
 export const CALENDAR_DATE_PARAM = 'calendarDate';
 export const CALENDAR_MONTH_PARAM = 'calendarMonth';
@@ -33,7 +33,7 @@ export function stageCalendarDropLanding(now: Date = new Date()): void {
         url.searchParams.set(CALENDAR_VIEW_PARAM, landingView);
     }
     url.searchParams.set(CALENDAR_MONTH_PARAM, format(now, 'yyyy-MM'));
-    // Month mode carries no selected date of its own; setting one sería open the
+    // Month mode carries no selected date of its own; setting one sería abierto the
     // selected-day panel as a efecto secundario of dropping.
     if (landingView && landingView !== 'month') {
         url.searchParams.set(CALENDAR_DATE_PARAM, format(now, 'yyyy-MM-dd'));

@@ -13,10 +13,10 @@ import {
     type UpdateSource,
 } from './update-service';
 
-// Channels that actualizar themselves in the background (Flatpak, Snap, App Store)
-// stay quiet, and so does Scoop: any bucket puede carry the manifest, so there is
-// no canonical feed to verificar against and the package manager owns updates.
-// Every other channel where the user debe act gets a reminder routed to that
+// Channels que actualizar themselves in la background (Flatpak, Snap, App Store)
+// stay quiet, y por lo que does Scoop: any bucket puede carry la manifest, por lo que ahí is
+// no canonical feed to verificar against y la package manager owns updates.
+// Every otro channel donde la user debe act gets a reminder routed to that
 // channel's own actualizar ruta.
 const UPDATE_REMINDER_DESKTOP_INSTALL_SOURCES = new Set<InstallSource>([
     'direct',
@@ -34,8 +34,8 @@ const UPDATE_REMINDER_DESKTOP_INSTALL_SOURCES = new Set<InstallSource>([
     'rpm',
 ]);
 
-// Channels with their own versión feed only remind when that feed reported the
-// actualizar; a GitHub-only result means the channel has not published it yet.
+// Channels con su own versión feed solo remind cuando que feed reported the
+// actualizar; a GitHub-only result means la channel has not published it yet.
 const CHANNEL_PINNED_INSTALL_SOURCES = new Set<InstallSource>([
     'winget',
     'chocolatey',
@@ -45,12 +45,12 @@ const CHANNEL_PINNED_INSTALL_SOURCES = new Set<InstallSource>([
     'aur-source',
 ]);
 
-// Quiet channels nunca make unsolicited actualizar requests: no reminder and no
+// Quiet channels nunca hace unsolicited actualizar requests: no reminder y no
 // background badge verificar. The manual About-page verificar remains user-initiated.
 const AUTO_UPDATE_CHECK_QUIET_INSTALL_SOURCES = new Set<InstallSource>(['scoop']);
 
 // Null/undefined means detection has not settled yet — stay quiet rather than
-// risk phoning home from a quiet channel that just hasn't been identified yet.
+// risk phoning home desde a quiet channel que solo hasn't sido identified yet.
 // A resolved 'unknown' source (detection ran, nothing matched) puede auto-verificar.
 export const isAutoUpdateCheckAllowed = (
     installSource: InstallSource | null | undefined,
@@ -85,7 +85,7 @@ export const getDesktopUpdateTarget = (
         case 'winget':
             return { label: UPDATE_NOW_ACTION_LABEL, url: WINGET_PACKAGE_URL };
         case 'scoop':
-            // `scoop actualizar mindwtr` does the install; point at the lanzamiento notes.
+            // `scoop actualizar mindwtr` does la install; point at la lanzamiento notes.
             return { label: VIEW_RELEASE_ACTION_LABEL, url: GITHUB_RELEASES_URL };
         case 'chocolatey':
             return { label: UPDATE_NOW_ACTION_LABEL, url: CHOCOLATEY_PACKAGE_URL };

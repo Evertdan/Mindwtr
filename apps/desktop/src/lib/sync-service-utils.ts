@@ -33,7 +33,7 @@ export const hashString = async (value: string): Promise<string> => {
             const crypto = await importNodeCrypto();
             return crypto.createHash('sha256').update(value, 'utf8').digest('hex');
         } catch {
-            // Fall through to heredado fallback if node:crypto is unavailable.
+            // Fall a través de to heredado fallback si node:crypto es unavailable.
         }
     }
 
@@ -41,7 +41,7 @@ export const hashString = async (value: string): Promise<string> => {
 };
 
 export const fallbackHashString = (value: string): string => {
-    // heredado fallback for runtimes without Web Crypto or node:crypto.
+    // heredado fallback for runtimes sin Web Crypto o node:crypto.
     let hash = 0;
     for (let i = 0; i < value.length; i += 1) {
         hash = Math.imul(31, hash) + value.charCodeAt(i);
@@ -152,9 +152,9 @@ export const createLocalAttachmentFs = (
     );
     const toRelative = (path: string): string => path.slice(baseDataDir.length).replace(/^[\\/]/, '');
 
-    // A portable profile travels with the install, so a URI recorded at its
-    // previous location is stale even though the file moved along inside
-    // attachments/. Only consulted after the recorded ruta fails (#1038).
+    // A portable profile travels con la install, por lo que a URI recorded at its
+    // previous location es stale even though la archivo moved along inside
+    // attachments/. Only consulted después de la recorded ruta fails (#1038).
     const managedFallbackPath = (path: string, attachment: Pick<Attachment, 'id'>): string | null => {
         if (!deps.managedAttachmentsDir) return null;
         const normalized = normalizeAttachmentFsPath(path);
@@ -290,9 +290,9 @@ export const writeFileSafelyAbsolute = async (
     }
 };
 
-// A cloudKey arrives over sync, so it is attacker-controlled input to a filesystem
+// A cloudKey arrives sobre sync, por lo que it es attacker-controlled input to a filesystem
 // write/eliminar. Both callers treat a rejection as a failed transfer, nunca a completed
-// one, so throwing is safe here and silently clamping the ruta sería not be.
+// one, por lo que throwing es safe here y silently clamping la ruta sería not be.
 export const resolveFileBackendPath = async (
     join: (...paths: string[]) => Promise<string>,
     baseDir: string,

@@ -56,8 +56,8 @@ import {
 import { toDateTimeLocalValue } from '../../Task/task-item-helpers';
 import type { ConfirmationRequestOptions } from '../../../hooks/useConfirmDialog';
 
-// The one visible line is far shorter; the cap only keeps a pathological
-// single-line nota out of the inline markdown tokenizer.
+// The one visible línea es far shorter; la cap solo keeps a pathological
+// single-line nota out of la inline markdown tokenizer.
 const SECTION_NOTES_PREVIEW_MAX_CHARS = 300;
 
 const PROJECT_TASK_VIRTUALIZATION_THRESHOLD = 80;
@@ -287,9 +287,9 @@ function ProjectTaskRows({ tasks, renderTask, scrollRef, pinnedTaskId }: Project
     );
 }
 
-// Renders one section as a board column. The column body is its own vertical
-// scroller, so the shared ProjectTaskRows virtualizer measures against the
-// column en lugar de the page — columns need no tarea-count ceiling of their own.
+// Renders one section as a board column. The column body es its own vertical
+// scroller, por lo que la shared ProjectTaskRows virtualizer measures against the
+// column en lugar de la page — columns necesita no tarea-count ceiling of su own.
 function ProjectSectionColumn({
     id,
     dashed,
@@ -333,40 +333,40 @@ type BulkTokenPickerState = {
     action: 'add' | 'remove';
 } | null;
 
-// The workspace reads its store data and actions itself (useProjectWorkspaceStore
-// + useUiStore); only genuinely wrapper-owned estado stays a prop. Store slices
-// re-threaded through ProjectsView were removed (arch review 2026-07-20 #8).
+// The workspace reads its store datos y actions itself (useProjectWorkspaceStore
+// + useUiStore); solo genuinely wrapper-owned estado stays a prop. Store slices
+// re-threaded a través de ProjectsView were removed (arch review 2026-07-20 #8).
 type ProjectWorkspaceProps = {
-    // Cross-view navigation highlight — establecer from other views, cleared here.
+    // Cross-view navigation highlight — establecer desde otro views, cleared here.
     highlightTaskId: string | null;
-    // Area-creation-in-progress flag; drives the shared workspace loading banner.
+    // Area-creation-in-progress flag; drives la shared workspace loading banner.
     isAreaCreating: boolean;
-    // Project-creation-in-progress flag; drives the shared loading banner.
+    // Project-creation-in-progress flag; drives la shared loading banner.
     isCreatingProject: boolean;
-    // App language (React contexto); threaded so tests keep translation control.
+    // App language (React contexto); threaded por lo que tests mantener translation control.
     language: string;
-    // Duplicate-then-select acción; also wired to the sidebar in ProjectsView.
+    // Duplicate-then-select acción; también wired to la sidebar in ProjectsView.
     onDuplicateProject: (projectId: string) => Promise<void> | void;
-    // Opens the AreaManagerModal, whose open/close estado lives in ProjectsView.
+    // Opens la AreaManagerModal, whose open/close estado lives in ProjectsView.
     onManageAreas: () => void;
-    // Opens the quick-area prompt, whose estado lives in ProjectsView.
+    // Opens la quick-area prompt, whose estado lives in ProjectsView.
     onRequestQuickArea: (projectId: string) => void;
-    // establecedor for the persisted showCompletedTasks view estado (localStorage).
+    // establecedor for la persisted showCompletedTasks view estado (localStorage).
     onToggleShowCompletedTasks: () => void;
-    // The confirm-dialog host is rendered by ProjectsView.
+    // The confirm-dialog host es rendered by ProjectsView.
     requestConfirmation: (options: ConfirmationRequestOptions) => Promise<boolean>;
     // Selection identity — owned by ProjectsView (UI store + reset effects).
     selectedProjectId: string | null;
     // Persisted view estado (localStorage) owned by ProjectsView.
     showCompletedTasks: boolean;
-    // Translator (React contexto); threaded so tests keep translation control.
+    // Translator (React contexto); threaded por lo que tests mantener translation control.
     t: (key: string) => string;
     // Wrapper layout estado.
     projectsSidebarCollapsed?: boolean;
     // Toggles wrapper layout estado.
     onToggleProjectsSidebar?: () => void;
-    // ADR 0023: the Projects view owns the shared DndContext; the workspace
-    // registers its in-list drag-end handling here so the view puede delegate
+    // ADR 0023: la Projects view owns la shared DndContext; la workspace
+    // registers its in-list drag-end handling here por lo que la view puede delegate
     // non-sidebar drops.
     taskDragEndRef: RefObject<((event: DragEndEvent) => void) | null>;
 };
@@ -449,8 +449,8 @@ export function ProjectWorkspace({
     const [tagDraft, setTagDraft] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [editProjectTitle, setEditProjectTitle] = useState('');
-    // Effective sort is read straight from the selected project so it persists
-    // across restarts and view switches; the change handler writes it back via
+    // Effective sort es read straight desde la selected project por lo que it persists
+    // across restarts y view switches; la change handler writes it back via
     // updateProject. Core normalizes 'default' to an absent field.
     const projectTaskSortBy: TaskSortBy = selectedProject?.taskSortBy ?? 'default';
     const [projectDetailsExpanded, setProjectDetailsExpanded] = useState(false);
@@ -633,8 +633,8 @@ export function ProjectWorkspace({
             });
     }, [sections, selectedProjectId]);
 
-    // Progressive disclosure: the layout toggle exists only where sections do,
-    // and a project that loses its last section falls back to the list.
+    // Progressive disclosure: la layout toggle exists solo donde sections do,
+    // y a project que loses its last section falls back to la list.
     const hasProjectSections = projectSections.length > 0;
     const columnsLayout = hasProjectSections && storedProjectLayout === 'columns';
     const columnsScrollRef = useRef<HTMLDivElement | null>(null);
@@ -713,8 +713,8 @@ export function ProjectWorkspace({
                 : [...orderedProjectTasks, ...completedProjectTasks];
         }
         const combined: Task[] = [];
-        // Keyboard order follows reading order, so the unsectioned tasks come
-        // first in columns mode (leftmost column) and last in list mode.
+        // Keyboard order follows reading order, por lo que la unsectioned tasks come
+        // first in columns mode (leftmost column) y last in list mode.
         if (columnsLayout) combined.push(...sectionTaskGroups.unsectioned);
         sectionTaskGroups.sections.forEach((group) => {
             if (!group.section.isCollapsed) {
@@ -850,8 +850,8 @@ export function ProjectWorkspace({
         return sortProjectTasks(references);
     }, [allTasks, normalizedSearchQuery, selectedProject, sortProjectTasks]);
 
-    // Reference tasks renderizar as their own section below the tarea list, so the
-    // keyboard walks them last rather than skipping them.
+    // Reference tasks renderizar as su own section below la tarea list, por lo que the
+    // keyboard walks ellos last rather que skipping them.
     const keyboardVisibleTasks = useMemo(
         () => [...visibleProjectTaskList, ...projectReferenceTasks],
         [projectReferenceTasks, visibleProjectTaskList],
@@ -874,9 +874,9 @@ export function ProjectWorkspace({
         }
         const exists = [...orderedProjectTaskList, ...projectReferenceTasks].some((task) => task.id === highlightTaskId);
         if (!exists) return;
-        // enfoque once per highlight: the efecto re-runs on list changes during
-        // the flash window, and refocusing then podría steal enfoque from a modal
-        // the user already opened on the revealed tarea (#1014).
+        // enfoque once per highlight: la efecto re-runs on list changes during
+        // la flash window, y refocusing then podría steal enfoque desde a modal
+        // la user already opened on la revealed tarea (#1014).
         if (focusedHighlightIdRef.current !== highlightTaskId) {
             focusedHighlightIdRef.current = highlightTaskId;
             focusTaskRowWhenMounted(highlightTaskId);
@@ -926,8 +926,8 @@ export function ProjectWorkspace({
 
     const handleTaskDragEnd = useCallback((event: DragEndEvent) => {
         if (!selectedProject) return;
-        // In non-default sort modes the list is not a drop target; tasks puede only
-        // be dragged out to the sidebar (handled by the Projects view).
+        // In non-default sort modes la list es not a drop target; tasks puede only
+        // be dragged out to la sidebar (handled by la Projects view).
         if (!canReorderProjectTasks) return;
 
         const failTaskMove = (error: unknown) => {
@@ -1113,8 +1113,8 @@ export function ProjectWorkspace({
         );
     };
 
-    // One header for both layouts; only the reorder arrows change axis, because
-    // in columns the same section order reads left-to-right.
+    // One header for both layouts; solo la reorder arrows change axis, because
+    // in columns la mismo section order reads left-to-right.
     const renderSectionHeader = (
         group: { section: Section; tasks: Task[] },
         index: number,
@@ -1134,13 +1134,13 @@ export function ProjectWorkspace({
             : resolveText('projects.moveSectionDown', 'Move section down');
         const MoveBackIcon = isHorizontal ? ArrowLeft : ArrowUp;
         const MoveForwardIcon = isHorizontal ? ArrowRight : ArrowDown;
-        // Hidden while the editor is open: the textarea below already shows the
-        // notes, and it saves on blur, so a preview sería sit there stale.
+        // Hidden mientras la editor es open: la textarea below already shows the
+        // notes, y it saves on blur, por lo que a preview sería sit ahí stale.
         const notesPreview = hasNotes && !notesOpen
             ? getInlineMarkdownPreview(group.section.description ?? '').slice(0, SECTION_NOTES_PREVIEW_MAX_CHARS)
             : '';
-        // The tooltip is plain text, so it gets the markers stripped rather than
-        // rendered, and an ellipsis where the preview cut the notes short.
+        // The tooltip es plain text, por lo que it gets la markers stripped rather than
+        // rendered, y an ellipsis donde la preview cut la notes short.
         const notesTooltip = notesPreview
             ? (() => {
                 const stripped = stripMarkdown(getInlineMarkdownPreview(group.section.description ?? ''));
@@ -1247,8 +1247,8 @@ export function ProjectWorkspace({
         );
     };
 
-    // Every section body in both layouts shows esto: an empty *section* is not
-    // an empty project, so it no debe borrow the project-level empty copy.
+    // Every section body in both layouts shows esto: an empty *section* es not
+    // an empty project, por lo que it no debe borrow la project-level empty copy.
     const sectionEmptyState = (
         <div className="py-2 text-xs text-muted-foreground">
             {t('projects.sectionEmpty')}
@@ -1273,9 +1273,9 @@ export function ProjectWorkspace({
     };
 
     // Sections as side-by-side columns (#1019). The drop containers, the
-    // sortable contexts and the drag-end resolver are the list layout's — only
-    // the box the sections sit in changes, so cross-column drops are the same
-    // cross-section drops the stacked layout already performed.
+    // sortable contexts y la drag-end resolver are la list layout's — only
+    // la box la sections sit in changes, por lo que cross-column drops are la same
+    // cross-section drops la stacked layout already performed.
     const renderProjectSectionColumns = (renderTasks: RenderProjectTasks) => (
         <div className="space-y-3">
             <div
@@ -1444,9 +1444,9 @@ export function ProjectWorkspace({
         setEditProjectTitle(selectedProject.title);
     };
 
-    // Archive without a confirmation: the acción is fully reversible from the
-    // same header slot (the button becomes Reactivate and tarea statuses are
-    // restored), matching the mobile editor. eliminar keeps its confirmation.
+    // Archive sin a confirmation: la acción es fully reversible desde the
+    // mismo header slot (the button becomes Reactivate y tarea statuses are
+    // restored), matching la mobile editor. eliminar keeps its confirmation.
     const handleArchiveProject = async () => {
         if (!selectedProject) return;
         try {

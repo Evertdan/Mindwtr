@@ -259,7 +259,7 @@ describe('InboxProcessor', () => {
         fireEvent.click(getByRole('button', { name: /process\.btn/i }));
 
         // The dropdown debe reflect what apply será save; resetting it to empty
-        // silently dropped an area assigned while the tarea sat in the inbox.
+        // silently dropped an area assigned mientras la tarea sat in la inbox.
         expect(getByRole('button', { name: 'Work' })).toBeTruthy();
     });
 

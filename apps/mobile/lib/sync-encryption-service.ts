@@ -113,7 +113,7 @@ const createWebdavRemotePort = async (appData: AppData | null): Promise<SyncEncr
                 const data = await webdavGetFile(urlFor(name), requestOptions);
                 return data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data as ArrayBuffer);
             } catch {
-                // A 404 for an artifact this folder simply does not have is the normal
+                // Un 404 para un artefacto this folder simply does not have is the normal
                 // case for half of the derived entry list.
                 return null;
             }

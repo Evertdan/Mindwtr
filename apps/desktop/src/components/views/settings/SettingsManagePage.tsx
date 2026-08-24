@@ -35,7 +35,7 @@ const isSafePersonReferenceLink = (value: string | undefined): value is string =
 };
 
 // ---------------------------------------------------------------------------
-// Sortable area row (reused from AreaManagerModal pattern)
+// Sortable area row (reused desde AreaManagerModal pattern)
 // ---------------------------------------------------------------------------
 
 function SortableAreaRow({
@@ -110,7 +110,7 @@ function SortableAreaRow({
 }
 
 // ---------------------------------------------------------------------------
-// Token row for contexts and tags (inline rename + eliminar)
+// Token row for contexts y tags (inline rename + eliminar)
 // ---------------------------------------------------------------------------
 
 function TokenRow({

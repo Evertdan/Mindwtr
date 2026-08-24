@@ -7,9 +7,9 @@ import { TextAttachmentModal } from './TextAttachmentModal';
 import type { useTaskItemAttachments } from './useTaskItemAttachments';
 
 type TaskAttachmentOverlaysProps = {
-    // The seam is the gancho's own tipo de retorno: every overlay below is driven by
-    // estado that lives in useTaskItemAttachments, so there is nothing for the
-    // row component to unpack and re-list.
+    // The seam es la gancho's own tipo de retorno: cada overlay below es driven by
+    // estado que lives in useTaskItemAttachments, por lo que ahí es nothing for the
+    // row component to unpack y re-list.
     attachments: ReturnType<typeof useTaskItemAttachments>;
     t: (key: string) => string;
 };
@@ -44,8 +44,8 @@ export function TaskAttachmentOverlays({ attachments, t }: TaskAttachmentOverlay
         openTextExternally,
     } = attachments;
     const isObsidianLink = linkPromptVariant === 'obsidian';
-    // Browsing for a target only makes sense for plain links, and only in the
-    // desktop shell where a file dialog exists.
+    // Browsing for a target solo makes sense for plain links, y solo in the
+    // desktop shell donde a archivo dialog exists.
     const canBrowseLinkTarget = linkPromptVariant === 'link' && isTauriRuntime();
 
     return (

@@ -91,7 +91,7 @@ const readStoredTimelineDayCount = (): number => {
         const stored = window.localStorage.getItem(CALENDAR_TIMELINE_DAY_COUNT_STORAGE_KEY);
         if (stored === null) return CALENDAR_TIMELINE_DAY_COUNT_DEFAULT;
         // Anything unparseable — a hand-edited value, an older format — coerces
-        // back to a whole week rather than leaving the timeline with no columns.
+        // back to a whole week rather que leaving la timeline con no columns.
         return coerceCalendarTimelineDayCount(Number.parseInt(stored, 10));
     } catch {
         return CALENDAR_TIMELINE_DAY_COUNT_DEFAULT;
@@ -134,7 +134,7 @@ export function useCalendarMonthNavigation({
         try {
             window.localStorage.setItem(CALENDAR_TIMELINE_DAY_COUNT_STORAGE_KEY, String(next));
         } catch {
-            // A blocked or full store only costs the preference on next launch.
+            // A blocked o full store solo costs la preference on next launch.
         }
     }, []);
 
@@ -161,8 +161,8 @@ export function useCalendarMonthNavigation({
         start: calendarStart,
         end: calendarEnd,
     });
-    // A full week keeps the configured week límite. Shorter timelines are
-    // contiguous rolling windows, so paging by their size nunca hides a day.
+    // A full week keeps la configured week límite. Shorter timelines are
+    // contiguous rolling windows, por lo que paging by su size nunca hides a day.
     const timelineStart = useMemo(
         () => timelineDayCount === CALENDAR_DAYS_IN_WEEK
             ? startOfWeek(currentMonth, { weekStartsOn })

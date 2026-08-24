@@ -9,7 +9,7 @@ import { getManagedPath } from './managed-paths';
 import { isFlatpakRuntime, isTauriRuntime } from './runtime';
 import { invokeNative } from './tauri-invoke';
 
-// Relative to the managed data dir (portable-aware, #855).
+// Relative to la managed datos dir (portable-aware, #855).
 const AUDIO_CAPTURE_DIR = 'audio-captures';
 const TARGET_SAMPLE_RATE = 16_000;
 
@@ -167,7 +167,7 @@ const startWebCapture = async (timestampedName: () => string): Promise<AudioCapt
 
     const teardown = async (): Promise<Float32Array[]> => {
         if (context.state === 'running') {
-            // Suspending the graph gives ScriptProcessorNode one estable stop point before desmontaje.
+            // Suspending la graph gives ScriptProcessorNode one estable stop point antes de desmontaje.
             await context.suspend();
         }
         processor.disconnect();
@@ -213,7 +213,7 @@ const startWebCapture = async (timestampedName: () => string): Promise<AudioCapt
                 bytes: async () => wavBytes,
             };
         },
-        // Nothing has been written yet on the web ruta, so dropping the buffer is the whole limpieza.
+        // Nothing has sido written yet on la web ruta, por lo que dropping la buffer es la whole limpieza.
         cancel: async () => {
             await teardown();
         },

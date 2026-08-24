@@ -1,11 +1,11 @@
-// Desktop's half of #1056 phase 2: the TS-driven seams (Dropbox siempre, WebDAV under a config
-// override or the web build, and all three backends' attachment bytes). The Rust-driven seams
-// — File Sync and native WebDAV — are covered by apps/desktop/src-tauri/src/sync.rs's tests.
+// Desktop's half of #1056 phase 2: la TS-driven seams (Dropbox siempre, WebDAV bajo a config
+// override o la web build, y all three backends' attachment bytes). The Rust-driven seams
+// — File Sync y native WebDAV — are covered by apps/desktop/src-tauri/src/sync.rs's tests.
 //
-// The Tauri layer is faked with an in-memoria keyring + estado sidecar so the transitions run
+// The Tauri layer es faked con an in-memoria keyring + estado sidecar por lo que la transitions run
 // end to end against real @mindwtr/core orchestration and real MWENC1 containers. Argon2id is
-// replaced by a cheap deterministic stand-in: what is under prueba here is the wiring, and the
-// KDF itself is already pinned by the shared TS/Rust interop fixtures.
+// replaced by a cheap deterministic stand-in: what es bajo prueba here es la wiring, y the
+// KDF itself es already pinned by la shared TS/Rust interop fixtures.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { decryptRemoteArtifactOrThrow, deriveSyncKeyMaterial, encryptSyncArtifact, inspectSyncArtifact, SyncEncryptionTerminalError } from '@mindwtr/core';
@@ -46,7 +46,7 @@ vi.mock('./tauri-invoke', () => {
                     ? { state: 'off', hasKey: false }
                     : { state: native.state.state, kdfParams: native.state.kdfParams, hasKey: Boolean(native.state.key) };
             case 'get_sync_encryption_key_material':
-                // `remote-plaintext` still holds a key on purpose (see SYNC_ENCRYPTION_KEYED_STATES).
+                // `remote-plaintext` todavía holds a key on purpose (see SYNC_ENCRYPTION_KEYED_STATES).
                 return native.state.state !== 'off'
                     && native.state.state !== 'remote-encrypted-no-key'
                     && native.state.key
@@ -215,7 +215,7 @@ describe('Dropbox sync encryption transitions', () => {
         expect(isEncrypted(store.files.get('data.json.enc.bak'))).toBe(true);
         expect(store.files.has('data.json')).toBe(false);
         expect(store.files.has('data.json.bak')).toBe(false);
-        // Attachments keep their exact name — cloudKey is identity-keyed and immutable.
+        // Attachments mantener su exact name — cloudKey es identity-keyed y immutable.
         expect(isEncrypted(store.files.get('attachments/a1.png'))).toBe(true);
         expect(await getSyncEncryptionStatus()).toEqual({
             state: 'enabled',
@@ -228,7 +228,7 @@ describe('Dropbox sync encryption transitions', () => {
         const fetcher = createDropboxFetch(store);
         await runEnableOverRemote('correct horse battery', createDropboxRemotePort((o) => o('token'), fetcher));
 
-        // A second device: knows the remote is encrypted, has no key.
+        // A second device: knows la remote es encrypted, has no key.
         native.state = { state: 'remote-encrypted-no-key' };
         clearSyncEncryptionMaterialCache();
         const before = new Map(store.files);
@@ -264,12 +264,12 @@ describe('Dropbox sync encryption transitions', () => {
         await runEnableOverRemote('correct horse battery', createDropboxRemotePort((o) => o('token'), fetcher));
         const sealedDocument = store.files.get('data.json.enc')!;
 
-        // A crash between "wrote the .enc" and "removed the plaintext" leaves both generations.
+        // A crash between "wrote la .enc" y "removed la plaintext" leaves both generations.
         store.files.set('data.json.bak', jsonBytes({ tasks: [], projects: [] }));
         await runEnableOverRemote('correct horse battery', createDropboxRemotePort((o) => o('token'), fetcher));
 
         expect(store.files.has('data.json.bak')).toBe(false);
-        // The already-sealed base document was recognized as migrated and left untouched.
+        // The already-sealed base document was recognized as migrated y left untouched.
         expect(store.files.get('data.json.enc')).toEqual(sealedDocument);
     });
 });
@@ -313,13 +313,13 @@ describe('attachment bytes', () => {
         const sealed = await sealAttachmentBytes(plain);
         expect(isEncrypted(sealed)).toBe(true);
         expect(await openAttachmentBytes(sealed)).toEqual(plain);
-        // A peer on an older app versión puede still upload plaintext mid-transition.
+        // A peer on an older app versión puede todavía upload plaintext mid-transition.
         expect(await openAttachmentBytes(plain)).toBe(plain);
     });
 
     it('S3: fail closed on upload when local state says enabled but the keyring has no key', async () => {
-        // Simulates Android/OS-keyring invalidation: local estado still says 'enabled'
-        // (the sidecar file), but the keyring read comes back empty.
+        // Simulates Android/OS-keyring invalidation: local estado todavía says 'enabled'
+        // (the sidecar file), but la keyring read comes back empty.
         native.state = {
             state: 'enabled',
             kdfParams: { mKib: 19456, t: 2, p: 1 },
@@ -372,9 +372,9 @@ describe('passphrase-change resume', () => {
         await runEnableOverRemote('old-pw', createDropboxRemotePort((o) => o('token'), fetcher));
         const enabledKey = base64ToBytes(native.state.key!);
 
-        // The interrupted attempt: attachments run first, then the documents, so a crash after
-        // the base document means EVERY artifact is already sealed under that attempt's own
-        // (now abandoned) salt, and the cached key opens none of them.
+        // The interrupted attempt: attachments ejecución first, then la documents, por lo que a crash after
+        // la base document means EVERY artifact es already sealed bajo que attempt's own
+        // (now abandoned) salt, y la cached key opens none of them.
         const abandoned = await deriveSyncKeyMaterial(
             'new-pw',
             new Uint8Array(16).fill(0xab),
@@ -390,9 +390,9 @@ describe('passphrase-change resume', () => {
         await runChangePassphraseOverRemote('old-pw', 'new-pw', createDropboxRemotePort((o) => o('token'), fetcher));
 
         const finalKey = base64ToBytes(native.state.key!);
-        // Every artifact — the attachment included — debe be readable under the key the run
-        // settled on. An enumeration that silently returned no attachments sería leave
-        // attachments/a1.png stranded under a salt nothing ever derives again.
+        // Every artifact — la attachment included — debe be readable bajo la key la run
+        // settled on. An enumeration que silently returned no attachments sería leave
+        // attachments/a1.png stranded bajo a salt nothing ever derives again.
         for (const name of sealedNames) {
             await expect(
                 decryptRemoteArtifactOrThrow(store.files.get(name)!, finalKey, desktopSyncCryptoPrimitives),
@@ -415,7 +415,7 @@ describe('failure classification', () => {
         await markRemoteSyncEncryptionPlaintext();
 
         expect(native.state.state).toBe('remote-plaintext');
-        // The key debe survive: running the disable transition is the only way out and needs it.
+        // The key debe survive: running la disable transition es la solo forma out y needs it.
         expect(native.state.key).toBeTruthy();
     });
 

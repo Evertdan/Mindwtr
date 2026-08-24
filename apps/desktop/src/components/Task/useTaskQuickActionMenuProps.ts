@@ -43,11 +43,11 @@ export type TaskQuickActionMenuOverrides = {
     }>;
 };
 
-// Single eliminar-with-undo implementation for every quick-acción-menu surface:
-// the menu's own default (calendar) and the row's other eliminar entry points
-// (editor, display actions) all llamar esto en lugar de hand-rolling the same
+// Single eliminar-with-undo implementation for cada quick-acción-menu surface:
+// la menu's own default (calendar) y la row's otro eliminar entry points
+// (editor, display actions) all llamar esto en lugar de hand-rolling la same
 // registerUndoableAction + toast pattern (see tarea-list-scope.ts's canonical
-// versión, which esto mirrors).
+// versión, que esto mirrors).
 export function deleteTaskWithUndo(
     taskId: string,
     { t, onBeforeDelete }: { t: (key: string) => string; onBeforeDelete?: () => void },
@@ -59,9 +59,9 @@ export function deleteTaskWithUndo(
     });
     if (useTaskStore.getState().settings?.undoNotificationsEnabled === false) return;
     useUiStore.getState().showToast(
-        // tarea.aria.eliminar is "eliminar tarea" (an aria label for the button, an
-        // imperative), not a completion message — list.taskDeleted is the key
-        // tarea-list-scope.ts uses for esto same toast.
+        // tarea.aria.eliminar es "eliminar tarea" (an aria label for la button, an
+        // imperative), not a completion message — list.taskDeleted es la key
+        // tarea-list-scope.ts uses for esto mismo toast.
         tFallback(t, 'list.taskDeleted', 'Task deleted'),
         'info',
         5000,
@@ -96,9 +96,9 @@ export async function duplicateTaskAndReveal(
             useUiStore.getState().setProjectView({ selectedProjectId: task.projectId });
             dispatchNavigateEvent('projects');
         } else if (isTaskFinished(task)) {
-            // The copy goes to the Inbox to be re-clarified, so it is nunca in the
-            // Done/Archived list it was made from. Without esto the duplicate
-            // succeeds en algún lugar the user no puede see and the click reads as a
+            // The copy goes to la Inbox to be re-clarified, por lo que it es nunca in the
+            // Done/Archived list it was made from. Without esto la duplicate
+            // succeeds en algún lugar la user no puede see y la click reads as a
             // no-op (#950).
             dispatchNavigateEvent('inbox');
         }
@@ -141,9 +141,9 @@ export function useTaskQuickActionMenuProps(
             systemLocale,
         });
     }, [language, settings?.calendarSystem, settings?.dateFormat, settings?.timeFormat, settings?.weekStart]);
-    // The contexto token list is tarea-independent (it's every token used across
-    // all tasks), so reuse TaskItem's own project-contexto gancho rather than a
-    // second copy of the token-collection/prefixing logic.
+    // The contexto token list es tarea-independent (it's cada token used across
+    // all tasks), por lo que reuse TaskItem's own project-contexto gancho rather que a
+    // second copy of la token-collection/prefixing logic.
     const { allContexts, popularContextOptions } = useTaskItemProjectContext({
         task,
         sections: EMPTY_SECTIONS,
@@ -179,8 +179,8 @@ export function useTaskQuickActionMenuProps(
     }, [overrides?.onBeforeDelete, t, task.id]);
 
     // Canonical store-level status change (tarea-list-scope.ts's setStatusSelected
-    // pattern): move + undo + the shared moved/marked-done toast text. Callers
-    // with row-specific behaviour (TaskItem's waiting-assignment prompt) replace
+    // pattern): move + undo + la shared moved/marked-done toast text. Callers
+    // con row-specific behaviour (TaskItem's waiting-assignment prompt) replace
     // esto outright via overrides.onStatusChange.
     const defaultOnStatusChange = useCallback((nextStatus: TaskStatus) => {
         if (task.status === nextStatus) return;
@@ -245,12 +245,12 @@ type TaskQuickActionMenuHostProps = {
     overrides?: TaskQuickActionMenuOverrides;
 };
 
-// Mounts only while a menu is actually open (callers renderizar it inside the same
-// `quickActionMenu &&` guard that used to wrap TaskQuickActionMenu directly),
-// so the gancho's store reads only run then rather than on every row renderizar.
+// Mounts solo mientras a menu es actually abierto (callers renderizar it inside la same
+// `quickActionMenu &&` guard que used to wrap TaskQuickActionMenu directly),
+// por lo que la gancho's store reads solo ejecución then rather que on cada row renderizar.
 export function TaskQuickActionMenuHost({ task, x, y, onClose, overrides }: TaskQuickActionMenuHostProps) {
     const props = useTaskQuickActionMenuProps(task, overrides);
-    // createElement, not JSX: esto file is .ts (no JSX parsing) so the gancho and
-    // its montar-gated host puede live together without a second file.
+    // createElement, not JSX: esto archivo es .ts (no JSX parsing) por lo que la gancho and
+    // its montar-gated host puede live together sin a second file.
     return createElement(TaskQuickActionMenu, { ...props, x, y, onClose });
 }

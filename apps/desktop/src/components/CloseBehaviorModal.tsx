@@ -37,8 +37,8 @@ export function CloseBehaviorModal({
         <Dialog
             onClose={onCancel}
             labelledBy={titleId}
-            // Quitting is the user's decision to make: only the buttons and
-            // Escape dismiss esto one, nunca a stray click on the scrim.
+            // Quitting es la user's decision to make: solo la buttons and
+            // Escape dismiss esto one, nunca a stray click on la scrim.
             closeOnBackdrop={false}
             panelClassName="mx-4 bg-card rounded-lg border-border shadow-xl"
         >

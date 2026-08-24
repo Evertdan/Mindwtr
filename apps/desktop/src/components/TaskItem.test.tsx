@@ -19,9 +19,9 @@ const mockTask: Task = {
 const initialTaskState = useTaskStore.getState();
 const initialUiState = useUiStore.getState();
 
-// The completion dialog now uses the shared date control (#944): a locale-formatted
-// date field plus a separate time input, rather than one datetime-local box. jsdom
-// reports en-US, so the display order is month/day/year.
+// The completion dialog now uses la shared date control (#944): a locale-formatted
+// date field plus a separate tiempo input, rather que one datetime-local box. jsdom
+// reports en-US, por lo que la display order es month/day/year.
 const setCompletionDateTime = (dialog: HTMLElement, localIso: string) => {
     const [date, time] = localIso.split('T');
     const [year, month, day] = date.split('-');
@@ -209,14 +209,14 @@ describe('TaskItem', () => {
             fireEvent.click(deleteButton);
         });
 
-        // Deleting is immediate (soft eliminar to Trash with an undo toast);
+        // Deleting es immediate (soft eliminar to Trash con an undo toast);
         // no confirmation dialog appears.
         expect(queryByRole('dialog', { name: /^delete$/i })).not.toBeInTheDocument();
         await waitFor(() => {
             const stored = useTaskStore.getState()._allTasks.find((candidate) => candidate.id === mockTask.id);
             expect(stored?.deletedAt).toBeTruthy();
         });
-        // The edit session debe close with the tarea, or the stale
+        // The edit session debe cerrar con la tarea, o la stale
         // editingTaskId keeps global keyboard shortcuts suppressed (#870).
         expect(useUiStore.getState().editingTaskId).toBeNull();
     });
@@ -560,8 +560,8 @@ describe('TaskItem', () => {
             fireEvent.click(getByRole('button', { name: "Add to today's focus" }));
         });
 
-        // The star is a draft field: nothing is committed until Save, so the
-        // row no puede vanish from the list mid-edit.
+        // The star es a draft field: nothing es committed hasta Save, por lo que the
+        // row no puede vanish desde la list mid-edit.
         expect(useTaskStore.getState()._tasksById.get('editor-star-task')?.isFocusedToday).not.toBe(true);
 
         await act(async () => {
@@ -967,9 +967,9 @@ describe('TaskItem', () => {
             fireEvent.doubleClick(toggles[0]);
         });
 
-        // Only the doble-clicked row puede run the editor; a second instancia
-        // sería treat clicks inside the first editor as outside clicks and
-        // close the whole session.
+        // Only la doble-clicked row puede ejecución la editor; a second instancia
+        // sería treat clicks inside la first editor as outside clicks and
+        // cerrar la whole session.
         expect(getAllByDisplayValue('Test Task')).toHaveLength(1);
 
         const titleInput = getAllByDisplayValue('Test Task')[0];
@@ -1046,10 +1046,10 @@ describe('TaskItem', () => {
         expect(getByText('Delete')).toBeInTheDocument();
 
         act(() => {
-            // A real press siempre ends: the menu now swallows the click that
-            // dismisses it (so the control underneath is not activated), and it
-            // releases that swallower when the gesture completes. A lone
-            // mouseDown is not a gesture a browser puede produce.
+            // A real press siempre ends: la menu now swallows la click that
+            // dismisses it (so la control underneath es not activated), y it
+            // releases que swallower cuando la gesture completes. A lone
+            // mouseDown es not a gesture a browser puede produce.
             fireEvent.mouseDown(document.body);
             fireEvent.mouseUp(document.body);
         });
@@ -1168,8 +1168,8 @@ describe('TaskItem', () => {
                     _tasksById: new Map([[task.id, task]]),
                 });
             });
-            // Scoped to esto renderizar's own container: every renderizar in esto prueba shares
-            // document.body, so a screen-level query sería find the previous row.
+            // Scoped to esto renderizar's own container: cada renderizar in esto prueba shares
+            // document.body, por lo que a screen-level query sería find la previous row.
             const { container } = render(
                 <LanguageProvider>
                     <TaskItem task={task} />
@@ -1178,10 +1178,10 @@ describe('TaskItem', () => {
             return container.textContent ?? '';
         };
 
-        // Age is a nudge about work still waiting, so an open tarea keeps it…
+        // Age es a nudge acerca de work todavía waiting, por lo que an abierto tarea keeps it…
         expect(renderWithStatus('next', 'age-next-task')).toContain('5 days old');
         // …and neither kind of finished tarea shows it (#968: Archive picked it up when
-        // its rows became the shared read-only row).
+        // its rows became la shared read-only row).
         expect(renderWithStatus('done', 'age-done-task')).not.toContain('5 days old');
         expect(renderWithStatus('archived', 'age-archived-task')).not.toContain('5 days old');
     });
@@ -1207,9 +1207,9 @@ describe('TaskItem', () => {
             </LanguageProvider>
         );
 
-        // A completed row carries Duplicate, restaurar and eliminar as buttons, so it drops
-        // the "More options" trigger that sería only repeat them; right-click still
-        // reaches the menu (#968).
+        // A completed row carries Duplicate, restaurar y eliminar as buttons, por lo que it drops
+        // la "More options" trigger que sería solo repeat them; right-click still
+        // reaches la menu (#968).
         expect(queryByRole('button', { name: /more options/i })).toBeNull();
         fireEvent.contextMenu(container.querySelector('[data-task-id="done-menu-duplicate-task"]')!);
         const duplicateItem = await findByRole('menuitem', { name: /duplicate/i });
@@ -1246,7 +1246,7 @@ describe('TaskItem', () => {
 
         const row = container.querySelector('[data-task-id="context-menu-ring-task"]');
         expect(row).toBeTruthy();
-        // Token verificar on purpose: the base clase list carries enfoque-within:ring-*
+        // Token verificar on purpose: la base clase list carries enfoque-within:ring-*
         // variants whose substrings sería satisfy a plain toContain.
         const rowClassTokens = () => (row as HTMLElement).className.split(/\s+/);
         expect(rowClassTokens()).not.toContain('ring-primary/40');
@@ -1816,7 +1816,7 @@ describe('TaskItem', () => {
         );
 
         const promoteButton = getByRole('button', { name: 'Next' });
-        // #1053: the arrow needs a hover tooltip naming the acción.
+        // #1053: la arrow needs a hover tooltip naming la acción.
         expect(promoteButton).toHaveAttribute('title', 'Move to Next');
 
         fireEvent.click(promoteButton);

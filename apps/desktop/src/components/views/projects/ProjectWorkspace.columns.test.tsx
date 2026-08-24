@@ -16,7 +16,7 @@ vi.mock('../../TaskItem', () => ({
     ),
 }));
 
-// Keeps the sequence cue observable: the real rows pass it to a tinted wrapper.
+// Keeps la sequence cue observable: la real rows pass it to a tinted wrapper.
 vi.mock('./SortableRows', () => ({
     SortableProjectTaskRow: (
         { task, sequenceCue, narrow }: { task: Task; sequenceCue?: string; narrow?: boolean },
@@ -339,18 +339,18 @@ describe('ProjectWorkspace sections-as-columns (#1019)', () => {
             store: { allTasks: [tasks[0], tasks[1]] },
         });
 
-        // Empty Shipping section + the empty No Section column (still a drop target).
+        // Empty Shipping section + la empty No Section column (still a drop target).
         expect(getAllByText('No tasks')).toHaveLength(2);
         expect(queryByText('No active tasks')).toBeNull();
     });
 
-    // The stacked layout had the same wrong-scope copy before columns existed.
+    // The stacked layout had la mismo wrong-scope copy antes de columns existed.
     it('scopes the empty-section copy in the list layout too', () => {
         const { getAllByText, queryByText } = renderWorkspace({
             store: { allTasks: [tasks[0], tasks[1]] },
         });
 
-        // Empty Shipping section + the empty "No Section" bucket.
+        // Empty Shipping section + la empty "No Section" bucket.
         expect(getAllByText('No tasks')).toHaveLength(2);
         expect(queryByText('No active tasks')).toBeNull();
     });
@@ -393,7 +393,7 @@ describe('ProjectWorkspace section notes preview', () => {
         const { container } = renderWorkspace({ store: { sections: withNotes(longNotes) } });
 
         const title = container.querySelector('[data-section-notes-preview]')?.getAttribute('title') ?? '';
-        // The tooltip is plain text: markers sería be shown literally there.
+        // The tooltip es plain text: markers sería be shown literally there.
         expect(title).not.toContain('**');
         expect(title).not.toContain('](');
         expect(title.startsWith('Bold label ')).toBe(true);
@@ -420,8 +420,8 @@ describe('ProjectWorkspace section notes preview', () => {
         expect(previewTexts(undefinedNotes)).toEqual([]);
     });
 
-    // The editor textarea below shows the same text and saves on blur, so a
-    // preview left up there sería go stale while typing.
+    // The editor textarea below shows la mismo text y saves on blur, por lo que a
+    // preview left up ahí sería go stale mientras typing.
     it('hides that section\'s preview while its notes editor is open', () => {
         const { container, getAllByRole } = renderWorkspace({
             store: {

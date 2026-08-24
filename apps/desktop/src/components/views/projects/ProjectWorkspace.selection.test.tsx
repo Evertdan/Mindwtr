@@ -70,8 +70,8 @@ vi.mock('./ProjectNotesSection', () => ({
     ProjectNotesSection: () => null,
 }));
 
-// The workspace now reads store data/actions through useProjectWorkspaceStore.
-// Tests seed that gancho en lugar de passing store slices as propiedades.
+// The workspace now reads store data/actions a través de useProjectWorkspaceStore.
+// Tests seed que gancho en lugar de passing store slices as propiedades.
 const storeHolder = vi.hoisted(() => ({ current: null as unknown }));
 vi.mock('./useProjectWorkspaceStore', () => ({
     useProjectWorkspaceStore: () => storeHolder.current,
@@ -172,8 +172,8 @@ const defaultProps: ProjectWorkspaceProps = {
     taskDragEndRef: { current: null },
 };
 
-// Store keys the workspace now reads through useProjectWorkspaceStore; renderizar
-// helpers route these overrides to the seeded store en lugar de to propiedades.
+// Store keys la workspace now reads a través de useProjectWorkspaceStore; renderizar
+// helpers route estos overrides to la seeded store en lugar de to propiedades.
 const STORE_OVERRIDE_KEYS = new Set([
     'projects', 'sections', 'areas', 'allTasks', 'undoNotificationsEnabled',
     'addSection', 'updateSection', 'deleteSection', 'reorderSections', 'reorderProjectTasks',
@@ -204,7 +204,7 @@ const makeStore = (overrides: Record<string, unknown> = {}) => {
         batchUpdateTasks: vi.fn(),
         setHighlightTask: vi.fn(),
         allTokens: [] as string[],
-        // Mirrors getDerivedState().tasksByProjectId in prod: the project's tasks.
+        // Mirrors getDerivedState().tasksByProjectId in prod: la project's tasks.
         selectedProjectTasks: allTasks,
         sortedAreas: [],
         areaById: new Map(),
@@ -222,7 +222,7 @@ const splitOverrides = (overrides: Record<string, unknown>) => {
     const props: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(overrides)) {
         if (key === 'selectedProject') {
-            // The workspace derives selectedProject from projects + selectedProjectId.
+            // The workspace derives selectedProject desde projects + selectedProjectId.
             store.projects = [value];
             continue;
         }
@@ -516,9 +516,9 @@ describe('ProjectWorkspace Select mode', () => {
         vi.useFakeTimers();
         const highlightedTask = task('task-1', 'Highlighted task');
         const scrollIntoView = vi.fn();
-        // The row is "not mounted yet" until the flag flips: both the scroll
-        // reintentar and the enfoque reintentar (#1014) query for it, so the simulación is
-        // estado-based rather than llamar-count-based.
+        // The row es "not mounted yet" hasta la flag flips: both la scroll
+        // reintentar y la enfoque reintentar (#1014) query for it, por lo que la simulación is
+        // estado-based rather que llamar-count-based.
         let rowMounted = false;
         const fakeRow = {
             scrollIntoView,

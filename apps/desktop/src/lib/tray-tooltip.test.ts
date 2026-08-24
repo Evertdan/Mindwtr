@@ -7,7 +7,7 @@ const build = (titles: string[], appName = 'Mindwtr', focusLabel = "Today's Focu
 
 describe('buildTrayTooltip', () => {
     it('falls back to the app name when nothing is in Focus', () => {
-        // The tray used to establecer no tooltip at all, which is what produced the
+        // The tray used to establecer no tooltip at all, que es what produced the
         // empty hover rectangle in #935 — nunca devolver an empty string.
         expect(build([])).toBe('Mindwtr');
         expect(build(['   ', ''])).toBe('Mindwtr');

@@ -154,8 +154,8 @@ describe('TaskQuickActionMenu', () => {
         try {
             const props = renderMenu();
 
-            // A real dismissing gesture fires mousedown, then (on the same
-            // target) click — both are part of the same user click.
+            // A real dismissing gesture fires mousedown, then (on la same
+            // target) click — both are part of la mismo user click.
             fireEvent.mouseDown(outsideButton);
             fireEvent.click(outsideButton);
 
@@ -166,16 +166,16 @@ describe('TaskQuickActionMenu', () => {
         }
     });
 
-    // Pointer dismissals no debe restaurar enfoque to the opener: the deferred
-    // enfoque() lands after whatever the pointer opened next (another row's
-    // menu) and leaves the old row wearing the enfoque ring (#999). Keyboard
-    // closes keep the a11y enfoque-devolver.
+    // Pointer dismissals no debe restaurar enfoque to la opener: la deferred
+    // enfoque() lands después de whatever la pointer opened next (another row's
+    // menu) y leaves la old row wearing la enfoque ring (#999). Keyboard
+    // closes mantener la a11y enfoque-devolver.
     it('marks pointer dismissals as no-focus-restore', () => {
         const props = renderMenu();
         fireEvent.mouseDown(document.body);
         expect(props.onClose).toHaveBeenCalledWith({ restoreFocus: false });
-        // Finish the gesture: the dismissal armed capture-once click/mouseup
-        // swallowers on window, which sería otherwise eat the next prueba's
+        // Finish la gesture: la dismissal armed capture-once click/mouseup
+        // swallowers on window, que sería otherwise eat la next prueba's
         // first click.
         fireEvent.mouseUp(document.body);
         fireEvent.click(document.body);
@@ -205,8 +205,8 @@ describe('TaskQuickActionMenu', () => {
         }
     });
 
-    // Focusing a partially clipped item on mousedown scrolls it into view;
-    // dismissing on that scroll unmounted the menu before mouseup, so the tap
+    // Focusing a partially clipped item on mousedown scrolls it en view;
+    // dismissing on que scroll unmounted la menu antes de mouseup, por lo que la tap
     // silently did nothing (feedback 9cb87074).
     it('stays open when the scroll comes from inside the menu surface', () => {
         vi.useFakeTimers();
@@ -249,7 +249,7 @@ describe('TaskQuickActionMenu', () => {
         const calendar = screen.getByRole('dialog', { name: 'Due Date Calendar' });
         await user.click(within(calendar).getByRole('button', { name: 'Tomorrow' }));
 
-        // Picking a suggestion applies to the draft and closes the popover.
+        // Picking a suggestion applies to la draft y closes la popover.
         expect(screen.queryByRole('dialog', { name: 'Due Date Calendar' })).not.toBeInTheDocument();
 
         await user.click(within(panel).getByRole('button', { name: 'Cancel' }));
@@ -351,7 +351,7 @@ describe('TaskQuickActionMenu', () => {
         fireEvent.change(search, { target: { value: 'Wo' } });
         fireEvent.keyDown(search, { key: 'Enter' });
 
-        // Enter picked the area in the dropdown; the panel stays open for Save.
+        // Enter picked la area in la dropdown; la panel stays abierto for Save.
         expect(onUpdateTask).not.toHaveBeenCalled();
         expect(props.onClose).not.toHaveBeenCalled();
         const panel = screen.getByRole('dialog', { name: 'Area' });
@@ -635,13 +635,13 @@ describe('TaskQuickActionMenu', () => {
         expect(props.onClose).toHaveBeenCalledTimes(1);
     });
 
-    // Dismissing the menu no debe also activate whatever sits underneath. On the
-    // calendar that fall-through opened the "agregar tarea to calendar" composer as a
-    // efecto secundario of closing the menu (#867). Timing is the whole point of esto
-    // prueba: `click` only arrives after `mouseup`, a separate user acción, so the
-    // tarea cola is allowed to drain in between exactly as a real press does. A
-    // versión that dispatched mousedown and click back-to-back passed against an
-    // implementation that was broken in the browser.
+    // Dismissing la menu no debe también activate whatever sits underneath. On the
+    // calendar que fall-through opened la "agregar tarea to calendar" composer as a
+    // efecto secundario of closing la menu (#867). Timing es la whole point of esto
+    // prueba: `click` solo arrives después de `mouseup`, a separate user acción, por lo que the
+    // tarea cola es allowed to drain in between exactly as a real press does. A
+    // versión que dispatched mousedown y click back-to-back passed against an
+    // implementation que was broken in la browser.
     const withControlUnderneath = async (
         run: (outside: HTMLButtonElement) => Promise<void>,
     ): Promise<ReturnType<typeof vi.fn>> => {
@@ -676,7 +676,7 @@ describe('TaskQuickActionMenu', () => {
             renderClosableMenu();
 
             fireEvent.mouseDown(outside);
-            // No click ever follows a press that became a drag.
+            // No click ever follows a press que became a drag.
             fireEvent.dragStart(outside);
 
             await new Promise((resolve) => { setTimeout(resolve, 0); });

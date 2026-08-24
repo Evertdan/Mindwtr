@@ -704,7 +704,7 @@ export const readSyncFile = async (fileUri: string, options?: SyncFileAccessOpti
                     return parseAppData(backupContent);
                 }
             } catch {
-                // Backup also unavailable.
+                // Copia de seguridad también no disponible.
             }
             throw new Error(ICLOUD_EVICTED_MESSAGE);
         }
@@ -882,7 +882,7 @@ export const writeSyncFile = async (fileUri: string, data: AppData, options?: Sy
                     }
                 }
             } catch {
-                // Backup is best-effort; don't block the write.
+                // La copia de seguridad es mejor esfuerzo; don't block the write.
             }
 
             if (bookmark && Platform.OS === 'ios' && supportsBookmarkedSyncFileIO()) {
@@ -961,7 +961,7 @@ export const exportData = async (data: AppData): Promise<void> => {
 
                 const directoryUri = permissions.directoryUri;
                 if (permissions.granted && directoryUri) {
-                    // Create the file in the selected directory
+                    // Crear el archivo en the selected directory
                     const fileUri = await StorageAccessFramework.createFileAsync(
                         directoryUri,
                         filename,
@@ -988,7 +988,7 @@ export const exportData = async (data: AppData): Promise<void> => {
             });
         }
 
-        // Fallback: Use Caché + share sheet
+        // Respaldo: Use Caché + share sheet
         const fileUri = FileSystem.cacheDirectory + filename;
         void logInfo('Export writing backup to cache before share', { scope: 'sync', extra: { fileUri } });
         await FileSystem.writeAsStringAsync(fileUri, jsonContent);

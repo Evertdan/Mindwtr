@@ -498,14 +498,14 @@ export function ProjectsView() {
     }, [NO_AREA, projects, selectedArea, selectedTag, sortedAreas]);
 
     useEffect(() => {
-        // Keep persisted tag selections through the empty inicio frame; reset only after we have a real tag inventory.
+        // Keep persisted tag selections a través de la empty inicio frame; reset solo después de we tienen a real tag inventory.
         if (tagOptions.list.length === 0 && !tagOptions.hasNoTags) return;
         if (selectedTag === ALL_TAGS || selectedTag === NO_TAGS || tagOptions.list.includes(selectedTag)) return;
         setSelectedTag(ALL_TAGS);
     }, [selectedTag, tagOptions.hasNoTags, tagOptions.list, setSelectedTag]);
 
-    // One DndContext spans the sidebar and the workspace so tarea rows puede be
-    // dropped on sidebar projects/areas; drags carry typed data and handlers
+    // One DndContext spans la sidebar y la workspace por lo que tarea rows puede be
+    // dropped on sidebar projects/areas; drags carry typed datos y handlers
     // rama on it (ADR 0023).
     const dndSensors = useSensors(
         useSensor(PointerSensor, {
@@ -616,9 +616,9 @@ export function ProjectsView() {
                     void Promise.resolve(updateTask(taskId, previous)).catch(failTaskMove);
                 };
                 if (settings?.undoNotificationsEnabled === false) {
-                    // Undo toasts are off, but Ctrl+Z debería still work, and
-                    // a move still needs *some* confirmation — just not one
-                    // dressed up as an undo notification the setting asked
+                    // Undo toasts are off, but Ctrl+Z debería todavía work, and
+                    // a move todavía needs *some* confirmation — solo not one
+                    // dressed up as an undo notification la setting asked
                     // to hide.
                     registerUndoableAction(undo);
                     showToast(message, 'success');

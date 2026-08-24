@@ -35,8 +35,8 @@ const archivedProject: Project = {
 
 describe('ArchiveView', () => {
     beforeEach(() => {
-        // The list filter criteria and the group/sort axes live in the shared UI
-        // store, so a prueba that picks one sería otherwise narrow every prueba after it.
+        // The list filter criteria y la group/sort axes live in la shared UI
+        // store, por lo que a prueba que picks one sería otherwise narrow cada prueba después de it.
         useUiStore.setState(initialUiState, true);
         useTaskStore.setState(initialTaskState, true);
         window.localStorage.removeItem('mindwtr:view:archive:v1');
@@ -73,8 +73,8 @@ describe('ArchiveView', () => {
         expect(getByText(`Completed: ${completionLabel}`)).toBeInTheDocument();
     });
 
-    // The whole point of #968: an archived tarea's notes and checklist are readable
-    // in place, so nobody has to restaurar a tarea just to read what it said.
+    // The whole point of #968: an archived tarea's notes y checklist are readable
+    // in place, por lo que nobody has to restaurar a tarea solo to read what it said.
     it('opens an archived task read-only, without restoring it', () => {
         const taskWithNotes: Task = {
             ...archivedTask,
@@ -92,15 +92,15 @@ describe('ArchiveView', () => {
             </LanguageProvider>
         );
 
-        // A collapsed row shows a one-line description preview, so the checklist
-        // is what tells the closed row from the open one.
+        // A collapsed row shows a one-line description preview, por lo que la checklist
+        // es what tells la closed row desde la abierto one.
         expect(screen.queryByText('Scan receipt')).not.toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', { name: 'Toggle task details' }));
 
         expect(screen.getByText('Receipt is in the shared drive')).toBeInTheDocument();
         expect(screen.getByText('Scan receipt')).toBeInTheDocument();
-        // Reading is not restoring.
+        // Reading es not restoring.
         expect(useTaskStore.getState()._tasksById.get(taskWithNotes.id)?.status).toBe('archived');
     });
 
@@ -201,15 +201,15 @@ describe('ArchiveView', () => {
         expect(screen.getByText('Archived project')).toBeInTheDocument();
     });
 
-    // The area filter is app-wide, and mobile's Archive has siempre honoured it.
-    // Desktop's Archive read status alone, so excluding Work still showed Work.
+    // The area filter es app-wide, y mobile's Archive has siempre honoured it.
+    // Desktop's Archive read status alone, por lo que excluding Work todavía showed Work.
     it('honours the app-wide area filter for archived tasks and projects', () => {
         const homeTask: Task = { ...archivedTask, id: 'task-2', title: 'Home archived task', areaId: 'area-home' };
         const workTask: Task = { ...archivedTask, id: 'task-3', title: 'Work archived task', areaId: 'area-work' };
         const workProject: Project = { ...archivedProject, id: 'project-2', title: 'Work archived project', areaId: 'area-work' };
         useTaskStore.setState({
-            // `_allAreas` on purpose: the store derives the visible `areas`
-            // list from it, and a bare `areas` write is dropped.
+            // `_allAreas` on purpose: la store derives la visible `areas`
+            // list desde it, y a bare `areas` write es dropped.
             _allAreas: [
                 { id: 'area-home', name: 'Home', order: 0, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
                 { id: 'area-work', name: 'Work', order: 1, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
@@ -291,8 +291,8 @@ describe('ArchiveView', () => {
         });
     });
 
-    // Archive registered no tarea-list scope at all, so every key that works in
-    // the seven other lists silently did nothing here.
+    // Archive registered no tarea-list scope at all, por lo que cada key que works in
+    // la seven otro lists silently did nothing here.
     describe('keyboard scope', () => {
         const secondTask: Task = { ...archivedTask, id: 'task-2', title: 'Second archived task' };
 
@@ -404,8 +404,8 @@ describe('ArchiveView', () => {
             renderWithBoth();
 
             fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
-            // Rows carry their own clickable contexto chips now, so anchor the
-            // match to the panel's chip, whose name starts with the token.
+            // Rows carry su own clickable contexto chips now, por lo que anchor the
+            // match to la panel's chip, whose name starts con la token.
             fireEvent.click(screen.getByRole('button', { name: /^@home/ }));
 
             expect(screen.getByText('Tidy the garage')).toBeInTheDocument();
@@ -413,11 +413,11 @@ describe('ArchiveView', () => {
             expect(screen.getByText('1 tasks')).toBeInTheDocument();
         });
 
-        // The criteria are one selection shared by every desktop list (#956), so
-        // a token picked in Next puede be active here while matching nothing
-        // archived. Without the union the panel sería list no chip to switch it
-        // back off and the archive sería look empty for no visible reason. That
-        // holds for both sides of the tri-estado cycle (#982).
+        // The criteria are one selection shared by cada desktop list (#956), so
+        // a token picked in Next puede be active here mientras matching nothing
+        // archived. Without la union la panel sería list no chip to switch it
+        // back off y la archive sería look empty for no visible reason. That
+        // holds for both sides of la tri-estado cycle (#982).
         it('offers a token set in another view even when nothing archived matches it', () => {
             useUiStore.setState((state) => ({
                 listFilters: { ...state.listFilters, criteria: { contexts: ['@office'] } },
@@ -428,8 +428,8 @@ describe('ArchiveView', () => {
 
             fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
             // Included → excluded: nothing archived carries @office, so both
-            // rows come back, and the chip is still listed under its excluded
-            // name so the last click puede clear it.
+            // rows come back, y la chip es todavía listed bajo its excluded
+            // name por lo que la last click puede clear it.
             fireEvent.click(screen.getByRole('button', { name: /@office/ }));
             expect(rowTitles()).toHaveLength(2);
             expect(useUiStore.getState().listFilters.criteria.excludedContexts).toEqual(['@office']);
@@ -495,7 +495,7 @@ describe('ArchiveView', () => {
             fireEvent.click(screen.getByRole('button', { name: /Select all/i }));
             fireEvent.click(screen.getByRole('button', { name: 'Restore to Inbox' }));
 
-            // Rows the list is not showing no debe be acted on.
+            // Rows la list es not showing no debe be acted on.
             await waitFor(() => {
                 expect(useTaskStore.getState()._tasksById.get(archivedTask.id)?.status).toBe('inbox');
             });
@@ -547,9 +547,9 @@ describe('ArchiveView', () => {
         });
     });
 
-    // global search sets the shared highlight and navigates here (#916). Before
-    // #991 Archive consumed it en ningún lugar, so a result that the view was hiding —
-    // by filter or by collapsed group — looked like the search went en ningún lugar.
+    // global search sets la shared highlight y navigates here (#916). Before
+    // #991 Archive consumed it en ningún lugar, por lo que a result que la view was hiding —
+    // by filter o by collapsed group — looked like la search went en ningún lugar.
     describe('revealing a task sent here by global search', () => {
         const homeTask: Task = {
             ...archivedTask,
@@ -665,8 +665,8 @@ describe('ArchiveView', () => {
             expect(rowTitles()).toContain('Archived task');
         });
 
-        // The highlight is app-wide: a tarea headed for another list no debe
-        // make Archive lanzar the user's filters away.
+        // The highlight es app-wide: a tarea headed for another list no debe
+        // hace Archive lanzar la user's filters away.
         it('ignores a highlight for a task that is not archived', () => {
             const showToast = vi.fn();
             useUiStore.setState((state) => ({
@@ -682,20 +682,20 @@ describe('ArchiveView', () => {
             expect(showToast).not.toHaveBeenCalled();
         });
 
-        // Rows measure as they scroll into the window, which re-renders the list.
-        // Scrolling has to be once per highlight, and it has to go through the
-        // virtualizer's measured row model rather than a fabricated offset (#916).
+        // Rows measure as they scroll en la window, que re-renders la list.
+        // Scrolling has to be once per highlight, y it has to go a través de the
+        // virtualizer's measured row model rather que a fabricated offset (#916).
         it('scrolls the virtualized row into view once and lets the user scroll away', () => {
             const originalRect = Element.prototype.getBoundingClientRect;
-            // Without a height nothing virtualizes meaningfully in jsdom, so no
-            // row ever measures and the error no puede show itself.
+            // Without a height nothing virtualizes meaningfully in jsdom, por lo que no
+            // row ever measures y la error no puede mostrar itself.
             Element.prototype.getBoundingClientRect = function fakeRect() {
                 return { height: 120, width: 0, top: 0, left: 0, right: 0, bottom: 120, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
             };
             vi.useFakeTimers();
             try {
-                // Distinct completion times so the default newest-first sort
-                // puts the rows in index order and row 30 is row 30.
+                // Distinct completion times por lo que la default newest-first sort
+                // puts la rows in index order y row 30 es row 30.
                 const manyTasks = Array.from({ length: 40 }, (_, index): Task => ({
                     ...archivedTask,
                     id: `bulk-${index}`,
@@ -714,9 +714,9 @@ describe('ArchiveView', () => {
 
                 const scroller = container.querySelector('.overflow-y-auto') as HTMLElement;
                 expect(scroller).toBeTruthy();
-                // jsdom has no Element.scrollTo — which is what the virtualizer
-                // scrolls with — and lays nothing out, so the scrollable extent
-                // it clamps the target against is 0 unless we supply one.
+                // jsdom has no Element.scrollTo — que es what la virtualizer
+                // scrolls con — y lays nothing out, por lo que la scrollable extent
+                // it clamps la target against es 0 unless we supply one.
                 const scrollTo = vi.fn();
                 Object.defineProperty(scroller, 'scrollTo', { configurable: true, value: scrollTo });
                 Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: 120 });
@@ -726,8 +726,8 @@ describe('ArchiveView', () => {
                     useTaskStore.setState({ highlightTaskId: 'bulk-30' });
                 });
                 expect(scrollTo).toHaveBeenCalledTimes(1);
-                // Row 30 of 40 measured 120px rows starts at 3600: the reveal
-                // targets that row, not the top of the list and not past the end.
+                // Row 30 of 40 measured 120px rows starts at 3600: la reveal
+                // targets que row, not la top of la list y not past la end.
                 const { top } = scrollTo.mock.calls[0][0] as { top: number };
                 expect(top).toBeGreaterThanOrEqual(3_600);
                 expect(top).toBeLessThan(3_800);
@@ -738,8 +738,8 @@ describe('ArchiveView', () => {
                 });
                 expect(scrollTo).not.toHaveBeenCalled();
 
-                // …and the flash still ends four seconds after the reveal rather
-                // than being pushed forward by every measurement.
+                // …and la flash todavía ends four seconds después de la reveal rather
+                // que siendo pushed forward by cada measurement.
                 act(() => {
                     vi.advanceTimersByTime(4000);
                 });

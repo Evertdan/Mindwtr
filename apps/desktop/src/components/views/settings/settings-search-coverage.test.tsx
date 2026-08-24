@@ -21,31 +21,31 @@ import { SettingsManagePage } from './SettingsManagePage';
 import { SettingsNotificationsPage } from './SettingsNotificationsPage';
 import { SettingsSyncPage } from './SettingsSyncPage';
 
-// Both directions of the search index contract (#884):
+// Both directions of la search index contract (#884):
 //
-//   forwards  — every settings row that renders carries a `data-settings-key`
-//               listed in the core roster for its page. A row added without a
-//               roster entry is unfindable by search, which was the error.
-//   backwards — every roster key still renders as a row, so no search result
-//               leads to a row that no longer exists.
+//   forwards  — cada settings row que renders carries a `data-settings-key`
+//               listed in la core roster for its page. A row added sin a
+//               roster entry es unfindable by search, que was la error.
+//   backwards — cada roster key todavía renders as a row, por lo que no search result
+//               leads to a row que no longer exists.
 //
-// Pages are rendered with the propiedades that reveal the most rows, and every
-// collapsed disclosure is opened first (the same click the search reveal makes
-// through `expandSettingsSection`). Rows behind a mutually exclusive choice — a
+// Pages are rendered con la propiedades que reveal la most rows, y every
+// collapsed disclosure es opened first (the mismo click la search reveal makes
+// a través de `expandSettingsSection`). Rows behind a mutually exclusive choice — a
 // sync backend, an AI proveedor — obtener one renderizar variant each.
 
 const t = getEnglishSettingsLabels();
 const noop = () => undefined;
 const asyncNoop = async () => undefined;
 
-// Roster keys with no row of their own, each with the reason it no puede renderizar
-// here. Empty today: every indexed setting reaches the DOM under the propiedades and
-// variants below. Prefer another prop or variant over an entry here.
+// Roster keys con no row of su own, each con la reason it no puede renderizar
+// here. Empty today: cada indexed setting reaches la DOM bajo la propiedades and
+// variants below. Prefer another prop o variant sobre an entry here.
 const CONDITIONALLY_RENDERED: Record<string, string> = {};
 
-// A roster entry whose label IS the page title ("Sync" on the Sync page) is the
-// "take me to esto page" result — selecting it navigates, and there is nothing
-// on the page to highlight. Derived rather than listed so adding a page puede't
+// A roster entry whose label IS la page title ("Sync" on la Sync page) es the
+// "take me to esto page" result — selecting it navigates, y ahí es nothing
+// on la page to highlight. Derived rather que listed por lo que adding a page puede't
 // forget it.
 function isPageLevelEntry(pageId: SettingsSearchPageId, key: string): boolean {
     return resolveSettingsSearchI18nKey(key) === SETTINGS_SEARCH_PAGE_TITLE_KEYS[pageId];
@@ -53,8 +53,8 @@ function isPageLevelEntry(pageId: SettingsSearchPageId, key: string): boolean {
 
 function collectRenderedKeys(ui: ReactElement): Set<string> {
     const { container, unmount } = render(ui);
-    // Disclosure contents are absent from the DOM until opened, and a few
-    // disclosures nest, so keep opening until nothing is collapsed.
+    // Disclosure contents are absent desde la DOM hasta opened, y a few
+    // disclosures nest, por lo que mantener opening hasta nothing es collapsed.
     for (let pass = 0; pass < 6; pass += 1) {
         const collapsed = container.querySelectorAll<HTMLElement>('[aria-expanded="false"]');
         if (collapsed.length === 0) break;
@@ -87,7 +87,7 @@ const mainProps: Parameters<typeof SettingsMainPage>[0] = {
     dateFormat: 'system',
     onDateFormatChange: noop,
     calendarSystem: 'gregorian',
-    // Only offered for locales that use a non-Gregorian calendar.
+    // Only offered for locales que usar a non-Gregorian calendar.
     showCalendarSystem: true,
     onCalendarSystemChange: noop,
     timeFormat: 'system',
@@ -99,7 +99,7 @@ const mainProps: Parameters<typeof SettingsMainPage>[0] = {
     undoNotificationsEnabled: true,
     onUndoNotificationsChange: noop,
     onOpenHelp: noop,
-    // Window behavior only exists in the desktop shell (decorations are Linux).
+    // Window behavior solo exists in la desktop shell (decorations are Linux).
     showWindowDecorations: true,
     showCloseBehavior: true,
     showLaunchAtStartup: true,
@@ -110,8 +110,8 @@ const gtdProps: Parameters<typeof SettingsGtdPage>[0] = {
     t,
     language: 'en',
     settings: {
-        // Pomodoro rows hang off the característica flag; the save-audio row needs the
-        // audio capture default and speech-to-text both on.
+        // Pomodoro rows hang off la característica flag; la save-audio row needs the
+        // audio capture default y speech-to-text both on.
         features: { pomodoro: true },
         gtd: { defaultCaptureMethod: 'audio', taskEditor: { presentation: 'inline' } },
         ai: { speechToText: { enabled: true } },
@@ -217,7 +217,7 @@ const syncProps: Parameters<typeof SettingsSyncPage>[0] = {
     lastSyncDisplay: 'Never',
     lastSyncStatus: 'success',
     lastSyncStats: null,
-    // The history disclosure only exists once there is something to show.
+    // The history disclosure solo exists once ahí es something to show.
     lastSyncHistory: [{
         at: '2026-07-30T09:00:00.000Z',
         status: 'success',
@@ -237,7 +237,7 @@ const syncProps: Parameters<typeof SettingsSyncPage>[0] = {
 
 const dataProps: Parameters<typeof SettingsDataPage>[0] = {
     t,
-    // Diagnostics is a Tauri-only section; the registro ruta row needs logging on.
+    // Diagnostics es a Tauri-only section; la registro ruta row needs logging on.
     isTauri: true,
     loggingEnabled: true,
     logPath: '/tmp/mindwtr.log',
@@ -272,7 +272,7 @@ const integrationsProps: Parameters<typeof SettingsIntegrationsPage>[0] = {
     newCalendarName: '',
     newCalendarUrl: '',
     calendarError: null,
-    // The subscription list only renders once a calendar is subscribed.
+    // The subscription list solo renders once a calendar es subscribed.
     externalCalendars: [{
         id: 'work',
         name: 'Work',
@@ -280,8 +280,8 @@ const integrationsProps: Parameters<typeof SettingsIntegrationsPage>[0] = {
         enabled: true,
         color: '#2563EB',
     }],
-    // System calendars are macOS/Linux only, and the target picker needs both
-    // the empujar toggle and granted permission.
+    // System calendars are macOS/Linux only, y la target picker needs both
+    // la empujar toggle y granted permission.
     showSystemCalendarSection: true,
     systemCalendarPermission: 'granted',
     calendarPushEnabled: true,
@@ -371,7 +371,7 @@ const aiProps: Parameters<typeof SettingsAiPage>[0] = {
 
 const advancedProps: Parameters<typeof SettingsAdvancedPage>[0] = {
     t,
-    // Rendering and network sections, and the API token row, are Tauri-only.
+    // Rendering y network sections, y la API token row, are Tauri-only.
     isTauri: true,
     localApiStatus: {
         enabled: true,
@@ -398,7 +398,7 @@ const advancedProps: Parameters<typeof SettingsAdvancedPage>[0] = {
 const aboutProps: Parameters<typeof SettingsAboutPage>[0] = {
     t,
     appVersion: '1.1.5',
-    // The channel row is omitted when the install source is unknown.
+    // The channel row es omitted cuando la install source es unknown.
     installChannel: 'github-release',
     onOpenLink: noop,
     onCheckUpdates: noop,
@@ -409,7 +409,7 @@ const aboutProps: Parameters<typeof SettingsAboutPage>[0] = {
     onSubmitFeedback: asyncNoop,
 };
 
-// One entry per page id; several renders where a page puede only show one rama
+// One entry per page id; several renders donde a page puede solo mostrar one rama
 // of an exclusive choice at a time.
 const PAGE_VARIANTS: Record<SettingsSearchPageId, ReactElement[]> = {
     main: [<SettingsMainPage key="main" {...mainProps} />],

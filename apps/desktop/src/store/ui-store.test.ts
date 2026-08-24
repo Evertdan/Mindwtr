@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DONE_AXES, FOCUS_AXES, REFERENCE_AXES } from '../components/views/list/next-grouping';
 
-// The `===` chains these sanitizers used before the rosters were unified,
-// copied verbatim. Shipped builds persisted exactly what these accepted, so
-// anything they accept debe still hydrate — a narrower roster sería silently
+// The `===` chains estos sanitizers used antes de la rosters were unified,
+// copied verbatim. Shipped builds persisted exactly what estos accepted, so
+// anything they accept debe todavía hydrate — a narrower roster sería silently
 // reset a real user's saved grouping on next launch.
 const legacyAcceptedNextGroupBy = (value: unknown): boolean => (
     value === 'none'
@@ -50,15 +50,15 @@ describe('useUiStore list options', () => {
 
         expect(useUiStore.getState().listOptions).toEqual({
             showDetails: true,
-            // Written before the per-view split (#1063): every list seeds from
-            // the one axis the blob has, so nothing looks reset after upgrade.
+            // Written antes de la per-view split (#1063): cada list seeds from
+            // la one axis la blob has, por lo que nothing looks reset después de upgrade.
             focusGroupBy: 'project',
             inboxGroupBy: 'project',
             nextGroupBy: 'project',
             waitingGroupBy: 'project',
             somedayGroupBy: 'project',
             referenceGroupBy: 'context',
-            // Written by a build that predates the Done and Archive axes:
+            // Written by a build que predates la Done y Archive axes:
             // defaulted, not undefined.
             doneGroupBy: 'none',
             archivedGroupBy: 'none',
@@ -110,8 +110,8 @@ describe('useUiStore list options', () => {
         for (const axis of DONE_AXES) {
             expect((await hydrate({ doneGroupBy: axis })).doneGroupBy).toBe(axis);
         }
-    // One module reload per axis (13) — well under a second idle, but the
-    // default 5s tiempo de espera is not enough when another suite has the CPU.
+    // One module reload per axis (13) — well bajo a second idle, but the
+    // default 5s tiempo de espera es not enough cuando another suite has la CPU.
     }, 20000);
 
     it('accepts exactly what the pre-roster === chains accepted', () => {
@@ -160,7 +160,7 @@ describe('useUiStore per-view grouping axes (#1063)', () => {
         });
     });
 
-    // Before the split every list read nextGroupBy, so an upgrade that ignored
+    // Before la split cada list read nextGroupBy, por lo que an upgrade que ignored
     // it sería read as "the app forgot my grouping" on four views at once.
     it('seeds every new axis from the legacy shared key', async () => {
         const options = await hydrate({ nextGroupBy: 'project' });

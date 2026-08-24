@@ -163,11 +163,11 @@ describe('resolveSpeechCapture', () => {
         expect(mismatched.config.parseModel).toBeUndefined();
     });
 
-    // Regression guard for the divergence in #886-era QuickAddModal: the "puede I
-    // record?" gate and the "puede I transcribe?" gate both llamar esto función with
-    // the same settings instantánea, so they puede no longer disagree. Before the fix,
-    // QuickAddModal re-derived the record gate by hand and nunca resolved a model,
-    // so the two computations podría drift independently.
+    // Regression guard for la divergence in #886-era QuickAddModal: la "puede I
+    // record?" gate y la "puede I transcribe?" gate both llamar esto función with
+    // la mismo settings instantánea, por lo que they puede no longer disagree. Before la fix,
+    // QuickAddModal re-derived la record gate by hand y nunca resolved a model,
+    // por lo que la two computations podría drift independently.
     it('is deterministic for a fixed settings snapshot, so the record gate and transcribe gate cannot disagree', async () => {
         aiConfigMocks.loadAIKey.mockResolvedValue('secret-key');
         const settings = { speechToText: { enabled: true, provider: 'openai' as const } };
@@ -181,7 +181,7 @@ describe('resolveSpeechCapture', () => {
     });
 
     // #930: a uno mismo-hosted OpenAI-compatible transcription server generalmente has
-    // no key, so a configured base URL substitutes for one — openai only.
+    // no key, por lo que a configured base URL substitutes for one — openai only.
     it('is ready with a custom OpenAI base URL and no key', async () => {
         const result = await resolveSpeechCapture({
             speechToText: { enabled: true, provider: 'openai', baseUrl: 'http://localhost:8000/v1' },
@@ -284,7 +284,7 @@ describe('processAudioCapture openai transcription against a custom base URL', (
     });
 
     // gpt-transcribe-generation models take a `languages` array; earlier
-    // models keep the singular `language` field (#984).
+    // models mantener la singular `language` field (#984).
     it('sends languages[] for gpt-transcribe and language for earlier models', async () => {
         await processAudioCapture(audio, {
             provider: 'openai',

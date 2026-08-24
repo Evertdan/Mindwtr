@@ -76,7 +76,7 @@ Ejecuta todos los comandos desde la raíz del repositorio.
 - Git
 - Cadena de herramientas Rust (requerida para compilación/desarrollo de escritorio Tauri)
 - Dependencias de webview del sistema para Tauri en tu sistema operativo
-- En Windows: las herramientas de compilación de C++ de Visual Studio 2022. La cadena de herramientas de 2026 actualmente falla en vincular los enlaces de transcripción `whisper-rs` (LNK1120 elementos externos de tiempo de ejecución de C no resueltos), así que fija el conjunto de herramientas MSVC v143 hasta que se corrija en sentido ascendente.
+- En Windows: las herramientas de compilación de C++ de Visual Studio 2022. La cadena de herramientas de 2026 actualmente falla al vincular `whisper-rs` (LNK1120 símbolos externos de C++ no resueltos), así que utiliza el conjunto de herramientas MSVC v143 hasta que se corrija en sentido ascendente.
 - Herramientas de Expo para desarrollo móvil
 - Android SDK y/o Xcode si construyes móvil de forma nativa
 
@@ -119,31 +119,21 @@ bun mobile:ios
 - `apps/mobile`: interfaz de usuario móvil y código de puente nativo
 - `packages/core/src`: lógica comercial compartida, almacén, sincronización y utilidades
 - `scripts/`: scripts de lanzamiento y utilidad
-- `docs/`: documentación de markdown utilizada por el proyecto
+- `docs/`: documentación en markdown utilizada por el proyecto
 
-El código de escritorio no debe importar `invoke` de `@tauri-apps/api/core` directamente. Llama a
-`invokeNative` (rechaza cuando no hay tiempo de ejecución de Tauri) o `invokeNativeOr(fallback, ...)`
-(resuelve el respaldo) desde `apps/desktop/src/lib/tauri-invoke.ts`, para que cada sitio de llamada
-indique lo que debe hacer en la compilación web del navegador. Una prueba de trinquete en
-`tauri-invoke.test.ts` falla en CI en una importación sin procesar.
+El código de escritorio no debe importar `invoke` de `@tauri-apps/api/core` directamente. Llama a `invokeNative` (rechaza cuando no hay tiempo de ejecución de Tauri) o `invokeNativeOr(fallback, ...)` (resuelve el respaldo) desde `apps/desktop/src/lib/tauri-invoke.ts`, para que cada sitio de llamada indique lo que debe hacer en la compilación web del navegador. Una prueba de trinquete en `tauri-invoke.test.ts` falla en CI en una importación sin procesar.
 
 ## Pruebas y verificaciones de calidad
 
-Antes de presionar, ejecuta la puerta de verificación de verificación local de línea de base:
+Antes de presionar, ejecuta la puerta de verificación local de línea de base:
 
 ```bash
 bun run verify
 ```
 
-`bun run verify` encadena verificación de tipos (core, cloud, desktop, mobile y mcp), linting
-para cada aplicación del espacio de trabajo, los cinco conjuntos de pruebas unitarias del espacio de trabajo, la suite de Rust
-(`native:test`, unos pocos segundos una vez que la caché de carga está caliente), verificaciones de gobernanza y
-esquema, paridad de configuración regional y paridad de LÉAME. CI también ejecuta presupuestos de rendimiento, umbrales de cobertura, Expo Doctor y verificaciones de metadatos de almacén/flujo de trabajo.
+`bun run verify` encadena verificación de tipos (core, cloud, desktop, mobile y mcp), linting para cada aplicación del espacio de trabajo, los cinco conjuntos de pruebas unitarias del espacio de trabajo, la suite de Rust (`native:test`, unos pocos segundos una vez que la caché de carga está caliente), verificaciones de gobernanza y esquema, paridad de configuración regional y paridad de README. CI también ejecuta presupuestos de rendimiento, umbrales de cobertura, Expo Doctor y verificaciones de metadatos de almacén/flujo de trabajo.
 
-Ejecuta `bun run native:test` por sí solo mientras iteras en
-`apps/desktop/src-tauri/`, y ejecuta
-`bun run test:perf` para cambios de lista, almacén, recurrencia u otra ruta activa.
-`bun run test:e2e` necesita un navegador y sigue siendo una puerta opcional separada.
+Ejecuta `bun run native:test` por sí solo mientras iteras en `apps/desktop/src-tauri/`, y ejecuta `bun run test:perf` para cambios de lista, almacén, recurrencia u otra ruta crítica. `bun run test:e2e` necesita un navegador y sigue siendo una puerta opcional separada.
 
 Mientras iteras, los comandos por área a continuación son más rápidos.
 
@@ -187,21 +177,21 @@ bun run test:e2e
   - móvil generalmente 2 espacios
 - Mantén los comentarios de código concisos y solo donde la lógica no es obvia.
 - Favorece consultas de prueba orientadas a la accesibilidad (`getByRole`, `getByLabelText`).
-- Elementos emergentes móviles: cualquier elemento emergente modal transparente que contenga un `TextInput` debe usar el gancho compartido `useAndroidKeyboardInset` para que permanezca encima del teclado suave de Android.
-- Los cambios del editor de descuento de rebajas necesitan pruebas de regresión para los modos de falla históricos (salto del cursor al tocar, desplazamiento a la vista, relleno de altura de teclado, sincronización de barra de herramientas) — estos se han enviado como errores de producción antes.
+- Elementos emergentes móviles: cualquier elemento emergente modal transparente que contenga un `TextInput` debe usar el hook compartido `useAndroidKeyboardInset` para que permanezca encima del teclado suave de Android.
+- Los cambios del editor de markdown necesitan pruebas de regresión para los modos de falla históricos (salto del cursor al tocar, desplazamiento a la vista, relleno de altura de teclado, sincronización de barra de herramientas) — estos se han enviado como errores de producción antes.
 
 Denominación:
 
 - Componentes/proveedores: `PascalCase`
-- Ganchos: `useSomething`
+- Hooks: `useSomething`
 - Módulos de utilidad: kebab-case (ejemplo: `storage-adapter.ts`)
 - Pruebas: reflejar el nombre del archivo de origen con `.test.ts`/`.test.tsx`
 
-## Codificación asistida por LLM ("vibe coding")
+## Codificación asistida por IA ("coding assistants")
 
-Mindwtr no es estrictamente contrario a la codificación asistida por LLM. Las herramientas de LLM están mejorando rápidamente y pueden ser productivas cuando se usan correctamente.
+Mindwtr no es estrictamente contrario a la codificación asistida por IA. Las herramientas de IA están mejorando rápidamente y pueden ser productivas cuando se usan correctamente.
 
-Si utilizas agentes LLM/codificación para contribuciones, sigue estas reglas:
+Si utilizas agentes de IA/codificación para contribuciones, sigue estas reglas:
 
 1. No uses interfaces de chat web como tu herramienta de codificación principal.
    Utiliza agentes de codificación en un IDE o CLI con indexación de repositorio y contexto completo de base de código.
@@ -257,25 +247,19 @@ Estilo de confirmación:
 Antes de que podamos fusionar tu solicitud de extracción, necesitarás firmar nuestro
 [Acuerdo de licencia de colaborador (CLA)](https://gist.github.com/dongdongbh/0446c35e1d5c1a73c344b16cba4aeeaa).
 
-Este es un proceso único — el Asistente de CLA verificará automáticamente
-cuando abras un PR y te lo pedirá si es necesario. Firmar toma aproximadamente
-30 segundos a través de tu cuenta de GitHub.
+Este es un proceso único — el Asistente de CLA verificará automáticamente cuando abras un PR y te lo pedirá si es necesario. Firmar toma aproximadamente 30 segundos a través de tu cuenta de GitHub.
 
 ### ¿Por qué un CLA?
 
-Mindwtr es gratuito, de código abierto y está bajo la licencia AGPL-3.0. El CLA
-asegura que el proyecto tenga la flexibilidad de explorar opciones de sostenibilidad
-(como licencias duales) en el futuro, para que podamos mantener vivo el proyecto a largo plazo.
-Retienes la propiedad total de tus contribuciones — el CLA simplemente otorga al proyecto una licencia para usarlas.
+Mindwtr es gratuito, de código abierto y está bajo la licencia AGPL-3.0. El CLA asegura que el proyecto tenga la flexibilidad de explorar opciones de sostenibilidad (como licencias duales) en el futuro, para que podamos mantener vivo el proyecto a largo plazo. Retienes la propiedad total de tus contribuciones — el CLA simplemente otorga al proyecto una licencia para usarlas.
 
-El núcleo de Mindwtr siempre seguirá siendo disponible bajo una
-licencia de código abierto aprobada por OSI.
+El núcleo de Mindwtr siempre seguirá siendo disponible bajo una licencia de código abierto aprobada por OSI.
 
 ## Contribuciones de documentación
 
 Las actualizaciones de documentación son bienvenidas en el repositorio del sitio de documentación, `README.md`, `README_zh.md` y documentación local del repositorio.
 
-La mayoría de la documentación orientada al usuario debe ir en la fuente de documentación web de Mindwtr, que construye el sitio de documentación pública en https://docs.mindwtr.app/. Utiliza el directorio `docs/` de este repositorio para documentación local del repositorio como guías de contribución, resúmenes de arquitectura, ADRs y notas de lanzamiento. El directorio `wiki/` contiene solo la página de inicio de la wiki de GitHub retirada, que dirige a los lectores al sitio de documentación; no agregues páginas de contenido allí.
+La mayoría de la documentación orientada al usuario debe ir en la fuente de documentación web de Mindwtr, que construye el sitio de documentación pública en https://docs.mindwtr.app/. Utiliza el directorio `docs/` de este repositorio para documentación local como guías de contribución, resúmenes de arquitectura, ADRs y notas de lanzamiento. El directorio `wiki/` contiene solo la página de inicio de la wiki de GitHub retirada, que dirige a los lectores al sitio de documentación; no agregues páginas de contenido allí.
 
 Al cambiar documentos:
 
@@ -301,7 +285,7 @@ La mayoría de las cadenas de traducción viven en:
 
 Al actualizar traducciones:
 
-- Mantén los marcadores de posición e internas de interpolación sin cambios
+- Mantén los marcadores de posición e interpolaciones sin cambios
 - Mantén intactos los tokens de comando donde el comportamiento del analizador depende de comandos en inglés
 - Para un nuevo idioma, registra la configuración regional en los registros de i18n compartidos, mapeo de configuración regional de fecha, selectores de idioma de escritorio/móvil y verificaciones de paridad de configuración regional
 - Después de cambiar cualquier cadena `starter.*`, ejecuta `bun run scripts/i18n-locale-parity.ts --fix` para regenerar `packages/core/src/i18n/starter-seed-strings.ts`. Ese archivo se genera, nunca se edita a mano, y `bun run i18n:check` falla hasta que vuelve a estar sincronizado
@@ -314,6 +298,6 @@ Si no estás seguro sobre el alcance o detalles de implementación:
 
 - Abre un problema de GitHub con una propuesta breve
 - Únete al chat comunitario en Discord: https://discord.gg/gc4h5t58PR
-- Pide retroalimentación del mantenedor antes de implementar cambios grandes
+- Solicita retroalimentación del mantenedor antes de implementar cambios grandes
 
 Gracias de nuevo por contribuir a Mindwtr.

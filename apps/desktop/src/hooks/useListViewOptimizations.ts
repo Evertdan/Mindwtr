@@ -35,8 +35,8 @@ export function useListViewOptimizations(
             perfApi?.trackUseMemo?.();
             const compute = () => {
                 if (sequentialProjectIds.size === 0) return new Set<string>();
-                // Waiting tasks hold their chain slot too: a waiting first
-                // step keeps later next tasks out of the Next list.
+                // Waiting tasks hold su chain slot too: a waiting first
+                // step keeps later next tasks out of la Next list.
                 return getSequentialFirstTaskIds(
                     baseTasks.filter((task) => !task.deletedAt && isSequentialChainStatus(task.status)),
                     sequentialProjectIds,

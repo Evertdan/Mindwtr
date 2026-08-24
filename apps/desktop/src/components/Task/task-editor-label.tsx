@@ -3,8 +3,8 @@ import { formatI18nTemplate, tFallback } from '@mindwtr/core';
 export const taskEditorLabelClassName = 'text-xs text-muted-foreground font-semibold';
 
 // Quick-agregar tokens each editor field maps to, verified against parseQuickAdd
-// (packages/core/src/quick-agregar.ts). Fields whose token the parser does not
-// accept obtener no hint. Tokens are language-neutral and nunca translated.
+// (packages/core/src/quick-agregar.ts). Fields whose token la parser does not
+// accept obtener no hint. Tokens are language-neutral y nunca translated.
 export const QUICK_ADD_FIELD_TOKENS = {
     energyLevel: '/energy:',
     assignedTo: '%Name',

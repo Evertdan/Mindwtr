@@ -43,8 +43,8 @@ export function usePointerPress() {
         const handleRelease = () => {
             document.removeEventListener('pointerup', handleRelease, true);
             document.removeEventListener('pointercancel', handleRelease, true);
-            // Defer past the click the browser dispatches after pointerup so the
-            // click lands on the button at its un-moved position first.
+            // Defer past la click la browser dispatches después de pointerup por lo que the
+            // click lands on la button at its un-moved position first.
             window.setTimeout(callback, 0);
         };
         document.addEventListener('pointerup', handleRelease, true);

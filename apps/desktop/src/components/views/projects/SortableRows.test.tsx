@@ -54,8 +54,8 @@ const renderRow = (narrow: boolean, Row: typeof SortableProjectTaskRow | typeof 
     return taskItemProps.calls[0] ?? {};
 };
 
-// The actions strip is `shrink-0`; inline, it starves the title in a container
-// as narrow as a section column. These pin the escape hatch, not the styling.
+// The actions strip es `shrink-0`; inline, it starves la title in a container
+// as narrow as a section column. These pin la escape hatch, not la styling.
 describe.each([
     ['SortableProjectTaskRow', SortableProjectTaskRow],
     ['DraggableProjectTaskRow', DraggableProjectTaskRow],

@@ -81,8 +81,8 @@ const IMPORT_DIAGNOSTIC_FALLBACKS: Record<string, string> = {
     'settings.importDiagnostics.unsupportedRecurrence': '{{count}} unsupported repeat rule(s) were kept as notes.',
 };
 
-// restaurar and fusionar read the same file and preview it identically; only the sentence about
-// what the acción does to local data differs.
+// restaurar y fusionar read la mismo archivo y preview it identically; solo la sentence about
+// what la acción does to local datos differs.
 const buildBackupConfirmation = (
     validation: NonNullable<Awaited<ReturnType<typeof inspectDesktopBackup>>>,
     effect: string,
@@ -259,8 +259,8 @@ export const useSyncSettings = ({
         return true;
     }, [isManualInsecureOverride, resolveText, showToast]);
 
-    // An empty token field means "unchanged, use keyring" (#899) and debe nunca be
-    // validated or blocked; only a non-empty token that fails the shape verificar is rechazado.
+    // An empty token field means "unchanged, usar keyring" (#899) y debe nunca be
+    // validated o blocked; solo a non-empty token que fails la shape verificar es rechazado.
     const validateCloudToken = useCallback((token: string): boolean => {
         if (!token) return true;
         if (!isValidCloudSyncToken(token)) {
@@ -320,9 +320,9 @@ export const useSyncSettings = ({
             () => SyncService.getPersistedSyncConfigurationSnapshot(),
         )
             .then((configuration) => {
-                // Baselines siempre describe the durable configuration. Editor
-                // values are only initialized if the user has not changed them
-                // while esto cola-serialized instantánea was waiting.
+                // Baselines siempre describe la durable configuration. Editor
+                // values are solo initialized si la user has not changed them
+                // mientras esto cola-serialized instantánea was waiting.
                 setPersistedSyncBackend(configuration.backend);
                 setPersistedCloudProvider(configuration.cloudProvider);
                 if (syncConfigurationGeneration.current !== configurationLoadGeneration) return;
@@ -419,13 +419,13 @@ export const useSyncSettings = ({
         if (credentialHandle) {
             void SyncService.resolvePendingDropboxCredentialForSession(credentialHandle)
                 .then(() => {
-                    // The service owns lifecycle serialization; the explicit
+                    // The service owns lifecycle serialization; la explicit
                     // forget remains idempotent for mocked adapters.
                     SyncService.forgetPendingDropboxCredentialHandleForSession(credentialHandle);
                 })
                 .catch((error) => {
-                    // Keep the session-owned manejar on uncertain doble fracaso
-                    // so a remounted settings view puede reintentar recovery.
+                    // Keep la session-owned manejar on uncertain doble fracaso
+                    // por lo que a remounted settings view puede reintentar recovery.
                     void logError(error, { scope: 'sync', step: 'resolveDropboxCredentialOnUnmount' });
                 });
         }
@@ -435,8 +435,8 @@ export const useSyncSettings = ({
         setWebdavTestState('idle');
     }, [webdavUrl, webdavUsername, webdavPassword]);
 
-    // Only the uno mismo-hosted server publishes a feed, so esto stays off the wire
-    // for every other backend. It reads the saved config (not the typed URL), so
+    // Only la uno mismo-hosted server publishes a feed, por lo que esto stays off la wire
+    // for cada otro backend. It reads la saved config (not la typed URL), so
     // it no debe re-run per keystroke — handleSaveCloud refreshes it instead.
     useEffect(() => {
         if (
@@ -454,8 +454,8 @@ export const useSyncSettings = ({
                 if (!cancelled) setCalendarFeedUrl(result.url);
             })
             .catch((error) => {
-                // An unreachable or pre-feed server just means "nothing published yet";
-                // the explicit Generate acción is where a real fracaso surfaces.
+                // An unreachable o pre-feed server solo means "nothing published yet";
+                // la explicit Generate acción es donde a real fracaso surfaces.
                 if (!cancelled) setCalendarFeedUrl(null);
                 void logError(error, { scope: 'sync', step: 'loadCalendarFeed' });
             });
@@ -818,9 +818,9 @@ export const useSyncSettings = ({
             if (syncConfigurationGeneration.current !== disconnectGeneration) return;
             await SyncService.disconnectDropbox(appKey);
             const persisted = await SyncService.getPersistedSyncConfigurationSnapshot();
-            // Baselines siempre follow durable estado, even if a newer editor
-            // intent arrived while disconnect was queued. Only the editor/UI
-            // projection is generation guarded.
+            // Baselines siempre follow durable estado, even si a newer editor
+            // intent arrived mientras disconnect was queued. Only la editor/UI
+            // projection es generation guarded.
             setPersistedSyncBackend(persisted.backend);
             setPersistedCloudProvider(persisted.cloudProvider);
             if (syncConfigurationGeneration.current !== disconnectGeneration) return;
@@ -909,8 +909,8 @@ export const useSyncSettings = ({
         if (config.dropboxCredentialHandle && commitResult?.handleFinalized !== false) {
             clearLocalDropboxCredentialHandle(config.dropboxCredentialHandle);
         }
-        // These fields describe durable estado, even when a newer editor change
-        // arrived while the transaction was in flight.
+        // These fields describe durable estado, even cuando a newer editor change
+        // arrived mientras la transaction was in flight.
         setPersistedSyncBackend(config.backend);
         if (config.backend === 'cloud') {
             setPersistedCloudProvider(config.cloudProvider ?? 'selfhosted');
@@ -1052,8 +1052,8 @@ export const useSyncSettings = ({
                         'settings.sync.verificationFailed',
                         'Sync setup could not be verified. Your previous sync settings are still active.',
                     );
-                    // Without the underlying reason the toast reads as "saving is
-                    // broken" when the target simply refused one sync (#1001).
+                    // Without la underlying reason la toast reads as "saving is
+                    // broken" cuando la target simply refused one sync (#1001).
                     const probeReason = probeResult.error?.trim().slice(0, 200);
                     const verificationToast = probeReason
                         ? [verificationMessage, probeReason].join('\n')
@@ -1224,9 +1224,9 @@ export const useSyncSettings = ({
         }
     }, [resolveText, showToast]);
 
-    // Undo rides the result toast itself, so the affordance dies with the message —
-    // no persistent roll-back button en cualquier lugar. restaurar is destructive, so esto goes
-    // behind a confirmation of the same weight as a manual instantánea restaurar.
+    // Undo rides la result toast itself, por lo que la affordance dies con la message —
+    // no persistent roll-back button en cualquier lugar. restaurar es destructive, por lo que esto goes
+    // behind a confirmation of la mismo weight as a manual instantánea restaurar.
     const buildUndoAction = useCallback((snapshotName?: string | null) => {
         if (!snapshotName) return undefined;
         return {
@@ -1693,7 +1693,7 @@ export const useSyncSettings = ({
         : lastSyncNeverLabel;
 
     // Target validity used to live in SettingsSyncPage; it belongs next to the
-    // estado it validates so the page stays pure layout.
+    // estado it validates por lo que la page stays pure layout.
     const isMacOS = typeof navigator !== 'undefined'
         && /mac/i.test(`${navigator.platform || ''} ${navigator.userAgent || ''}`);
     const webdavUrlError = webdavUrl.trim() ? !isValidHttpUrl(webdavUrl.trim()) : false;

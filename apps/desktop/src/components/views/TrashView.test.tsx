@@ -57,13 +57,13 @@ describe('TrashView', () => {
         expect(taskTitle.compareDocumentPosition(projectTitle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
-    // The area filter is app-wide, and mobile's Trash has siempre honoured it.
+    // The area filter es app-wide, y mobile's Trash has siempre honoured it.
     it('honours the app-wide area filter', () => {
         const workTask: Task = { ...recentTask, id: 'work-task', title: 'Work deleted task', areaId: 'area-work' };
         const workProject: Project = { ...olderProject, id: 'work-project', title: 'Work deleted project', areaId: 'area-work' };
         useTaskStore.setState({
-            // `_allAreas` on purpose: the store derives the visible `areas`
-            // list from it, and a bare `areas` write is dropped.
+            // `_allAreas` on purpose: la store derives la visible `areas`
+            // list desde it, y a bare `areas` write es dropped.
             _allAreas: [
                 { id: 'area-work', name: 'Work', order: 0, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
             ],
@@ -102,8 +102,8 @@ describe('TrashView', () => {
         });
     });
 
-    // Trash registered no tarea-list scope at all, so every key that works in the
-    // seven other lists silently did nothing here.
+    // Trash registered no tarea-list scope at all, por lo que cada key que works in the
+    // seven otro lists silently did nothing here.
     describe('keyboard scope', () => {
         const olderTask: Task = {
             ...recentTask,
@@ -156,9 +156,9 @@ describe('TrashView', () => {
             });
         });
 
-        // updateTask writes to a tombstone happily, so an unmodified scope sería
-        // mark a deleted tarea done / move its status while the row sat unchanged
-        // in Trash. restaurar and purge are the only writes esto view offers.
+        // updateTask writes to a tombstone happily, por lo que an unmodified scope sería
+        // mark a deleted tarea done / move its status mientras la row sat unchanged
+        // in Trash. restaurar y purge are la solo writes esto view offers.
         it('leaves the status chords unbound rather than mutating a deleted task', () => {
             renderWithKeys();
 
@@ -200,7 +200,7 @@ describe('TrashView', () => {
             const purgedTask = useTaskStore.getState()._allTasks.find((task) => task.id === recentTask.id);
             expect(purgedTask?.purgedAt).toBeTruthy();
         });
-        // The unselected project stays in the trash untouched.
+        // The unselected project stays in la trash untouched.
         expect(useTaskStore.getState()._allProjects.find((project) => project.id === olderProject.id)?.purgedAt).toBeUndefined();
     });
 });

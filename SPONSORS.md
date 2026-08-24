@@ -1,53 +1,53 @@
-# Sponsor Mindwtr
+# Patrocina Mindwtr
 
-[Mindwtr](https://mindwtr.app) is a free and open-source, cross-platform Getting Things Done (GTD) productivity app for desktop, mobile, and web.
+[Mindwtr](https://mindwtr.app) es una aplicación de productividad Getting Things Done (GTD) gratuita y de código abierto, multiplataforma para escritorio, móvil y web.
 
-Mindwtr is actively used by **15,000+ users**, with **1,000+ daily active users**, and the community continues to grow rapidly.
+Mindwtr es utilizada activamente por **más de 15.000 usuarios**, con **más de 1.000 usuarios activos diarios**, y la comunidad continúa creciendo rápidamente.
 
-Sponsorship keeps Mindwtr free, independent, and actively maintained — funding development, cross-platform testing and release infrastructure, documentation, and community support.
+El patrocinio mantiene Mindwtr gratuita, independiente y activamente mantenida — financiando desarrollo, pruebas multiplataforma e infraestructura de lanzamiento, documentación y soporte comunitario.
 
-- **Individual support:** [GitHub Sponsors](https://github.com/sponsors/dongdongbh) · [Ko-fi](https://ko-fi.com/D1D01T20WK)
-- **Corporate sponsorship:** see below, then contact **[support@mindwtr.app](mailto:support@mindwtr.app)**
-- **Project:** <https://github.com/dongdongbh/Mindwtr> · **Website:** <https://mindwtr.app>
+- **Soporte individual:** [GitHub Sponsors](https://github.com/sponsors/dongdongbh) · [Ko-fi](https://ko-fi.com/D1D01T20WK)
+- **Patrocinio corporativo:** ver abajo, luego contacta a **[support@mindwtr.app](mailto:support@mindwtr.app)**
+- **Proyecto:** <https://github.com/dongdongbh/Mindwtr> · **Sitio web:** <https://mindwtr.app>
 
 ---
 
-## Why sponsor Mindwtr?
+## ¿Por qué patrocinar Mindwtr?
 
-Mindwtr is a user-facing application people open every day — an audience interested in productivity, GTD, software development, automation, self-hosting, and AI-assisted workflows. Depending on the tier, sponsors are recognized in the Mindwtr repository and on the official website.
+Mindwtr es una aplicación orientada al usuario que la gente abre todos los días — una audiencia interesada en productividad, GTD, desarrollo de software, automatización, auto-alojamiento y flujos de trabajo asistidos por IA. Dependiendo del nivel, los patrocinadores se reconocen en el repositorio de Mindwtr y en el sitio web oficial.
 
-Sponsorship does **not** purchase control over the roadmap, issue priority, project decisions, or user data.
+El patrocinio **no** compra control sobre la hoja de ruta, prioridad de issues, decisiones del proyecto o datos de usuarios.
 
-## Corporate sponsorship tiers
+## Niveles de patrocinio corporativo
 
-| Tier | Price | Placement |
+| Nivel | Precio | Colocación |
 | --- | ---: | --- |
-| **Bronze** | $250/month | Company name + link in the Mindwtr README |
-| **Silver** | $500/month | Company logo + link in the Mindwtr README |
-| **Gold** | $1,000/month | Silver benefits + logo and link on [mindwtr.app](https://mindwtr.app) |
-| **Strategic / Product Partner** | Contact us | Custom partnerships, integrations, co-marketing |
+| **Bronce** | $250/mes | Nombre de la empresa + enlace en el README de Mindwtr |
+| **Plata** | $500/mes | Logotipo de la empresa + enlace en el README de Mindwtr |
+| **Oro** | $1.000/mes | Beneficios de Plata + logotipo y enlace en [mindwtr.app](https://mindwtr.app) |
+| **Socio Estratégico / de Producto** | Contáctanos | Asociaciones personalizadas, integraciones, co-marketing |
 
-Corporate sponsorships run for a minimum of **3 months**. Placements go live after the sponsor and creative are approved and payment for the first term is received.
+Los patrocinios corporativos se ejecutan por un mínimo de **3 meses**. Las colocaciones se hacen públicas después de que el patrocinador y la creatividad sean aprobados y se reciba el pago del primer período.
 
-Individual supporter tiers ($5+/month) live on [GitHub Sponsors](https://github.com/sponsors/dongdongbh) and are recognized in the README supporters list.
+Los niveles de soporte individual ($5+/mes) viven en [GitHub Sponsors](https://github.com/sponsors/dongdongbh) y se reconocen en la lista de seguidores del README.
 
-## How to become a corporate sponsor
+## Cómo convertirse en patrocinador corporativo
 
-1. Email **[support@mindwtr.app](mailto:support@mindwtr.app)** with your company name, website, preferred tier, and destination URL.
-2. Provide an SVG logo where possible, or a high-resolution transparent PNG.
-3. Mindwtr reviews the sponsor and placement before confirming.
-4. Standard sponsorships can be paid through GitHub Sponsors. Companies requiring contracts, invoices, purchase orders, or alternative payment arrangements should contact [support@mindwtr.app](mailto:support@mindwtr.app). Corporate placements may require a short written sponsorship agreement; strategic partnerships and product integrations always do.
+1. Envía un correo a **[support@mindwtr.app](mailto:support@mindwtr.app)** con el nombre de tu empresa, sitio web, nivel preferido y URL de destino.
+2. Proporciona un logotipo SVG si es posible, o una PNG transparente de alta resolución.
+3. Mindwtr revisa al patrocinador y la colocación antes de confirmar.
+4. Los patrocinios estándar se pueden pagar a través de GitHub Sponsors. Las empresas que requieran contratos, facturas, órdenes de compra o acuerdos de pago alternativos deben contactar con [support@mindwtr.app](mailto:support@mindwtr.app). Las colocaciones corporativas pueden requerir un acuerdo de patrocinio breve escrito; las asociaciones estratégicas e integraciones de productos siempre lo hacen.
 
-## Product and API partnerships
+## Asociaciones de productos e API
 
-Companies interested in integrating a service, API, or AI provider with Mindwtr are welcome to discuss a separate partnership — it is **not included in the standard tiers** and is quoted individually.
+Las empresas interesadas en integrar un servicio, API o proveedor de IA con Mindwtr están invitadas a discutir una asociación separada — **no está incluida en los niveles estándar** y se cotiza individualmente.
 
-Any integration must remain optional for users, clearly disclose the third-party service, respect Mindwtr's privacy and local-first principles, avoid vendor lock-in, and provide genuine value to Mindwtr users. Payment does not guarantee acceptance of a proposed integration, and no sponsor becomes a default or mandatory provider.
+Cualquier integración debe permanecer opcional para los usuarios, divulgar claramente el servicio de terceros, respetar los principios de privacidad y local-first de Mindwtr, evitar el bloqueo de proveedores y proporcionar valor genuino a los usuarios de Mindwtr. El pago no garantiza la aceptación de una integración propuesta, y ningún patrocinador se convierte en un proveedor predeterminado u obligatorio.
 
-## Sponsorship and content policy
+## Política de patrocinio y contenido
 
-Sponsorship does not imply that Mindwtr endorses a sponsor's products, services, claims, or business practices. All sponsor names, logos, links, and promotional content are subject to approval, and Mindwtr may decline or remove placements that are illegal, deceptive, gambling/adult, misleading about the relationship with Mindwtr, harmful to user privacy or security, or otherwise in conflict with the project's values or its users' interests. Sponsor links may use `rel="sponsored nofollow"`. Mindwtr retains final editorial control over the project, website, documentation, releases, roadmap, and product experience.
+El patrocinio no implica que Mindwtr respalde los productos, servicios, afirmaciones o prácticas comerciales de un patrocinador. Todos los nombres, logotipos, enlaces y contenido promocional del patrocinador están sujetos a aprobación, y Mindwtr puede declinar o eliminar colocaciones que sean ilegales, engañosas, juego/adulto, engañosas sobre la relación con Mindwtr, perjudiciales para la privacidad o seguridad del usuario, o en conflicto con los valores del proyecto o los intereses de sus usuarios. Los enlaces de los patrocinadores pueden usar `rel="sponsored nofollow"`. Mindwtr retiene el control editorial final sobre el proyecto, sitio web, documentación, lanzamientos, hoja de ruta y experiencia del producto.
 
 ---
 
-Questions or partnership proposals: **[support@mindwtr.app](mailto:support@mindwtr.app)**. Thank you for supporting independent open-source software. ❤️
+Preguntas o propuestas de asociación: **[support@mindwtr.app](mailto:support@mindwtr.app)**. Gracias por apoyar software de código abierto independiente. ❤️

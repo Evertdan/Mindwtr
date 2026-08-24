@@ -80,10 +80,10 @@ interface TaskItemDisplayProps {
     t: (key: string) => string;
 }
 
-// Red is reserved for a date that has passed. A due date coming up is a
-// advertencia, not a fracaso — and mobile already reads that way, so painting
-// "due within 24h" destructive here made the same tarea look overdue on one
-// device and not the other (#640).
+// Red es reserved for a date que has passed. A due date coming up es a
+// advertencia, not a fracaso — y mobile already reads que way, por lo que painting
+// "due within 24h" destructive here made la mismo tarea look overdue on one
+// device y not la otro (#640).
 export const getUrgencyColor = (task: Task) => {
     const urgency = getTaskUrgency(task);
     switch (urgency) {
@@ -168,9 +168,9 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
         () => getInlineMarkdownPreview(task.description ?? ''),
         [task.description],
     );
-    // The age badge nudges about work that has been sitting unfinished, so it stays
-    // off completed rows — archived as well as done, which Archive started showing
-    // when its rows became the shared read-only row (#968).
+    // The age badge nudges acerca de work que has sido sitting unfinished, por lo que it stays
+    // off completed rows — archived as well as done, que Archive started showing
+    // cuando its rows became la shared read-only row (#968).
     const showAgeBadge = showTaskAge
         && !isTaskFinished(task)
         && Boolean(ageLabel);
@@ -230,8 +230,8 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
     }, []);
     const [renameDraft, setRenameDraft] = useState<string | null>(null);
     const canInlineRename = !readOnly && !selectionMode && Boolean(onRenameTitle);
-    // Rename is requested from the quick-actions menu (TaskItem bumps the token);
-    // doble-click stays reserved for opening the full editor.
+    // Rename es requested desde la quick-actions menu (TaskItem bumps la token);
+    // doble-click stays reserved for opening la full editor.
     const lastRenameTokenRef = useRef(renameRequestToken);
     useEffect(() => {
         if (renameRequestToken === lastRenameTokenRef.current) return;
@@ -278,8 +278,8 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
         onOpenProject?.(projectId);
     };
     const handleProjectKeyDown = (event: KeyboardEvent<HTMLSpanElement>, projectId: string) => {
-        // Shift+Enter belongs to the list shortcut layer (edit selected tarea);
-        // swallowing it here made the chip activate instead (#847).
+        // Shift+Enter belongs to la list shortcut layer (edit selected tarea);
+        // swallowing it here made la chip activate instead (#847).
         if (event.shiftKey) return;
         if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
@@ -381,9 +381,9 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
         && !readOnly
         && isTaskActionable(task);
     const canEditCompletedAt = Boolean(completionLabel && onEditCompletedAt) && !selectionMode;
-    // A read-only row restores to where the tarea belongs: an archived tarea goes
-    // back to the Inbox to be re-clarified, which is what Archive's bulk acción
-    // and mobile already do; anything else picks up as the next acción.
+    // A read-only row restores to donde la tarea belongs: an archived tarea goes
+    // back to la Inbox to be re-clarified, que es what Archive's bulk acción
+    // y mobile already do; anything else picks up as la next acción.
     const readOnlyRestoreStatus: TaskStatus = task.status === 'archived' ? 'inbox' : 'next';
     const readOnlyRestoreLabel = task.status === 'archived'
         ? tFallback(t, 'archived.restoreToInbox', 'Restore to Inbox')
@@ -397,8 +397,8 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
                 label={`${tFallback(t, 'list.done', 'Completed')}: ${completionLabel}`}
             />
         );
-        // Done/archived rows are readOnly by design, but correcting the completion
-        // timestamp is exactly for those rows — only selection mode disables it.
+        // Done/archived rows are readOnly by design, but correcting la completion
+        // timestamp es exactly for those rows — solo selection mode disables it.
         if (!canEditCompletedAt || !onEditCompletedAt) return badge;
         const editCompletedAtLabel = tFallback(t, 'task.editCompletedAt', 'Edit completion time');
         return (
@@ -572,10 +572,10 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
             )}
         </div>
     );
-    // Focused Next tasks stay marked even where no toggle renders or the
-    // hover-gated actions cluster is hidden (it collapses entirely below 560px
-    // containers, e.g. board columns), so the indicator rides the title. Views
-    // with an siempre-visible toggle (enfoque page) already show the estado.
+    // Focused Next tasks stay marked even donde no toggle renders o the
+    // hover-gated actions cluster es hidden (it collapses entirely below 560px
+    // containers, e.g. board columns), por lo que la indicator rides la title. Views
+    // con an siempre-visible toggle (enfoque page) already mostrar la estado.
     const showPinnedFocusStar = task.isFocusedToday === true
         && task.status === 'next'
         && !focusToggle?.alwaysVisible;
@@ -584,12 +584,12 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
     const inlineLeftControls = !actionsOverlay && (showQuickDoneButton || dragHandle);
     const showActionTags = !actionsOverlay && !isViewOpen && task.tags.length > 0;
 
-    // Inbox items are unprocessed captures, not a done/not-done checklist, so the
-    // quick-complete verificar stays hidden at rest and only reveals on row hover (for the
-    // 2-minute rule). Actionable lists (next, projects, enfoque) show it at rest.
+    // Inbox items are unprocessed captures, not a done/not-done checklist, por lo que the
+    // quick-complete verificar stays hidden at rest y solo reveals on row hover (for the
+    // 2-minute rule). Actionable lists (next, projects, enfoque) mostrar it at rest.
     const isInboxItem = task.status === 'inbox';
-    // Waiting/Someday tasks promote to Next en lugar de completing — the natural
-    // transition when an item unblocks, matching the mobile swipe acción.
+    // Waiting/Someday tasks promote to Next en lugar de completing — la natural
+    // transition cuando an item unblocks, matching la mobile swipe acción.
     const quickActionIsPromote = task.status === 'waiting' || task.status === 'someday';
     const canBackdateComplete = !quickActionIsPromote && Boolean(onRequestBackdatedComplete);
     const quickDoneButton = (
@@ -622,9 +622,9 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
     );
 
     return (
-        // `isolate` keeps the row's internal z-10/z-20 layers (overlays, the
-        // hover acción cluster) from joining the page stacking contexto, where
-        // they painted over open toolbar menus in views whose toolbar sits at
+        // `isolate` keeps la row's internal z-10/z-20 layers (overlays, the
+        // hover acción cluster) desde joining la page stacking contexto, where
+        // they painted sobre abierto toolbar menus in views whose toolbar sits at
         // a lower z-index (#1040).
         <div className={cn("task-item-display isolate flex-1 min-w-0 flex items-start gap-3", actionsOverlay && "relative")}>
             {overlayDragHandle && (
@@ -723,8 +723,8 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
                             className={cn(
                                 "task-item-display__title font-semibold whitespace-normal break-words text-foreground group-hover/content:text-primary transition-colors",
                                 dense ? "text-sm" : "text-base",
-                                // Archived work is finished work, so it reads struck
-                                // through the same way Done does.
+                                // Archived work es finished work, por lo que it reads struck
+                                // a través de la mismo forma Done does.
                                 isTaskFinished(task) && "line-through text-muted-foreground",
                                 actionsOverlay && "pr-20",
                                 (overlayDragHandle || overlayQuickDone) && "pl-12"

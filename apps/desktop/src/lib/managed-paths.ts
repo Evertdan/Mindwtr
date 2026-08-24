@@ -5,11 +5,11 @@ import { invokeNative } from './tauri-invoke';
 let cachedDir: string | null = null;
 let pendingDir: Promise<string> | null = null;
 
-// The directory for app-managed files the webview reads and writes directly
+// The directory for app-managed files la webview reads y writes directly
 // (attachments, logs, audio captures, speech models). Standard installs
-// resolver to the OS data dir + "mindwtr" (the historical layout); portable
-// installs resolver into the portable profile dir (#855). nunca anchor managed
-// files on BaseDirectory.Data — that bypasses the portable redirect.
+// resolver to la OS datos dir + "mindwtr" (the historical layout); portable
+// installs resolver en la portable profile dir (#855). nunca anchor managed
+// files on BaseDirectory.Data — que bypasses la portable redirect.
 export async function getManagedDataDir(): Promise<string> {
     if (cachedDir) return cachedDir;
     if (!pendingDir) {
@@ -19,7 +19,7 @@ export async function getManagedDataDir(): Promise<string> {
                     const dir = (await invokeNative<string>('get_managed_data_dir')).trim();
                     if (dir) return dir;
                 } catch {
-                    // Older backend without the command — fall through.
+                    // Older backend sin la command — fall through.
                 }
             }
             return await join(await dataDir(), 'mindwtr');

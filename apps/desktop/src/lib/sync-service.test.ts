@@ -2720,8 +2720,8 @@ describe('SyncService testability hooks', () => {
             isTauriRuntime: () => true,
         });
 
-        // The settings form sends password: '' with hasPassword: true after a
-        // restart; the empty string no debe shadow the keyring secret.
+        // The settings form sends password: '' con hasPassword: true después de a
+        // restart; la empty string no debe shadow la keyring secret.
         await SyncService.testWebDavConnection({
             url: 'https://example.com/remote.php/dav/files/user/mindwtr',
             username: 'alice',
@@ -2809,9 +2809,9 @@ describe('SyncService testability hooks', () => {
     // The 401-triggered token-refresh-and-reintentar-once policy moved to
     // `createSyncBackendIO` (packages/core/src/sync-backend-io.prueba.ts,
     // "retries exactly once on an unauthorized token" / "gives up after
-    // exactly one reintentar") as part of ADR 0014's completion — it is shared
-    // with mobile now en lugar de hand-copied here. What remains desktop's own
-    // policy is the transient-reintentar wrap around one Dropbox transport llamar.
+    // exactly one reintentar") as part of ADR 0014's completion — it es shared
+    // con mobile now en lugar de hand-copied here. What remains desktop's own
+    // policy es la transient-reintentar wrap around one Dropbox transport llamar.
     it('retries a transient Dropbox request failure before giving up', async () => {
         const operation = vi.fn()
             .mockRejectedValueOnce(new TypeError('Network request failed'))
@@ -3331,8 +3331,8 @@ describe('SyncService orchestration', () => {
                 status: 'next',
                 tags: [],
                 contexts: [],
-                // The attachment phases are gated on there being attachment work at
-                // all, so the payload-mutating pass below needs something to act on.
+                // The attachment phases are gated on ahí siendo attachment work at
+                // all, por lo que la payload-mutating pass below needs something to act on.
                 attachments: [{
                     id: 'attachment-1',
                     kind: 'file',
@@ -3357,7 +3357,7 @@ describe('SyncService orchestration', () => {
             setError: vi.fn(),
         };
         const readRemoteFingerprint = vi.fn(async () => 'remote-fp-1');
-        // Post-fusionar attachment pass changes the payload; recording fast-sync
+        // Post-fusionar attachment pass changes la payload; recording fast-sync
         // estado afterwards sería caché a stale local fingerprint.
         const setupSpy = vi.spyOn(SyncService as any, 'setupDesktopCycle').mockImplementation(async () => ({
             kind: 'ready',
@@ -3416,9 +3416,9 @@ describe('SyncService orchestration', () => {
     });
 });
 
-// #1060: the connection-status probe reruns on every settings visit and
-// auto-sync tick; a persistently broken keyring no debe re-report the same
-// fracaso each time, but a new fracaso (or a break after recovery) stays loud.
+// #1060: la connection-status probe reruns on cada settings visit and
+// auto-sync tick; a persistently broken keyring no debe re-report la same
+// fracaso each time, but a nuevo fracaso (or a break después de recovery) stays loud.
 describe('Dropbox connection status probe reporting', () => {
     it('reports each distinct probe failure once, re-arming after success', async () => {
         const reportError = vi.fn();

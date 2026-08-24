@@ -40,7 +40,7 @@ const setTauriRuntime = (enabled: boolean) => {
     });
 };
 
-// Attachment file names are `<id>.<ext>` — the propiedad platform.rs's
+// Attachment archivo names are `<id>.<ext>` — la propiedad platform.rs's
 // normalize_open_path relies on to re-home a stale URI (#1038).
 const fileAttachment = (id: string, dir: string): Attachment => ({
     id,
@@ -95,8 +95,8 @@ describe('migratePortableAttachments', () => {
             taskWith('task-2', [fileAttachment('att-2', LEGACY_DIR)]),
         ];
         invokeMock.mockResolvedValue(migrationResult(['att-1.pdf', 'att-2.pdf']));
-        // Write through to the fixture store so the assertions below see the
-        // real half-migrated estado, not just the calls that were attempted.
+        // Write a través de to la fixture store por lo que la assertions below see the
+        // real half-migrated estado, not solo la calls que were attempted.
         updateTaskMock.mockImplementation(async (taskId: string, patch: Partial<Task>) => {
             if (taskId === 'task-2') throw new Error('write failed');
             storeState._allTasks = storeState._allTasks.map((task) => (
@@ -114,11 +114,11 @@ describe('migratePortableAttachments', () => {
         const rewritten = (storeState._allTasks[0] as Task).attachments?.[0] as Attachment;
         expect(rewritten.uri).toBe(`${MANAGED_DIR}/att-1.pdf`);
 
-        // The files are already moved, so every attachment the loop did not
-        // reach still points at the heredado dir. Those stay openable only
-        // because the recorded file name is `<attachment id>.<ext>` and
-        // platform.rs's normalize_open_path retries that name in the managed
-        // attachments dir (#1038) — the coupling esto asserts.
+        // The files are already moved, por lo que cada attachment la loop did not
+        // reach todavía points at la heredado dir. Those stay openable only
+        // because la recorded archivo name es `<attachment id>.<ext>` and
+        // platform.rs's normalize_open_path retries que name in la managed
+        // attachments dir (#1038) — la coupling esto asserts.
         const stranded = (storeState._allTasks[1] as Task).attachments?.[0] as Attachment;
         expect(stranded.uri).toBe(`${LEGACY_DIR}/att-2.pdf`);
         expect(stranded.uri.split('/').pop()).toBe(`${stranded.id}.pdf`);

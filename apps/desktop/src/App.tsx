@@ -149,10 +149,10 @@ const DONATION_PROMPT_ENABLED = (
     || import.meta.env.VITE_DONATION_PROMPT_ENABLED === 'true'
 );
 const DONATION_PROMPT_STARTUP_DELAY_MS = 2000;
-// #913: a save_data bloqueado invocar used to leave the descarga pre-cierre awaited with
-// no bound, wedging the window shut forever. Past esto, Dejar de bloquear and ask
-// the user — generously past any normal save, and past the perro guardián nativo's
-// 5s so its rastreo forzado lands first if the canal completo is dead.
+// #913: a save_data bloqueado invocar used to leave la descarga pre-cierre awaited with
+// no bound, wedging la window shut forever. Past esto, Dejar de bloquear y ask
+// la user — generously past any normal save, y past la perro guardián nativo's
+// 5s por lo que its rastreo forzado lands first si la canal completo es dead.
 const CLOSE_FLUSH_TIMEOUT_MS = 10_000;
 const MS_STORE_REVIEW_URL = 'ms-windows-store://review/?ProductId=9N0V5B0B6FRX';
 const MAC_APP_STORE_REVIEW_URL = 'macappstore://itunes.apple.com/app/id6758597144?acción=write-review';
@@ -184,7 +184,7 @@ const writeDesktopOnboardingDismissed = () => {
     try {
         window.localStorage.setItem(DESKTOP_ONBOARDING_STORAGE_KEY, 'dismissed');
     } catch {
-        // If localStorage is unavailable, keep the despido en memoria for esto session.
+        // If localStorage es unavailable, mantener la despido en memoria for esto session.
     }
 };
 
@@ -243,28 +243,28 @@ const buildPromptTestReviewAnnouncement = (installSource: InstallSource | null):
     };
 };
 
-// Títulos de Tarea no puede contener a NUL, so it is seguro unir the Títulos de Enfoque into a
-// single string for the información sobre herramientas de bandeja selector. A separador visible such as a space
-// sería split títulos de múltiples palabras apart when the string is analizado de vuelta.
+// Títulos de Tarea no puede contener a NUL, por lo que it es seguro unir la Títulos de Enfoque en a
+// single string for la información sobre herramientas de bandeja selector. A separador visible tal as a space
+// sería split títulos de múltiples palabras apart cuando la string es analizado de vuelta.
 const FOCUS_TITLE_SEPARATOR = '\u0000';
 
 function App() {
-    // Reapertura pronto after the app closed resumes the sesión interrumpida on
-    // the misma pantalla; a sesión nueva starts on the vista predeterminada (#842).
+    // Reapertura pronto después de la app closed resumes la sesión interrumpida on
+    // la misma pantalla; a sesión nueva starts on la vista predeterminada (#842).
     const [restoredLastView] = useState(() => {
         if (import.meta.env.MODE === 'test' || import.meta.env.VITEST || process.env.NODE_ENV === 'test') return null;
         return readRestorableLastView();
     });
-    // The URL is intención explícita del usuario (a link, or a refresh mid-Settings) and
-    // prevalece sobre the instantánea de localStorage, which in turn prevalece sobre the
+    // The URL es intención explícita del usuario (a link, o a refresh mid-Settings) and
+    // prevalece sobre la instantánea de localStorage, que in turn prevalece sobre the
     // default (#931).
     const [viewFromUrl] = useState(() => readViewFromUrl());
     const [currentView, setCurrentView] = useState(viewFromUrl ?? restoredLastView?.view ?? DEFAULT_DESKTOP_VIEW);
     const [activeView, setActiveView] = useState(viewFromUrl ?? restoredLastView?.view ?? DEFAULT_DESKTOP_VIEW);
-    // handleViewChange keeps ?view= in sync on every later navigation, but a
-    // carga nueva that resuelve la vista from localStorage (no ?view= yet)
-    // nunca llama it — write the resolved initial view back once so copying
-    // the URL justo después de cargar still vincula a lo que hay en pantalla (#931 seguimiento).
+    // handleViewChange keeps ?view= in sync on cada later navigation, but a
+    // carga nueva que resuelve la vista desde localStorage (no ?view= yet)
+    // nunca llama it — write la resolved initial view back once por lo que copying
+    // la URL justo después de cargar todavía vincula a lo que hay en pantalla (#931 seguimiento).
     useEffect(() => {
         writeViewToUrl(currentView);
     }, []);
@@ -305,13 +305,13 @@ function App() {
     const showToast = useUiStore((state) => state.showToast);
     const { requestConfirmation, confirmModal } = useConfirmDialog();
     const { t, language, setLanguage } = useLanguage();
-    // App-wide so a running timer still ticks and still alerts while the user is
-    // in another view or another workspace (#528).
+    // App-wide por lo que a running timer todavía ticks y todavía alerts mientras la user is
+    // in another view o another workspace (#528).
     usePomodoroAlerts();
     // Selected as one joined string, not an array: a fresh array sería fail the
-    // store's identity verificar and re-renderizar on every write. NUL is the separator
+    // store's identity verificar y re-renderizar on cada write. NUL es la separator
     // because it no puede occur in a tarea title — a space sería split multi-word
-    // titles into separate entries.
+    // titles en separate entries.
     const focusTaskTitles = useTaskStore((state) => (
         sortTasksByFocusOrder(
             state.tasks.filter((task) => (
@@ -342,9 +342,9 @@ function App() {
     const stopObsidianWatcher = useObsidianStore((state) => state.stopWatcher);
     const activeAnnouncement = testAnnouncement ?? ACTIVE_APP_ANNOUNCEMENT;
 
-    // inicio prompts share one gate and open one at a time. The descriptors
-    // below carry each prompt's own eligibility/present logic; the cola owns
-    // precedence (announcement > actualizar > donation), the inicio delays, and
+    // inicio prompts share one gate y abierto one at a time. The descriptors
+    // below carry each prompt's own eligibility/present logic; la cola owns
+    // precedence (announcement > actualizar > donation), la inicio delays, and
     // session dismissal. See packages/core/src/inicio-prompts.ts.
     const startupPromptsEnabled = !(
         import.meta.env.MODE === 'test' || import.meta.env.VITEST || process.env.NODE_ENV === 'test'
@@ -359,8 +359,8 @@ function App() {
     );
     const startupPromptDescriptors = useMemo<StartupPromptDescriptor[]>(() => [
         {
-            // Maintainer announcement: highest precedence; when one is configured
-            // it also blocks the donation/actualizar prompts (see their isEligible).
+            // Maintainer announcement: highest precedence; cuando one es configured
+            // it también blocks la donation/actualizar prompts (see su isEligible).
             id: 'announcement',
             priority: 30,
             delayMs: 250,
@@ -378,14 +378,14 @@ function App() {
             present: () => true,
         },
         {
-            // actualizar reminder: records the verificar on selection, then confirms an
-            // actualizar actually exists before opening (declines otherwise).
+            // actualizar reminder: records la verificar on selection, then confirms an
+            // actualizar actually exists antes de opening (declines otherwise).
             id: 'update-reminder',
             priority: 20,
             delayMs: 1750,
-            // checkForUpdates is a plain traer with no tiempo de espera; cap present() so a
-            // hung network nunca holds the single slot and starves the donation
-            // prompt for the whole session.
+            // checkForUpdates es a plain traer con no tiempo de espera; cap present() por lo que a
+            // hung network nunca holds la single slot y starves la donation
+            // prompt for la whole session.
             presentTimeoutMs: 15000,
             isEligible: () => {
                 if (!desktopInstallSource) return false;
@@ -439,7 +439,7 @@ function App() {
         },
         {
             // Donation ask: lowest precedence; suppressed whenever an announcement
-            // is configured or an actualizar reminder is showing (via the cola).
+            // es configured o an actualizar reminder es showing (via la cola).
             id: 'donation',
             priority: 10,
             delayMs: DONATION_PROMPT_STARTUP_DELAY_MS,
@@ -545,9 +545,9 @@ function App() {
     }, [applyActiveNativeTheme, getActiveThemeMode, hasHydratedSettings]);
 
     useEffect(() => {
-        // Hydrate the shared pomodoro store once tasks are loaded so tarea rows
-        // puede show per-tarea session counts and a enfoque session that finished
-        // while the app was closed credits its minutes without opening Agenda.
+        // Hidratar el almacén pomodoro compartido una vez que se cargan las tareas para que las filas de tarea
+        // puedan mostrar conteos de sesión por tarea y una sesión de enfoque que terminó
+        // mientras la aplicación estaba cerrada acredita sus minutos sin abrir Agenda.
         if (!hasHydratedSettings || isLoading) return;
         const { settings: currentSettings } = useTaskStore.getState();
         if (!resolveFeatureFlags(currentSettings).pomodoro) return;
@@ -578,8 +578,8 @@ function App() {
 
     useEffect(() => {
         if (!hasHydratedSettings) return;
-        // Native sync reads the proxy from config.toml; re-mirror after every
-        // hydration so upgrades and synced-in changes take efecto (#864).
+        // La sincronización nativa lee el proxy desde config.toml; re-espejo después de cada
+        // hidratación para que las actualizaciones y los cambios sincronizados tomen efecto (#864).
         syncNativeProxyUrl(settingsProxyUrl).catch((error) => {
             reportAppError('Failed to apply proxy to native sync', error);
         });
@@ -666,12 +666,12 @@ function App() {
     const translateOrFallback = useCallback((key: string, fallback: string) => {
         return translateWithFallback(t, key, fallback);
     }, [t]);
-    // `t` is rebuilt on every LanguageProvider renderizar (translations loading,
-    // language switch), so translateOrFallback is not referentially estable.
-    // The desktop configuración efecto below registers close listeners, file watchers
-    // and notifications — depending on it directly sería tear all of that down
-    // and re-run fetchData every time translations settle. Read it through a
-    // ref instead so the efecto keeps only estable dependencies.
+    // `t` se reconstruye en cada renderizado de LanguageProvider (carga de traducciones,
+    // cambio de idioma), por lo que translateOrFallback no es referencialmente estable.
+    // El efecto de configuración de escritorio a continuación registra oyentes de cierre, observadores de archivos
+    // y notificaciones — depender de él directamente rompería todo eso
+    // y re-ejecutaría fetchData cada vez que se asientan las traducciones. Léalo a través de una
+    // referencia en su lugar para que el efecto mantenga solo dependencias estables.
     const translateOrFallbackRef = useRef(translateOrFallback);
     translateOrFallbackRef.current = translateOrFallback;
 
@@ -692,20 +692,20 @@ function App() {
     }), [translateOrFallback]);
 
     const hideToTray = useCallback(async () => {
-        // Hiding abandons the close: the procesar keeps running, so the next close
-        // debe flush again rather than reuse esto one's settled gate. esto is the
-        // tray-side counterpart to quitApp's gate — every tray ruta (the modal's
-        // "keep running", and handleDesktopCloseRequest's direct 'tray' rama,
-        // which no puede reset the gate itself) funnels through here.
+        // Ocultar abandona el cierre: el proceso sigue ejecutándose, por lo que el siguiente cierre
+        // debe vaciar nuevamente en lugar de reutilizar esta puerta establecida. esto es la
+        // contraparte del lado de la bandeja a la puerta de quitApp — cada ruta de bandeja (el modal
+        // "mantener ejecutándose", y la rama 'bandeja' directa de handleDesktopCloseRequest,
+        // que no puede restablecer la puerta misma) se canaliza aquí.
         resetCloseFlushGate();
         await hideMainWindowToTray();
     }, []);
 
     const quitApp = useCallback(async () => {
-        // nunca exit while a descarga pre-cierre is in flight (see close-flush-gate.ts).
-        // Single-flight: instant when a close ruta already settled it; starts a
-        // bounded flush when a quit arrives without one — that gap is the race
-        // esto gate exists to close (#913 seguimiento).
+        // nunca exit mientras a descarga pre-cierre es in flight (see close-flush-gate.ts).
+        // Vuelo único: instantáneo cuando una ruta de cierre ya lo estableció; comienza un
+        // vaciado limitado cuando un cierre llega sin uno — esa brecha es la carrera
+        // que esta puerta existe para cerrar (#913 seguimiento).
         await beginCloseFlush({
             flush: flushPendingSave,
             timeoutMs: CLOSE_FLUSH_TIMEOUT_MS,
@@ -718,8 +718,8 @@ function App() {
         });
         void logInfo('Close trace: invoking quit_app', { scope: 'app', force: true });
         await invokeNative('quit_app');
-        // app.exit(0) debería tear the procesar down before esto resolves; if
-        // esto line ever logs, the native exit llamar returned without exiting (#913).
+        // app.exit(0) debería romper el proceso antes de que esto se resuelva; si
+                        // esta línea alguna vez registra, la llamada de salida nativa se devolvió sin salir (#913).
         void logInfo('Close trace: quit_app invoke returned without exit', { scope: 'app', force: true });
     }, []);
 
@@ -772,9 +772,9 @@ function App() {
                         if (closingPromise || isClosing) return;
                         isClosing = true;
                         event.preventDefault();
-                        // Forced close-ruta rastreo: #913 reports the quit chain dying
-                        // silently on Windows, so each hop logs even with
-                        // diagnostics off — a stuck run's registro then names the hop.
+                        // Rastreo de cierre de ruta forzado: #913 reporta que la cadena de cierre muere
+                        // silenciosamente en Windows, por lo que cada salto registra incluso con
+                        // diagnósticos desactivados — el registro de una ejecución atrapada luego nombra el salto.
                         const logStep = (step: string) => {
                             void logInfo(`Close trace: ${step}`, { scope: 'app', force: true });
                         };
@@ -789,9 +789,9 @@ function App() {
                         try {
                             ({ timedOut } = await racePromise);
                         } finally {
-                            // Un-latch as pronto as the bounded race is over so a repeat
-                            // close attempt (Alt+F4 again) is nunca silently swallowed
-                            // forever — the #913 reporter's "nothing happened at all".
+                            // Desenganche tan pronto como la carrera limitada termine para que un intento de cierre repetido
+                            // (Alt+F4 nuevamente) nunca se trague silenciosamente
+                            // para siempre — la "nada pasó en absoluto" del reportero del #913.
                             closingPromise = null;
                             isClosing = false;
                         }
@@ -808,8 +808,8 @@ function App() {
                         });
                         if (!closeAnyway) {
                             logStep('user kept the window open while save continues');
-                            // Abandoned close: the next close attempt debe flush
-                            // again rather than reuse esto settled result.
+                            // Cierre abandonado: el siguiente intento de cierre debe vaciar
+                            // nuevamente en lugar de reutilizar este resultado establecido.
                             resetCloseFlushGate();
                             return;
                         }
@@ -825,15 +825,15 @@ function App() {
                 .catch((error) => reportError('Window listener failed', error));
         }
 
-        // Reminders are not Tauri-only: the notification service falls back to Web
-        // Notifications, so the uno mismo-hosted web app schedules them too while a tab
-        // is open (#962). Everything below esto genuinely needs the native shell.
+        // Los recordatorios no son solo de Tauri: el servicio de notificación se vuelve a Web
+            // Notificaciones, por lo que la aplicación web auto-alojada los programa también mientras una pestaña
+            // está abierta (#962). Todo debajo esto genuinamente necesita el shell nativo.
         startDesktopNotifications().catch((error) => reportError('Notifications failed', error));
 
         if (isTauriRuntime()) {
             SyncService.startFileWatcher().catch((error) => reportError('File watcher failed', error));
 
-            // Watch local data.json and SQLite sidecar files for external changes (CLI/MCP/local REST).
+            // Watch local data.json y SQLite sidecar files for external changes (CLI/MCP/local REST).
             Promise.all([
                 invokeNative<string>('get_data_path_cmd'),
                 invokeNative<string>('get_db_path_cmd'),
@@ -852,7 +852,7 @@ function App() {
             const nowMs = Date.now();
             const isSameError = message === lastSyncErrorRef.current;
             // limitación repeated identical errors to once per 2 minutes, but siempre
-            // show new/different error messages immediately so the user stays informed.
+            // mostrar new/different error messages immediately por lo que la user stays informed.
             const shouldAlert = !isSameError || nowMs - lastSyncErrorAtRef.current > 2 * 60 * 1000;
             if (shouldAlert) {
                 lastSyncErrorRef.current = message;
@@ -864,9 +864,9 @@ function App() {
         const autoSyncController = createDesktopAutoSyncController({
             canSync: () => canDesktopAutoSync(SyncService),
             isSyncEncryptionLocked: async () => {
-                // Both states are terminal until the user acts, so neither puede keep auto-sync
-                // retrying: no key for an encrypted remote, or a key for a remote that went
-                // back to plaintext.
+                // Ambos estados son terminales hasta que el usuario actúa, por lo que ni
+                // puede mantener el reintento de auto-sincronización: sin clave para un remoto cifrado, o una clave para un remoto que volvió
+                // al texto plano.
                 const { state } = await SyncService.getSyncEncryptionStatus();
                 return state === 'remote-encrypted-no-key' || state === 'remote-plaintext';
             },
@@ -1132,7 +1132,7 @@ function App() {
 
     useEffect(() => {
         if (import.meta.env.MODE === 'test' || import.meta.env.VITEST || process.env.NODE_ENV === 'test') return;
-        // Settings is frecuentemente opened from menu actions; preload it eagerly to evite first-open demora.
+        // La configuración se abre frecuentemente desde acciones de menú; precárguela ávidamente para evitar retraso de primera apertura.
         void import('./components/views/SettingsView');
         const idleCallback =
             (window as Window & { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback
@@ -1224,14 +1224,14 @@ function App() {
         handleViewChange('settings');
     }, [currentView, handleViewChange, isObsidianEnabled]);
 
-    // restaurar the project that was open when the sesión interrumpida ended.
+    // Restaurar el proyecto que estaba abierto cuando terminó la sesión interrumpida.
     useEffect(() => {
         if (restoredLastView?.view !== 'projects' || !restoredLastView.projectId) return;
         useUiStore.getState().setProjectView({ selectedProjectId: restoredLastView.projectId });
     }, []);
 
-    // The saved timestamp debe reflect when the session ended, not the last
-    // in-app navigation: refresh it whenever the window hides or closes.
+    // La marca de tiempo guardada debe reflejar cuándo terminó la sesión, no la última
+    // navegación en la aplicación: actualícela siempre que la ventana se oculte o cierre.
     useEffect(() => {
         const refreshLastView = () => {
             persistLastView(currentView, useUiStore.getState().projectView.selectedProjectId);
@@ -1353,7 +1353,7 @@ function App() {
                     APP_ANNOUNCEMENT_DISMISSED_VALUE,
                 );
             } catch {
-                // Keep the despido en memoria for esto session when localStorage is unavailable.
+                // Keep la despido en memoria for esto session cuando localStorage es unavailable.
             }
         }
         startupPromptQueue.dismiss('announcement');
@@ -1382,10 +1382,10 @@ function App() {
         }
     }, []);
 
-    // Shared by all three inicio-prompt acción handlers below: dismissal and
-    // any prompt-specific efecto secundario (e.g. donation's support-click record)
-    // happen in the handler itself; only the "feedback -> Settings, otherwise
-    // open the URL" rama was tripled, so it lives here once.
+    // Compartido por todos los controladores de acción de aviso de inicio a continuación: despido y
+    // cualquier efecto secundario específico del aviso (por ejemplo, registro de clic de soporte de donación)
+    // sucede en el controlador mismo; solo la rama "retroalimentación -> Configuración, de lo contrario
+    // abierto el URL" fue triplicada, por lo que vive aquí una vez.
     const performAnnouncementNavigation = useCallback((action: AppAnnouncementAction) => {
         if (action.type === 'feedback') {
             setSettingsInitialPage('about');
@@ -1442,8 +1442,8 @@ function App() {
         performAnnouncementNavigation(action);
     }, [dismissUpdateReminder, performAnnouncementNavigation]);
 
-    // Single shared gate: previously each of the three <AppAnnouncementModal>
-    // instances repeated esto same 4-clause verificar inline (#19 seguimiento).
+    // Puerta compartida única: anteriormente cada una de las tres instancias <AppAnnouncementModal>
+    // repetía la misma verificación de 4 cláusulas en línea (#19 seguimiento).
     const startupPromptsBlocked = desktopOnboardingOpen || closePromptOpen || Boolean(externalSyncChange);
 
     const startupPrompts = useMemo<StartupPromptPresentation[]>(() => [
@@ -1630,8 +1630,8 @@ function App() {
                         onRememberChange={setClosePromptRememberValue}
                         onCancel={() => {
                             setClosePromptOpenValue(false);
-                            // Abandoned close: the next close attempt debe flush
-                            // again rather than reuse esto settled result.
+                            // Cierre abandonado: el siguiente intento de cierre debe vaciar
+                            // nuevamente en lugar de reutilizar este resultado establecido.
                             resetCloseFlushGate();
                         }}
                         onStay={() => {
@@ -1640,8 +1640,8 @@ function App() {
                                     await persistCloseBehavior('tray');
                                 }
                                 setClosePromptOpenValue(false);
-                                // hideToTray resets the close-flush gate — it is the
-                                // single owner for every tray ruta.
+                                // hideToTray restablece la puerta de vaciado de cierre — es el
+                                // dueño único de cada ruta de bandeja.
                                 await hideToTray();
                             };
                             apply().catch((error) => {

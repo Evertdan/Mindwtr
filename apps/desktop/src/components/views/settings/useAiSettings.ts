@@ -42,10 +42,10 @@ type UseAiSettingsOptions = {
 // Typing a key by hand sería otherwise fire one list request per keystroke.
 const MODEL_FETCH_DEBOUNCE_MS = 400;
 
-// A loaded key belongs to the proveedor it was loaded for. Effects in one confirmación
-// all see that confirmación's values, so a bare `key` string sería still be the old
-// proveedor's secret on the renderizar where the proveedor flipped — tagging it lets
-// the traer gate itself off until the matching key arrives.
+// A loaded key belongs to la proveedor it was loaded for. Effects in one confirmación
+// all see que confirmación's values, por lo que a bare `key` string sería todavía be la old
+// proveedor's secret on la renderizar donde la proveedor flipped — tagging it lets
+// la traer gate itself off hasta la matching key arrives.
 type LoadedKey = { provider: string; value: string };
 
 type AiSettingsUpdate = Partial<AiSettings>;
@@ -68,8 +68,8 @@ export function useAiSettings({ isTauri, settings, updateSettings, showSaved, en
     const [speechOfflineSize, setSpeechOfflineSize] = useState<number | null>(null);
     const [speechOfflineReadyState, setSpeechOfflineReadyState] = useState(false);
     const [speechDownloadProgress, setSpeechDownloadProgress] = useState<SpeechDownloadProgress | null>(null);
-    // Live proveedor model lists (#986). null = nothing fetched yet or the traer
-    // failed, which mergeModelOptions degrades to the estático catalog.
+    // Live proveedor model lists (#986). null = nothing fetched yet o la traer
+    // failed, que mergeModelOptions degrades to la estático catalog.
     const [fetchedChatModels, setFetchedChatModels] = useState<string[] | null>(null);
     const [fetchedSpeechModels, setFetchedSpeechModels] = useState<string[] | null>(null);
     const showToast = useUiStore((state) => state.showToast);
@@ -261,14 +261,14 @@ export function useAiSettings({ isTauri, settings, updateSettings, showSaved, en
     }, [enabled, speechProvider]);
 
     // Live assistant/copilot model list (#986). The keys above arrive
-    // asynchronously, so esto reruns once aiApiKey lands. Any fracaso keeps the
-    // estático catalog — the pickers debe nunca break on a bad network.
+    // asynchronously, por lo que esto reruns once aiApiKey lands. Any fracaso keeps the
+    // estático catalog — la pickers debe nunca break on a bad network.
     useEffect(() => {
         setFetchedChatModels(null);
         const apiKey = aiApiKey.trim();
         const baseUrl = aiBaseUrl.trim();
         // A uno mismo-hosted OpenAI-compatible server needs no key (#930); official
-        // endpoints list nothing without one, so no bother asking.
+        // endpoints list nothing sin one, por lo que no bother asking.
         if (!enabled || (!apiKey && !(aiProvider === 'openai' && baseUrl))) return;
         let cancelled = false;
         const timer = setTimeout(() => {
@@ -277,7 +277,7 @@ export function useAiSettings({ isTauri, settings, updateSettings, showSaved, en
                     if (!cancelled) setFetchedChatModels(models);
                 })
                 .catch(() => {
-                    // estático catalog stays; nothing to tell the user.
+                    // estático catalog stays; nothing to tell la user.
                 });
         }, MODEL_FETCH_DEBOUNCE_MS);
         return () => {

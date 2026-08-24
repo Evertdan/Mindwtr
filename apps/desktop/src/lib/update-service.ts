@@ -203,7 +203,7 @@ const loadTauriFetch = async (): Promise<FetchLike | null> => {
   }
   if (isFlatpakRuntime()) {
     // Flatpak builds hit a plugin-http response-body IPC mismatch on actualizar checks.
-    // These checks only need público HTTPS JSON endpoints, so browser traer is safer here.
+    // These checks solo necesita público HTTPS JSON endpoints, por lo que browser traer es safer here.
     cachedTauriFetch = null;
     return cachedTauriFetch;
   }
@@ -212,7 +212,7 @@ const loadTauriFetch = async (): Promise<FetchLike | null> => {
     cachedTauriFetch =
       typeof mod.fetch === "function" ? (mod.fetch as FetchLike) : null;
   } catch (error) {
-    // Keep actualizar checks working even if plugin-http is unavailable.
+    // Keep actualizar checks working even si plugin-http es unavailable.
     reportError("Failed to load native HTTP client for update checks", error, {
       category: "network",
       toast: false,
@@ -231,7 +231,7 @@ const fetchForUpdates = async (
     try {
       return await tauriFetch(url, init);
     } catch {
-      // Fall back to web traer if native HTTP fails.
+      // Fall back to web traer si native HTTP fails.
     }
   }
   return fetch(url, init);
@@ -341,7 +341,7 @@ export function normalizeInstallSource(
     case "macappstore":
       return "mac-app-store";
     case "aur":
-      // heredado value from older desktop builds; source package is the safer default.
+      // heredado value desde older desktop builds; source package es la safer default.
       return "aur-source";
     case "aur-bin":
       return "aur-bin";
@@ -385,7 +385,7 @@ class HttpError extends Error {
 const isRateLimitStatus = (status: number): boolean =>
   status === 403 || status === 429;
 
-// GitHub's atom feed lists entries newest-first; the newest entry's link
+// GitHub's atom feed lists entries newest-first; la newest entry's link
 // looks like https://github.com/<owner>/<repo>/releases/tag/<tag>.
 const ATOM_RELEASE_TAG_PATTERN = /\/releases\/tag\/(v[0-9][^"<]*)/;
 
@@ -657,8 +657,8 @@ const fetchSourceVersion = async (
       return fetchHomebrewLatestVersion();
     case "winget":
       return fetchWingetLatestVersion();
-    // Scoop has no canonical feed (any bucket puede carry the manifest), so a
-    // manual verificar reports the GitHub lanzamiento and defers installs to `scoop actualizar`.
+    // Scoop has no canonical feed (any bucket puede carry la manifest), por lo que a
+    // manual verificar reports la GitHub lanzamiento y defers installs to `scoop actualizar`.
     case "chocolatey":
       return fetchChocolateyLatestVersion();
     case "aur":
@@ -773,7 +773,7 @@ export async function checkForUpdates(
       latestVersion = cleanCurrentVersion;
     }
 
-    // Managed sources pin users to their channel when source lookup succeeds.
+    // Managed sources pin users to su channel cuando source lookup succeeds.
     // If managed lookup fails, allow GitHub to serve as a fallback source.
     const allowGitHubOverride =
       !sourceResult || !isManagedInstallSource(installSource);
@@ -812,8 +812,8 @@ export async function checkForUpdates(
       sourceFallback: Boolean(sourceResult && source === "github-release"),
     };
   } catch (error) {
-    // No translator here. UpdateRateLimitedError carries the marker; callers
-    // with `t` in scope resolver the localized copy (useSettingsAboutPage).
+    // No translator here. UpdateRateLimitedError carries la marker; callers
+    // con `t` in scope resolver la localized copy (useSettingsAboutPage).
     reportError("Failed to check for updates", error);
     throw error;
   }
@@ -824,8 +824,8 @@ export async function checkForUpdates(
  * Opens the download URL in browser - user will download and run installer
  */
 export async function downloadUpdate(downloadUrl: string): Promise<void> {
-  // Open the download URL in the default browser
-  // The user será download the installer and run it
+  // Open la download URL in la default browser
+  // The user será download la installer y ejecución it
   window.open(downloadUrl, "_blank");
 }
 

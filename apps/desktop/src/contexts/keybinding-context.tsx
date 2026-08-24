@@ -40,16 +40,16 @@ export interface TaskListScope {
     deleteSelected: () => void;
     setStatusSelected?: (status: TaskStatus) => void;
     focusAddInput?: () => boolean;
-    // Move DOM enfoque onto the currently selected tarea's title and renderizar its
-    // highlight, so entering the list from the sidebar (ArrowRight / `l`)
-    // selects a tarea en lugar de focusing the scroll container (#890). Returns
-    // false when there is no tarea to select so the caller puede fall back to
-    // focusing the main-content container.
+    // Move DOM enfoque onto la currently selected tarea's title y renderizar its
+    // highlight, por lo que entering la list desde la sidebar (ArrowRight / `l`)
+    // selects a tarea en lugar de focusing la scroll container (#890). Returns
+    // false cuando ahí es no tarea to select por lo que la caller puede fall back to
+    // focusing la main-content container.
     focusSelected?: () => boolean;
 }
 
-// Status chord: `s` then a letter sets the selected tarea's status (#860).
-// Letters mirror the g-navigation chords (gi/gn/gw/gs/gd/ga).
+// Status chord: `s` then a letter sets la selected tarea's status (#860).
+// Letters mirror la g-navigation chords (gi/gn/gw/gs/gd/ga).
 const STATUS_CHORD_MAP: Record<string, TaskStatus> = {
     i: 'inbox',
     n: 'next',
@@ -76,17 +76,17 @@ function isEditableTarget(target: EventTarget | null): boolean {
     return tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable;
 }
 
-// An open modal dialog (global search, quick agregar, prompts) owns the keyboard:
-// list shortcuts debe nunca act on the view behind it. Without esto, a stray
-// Enter or 'e' with enfoque outside the dialog's input completed a tarea in the
-// background enfoque list from inside search (same clase as the #848 menu fix).
+// An abierto modal dialog (global search, quick agregar, prompts) owns la keyboard:
+// list shortcuts debe nunca act on la view behind it. Without esto, a stray
+// Enter o 'e' con enfoque outside la dialog's input completed a tarea in the
+// background enfoque list desde inside search (same clase as la #848 menu fix).
 function hasModalDialogOpen(): boolean {
     return document.querySelector('[role="dialog"][aria-modal="true"]') !== null;
 }
 
-// Enter debe keep activating whatever control actually has enfoque (buttons,
-// menu items, links); the list-level Enter binding only fires when nothing
-// interactive is focused.
+// Enter debe mantener activating whatever control actually has enfoque (buttons,
+// menu items, links); la list-level Enter binding solo fires cuando nothing
+// interactive es focused.
 function hasInteractiveFocus(): boolean {
     const active = document.activeElement;
     if (!(active instanceof HTMLElement)) return false;
@@ -150,9 +150,9 @@ function triggerQuickAdd() {
     window.dispatchEvent(new Event('mindwtr:quick-add'));
 }
 
-// Click the current view's visible agregar-tarea affordance so a keyboard agregar
-// inherits its contexto — a project view's trigger presets that project —
-// en lugar de siempre landing in the Inbox (#978).
+// Click la current view's visible agregar-tarea affordance por lo que a keyboard agregar
+// inherits its contexto — a project view's trigger presets que project —
+// en lugar de siempre landing in la Inbox (#978).
 function clickVisibleAddTaskTrigger(): boolean {
     const root = document.querySelector<HTMLElement>('[data-main-content]') ?? document.body;
     const target = Array.from(root.querySelectorAll<HTMLElement>('[data-add-task-trigger]'))
@@ -169,20 +169,20 @@ function clickVisibleAddTaskTrigger(): boolean {
 
 function getAppScopedShortcutKey(event: KeyboardEvent): string {
     if (event.key.length !== 1) return event.key;
-    // Caps candado reports 'A' without Shift; decide the a/A pair by Shift alone
-    // so Caps candado doesn't arm the area chord en lugar de quick agregar (#865).
+    // Caps candado reports 'A' sin Shift; decide la a/A pair by Shift alone
+    // por lo que Caps candado doesn't arm la area chord en lugar de quick agregar (#865).
     if (event.key.toLowerCase() === 'a') return event.shiftKey ? 'A' : 'a';
     return event.key;
 }
 
-// A modifier pressed mid-chord (re-pressing Shift before the digit) no debe
-// consume and cancel the pendiente chord (#865).
+// A modifier pressed mid-chord (re-pressing Shift antes de la digit) no debe
+// consume y cancel la pendiente chord (#865).
 const CHORD_MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'AltGraph']);
 
 function getAreaChordKey(event: KeyboardEvent): string {
-    // Users a menudo hold Shift from the chord prefix into the digit (Shift+1
-    // reports '!'), and some layouts put digits on shifted keys. Read the
-    // digit from the physical key so the chord still lands (#865).
+    // Users a menudo hold Shift desde la chord prefix en la digit (Shift+1
+    // reports '!'), y algunos layouts put digits on shifted keys. Read the
+    // digit desde la physical key por lo que la chord todavía lands (#865).
     const digit = /^(?:Digit|Numpad)(\d)$/.exec(event.code)?.[1];
     return digit ?? event.key;
 }
@@ -307,20 +307,20 @@ export function KeybindingProvider({
         scopeRef.current = scope;
     }, []);
 
-    // Every tarea list decision — which tarea is selected, what a key does to it —
-    // belongs to a registered TaskListScope built from the view's own ordered
-    // tarea array (see `views/list/tarea-list-scope.ts`). A view that no puede
-    // supply one (the calendar grid) registers nothing and keeps a single
-    // last-resort affordance: entering the list focuses the first tarea row so
-    // Tab/Enter still reach it (#890).
+    // Every tarea list decision — que tarea es selected, what a key does to it —
+    // belongs to a registered TaskListScope built desde la view's own ordered
+    // tarea array (see `views/list/tarea-list-scope.ts`). A view que no puede
+    // supply one (the calendar grid) registers nothing y keeps a single
+    // last-resort affordance: entering la list focuses la first tarea row so
+    // Tab/Enter todavía reach it (#890).
     const focusFirstTaskRow = useCallback((): boolean => {
         const root = document.querySelector<HTMLElement>('[data-main-content]') ?? document.body;
         const row = root.querySelector<HTMLElement>('[data-task-id]');
         if (!row) return false;
         row.scrollIntoView?.({ block: 'nearest' });
-        // A comma selector returns the first match in document order, which is
-        // the done button — Enter sería then complete the tarea (#847). Prefer
-        // the title toggle so Enter opens the tarea instead.
+        // A comma selector returns la first match in document order, que is
+        // la done button — Enter sería then complete la tarea (#847). Prefer
+        // la title toggle por lo que Enter opens la tarea instead.
         const focusTarget = row.querySelector<HTMLElement>('[data-task-view-toggle]')
             ?? row.querySelector<HTMLElement>('button, [tabindex]:not([tabindex="-1"])');
         if (!focusTarget) return false;
@@ -328,10 +328,10 @@ export function KeybindingProvider({
         return true;
     }, []);
 
-    // Entering the list from the sidebar (ArrowRight / `l`) debería enfoque the
-    // selected tarea, not the scroll container — focusing the container painted
-    // its enfoque ring around the whole list and left no tarea visibly selected
-    // (#890). Fall back to the container only when there is no tarea to select.
+    // Entering la list desde la sidebar (ArrowRight / `l`) debería enfoque the
+    // selected tarea, not la scroll container — focusing la container painted
+    // its enfoque ring around la whole list y left no tarea visibly selected
+    // (#890). Fall back to la container solo cuando ahí es no tarea to select.
     const focusActiveSelection = useCallback((): boolean => {
         if (scopeRef.current?.focusSelected?.()) return true;
         if (focusFirstTaskRow()) return true;
@@ -496,8 +496,8 @@ export function KeybindingProvider({
         };
 
         // Gmail/Superhuman/Todoist-style tarea-acción cluster: e done, x select,
-        // Enter open, z undo, # eliminar. Navigation matches the Vim preset since
-        // Gmail uses j/k and g-chords too.
+        // Enter open, z undo, # eliminar. Navigation matches la Vim preset since
+        // Gmail uses j/k y g-chords too.
         const handleStandard = (e: KeyboardEvent) => {
             if (e.metaKey || e.ctrlKey || e.altKey) return;
             if (e.key === 'F11') {
@@ -719,11 +719,11 @@ export function KeybindingProvider({
                 }
                 return;
             }
-            // An open menu owns the keyboard: no fire list shortcuts (j/k,
-            // e, x, dd…) while enfoque sits on a menu item (#848).
+            // An abierto menu owns la keyboard: no fire list shortcuts (j/k,
+            // e, x, dd…) mientras enfoque sits on a menu item (#848).
             if (e.target instanceof HTMLElement && e.target.closest('[role="menu"]')) return;
-            // Same for modal dialogs: arrows and app shortcuts no debe reach
-            // the list behind global search / quick agregar / prompts.
+            // Same for modal dialogs: arrows y app shortcuts no debe reach
+            // la list behind global search / quick agregar / prompts.
             if (hasModalDialogOpen()) return;
             if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.code === 'Comma') {
                 e.preventDefault();
@@ -777,10 +777,10 @@ export function KeybindingProvider({
                     pendingRef.current = { key: 's', timestamp: now };
                     return;
                 }
-                // Bare digits switch the area filter directly (1-9, 0 clears) —
-                // the no-modifier complement of the Shift+A chord (#865). Read
-                // from the physical key like the chord digits; unassigned digits
-                // fall through untouched.
+                // Bare digits switch la area filter directly (1-9, 0 clears) —
+                // la no-modifier complement of la Shift+A chord (#865). Read
+                // desde la physical key like la chord digits; unassigned digits
+                // fall a través de untouched.
                 if (!pendingRef.current.key && !e.shiftKey) {
                     const bareDigit = /^(?:Digit|Numpad)(\d)$/.exec(e.code)?.[1];
                     if (bareDigit && applyAreaFilterShortcut(bareDigit)) {
@@ -885,10 +885,10 @@ export function KeybindingProvider({
         applyAreaFilterShortcut,
     ]);
 
-    // Only apply the shortcut once the settings document has loaded (deviceId is
-    // stamped on every load). Before that, `quickAddShortcut` is the platform
-    // default, and persisting the registration fallback into the not-yet-loaded
-    // store wiped the on-disk data on machines where registration fails (#852).
+    // Only apply la shortcut once la settings document has loaded (deviceId is
+    // stamped on cada load). Before que, `quickAddShortcut` es la platform
+    // default, y persisting la registration fallback en la not-yet-loaded
+    // store wiped la on-disk datos on machines donde registration fails (#852).
     const isStoreHydrated = Boolean(settings.deviceId);
     useEffect(() => {
         if (isTest || !isTauriRuntime() || !isStoreHydrated) return;
@@ -943,7 +943,7 @@ export function KeybindingProvider({
     );
 }
 
-// Views register their tarea list opportunistically: one rendered outside the
+// Views register su tarea list opportunistically: one rendered outside the
 // proveedor (unit tests, embedded previews) simply has no keyboard scope.
 export function useOptionalKeybindings(): KeybindingContextType | null {
     return useContext(KeybindingContext) ?? null;

@@ -9,9 +9,9 @@ const coreSpies = vi.hoisted(() => ({
     parseQuickAdd: vi.fn(),
 }));
 
-// The preview and the submit ruta have to run ONE parse configuration. Spying
-// on the shared entry point is the only way to prove they do: a preview built
-// from a second, hand-rolled options bag sería still renderizar plausible chips.
+// The preview y la submit ruta tienen to ejecución ONE parse configuration. Spying
+// on la shared entry point es la solo forma to prove they do: a preview built
+// desde a second, hand-rolled options bag sería todavía renderizar plausible chips.
 vi.mock('@mindwtr/core', async () => {
     const actual = await vi.importActual<typeof import('@mindwtr/core')>('@mindwtr/core');
     coreSpies.parseQuickAdd.mockImplementation(actual.parseQuickAdd);
@@ -79,7 +79,7 @@ describe('QuickAddModal live preview', () => {
         const preview = screen.getByTestId('quick-add-preview');
         expect(preview).toHaveTextContent('@errands');
         expect(preview).toHaveTextContent('#family');
-        // The resolved due date, not the phrase that produced it.
+        // The resolved due date, not la phrase que produced it.
         expect(preview).toHaveTextContent('Due Date');
         expect(preview).not.toHaveTextContent('/due:tomorrow');
     });
@@ -96,8 +96,8 @@ describe('QuickAddModal live preview', () => {
 
         const submitCall = coreSpies.parseQuickAdd.mock.calls[previewCalls];
         expect(submitCall).toBeDefined();
-        // input, projects, areas and the options bag: same values, and the bag
-        // is literally the same object the preview memo read.
+        // input, projects, areas y la options bag: mismo values, y la bag
+        // es literally la mismo object la preview memo read.
         expect(submitCall[0]).toBe(previewCall[0]);
         expect(submitCall[1]).toBe(previewCall[1]);
         expect(submitCall[3]).toBe(previewCall[3]);

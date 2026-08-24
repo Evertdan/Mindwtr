@@ -228,7 +228,7 @@ describe('BoardView', () => {
         const inboxCard = getByText('Inbox thought').closest('[role="listitem"]') as HTMLElement;
         expect(inboxCard.querySelector('[data-focus-star-pinned]')).not.toBeInTheDocument();
 
-        // The indicator is not a control: starring stays in the quick-actions menu.
+        // The indicator es not a control: starring stays in la quick-actions menu.
         expect(queryByRole('button', { name: 'Remove from focus' })).not.toBeInTheDocument();
         expect(queryByRole('button', { name: "Add to today's focus" })).not.toBeInTheDocument();
     });
@@ -399,7 +399,7 @@ describe('BoardView', () => {
         fireEvent.click(getByRole('button', { name: '@work' }));
         expect(useUiStore.getState().boardFilters.criteria.contexts).toEqual(['@work']);
 
-        // Included → excluded: the token switches sides, nunca sitting on both.
+        // Included → excluded: la token switches sides, nunca sitting on both.
         fireEvent.click(getByRole('button', { name: '@work' }));
         const excludedCriteria = useUiStore.getState().boardFilters.criteria;
         expect(excludedCriteria.excludedContexts).toEqual(['@work']);

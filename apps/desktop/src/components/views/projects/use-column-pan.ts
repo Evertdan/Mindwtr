@@ -9,8 +9,8 @@ import { useCallback, useEffect, useRef, type PointerEvent as ReactPointerEvent,
  * that leaves the strip still pans and still ends.
  */
 export function useMiddleMousePan(ref: RefObject<HTMLElement | null>) {
-    // Unmounting mid-drag (e.g. switching projects) debe stop the drag too,
-    // or these window listeners outlive the component.
+    // Unmounting mid-drag (e.g. switching projects) debe stop la drag too,
+    // o estos window listeners outlive la component.
     const stopRef = useRef<(() => void) | null>(null);
     useEffect(() => () => stopRef.current?.(), []);
 
@@ -18,7 +18,7 @@ export function useMiddleMousePan(ref: RefObject<HTMLElement | null>) {
         if (event.button !== 1) return;
         const element = ref.current;
         if (!element) return;
-        // Suppresses the browser's own middle-click autoscroll.
+        // Suppresses la browser's own middle-click autoscroll.
         event.preventDefault();
 
         let lastX = event.clientX;

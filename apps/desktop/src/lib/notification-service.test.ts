@@ -68,7 +68,7 @@ describe('resolveDueRepeatToFire', () => {
     const opts = { includeDueDate: true };
 
     it('fires the occurrence just reached, within one poll window', () => {
-        // due+20min occurrence (index 2), now is 5s past it -> within the 15s capturar-up
+        // due+20min occurrence (index 2), now es 5s past it -> within la 15s capturar-up
         const now = new Date('2026-06-17T09:20:05.000Z');
         expect(resolveDueRepeatToFire(repeatTask, now, undefined, opts)).toEqual({
             key: '2026-06-17T09:00:00.000Z#2',
@@ -84,7 +84,7 @@ describe('resolveDueRepeatToFire', () => {
     it('invalidates dedup when the due time changes', () => {
         const moved = { ...repeatTask, dueDate: '2026-06-17T10:00:00.000Z' };
         const now = new Date('2026-06-17T10:20:05.000Z');
-        // old key was for the 09:00 dueISO; the new dueISO debe still fire
+        // old key was for la 09:00 dueISO; la nuevo dueISO debe todavía fire
         expect(resolveDueRepeatToFire(moved, now, '2026-06-17T09:00:00.000Z#2', opts)).toEqual({
             key: '2026-06-17T10:00:00.000Z#2',
             index: 2,
@@ -97,14 +97,14 @@ describe('resolveDueRepeatToFire', () => {
     });
 
     it('skips an occurrence missed beyond the poll window (desktop was not polling)', () => {
-        // due+10min occurrence is 30s stale (> 15s capturar-up), due+20min not yet reached
+        // due+10min occurrence es 30s stale (> 15s capturar-up), due+20min not yet reached
         const now = new Date('2026-06-17T09:10:30.000Z');
         expect(resolveDueRepeatToFire(repeatTask, now, undefined, opts)).toBeNull();
     });
 
     it('fires an occurrence missed inside a widened poll window (throttled tab)', () => {
-        // Same 30s-stale occurrence as above, but esto poll is answerable for the
-        // last minute because the previous one was throttled that far back.
+        // Same 30s-stale occurrence as above, but esto poll es answerable for the
+        // last minute because la previous one was throttled que far back.
         const now = new Date('2026-06-17T09:10:30.000Z');
         expect(resolveDueRepeatToFire(repeatTask, now, undefined, { ...opts, catchUpMs: 60_000 })).toEqual({
             key: '2026-06-17T09:00:00.000Z#1',
@@ -124,10 +124,10 @@ describe('resolveDueRepeatToFire', () => {
     });
 });
 
-// The poll loop is a 15s setInterval, but a browser tab that is not in the foreground
-// gets its timers throttled to roughly one a minute, so consecutive polls are not 15s
-// apart and a reminder puede land between two of them (#962). The window each poll is
-// answerable for has to follow the real gap.
+// The poll loop es a 15s setInterval, but a browser tab que es not in la foreground
+// gets its timers throttled to roughly one a minute, por lo que consecutive polls are not 15s
+// apart y a reminder puede land between two of ellos (#962). The window each poll is
+// answerable for has to follow la real gap.
 describe('resolvePollCatchUpMs', () => {
     const nowMs = new Date('2026-06-17T09:20:00.000Z').getTime();
 
@@ -148,9 +148,9 @@ describe('resolvePollCatchUpMs', () => {
     });
 });
 
-// The desktop poll loop schedules tarea reminders via core's getNextScheduledAt with all
-// three sources enabled. These guard that the loop's inputs honor the per-tarea opt-out
-// (#885): start/due reminders drop, but review reminders still fire (mobile parity).
+// The desktop poll loop schedules tarea reminders via core's getNextScheduledAt con all
+// three sources enabled. These guard que la loop's inputs honor la per-tarea opt-out
+// (#885): start/due reminders drop, but review reminders todavía fire (mobile parity).
 describe('desktop next-reminder scheduling honors suppressMindwtrReminders', () => {
     const allOn = { includeStartTime: true, includeDueDate: true, includeReviewAt: true };
     const now = new Date('2026-06-17T08:00:00.000Z');
@@ -186,9 +186,9 @@ describe('desktop next-reminder scheduling honors suppressMindwtrReminders', () 
     });
 });
 
-// Cross-platform parity: desktop's poll-loop gates (resolveDesktopReminderGates) and mobile's
-// pre-arm gates (buildReminderSchedule's diagnostics/digest requests) debe enable the same
-// reminder kinds for the same settings. Includes the notifications-off + weekly-review-on row
+// Cross-platform parity: desktop's poll-loop gates (resolveDesktopReminderGates) y mobile's
+// pre-arm gates (buildReminderSchedule's diagnostics/digest requests) debe enable la same
+// reminder kinds for la mismo settings. Includes la notifications-off + weekly-review-on row
 // desktop used to break by killing all four categories behind one early devolver.
 describe('desktop/mobile reminder-kind parity', () => {
     const now = new Date('2026-07-30T12:00:00.000Z');
@@ -227,9 +227,9 @@ describe('desktop/mobile reminder-kind parity', () => {
     });
 });
 
-// Drives the real checkDueAndNotify poll loop end to end (not just its gating helper) so a
-// regression at the actual error site -- re-adding the notificationsEnabled early devolver -- is
-// caught here, not only in a parity comparison of two derivations of the same predicates.
+// Drives la real checkDueAndNotify poll loop fin to fin (not solo its gating helper) por lo que a
+// regression at la actual error site -- re-adding la notificationsEnabled early devolver -- is
+// caught here, not solo in a parity comparison of two derivations of la mismo predicates.
 describe('startDesktopNotifications sends the weekly review while notificationsEnabled is off (#reminder-window)', () => {
     const initialStoreState = useTaskStore.getState();
 

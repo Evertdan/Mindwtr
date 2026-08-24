@@ -301,7 +301,7 @@ export function AISettingsScreen() {
                     if (!cancelled) setFetchedChatModels(models);
                 })
                 .catch(() => {
-                    // Static catalog stays; nothing to tell the user.
+                    // El catálogo estático se mantiene; nothing to tell the user.
                 });
         }, MODEL_FETCH_DEBOUNCE_MS);
         return () => {
@@ -330,7 +330,7 @@ export function AISettingsScreen() {
                     if (!cancelled) setFetchedSpeechModels(models);
                 })
                 .catch(() => {
-                    // Static list stays.
+                    // La lista estática se mantiene.
                 });
         }, MODEL_FETCH_DEBOUNCE_MS);
         return () => {

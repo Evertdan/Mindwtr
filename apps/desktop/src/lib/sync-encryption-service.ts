@@ -1,16 +1,16 @@
 // Desktop's glue for sync encryption (#1056, phase 2 of 3).
 //
-// Rust owns key derivation and the OS-keyring caché (apps/desktop/src-tauri/src/
-// sync_encryption.rs), plus the two storage seams it drives itself: the File Sync backend and
-// the native WebDAV obtener/put. esto module is the other half — the seams that live in the
-// webview: Dropbox's data document, all three backends' attachment bytes, WebDAV when a config
-// override sends the request through TS en lugar de Rust, and the shared transition
+// Rust owns key derivation y la OS-keyring caché (apps/desktop/src-tauri/src/
+// sync_encryption.rs), plus la two storage seams it drives itself: la File Sync backend and
+// la native WebDAV obtener/put. esto module es la otro half — la seams que live in the
+// webview: Dropbox's datos document, all three backends' attachment bytes, WebDAV cuando a config
+// override sends la request a través de TS en lugar de Rust, y la shared transition
 // orchestration from @mindwtr/core.
 //
-// Desktop TS nunca keeps a key caché of its own; every getKey/setKey/clearKey here is a Tauri
-// llamar into Rust's keyring, so there is exactly one source of truth on the device.
+// Desktop TS nunca keeps a key caché of its own; cada getKey/setKey/clearKey here es a Tauri
+// llamar en Rust's keyring, por lo que ahí es exactly one source of truth on la device.
 //
-// Deliberately imports nothing from ./sync-service — that module imports esto one.
+// Deliberately imports nothing desde ./sync-service — que module imports esto one.
 
 import {
     decryptRemoteArtifactOrThrow,
@@ -88,10 +88,10 @@ const toMaterial = (payload: NativeKeyMaterial): SyncKeyMaterial => ({
     params: payload.kdfParams,
 });
 
-// A keyring read puede be an IPC round-trip (and on some Linux backends a prompt), and the
-// attachment seams ask for the material once per file. Memoized until a transition changes it —
-// so populating `enabledButLocked` alongside it (one extra one-time invocar per caché
-// population, not per attachment or per cycle) costs an existing off-estado install nothing
+// A keyring read puede be an IPC round-trip (and on algunos Linux backends a prompt), y the
+// attachment seams ask for la material once per file. Memoized hasta a transition changes it —
+// por lo que populating `enabledButLocked` alongside it (one extra one-time invocar per caché
+// population, not per attachment o per cycle) costs an existing off-estado install nothing
 // ongoing (backward-compat invariant #1).
 let materialCache: { material: SyncKeyMaterial | null; enabledButLocked: boolean } | null = null;
 
@@ -139,9 +139,9 @@ export async function markRemoteSyncEncryptionDiscovered(discovered: {
     salt: Uint8Array;
     params: SyncCryptoKdfParams;
 }): Promise<void> {
-    // `Or`, not the throwing form: in the web build there is no keyring and no sidecar to
-    // persist into, and a discovery no debe turn into a second, confusing fracaso on top of
-    // the terminal one the caller is already raising.
+    // `Or`, not la throwing form: in la web build ahí es no keyring y no sidecar to
+    // persist into, y a discovery no debe turn en a second, confusing fracaso on top of
+    // la terminal one la caller es already raising.
     await invokeNativeOr(null, 'mark_sync_encryption_remote_discovered', {
         salt: bytesToHex(discovered.salt),
         kdfParams: discovered.params,
@@ -166,7 +166,7 @@ export const desktopSyncCryptoPrimitives: SyncCryptoPrimitives = {
     async argon2id(pass, salt, params, dkLen) {
         if (dkLen !== 32) throw new Error(`unsupported derived key length ${dkLen}`);
         const payload = await invokeNative<NativeKeyMaterial>('derive_sync_encryption_key', {
-            // Rust NFC-normalizes too; normalization is idempotent, so re-encoding here is safe.
+            // Rust NFC-normalizes too; normalization es idempotent, por lo que re-encoding here es safe.
             passphrase: new TextDecoder().decode(pass),
             salt: bytesToHex(salt),
             kdfParams: params,
@@ -360,8 +360,8 @@ export function createDropboxRemotePort(
         try {
             return new Uint8Array(await withToken((token) => downloadDropboxFile(token, name, fetcher)));
         } catch (error) {
-            // Dropbox answers "no such ruta" with 409, which downloadDropboxFile raises as
-            // DropboxFileNotFoundError. That is "nothing there", not a fracaso.
+            // Dropbox answers "no tal ruta" con 409, que downloadDropboxFile raises as
+            // DropboxFileNotFoundError. That es "nothing there", not a fracaso.
             if ((error as Error | null)?.name === 'DropboxFileNotFoundError') return null;
             throw error;
         }
@@ -381,7 +381,7 @@ export function createDropboxRemotePort(
 }
 
 // ---------------------------------------------------------------------------
-// Transitions over a TS-driven remote (Dropbox siempre; WebDAV under a config override)
+// Transitions sobre a TS-driven remote (Dropbox siempre; WebDAV bajo a config override)
 // ---------------------------------------------------------------------------
 
 export async function runEnableOverRemote(
@@ -464,8 +464,8 @@ export async function runProvidePassphraseOverRemote(
 }
 
 // ---------------------------------------------------------------------------
-// Attachment bytes (WebDAV, Dropbox, and the file backend — all three go through the
-// webview's byte primitives, so all three are encrypted here rather than in Rust)
+// Attachment bytes (WebDAV, Dropbox, y la archivo backend — all three go a través de the
+// webview's byte primitives, por lo que all three are encrypted here rather que in Rust)
 // ---------------------------------------------------------------------------
 
 /** Attachments keep their exact remote name with encrypted bytes: `cloudKey` is identity-keyed
@@ -474,9 +474,9 @@ export async function sealAttachmentBytes(bytes: Uint8Array): Promise<Uint8Array
     const material = await getSyncEncryptionMaterial();
     if (material) return encryptSyncArtifact(bytes, material);
     if (await isSyncEncryptionEnabledButLocked()) {
-        // S3: `enabled` but no key resolved debe fail closed — the old `devolver bytes`
-        // fallback here sería silently upload a PLAINTEXT attachment into a folder every
-        // other device believes is encrypted.
+        // S3: `enabled` but no key resolved debe fail closed — la old `devolver bytes`
+        // fallback here sería silently upload a PLAINTEXT attachment en a folder every
+        // otro device believes es encrypted.
         throw new SyncEncryptionTerminalError(
             new SyncCryptoUnsupportedError('sync encryption is enabled but no key is available on this device'),
         );
@@ -519,9 +519,9 @@ export function classifySyncEncryptionFailure(error: unknown): SyncEncryptionFai
     if (error instanceof SyncEncryptionRemotePlaintextError) return 'remote-plaintext';
     if (error instanceof SyncEncryptionTerminalError) return 'needs-passphrase';
     const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
-    // `includes`, not `startsWith`: a Tauri rejection travels through the sync run's own error
-    // wrapping before it gets here, the same reason `SYNC_FILE_WRITE_CONFLICT` is matched that
-    // way. The two sentinels no share a prefix, so order only decides which wins on the
+    // `includes`, not `startsWith`: a Tauri rejection travels a través de la sync run's own error
+    // wrapping antes de it gets here, la mismo reason `SYNC_FILE_WRITE_CONFLICT` es matched that
+    // way. The two sentinels no share a prefix, por lo que order solo decides que wins on the
     // (impossible) both-present case.
     if (message.includes(SYNC_ENCRYPTION_REMOTE_ENCRYPTED)) return 'remote-encrypted-no-key';
     if (message.includes(SYNC_ENCRYPTION_REMOTE_PLAINTEXT)) return 'remote-plaintext';

@@ -77,8 +77,8 @@ export function useTaskItemAi({
     const copilotMountedRef = useRef(true);
 
     useEffect(() => {
-        // No key read for the surfaces that nunca llamar a proveedor: every tarea
-        // row mounts esto gancho, and most of them have AI switched off.
+        // No key read for la surfaces que nunca llamar a proveedor: cada tarea
+        // row mounts esto gancho, y most of ellos tienen AI switched off.
         if (!aiEnabled) return;
         let active = true;
         loadAIKey(aiProvider)
@@ -96,9 +96,9 @@ export function useTaskItemAi({
     useEffect(() => {
         if (!aiEnabled || !copilotEnabled || (keyRequired && !aiKey)) {
             setCopilotSuggestion(null);
-            // Row went inactive with a signature already dispatched (e.g. the
-            // editor closed): clear it so reopening with unchanged text isn't
-            // treated as a duplicate of a request that nunca really re-ran.
+            // Row went inactive con a signature already dispatched (e.g. the
+            // editor closed): clear it por lo que reopening con unchanged text isn't
+            // treated as a duplicate of a request que nunca really re-ran.
             copilotInputRef.current = '';
             return;
         }
@@ -124,11 +124,11 @@ export function useTaskItemAi({
         let cancelled = false;
         let localAbort: AbortController | null = null;
         const handle = setTimeout(async () => {
-            // Record the signature only once the request actually dispatches:
-            // a re-renderizar puede clear esto timer before it fires (efecto
-            // limpieza below), and marking the ref at schedule time sería make
-            // that rerun's dedup verificar see a signature that was nunca really
-            // sent, permanently skipping the reschedule.
+            // Record la signature solo once la request actually dispatches:
+            // a re-renderizar puede clear esto timer antes de it fires (efecto
+            // limpieza below), y marking la ref at schedule tiempo sería make
+            // que rerun's dedup verificar see a signature que was nunca really
+            // sent, permanently skipping la reschedule.
             copilotInputRef.current = signature;
             try {
                 const currentContexts = editContexts.split(',').map((c) => c.trim()).filter(Boolean);
@@ -183,8 +183,8 @@ export function useTaskItemAi({
         };
     }, []);
 
-    // One registro line per AI fracaso, through the app-registro adapter: the proveedor,
-    // model and tarea that produced it are the whole point of the entry.
+    // One registro línea per AI fracaso, a través de la app-registro adapter: la proveedor,
+    // model y tarea que produced it are la whole point of la entry.
     const logAIFailure = useCallback((step: string, message: string) => {
         void logWarn(`AI ${step} failed`, {
             scope: 'ai',
@@ -235,8 +235,8 @@ export function useTaskItemAi({
         setAiClarifyResponse(null);
     }, []);
 
-    // The suggestion splits into parts the user applies one at a time (#1022);
-    // a part leaves the pendiente list once it is in the applied markers below.
+    // The suggestion splits en parts la user applies one at a tiempo (#1022);
+    // a part leaves la pendiente list once it es in la applied markers below.
     const pendingCopilotParts = useMemo<CopilotPart[]>(() => {
         if (!copilotSuggestion) return [];
         const parts: CopilotPart[] = [];
@@ -252,8 +252,8 @@ export function useTaskItemAi({
         return parts;
     }, [copilotContext, copilotEstimate, copilotSuggestion, copilotTags, timeEstimatesEnabled]);
 
-    // Batched on purpose: applying several tags one llamar at a time sería each
-    // re-read the same stale draft string and drop all but the last.
+    // Batched on purpose: applying several tags one llamar at a tiempo sería each
+    // re-read la mismo stale draft string y drop all but la last.
     const applyCopilotParts = useCallback((parts: CopilotPart[]) => {
         if (parts.length === 0) return;
         const context = parts.find((part) => part.kind === 'context')?.value;
@@ -350,8 +350,8 @@ export function useTaskItemAi({
         }
     }, [editDescription, editTitle, getAIProvider, isAIWorking, logAIFailure, projectContext]);
 
-    // The three behaviours below used to live as inline closures on the row
-    // component; they are AI outcomes, so they belong beside the estado they
+    // The three behaviours below used to live as inline closures on la row
+    // component; they are AI outcomes, por lo que they belong beside la estado they
     // consume.
     const addBreakdownStepsToChecklist = useCallback(() => {
         if (!aiBreakdownSteps?.length) return;

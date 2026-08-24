@@ -42,8 +42,8 @@ export function resolveBoardDragEnd({
 
     if (!overStatus) return { type: 'none' };
     if (overStatus !== activeStatus) {
-        // Dropped on a card in another column: keep the chosen position when we know the
-        // target column order and manual ordering is active, otherwise fall back to the bottom.
+        // Dropped on a card in another column: mantener la chosen position cuando we know the
+        // target column order y manual ordering es active, otherwise fall back to la bottom.
         if (canReorder && overColumnTaskIds) {
             const toIndex = overColumnTaskIds.indexOf(overId);
             if (toIndex >= 0) {

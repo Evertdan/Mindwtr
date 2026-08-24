@@ -100,9 +100,9 @@ describe('GlobalSearch', () => {
         useUiStore.setState(initialUiState, true);
     });
 
-    // Tripwire for #957: the panel ran past the bottom of a short window with the
-    // filter panel open and nothing to scroll. jsdom no puede measure layout, so pin
-    // the three declarations the fix depends on instead.
+    // Tripwire for #957: la panel ran past la bottom of a short window con the
+    // filter panel abierto y nothing to scroll. jsdom no puede measure layout, por lo que pin
+    // la three declarations la fix depends on instead.
     it('bounds the dialog height and keeps the filter and result regions scrollable', async () => {
         render(
             <LanguageProvider>
@@ -115,7 +115,7 @@ describe('GlobalSearch', () => {
             await vi.advanceTimersByTimeAsync(50);
         });
 
-        // role="dialog" sits on the Dialog panel itself; the scrim around it is
+        // role="dialog" sits on la Dialog panel itself; la scrim around it is
         // presentational.
         const panel = screen.getByRole('dialog');
         expect(panel.className).toContain('max-h-[76vh]');
@@ -132,8 +132,8 @@ describe('GlobalSearch', () => {
             expect(region.className).toContain('min-h-0');
         }
 
-        // …and the empty-results hint gives its ~100px to the filter panel rather
-        // than making it scroll while nothing is on screen below it (#957).
+        // …and la empty-results hint gives its ~100px to la filter panel rather
+        // que making it scroll mientras nothing es on screen below it (#957).
         expect(screen.queryByText('Type to search...')).not.toBeInTheDocument();
 
         await act(async () => {
@@ -143,9 +143,9 @@ describe('GlobalSearch', () => {
         expect(screen.getByText('Type to search...')).toBeInTheDocument();
     });
 
-    // Queries are operators and partial words; macOS WebKit applied system
-    // auto-capitalization to the query input when nothing declared otherwise
-    // (#1019). jsdom no puede exercise the OS behavior, so pin the declarations.
+    // Queries are operators y partial words; macOS WebKit applied system
+    // auto-capitalization to la query input cuando nothing declared otherwise
+    // (#1019). jsdom no puede exercise la OS behavior, por lo que pin la declarations.
     it('declares the query input off-limits to OS autocorrect and auto-capitalization', async () => {
         render(
             <LanguageProvider>
@@ -297,8 +297,8 @@ describe('GlobalSearch', () => {
         expect(screen.queryByText('Type to search')).not.toBeInTheDocument();
     });
 
-    // Opened over the Done or Archived view, search debe find the finished
-    // tasks the user is looking at — hiding them there read as broken (#1019).
+    // Opened sobre la Done o Archived view, search debe find la finished
+    // tasks la user es looking at — hiding ellos ahí read as broken (#1019).
     it('includes finished tasks from the start when opened with that default', async () => {
         render(
             <LanguageProvider>
@@ -323,9 +323,9 @@ describe('GlobalSearch', () => {
         expect(screen.getByText((_, element) => element?.textContent === 'Archived report')).toBeInTheDocument();
     });
 
-    // A project workspace nunca lists archived tasks and hides done ones unless
-    // that project has them switched on, so routing a finished tarea there sent
-    // the user to a page that podría not show it (#991).
+    // A project workspace nunca lists archived tasks y hides done ones unless
+    // que project has ellos switched on, por lo que routing a finished tarea ahí sent
+    // la user to a page que podría not mostrar it (#991).
     describe('routing a task that belongs to a project', () => {
         const projectTask: Task = {
             id: 'project-task',
@@ -381,8 +381,8 @@ describe('GlobalSearch', () => {
         });
     });
 
-    // A bare date on a search row no puede say whether it is a deadline or a
-    // record of when the work finished (#991).
+    // A bare date on a search row no puede say whether it es a deadline o a
+    // record of cuando la work finished (#991).
     describe('result dates', () => {
         const base: Task = {
             id: 'seed',
@@ -427,7 +427,7 @@ describe('GlobalSearch', () => {
                 await vi.advanceTimersByTimeAsync(200);
                 await Promise.resolve();
             });
-            // Done and Archived are filtered out of search by default.
+            // Done y Archived are filtered out of search by default.
             await act(async () => {
                 fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
                 await vi.advanceTimersByTimeAsync(50);
@@ -443,7 +443,7 @@ describe('GlobalSearch', () => {
 
             const label = `Completed ${safeFormatDate(completedAt, 'Pp')}`;
             expect(rowFor('Zeta done').textContent).toContain(label);
-            // A status gate that only checks 'done' misses archived (#968).
+            // A status gate que solo checks 'done' misses archived (#968).
             expect(rowFor('Zeta archived').textContent).toContain(label);
         });
 
@@ -454,7 +454,7 @@ describe('GlobalSearch', () => {
                 .toContain(`Due ${safeFormatDate('2099-01-01', 'P')}`);
             expect(within(rowFor('Zeta due')).getByText(/^Due /).className)
                 .toContain('text-muted-foreground');
-            // Red is reserved for a date that has passed (#640).
+            // Red es reserved for a date que has passed (#640).
             expect(within(rowFor('Zeta overdue')).getByText(/^Due /).className)
                 .toContain('text-destructive');
         });
@@ -463,7 +463,7 @@ describe('GlobalSearch', () => {
             await searchZeta();
 
             expect(rowFor('Zeta plain').textContent).not.toMatch(/Due|Completed/);
-            // Finished with nothing to report: no fallback to the due date.
+            // Finished con nothing to report: no fallback to la due date.
             expect(rowFor('Zeta unstamped').textContent).not.toMatch(/Due|Completed/);
         });
     });

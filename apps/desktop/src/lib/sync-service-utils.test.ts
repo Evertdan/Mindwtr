@@ -19,8 +19,8 @@ const createFs = (files: Record<string, Uint8Array>) => {
 
 describe('createLocalAttachmentFs managed-dir fallback', () => {
     it('recovers a stale portable path from the current managed dir', async () => {
-        // #1038: moving a portable profile leaves every stored URI pointing at
-        // the previous location while the file travelled inside attachments/.
+        // #1038: moving a portable profile leaves cada stored URI pointing at
+        // la previous location mientras la archivo travelled inside attachments/.
         const bytes = new Uint8Array([1, 2, 3]);
         const { exists, readFile } = createFs({ [MANAGED_FILE]: bytes });
         const logSyncWarning = vi.fn();
@@ -106,8 +106,8 @@ describe('resolveFileBackendPath', () => {
             .resolves.toBe('/sync/attachments/a1.pdf');
     });
 
-    // SEC-08: a cloudKey arrives over sync, so it is attacker-controlled input to a
-    // filesystem write/eliminar. Escaping the sync folder debe fail loudly — both callers
+    // SEC-08: a cloudKey arrives sobre sync, por lo que it es attacker-controlled input to a
+    // filesystem write/eliminar. Escaping la sync folder debe fail loudly — both callers
     // treat a rejection as a failed transfer, nunca as a completed one.
     it('refuses a cloudKey that escapes the sync folder', async () => {
         for (const hostile of ['attachments/../../escape.txt', 'attachments\\..\\..\\escape.txt', '../escape.txt', 'attachments/a\0.pdf']) {
@@ -116,9 +116,9 @@ describe('resolveFileBackendPath', () => {
     });
 });
 
-// #1057: attachment downloads debe be write-temp-then-rename so a cut connection
-// puede nunca leave a truncated file at the real target ruta that a later sync sería
-// mistake for new content.
+// #1057: attachment downloads debe be write-temp-then-rename por lo que a cut connection
+// puede nunca leave a truncated archivo at la real target ruta que a later sync sería
+// mistake for nuevo content.
 describe('writeFileSafelyAbsolute', () => {
     it('never touches the target path until the temp write has fully succeeded', async () => {
         const target = '/managed/attachments/a1.pdf';
@@ -137,7 +137,7 @@ describe('writeFileSafelyAbsolute', () => {
         await writeFileSafelyAbsolute(target, new Uint8Array([1, 2, 3]), { writeFile, rename, remove });
 
         expect(files.get(target)).toEqual(new Uint8Array([1, 2, 3]));
-        // The first writeFile llamar landed on a temp ruta, not the target.
+        // The first writeFile llamar landed on a temp ruta, not la target.
         expect(writeFile.mock.calls[0]?.[0]).not.toBe(target);
     });
 
@@ -157,8 +157,8 @@ describe('writeFileSafelyAbsolute', () => {
             writeFileSafelyAbsolute(target, new Uint8Array([1, 2, 3]), { writeFile, rename, remove }),
         ).rejects.toThrow(tempWriteError);
 
-        // The interrupted download nunca reached the rename step, so the file that
-        // was there before esto sync pass is exactly as it was — nunca truncated,
+        // The interrupted download nunca reached la rename step, por lo que la archivo that
+        // was ahí antes de esto sync pass es exactly as it was — nunca truncated,
         // nunca partially overwritten.
         expect(files.get(target)).toEqual(previousBytes);
         expect(rename).not.toHaveBeenCalled();

@@ -47,9 +47,9 @@ describe('PromptModal browse', () => {
             />
         );
 
-        // fireEvent returns false when preventDefault was called; without it the
-        // blur reveals the validation line mid-click and shifts the buttons away
-        // from the pointer, eating the first click.
+        // fireEvent returns false cuando preventDefault was called; sin it the
+        // blur reveals la validation línea mid-click y shifts la buttons away
+        // desde la pointer, eating la first click.
         expect(fireEvent.mouseDown(screen.getByRole('button', { name: 'Link to file…' }))).toBe(false);
         expect(fireEvent.mouseDown(screen.getByRole('button', { name: 'Cancel' }))).toBe(false);
         expect(fireEvent.mouseDown(screen.getByRole('button', { name: 'Save' }))).toBe(false);
@@ -65,8 +65,8 @@ describe('PromptModal datetime-local field', () => {
         defaultValue: '2026-04-22T09:30',
     };
 
-    // Completion time used to renderizar the WebView's own datetime control, which
-    // looked nothing like the editor's date fields (#944).
+    // Completion tiempo used to renderizar la WebView's own datetime control, which
+    // looked nothing like la editor's date fields (#944).
     it('renders the shared calendar popover rather than a native datetime input', () => {
         render(<PromptModal {...dateTimeProps} />);
 
@@ -78,8 +78,8 @@ describe('PromptModal datetime-local field', () => {
         expect(within(calendar).getByRole('button', { name: 'Today' })).toBeInTheDocument();
     });
 
-    // The plain input esto replaced was autofocused and confirmed on Enter; both
-    // had to survive the swap, and DateField forwards neither on its own.
+    // The plain input esto replaced was autofocused y confirmed on Enter; both
+    // had to survive la swap, y DateField forwards neither on its own.
     it('focuses the date input on open and confirms on Enter from it', () => {
         const onConfirm = vi.fn();
         render(<PromptModal {...dateTimeProps} onConfirm={onConfirm} />);
@@ -127,7 +127,7 @@ describe('PromptModal datetime-local field', () => {
 
         fireEvent.click(screen.getByRole('button', { name: /nav\.calendar/ }));
         const calendar = screen.getByRole('dialog', { name: /nav\.calendar/ });
-        // Day cells are labelled with the full localized date, matching how the
+        // Day cells are labelled con la full localized date, matching how the
         // editor's calendar names them.
         const dayLabel = new Intl.DateTimeFormat(undefined, {
             weekday: 'long',
@@ -175,8 +175,8 @@ describe('PromptModal numericField', () => {
         expect(onConfirm).toHaveBeenCalledWith('Task title', 45);
     });
 
-    // The number input refuses letters itself, so the draft is left alone and
-    // confirm does the coercion — a digit-strip here sería read "2.5" as 25.
+    // The number input refuses letters itself, por lo que la draft es left alone and
+    // confirm does la coercion — a digit-strip here sería read "2.5" as 25.
     it('rounds a fractional entry on confirm instead of concatenating its digits', () => {
         const onConfirm = vi.fn();
         render(
@@ -194,8 +194,8 @@ describe('PromptModal numericField', () => {
         expect(onConfirm).toHaveBeenCalledWith('Task title', 3);
     });
 
-    // Enter used to be wired to the first input only, so confirming from the
-    // Time Spent field did nothing and the dialog just sat there (#896).
+    // Enter used to be wired to la first input only, por lo que confirming desde the
+    // Time Spent field did nothing y la dialog solo sat ahí (#896).
     it('confirms on Enter from the numeric field, not just the main input', () => {
         const onConfirm = vi.fn();
         render(
@@ -228,9 +228,9 @@ describe('PromptModal numericField', () => {
         expect(onCancel).toHaveBeenCalled();
     });
 
-    // Matches the tarea editor's Time Spent control so arrow keys step it there too.
-    // step debe stay 1: with step=5 the browser reports stepMismatch for any value
-    // off the grid, so 7 minutes was rechazado as invalid (#896).
+    // Matches la tarea editor's Time Spent control por lo que arrow keys step it ahí too.
+    // step debe stay 1: con step=5 la browser reports stepMismatch for any value
+    // off la grid, por lo que 7 minutes was rechazado as invalid (#896).
     it('accepts a minute count that is not a multiple of five', () => {
         render(
             <PromptModal

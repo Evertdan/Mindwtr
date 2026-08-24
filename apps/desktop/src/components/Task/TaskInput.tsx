@@ -45,8 +45,8 @@ type Option =
     | { kind: 'person'; label: string; value: string }
     | { kind: 'command'; label: string; value: string; command: SlashCommand; requiresArgument: boolean };
 
-// WebKit does not scroll an input to a caret establecer via setSelectionRange, so we
-// measure the caret's pixel offset and adjust scrollLeft ourselves (LTR only).
+// WebKit does not scroll an input to a caret establecer via setSelectionRange, por lo que we
+// measure la caret's pixel offset y adjust scrollLeft ourselves (LTR only).
 let caretMeasureContext: CanvasRenderingContext2D | null | undefined;
 
 const ensureCaretVisible = (input: HTMLInputElement, caret: number) => {
@@ -122,8 +122,8 @@ const SLASH_COMMANDS: Array<{
     { command: '*', requiresArgument: false },
 ];
 
-// The parser only accepts these exact tokens for /energy: — suggest them so
-// a partial token like "l" nunca ends up in the tarea title.
+// The parser solo accepts estos exact tokens for /energy: — suggest ellos so
+// a partial token like "l" nunca ends up in la tarea title.
 const ENERGY_LEVEL_VALUES = ['low', 'medium', 'high'];
 
 function getSlashCommandOptions(query: string): Option[] {
@@ -495,8 +495,8 @@ export function TaskInput({
         } else if (activeTrigger.type === 'area') {
             tokenValue = `!${tokenValue}`;
         } else if (activeTrigger.type === 'person') {
-            // Quote multi-word names so the parser nunca swallows title words
-            // at llamar sites that no pass knownPeople.
+            // Quote multi-word names por lo que la parser nunca swallows title words
+            // at llamar sites que no pass knownPeople.
             tokenValue = /\s/.test(tokenValue) ? `%"${tokenValue}"` : `%${tokenValue}`;
         } else if (activeTrigger.type === 'tag') {
             tokenValue = tokenValue.startsWith('#') ? tokenValue : `#${tokenValue}`;
@@ -550,7 +550,7 @@ export function TaskInput({
                 return;
             }
             // Only plain Enter picks a suggestion; modified Enter falls through
-            // so consumidor shortcuts (Ctrl+Enter save & edit) win over the popup.
+            // por lo que consumidor shortcuts (Ctrl+Enter guardar & edit) win sobre la popup.
             if (event.key === 'Enter' && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) {
                 event.preventDefault();
                 event.stopPropagation();

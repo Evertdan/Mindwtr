@@ -71,7 +71,7 @@ describe('undoTaskCompletion', () => {
         });
         const store = useTaskStore.getState();
         await store.moveTask('t3', 'done');
-        // Cap refills while the undo toast is on screen.
+        // Cap refills mientras la undo toast es on screen.
         await store.updateTask('f1', { isFocusedToday: true });
         await store.updateTask('f2', { isFocusedToday: true });
         await store.updateTask('f3', { isFocusedToday: true });

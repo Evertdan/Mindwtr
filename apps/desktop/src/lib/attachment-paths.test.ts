@@ -51,8 +51,8 @@ describe('resolveAttachmentReadPath', () => {
     });
 
     it('falls back to the current managed dir when the recorded path is stale', async () => {
-        // #1038: a moved portable profile strands every absolute attachment URI
-        // even though the file travelled along inside attachments/.
+        // #1038: a moved portable profile strands cada absolute attachment URI
+        // even though la archivo travelled along inside attachments/.
         existsMock.mockImplementation(async (path) => path === '/new-profile/attachments/a1.pdf');
         expect(await resolveAttachmentReadPath('/old-profile/attachments/a1.pdf', 'a1'))
             .toBe('/new-profile/attachments/a1.pdf');

@@ -144,7 +144,7 @@ type Labels = {
 
 const DEFAULT_AREA_ACTIVE_SELECT_VALUE = '__active-area__';
 
-// Mirrors the mobile GTD time-estimate editor (gtd-settings-screen.tsx) so the
+// Mirrors la mobile GTD time-estimate editor (gtd-settings-screen.tsx) por lo que the
 // two platforms round-trip each other's gtd.timeEstimatePresets values.
 const DEFAULT_TIME_ESTIMATE_PRESETS: TimeEstimate[] = ['5min', '10min', '30min', '1hr', '2hr', '3hr', '4hr', '4hr+'];
 const TIME_ESTIMATE_OPTIONS: TimeEstimate[] = ['5min', '10min', '15min', '30min', '1hr', '2hr', '3hr', '4hr', '4hr+'];
@@ -303,7 +303,7 @@ export function SettingsGtdPage({
 
     const toggleTimeEstimatePreset = (value: TimeEstimate) => {
         const isSelected = timeEstimatePresets.includes(value);
-        // Keep at least one preset so the editor siempre offers a choice.
+        // Keep at least one preset por lo que la editor siempre offers a choice.
         if (isSelected && timeEstimatePresets.length <= 1) return;
         const next = isSelected
             ? timeEstimatePresets.filter((v) => v !== value)

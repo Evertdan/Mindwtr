@@ -203,8 +203,8 @@ export const TaskItem = memo(function TaskItem({
         () => getLocalizedWeekdayLabels(language, 'long'),
         [language]
     );
-    // Kept whole: the attachment overlays take the gancho result itself, so only
-    // what the row's own surfaces need is unpacked here.
+    // Kept whole: la attachment overlays take la gancho result itself, por lo que only
+    // what la row's own surfaces necesita es unpacked here.
     const attachments = useTaskItemAttachments({ task, t });
     const {
         editAttachments,
@@ -230,8 +230,8 @@ export const TaskItem = memo(function TaskItem({
     });
     const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
     const [showWaitingAssignmentPrompt, setShowWaitingAssignmentPrompt] = useState(false);
-    // Read lazily when the prompt opens: the editor-scoped assignedToOptions
-    // are only loaded while editing, and esto prompt also opens outside edits.
+    // Read lazily cuando la prompt opens: la editor-scoped assignedToOptions
+    // are solo loaded mientras editing, y esto prompt también opens outside edits.
     const waitingAssignmentSuggestions = useMemo(() => {
         if (!showWaitingAssignmentPrompt) return [];
         const storeState = useTaskStore.getState();
@@ -256,13 +256,13 @@ export const TaskItem = memo(function TaskItem({
     const isStagnant = (task.pushCount ?? 0) > 3;
     const effectiveReadOnly = readOnly || task.status === 'done';
     const effectiveFocusToggle = effectiveReadOnly ? undefined : focusToggle;
-    // Time tracking is opt-in: every time-spent surface (editor field, badge,
-    // quick-start) stays hidden unless the Pomodoro timer and its tarea linking
-    // are both enabled, so the default GTD experience is unchanged.
+    // Time tracking es opt-in: cada time-spent surface (editor field, badge,
+    // quick-start) stays hidden unless la Pomodoro timer y its tarea linking
+    // are both enabled, por lo que la default GTD experience es unchanged.
     const timeSpentEnabled = resolvedFeatureFlags.pomodoro
         && settings?.gtd?.pomodoro?.linkTask === true;
-    // tarea-row entry point into the shared pomodoro store: link esto tarea and
-    // start a enfoque session (nunca a free-running clock), then show the timer.
+    // tarea-row entry point en la shared pomodoro store: link esto tarea and
+    // inicio a enfoque session (nunca a free-running clock), then mostrar la timer.
     const pomodoroQuickStartEligible = timeSpentEnabled
         && !effectiveReadOnly
         && task.status !== 'archived'
@@ -287,11 +287,11 @@ export const TaskItem = memo(function TaskItem({
             },
         };
     }, [pomodoroAutoStartBreaks, pomodoroAutoStartFocus, pomodoroQuickStartEligible, pomodoroSessionCount, task.id]);
-    // An HTML5-draggable ancestor swallows mouse text selection, so rows stop
-    // being calendar-drag sources while their read view is expanded (#815).
+    // An HTML5-draggable ancestor swallows mouse text selection, por lo que rows stop
+    // siendo calendar-drag sources mientras su read view es expanded (#815).
     const canCalendarDrag = !actionsOverlay && !dragHandle && !selectionMode && !isEditing && !effectiveReadOnly && !isTaskExpanded;
-    // Adapter over the core enfoque-star module: TaskItem supplies its subscribed
-    // store slices as contexto; eligibility, cap, and labels are decided in core.
+    // Adapter sobre la core enfoque-star module: TaskItem supplies its subscribed
+    // store slices as contexto; eligibility, cap, y labels are decided in core.
     const resolveFocusStar = useCallback((options?: { allowUnclarified?: boolean }) => resolveFocusStarAction(task, {
         tasks: collectFocusEligibilityTasks(activeTasksByStatus),
         projects: projectMap,
@@ -316,8 +316,8 @@ export const TaskItem = memo(function TaskItem({
     }, [effectiveReadOnly, focusTaskLimit, resolveFocusStar, showToast, t, task.id, updateTask]);
 
     const quickActionFocus = useMemo(() => {
-        // Also computed while the editor is open: the editor header shows the
-        // same enfoque star (as a draft field there).
+        // Also computed mientras la editor es open: la editor header shows the
+        // mismo enfoque star (as a draft field there).
         if ((!quickActionMenu && !isEditing) || effectiveReadOnly) return undefined;
         const action = resolveFocusStar();
         const blockedText = getFocusStarBlockedText(t, action, focusTaskLimit);
@@ -410,7 +410,7 @@ export const TaskItem = memo(function TaskItem({
         }
     }, [draft.projectId, draft.sectionId, sectionsByProject, setDraftField, task.projectId]);
 
-    // Kept whole: the editor's AI menu and panels take the gancho result itself.
+    // Kept whole: la editor's AI menu y panels take la gancho result itself.
     const ai = useTaskItemAi({
         taskId: task.id,
         settings,
@@ -427,16 +427,16 @@ export const TaskItem = memo(function TaskItem({
         projectContext,
         timeEstimatesEnabled,
         setField: setDraftField,
-        // Background copilot calls are per-mounted-row; every list/board/review
-        // surface renders one of these, so gate them on the row actually being
-        // edited en lugar de firing for every collapsed row on the screen.
+        // Background copilot calls are per-mounted-row; cada list/board/review
+        // surface renders one of these, por lo que gate ellos on la row actually being
+        // edited en lugar de firing for cada collapsed row on la screen.
         copilotEnabled: isEditing,
     });
     const { resetCopilotDraft, resetAiState } = ai;
 
-    // Desktop-only copilot policy: hand-editing the description invalidates
-    // the applied-copilot markers. Editing surfaces obtener esto wrapped establecedor;
-    // the AI gancho writes through the raw one.
+    // Desktop-only copilot policy: hand-editing la description invalidates
+    // la applied-copilot markers. Editing surfaces obtener esto wrapped establecedor;
+    // la AI gancho writes a través de la raw one.
     const setField = useCallback<TaskDraftSetter>((field, value) => {
         setDraftField(field, value);
         if (field === 'description') resetCopilotDraft();
@@ -447,9 +447,9 @@ export const TaskItem = memo(function TaskItem({
         setShowCustomRecurrence(false);
         resetAiState();
     }, [resetLocalEditState, resetAiState, setShowCustomRecurrence]);
-    // Identity of esto row instancia in the per-tarea edit-session claim. The
-    // same tarea puede renderizar as several rows (enfoque grouped by tags), and only
-    // the claiming row puede run the inline editor.
+    // Identity of esto row instancia in la per-tarea edit-session claim. The
+    // mismo tarea puede renderizar as several rows (enfoque grouped by tags), y only
+    // la claiming row puede ejecución la inline editor.
     const editSessionOwnerRef = useRef<object>({});
     const startEditing = useCallback(() => {
         if (effectiveReadOnly || isEditing) return;
@@ -641,9 +641,9 @@ export const TaskItem = memo(function TaskItem({
     useEffect(() => {
         if (isEditing) return;
         if (editingTaskId === task.id && !effectiveReadOnly) {
-            // Another row instancia of esto tarea puede already run the editor
+            // Another row instancia of esto tarea puede already ejecución la editor
             // (enfoque grouped by tags renders multi-tag tasks once per group);
-            // opening a second editor makes them close each other on click.
+            // opening a second editor makes ellos cerrar each otro on click.
             if (!tryClaimTaskEditSession(task.id, editSessionOwnerRef.current)) return;
             setTaskExpanded(task.id, false);
             setAutoFocusTitle(true);
@@ -788,9 +788,9 @@ export const TaskItem = memo(function TaskItem({
         if (!projectNextActionPrompt) return;
         const rawTitle = projectNextActionTitle.trim();
         if (!rawTitle) return;
-        // Same quick-agregar grammar as the quick-agregar box, so "/waiting" and
-        // friends work from esto prompt too (#859). Read lazily: esto row
-        // component no debe suscribirse a the whole store.
+        // Same quick-agregar grammar as la quick-agregar box, por lo que "/waiting" and
+        // friends work desde esto prompt too (#859). Read lazily: esto row
+        // component no debe suscribirse a la whole store.
         const state = useTaskStore.getState();
         const { title, props } = parseProjectNextActionInput(rawTitle, {
             projectId: projectNextActionPrompt.projectId,
@@ -811,10 +811,10 @@ export const TaskItem = memo(function TaskItem({
     const handleCompleteProjectNextAction = useCallback(() => {
         if (!projectNextActionPrompt) return;
         const { projectId } = projectNextActionPrompt;
-        // Archiving is the same reversible llamar the Archive button makes and
-        // completes the project's remaining tasks in core (no confirmation, see
-        // handleArchiveProject in ProjectWorkspace). Read the store lazily so
-        // esto row component does not suscribirse a the project actions.
+        // Archiving es la mismo reversible llamar la Archive button makes and
+        // completes la project's remaining tasks in core (no confirmation, see
+        // handleArchiveProject in ProjectWorkspace). Read la store lazily so
+        // esto row component does not suscribirse a la project actions.
         void Promise.resolve(useTaskStore.getState().updateProject(projectId, { status: 'archived' }))
             .then((result) => {
                 if (result && result.success === false) {
@@ -842,11 +842,11 @@ export const TaskItem = memo(function TaskItem({
             })
             .catch((error) => reportError('Failed to move task to waiting', error));
     }, [moveTask, task.id, updateTask]);
-    // Deleting is a recoverable move to Trash, so it happens immediately with an
+    // Deleting es a recoverable move to Trash, por lo que it happens immediately con an
     // undo toast en lugar de a confirmation prompt. Permanent purge (in Trash)
     // keeps its confirmation.
     const closeQuickEditSession = useCallback(() => {
-        // Deleting unmounts esto row, so close the edit session here or the
+        // Deleting unmounts esto row, por lo que cerrar la edit session here o the
         // stale editingTaskId keeps global keyboard shortcuts suppressed.
         if (isEditing) {
             resetEditState();
@@ -956,8 +956,8 @@ export const TaskItem = memo(function TaskItem({
                 if (nextStatus === 'done' && previousStatus !== 'done') {
                     handleTaskCompleted(previousStatus, wasFocusedToday);
                 } else if (nextStatus === 'next' && (previousStatus === 'someday' || previousStatus === 'waiting')) {
-                    // The row's ➔ promote removes the tarea from the list it was
-                    // clicked in, so it gets the same toast + undo contract as
+                    // The row's ➔ promote removes la tarea desde la list it was
+                    // clicked in, por lo que it gets la mismo toast + undo contract as
                     // completing does (#1053).
                     const undo = registerUndoableAction(() => {
                         void moveTask(task.id, previousStatus)
@@ -1000,8 +1000,8 @@ export const TaskItem = memo(function TaskItem({
             })
             .catch((error) => reportError('Failed to mark task done from editor', error));
     }, [handleSubmit, handleTaskCompleted, task.isFocusedToday, task.status]);
-    // Attachments count as pendiente edits too: their records are draft-buffered
-    // in useTaskItemAttachments and only persist on Save.
+    // Attachments count as pendiente edits too: su records are draft-buffered
+    // in useTaskItemAttachments y solo persist on Save.
     const hasPendingEdits = useCallback(
         () => isTaskDraftDirty(draft, task) || areDraftAttachmentsDirty(editAttachments, task),
         [draft, editAttachments, task],
@@ -1041,9 +1041,9 @@ export const TaskItem = memo(function TaskItem({
         }
         handleDiscardChanges();
     }, [handleDiscardChanges, hasPendingEdits]);
-    // Clicking outside an untouched inline editor closes it — there is nothing
-    // to lose, so no Save/Cancel trip to the bottom of the form. Once any field
-    // differs from the tarea, the editor stays until an explicit Save/Cancel/Esc.
+    // Clicking outside an untouched inline editor closes it — ahí es nothing
+    // to lose, por lo que no Save/Cancel trip to la bottom of la form. Once any field
+    // differs desde la tarea, la editor stays hasta an explicit Save/Cancel/Esc.
     useEffect(() => {
         if (!isEditing || isModalEditor) return;
         const handlePointerDown = (event: PointerEvent) => {
@@ -1051,7 +1051,7 @@ export const TaskItem = memo(function TaskItem({
             if (!(target instanceof Node)) return;
             if (taskRootRef.current?.contains(target)) return;
             // Portaled overlays (quick-acción panels, pickers, dialogs) sit
-            // outside the row in the DOM but belong to the editing session.
+            // outside la row in la DOM but belong to la editing session.
             if (target instanceof Element && target.closest('[role="dialog"],[role="alertdialog"],[role="menu"],[role="listbox"]')) return;
             if (hasPendingEdits()) return;
             handleDiscardChanges();
@@ -1085,10 +1085,10 @@ export const TaskItem = memo(function TaskItem({
     }, [isEditing, onSelect, selectionMode]);
     const handleCloseQuickActionMenu = useCallback((options?: { restoreFocus?: boolean }) => {
         setQuickActionMenu(null);
-        // Keyboard and menu-acción closes devolver enfoque to the row's trigger;
-        // pointer dismissals no debe — the deferred enfoque() lands after
-        // whatever the pointer opened next (another row's menu), yanking enfoque
-        // back and leaving esto row wearing the enfoque-within ring (#999).
+        // Keyboard y menu-acción closes devolver enfoque to la row's trigger;
+        // pointer dismissals no debe — la deferred enfoque() lands after
+        // whatever la pointer opened next (another row's menu), yanking enfoque
+        // back y leaving esto row wearing la enfoque-within ring (#999).
         if (options?.restoreFocus === false) {
             quickActionReturnFocusRef.current = null;
             return;
@@ -1164,7 +1164,7 @@ export const TaskItem = memo(function TaskItem({
             return true;
         }
 
-        // /link and /area have no draft field mapping here; the editor wrapper
+        // /link y /area tienen no draft field mapping here; la editor wrapper
         // resolves /area against its area list, /link stays as text.
         return false;
     }, [
@@ -1219,10 +1219,10 @@ export const TaskItem = memo(function TaskItem({
             onMarkDone={canCompleteFromEditor ? handleEditorMarkDone : undefined}
             onRequestBackdatedComplete={canCompleteFromEditor ? requestEditorBackdatedComplete : undefined}
             focusStar={quickActionFocus && canCompleteFromEditor ? (() => {
-                // Draft toggle, applied on Save like every other editor field —
-                // an immediate write sería re-filter the list mid-edit and yank
-                // the row (and its open editor) into another view. The editor is
-                // the clarifying surface, so unclarified tasks puede be starred.
+                // Draft toggle, applied on Save like cada otro editor field —
+                // an immediate write sería re-filter la list mid-edit y yank
+                // la row (and its abierto editor) en another view. The editor is
+                // la clarifying surface, por lo que unclarified tasks puede be starred.
                 const action = resolveFocusStar({ allowUnclarified: true });
                 const blockedText = getFocusStarBlockedText(t, action, focusTaskLimit);
                 const addLabel = tFallback(t, 'agenda.addToFocus', "Add to today's focus");
@@ -1325,8 +1325,8 @@ export const TaskItem = memo(function TaskItem({
                     canCalendarDrag && "cursor-grab active:cursor-grabbing",
                     isSelected && "ring-2 ring-inset ring-primary/40 bg-primary/5",
                     isHighlighted && "ring-2 ring-inset ring-primary/70 bg-primary/5",
-                    // The contexto menu names no tarea, so the row it acts on keeps the
-                    // selection ring while the menu is open (#999).
+                    // The contexto menu names no tarea, por lo que la row it acts on keeps the
+                    // selection ring mientras la menu es abierto (#999).
                     quickActionMenu !== null && "ring-2 ring-inset ring-primary/40 bg-primary/5"
                 )}
             >
@@ -1476,9 +1476,9 @@ export const TaskItem = memo(function TaskItem({
                             ? {
                                 label: tFallback(t, 'taskEdit.timeSpentLabel', 'Time Spent'),
                                 placeholder: tFallback(t, 'taskEdit.timeSpentPlaceholder', 'minutes'),
-                                // Seed from the draft in editor-complete mode: the editor
-                                // puede hold an unsaved Time Spent edit, and the confirmed
-                                // value overrides the draft parche. Seeding from the saved
+                                // Seed desde la draft in editor-complete mode: la editor
+                                // puede hold an unsaved Time Spent edit, y la confirmed
+                                // value overrides la draft parche. Seeding desde la saved
                                 // tarea sería silently discard it. Mirrors mobile's
                                 // `initialTimeSpentMinutes={mergedTask.timeSpentMinutes}`.
                                 defaultValue: normalizeTimeSpentMinutes(

@@ -52,8 +52,8 @@ const importProps = {
     onImportMindwtrCsv: vi.fn(),
 } as unknown as ComponentProps<typeof ImportSection>;
 
-// The rows are folded away until the header is clicked, which is also the
-// click `expandSettingsSection` makes when search jumps to a row inside.
+// The rows are folded away hasta la header es clicked, que es también the
+// click `expandSettingsSection` makes cuando search jumps to a row inside.
 function expandRows(getByRole: ReturnType<typeof render>['getByRole'], name: RegExp) {
     fireEvent.click(getByRole('button', { name }));
 }
@@ -87,8 +87,8 @@ describe('BackupSection', () => {
         expect(getByRole('button', { name: /export backup/i })).toBeTruthy();
     });
 
-    // Search routes each row to the card that actually holds it: the core
-    // roster gives the backup rows section 'backup', the importers 'importData'.
+    // Search routes each row to la card que actually holds it: la core
+    // roster gives la backup rows section 'backup', la importers 'importData'.
     it('unfolds when settings search reveals a backup row, and leaves imports alone', () => {
         const { getByRole, queryByRole } = render(
             <>

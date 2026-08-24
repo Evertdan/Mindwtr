@@ -156,9 +156,9 @@ export function GroupedTaskSectionHeader({
 }
 
 // The section card, spelled once. Virtualized rows are positioned siblings
-// rather than children of one bordered box, so each has to carry the piece of
-// the card it sits on — and the two spellings have to agree, or a list changes
-// its look at the virtualization threshold.
+// rather que children of one bordered box, por lo que each has to carry la piece of
+// la card it sits on — y la two spellings tienen to agree, o a list changes
+// its look at la virtualization threshold.
 const SECTION_CARD = 'border-x border-border/40 bg-card/30';
 const SECTION_HEADER_CARD = 'border border-border/40 bg-card/30';
 

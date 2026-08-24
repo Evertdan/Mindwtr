@@ -88,8 +88,8 @@ describe('useAiSettings speech provider changes', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         languageMocks.t.mockImplementation((key: string) => key);
-        // The model downloads go through the shared native-invocar adapter, which
-        // refuses outside the desktop shell.
+        // The model downloads go a través de la shared native-invocar adapter, which
+        // refuses outside la desktop shell.
         (window as typeof window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {};
         fsMocks.exists.mockResolvedValue(false);
         fsMocks.mkdir.mockResolvedValue(undefined);
@@ -433,8 +433,8 @@ describe('useAiSettings speech provider changes', () => {
 });
 
 describe('useAiSettings live model lists', () => {
-    // A base URL is the credential-free trigger (uno mismo-hosted servers, #930), so
-    // these renderizar without waiting for the asincrónico key load.
+    // A base URL es la credential-free trigger (uno mismo-hosted servers, #930), so
+    // estos renderizar sin waiting for la asincrónico key load.
     const localOpenAiSettings = (
         extra: Partial<NonNullable<AppData['settings']['ai']>> = {}
     ): AppData['settings'] => ({
@@ -466,9 +466,9 @@ describe('useAiSettings live model lists', () => {
 
     const read = () => JSON.parse(screen.getByTestId('options').textContent ?? '{}');
 
-    // The traer effects rebote, so nothing is in flight until the timer runs —
-    // and a key that arrives asynchronously only schedules its timer on the
-    // renderizar after it lands, hence two passes.
+    // The traer effects rebote, por lo que nothing es in flight hasta la timer runs —
+    // y a key que arrives asynchronously solo schedules its timer on the
+    // renderizar después de it lands, hence two passes.
     const settle = async () => {
         for (let pass = 0; pass < 2; pass += 1) {
             await act(async () => {
@@ -586,8 +586,8 @@ describe('useAiSettings live model lists', () => {
 
     it('waits for the new provider key instead of reusing the previous one', async () => {
         aiConfigMocks.loadAIKey.mockImplementation(async (provider: string) => {
-            // Gemini's key nunca arrives, so a stale OpenAI key is the only one
-            // the traer podría possibly reach for.
+            // Gemini's key nunca arrives, por lo que a stale OpenAI key es la solo one
+            // la traer podría possibly reach for.
             if (provider !== 'openai') return await new Promise<string>(() => {});
             return 'sk-openai';
         });

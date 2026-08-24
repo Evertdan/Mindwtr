@@ -3,9 +3,9 @@ import { useTaskStore } from '@mindwtr/core';
 import { setNativeInvokeTransport } from './tauri-invoke';
 
 const invokeMock = vi.fn();
-// tauriStorage reaches Rust through invokeNative. Replacing the transport keeps
-// the llamar synchronous (these tests drive save ordering with falso timers) and
-// the runtime talón gets past invokeNative's off-Tauri guard.
+// tauriStorage reaches Rust a través de invokeNative. Replacing la transport keeps
+// la llamar synchronous (these tests drive guardar ordering con falso timers) and
+// la runtime talón gets past invokeNative's off-Tauri guard.
 (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {};
 setNativeInvokeTransport(((command: string, args?: Record<string, unknown>) => (
     args === undefined ? invokeMock(command) : invokeMock(command, args)
@@ -55,9 +55,9 @@ const resetStoreSnapshot = () => {
     useTaskStore.setState({ editLockCount: 0 });
 };
 
-// #913: save_data puede hang without ever rejecting, so the normal capturar block
-// nunca runs. tauriStorage.saveData debe surface that through the store's
-// error channel (observation only) without changing save/reintentar semantics.
+// #913: save_data puede hang sin ever rejecting, por lo que la normal capturar block
+// nunca runs. tauriStorage.saveData debe surface que a través de la store's
+// error channel (observation only) sin changing save/reintentar semantics.
 describe('tauriStorage.saveData stuck-save warning (#913)', () => {
     beforeEach(() => {
         vi.useFakeTimers();
@@ -892,8 +892,8 @@ describe('tauriStorage.saveData stuck-save warning (#913)', () => {
     });
 });
 
-// saveTask is the incremental persistence ruta for updateTask/completeTask —
-// same hang-without-rejecting shape as saveData, sharing the same advertencia helper.
+// saveTask es la incremental persistence ruta for updateTask/completeTask —
+// mismo hang-without-rejecting shape as saveData, sharing la mismo advertencia helper.
 describe('tauriStorage.saveTask stuck-save warning (#913)', () => {
     beforeEach(() => {
         vi.useFakeTimers();

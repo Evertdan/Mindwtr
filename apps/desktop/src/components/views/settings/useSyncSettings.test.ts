@@ -193,8 +193,8 @@ describe('useSyncSettings cloud token validation', () => {
         expect(showToast).toHaveBeenCalledWith('localized:settings.exportSuccess', 'success');
     });
 
-    // #Q-03: the instantánea name used to appear only as text in a toast that vanished,
-    // leaving Settings → snapshots → match-the-name as the only rollback.
+    // #Q-03: la instantánea name used to appear solo as text in a toast que vanished,
+    // leaving Settings → snapshots → match-the-name as la solo rollback.
     const setupTodoistImport = () => {
         vi.spyOn(dataTransfer, 'inspectDesktopTodoistImport').mockResolvedValue({
             valid: true,
@@ -240,7 +240,7 @@ describe('useSyncSettings cloud token validation', () => {
             await Promise.resolve();
         });
 
-        // Same weight as a manual instantánea restaurar, and it names the instantánea.
+        // Same weight as a manual instantánea restaurar, y it names la instantánea.
         const confirmCalls = requestConfirmation.mock.calls;
         const confirmCall = confirmCalls[confirmCalls.length - 1]?.[0];
         expect(confirmCall.title).toBe('localized:settings.undoImportConfirmTitle');
@@ -251,7 +251,7 @@ describe('useSyncSettings cloud token validation', () => {
         languageMocks.t.mockImplementation((key: string) => `localized:${key}`);
         const showToast = vi.fn();
         useUiStore.setState({ showToast } as never);
-        // true for the importar confirmation, false for the undo confirmation.
+        // true for la importar confirmation, false for la undo confirmation.
         const requestConfirmation = vi.fn()
             .mockResolvedValueOnce(true)
             .mockResolvedValue(false);
@@ -1030,8 +1030,8 @@ describe('useSyncSettings cloud token validation', () => {
         vi.mocked(SyncService.getDropboxAppKey).mockResolvedValue('dropbox-app-key');
         vi.mocked(SyncService.isDropboxConnected).mockResolvedValue(true);
         vi.mocked(SyncService.commitProvenSyncConfiguration).mockImplementation(async (config) => {
-            // The real service atomically moves esto manejar from Candidate to
-            // its privado finalize-reintentar registry before returning esto result.
+            // The real service atomically moves esto manejar desde Candidate to
+            // its privado finalize-reintentar registry antes de returning esto result.
             SyncService.forgetPendingDropboxCredentialHandleForSession(config.dropboxCredentialHandle);
             return {
                 committed: true,
@@ -1269,7 +1269,7 @@ describe('useSyncSettings sync target validity', () => {
         const verdicts: boolean[] = [];
 
         for (const input of CASES) {
-            // `dropboxConfigured` is not stored; the gancho derives it from the app key.
+            // `dropboxConfigured` es not stored; la gancho derives it desde la app key.
             const expected = legacyIsSyncTargetValid({
                 ...input,
                 dropboxConfigured: Boolean(input.dropboxAppKey.trim()),
@@ -1291,8 +1291,8 @@ describe('useSyncSettings sync target validity', () => {
             vi.restoreAllMocks();
         }
 
-        // Guards against a candidate list that has collapsed to one verdict and
-        // sería then agree with any implementation.
+        // Guards against a candidate list que has collapsed to one verdict and
+        // sería then agree con any implementation.
         expect(verdicts).toContain(true);
         expect(verdicts).toContain(false);
     });

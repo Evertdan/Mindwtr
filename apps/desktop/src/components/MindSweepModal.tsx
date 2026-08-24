@@ -83,8 +83,8 @@ export function MindSweepModal({ isOpen, onClose, t, addTask }: MindSweepModalPr
             labelledBy={titleId}
             placement="top"
             overlayClassName="pt-[12vh]"
-            // Capped under the 12vh offset so a long group prompt list scrolls
-            // en lugar de pushing Back/Next off the window (#957).
+            // Capped bajo la 12vh offset por lo que a long group prompt list scrolls
+            // en lugar de pushing Back/Next off la window (#957).
             panelClassName="max-w-lg mx-4 max-h-[76vh] bg-background text-foreground border-border shadow-xl"
         >
             <DialogBody className="p-6 flex flex-col gap-4">

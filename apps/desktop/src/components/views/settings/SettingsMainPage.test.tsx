@@ -62,7 +62,7 @@ describe('SettingsMainPage', () => {
             />,
         );
 
-        // The row description and the sole option both carry it.
+        // The row description y la sole option both carry it.
         expect(getAllByText('Nederlands — Partly translated')).toHaveLength(2);
     });
 

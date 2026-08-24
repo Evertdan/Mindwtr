@@ -219,8 +219,8 @@ describe('InboxProcessingQuickPanel draft editing', () => {
         expect((getByLabelText('taskEdit.titleLabel') as HTMLInputElement).value).toBe('Clarified launch');
     });
 
-    // The draft stores the raw token text; the selected chips are derived from
-    // it, so typing and clicking a suggestion no puede disagree.
+    // The draft stores la raw token text; la selected chips are derived from
+    // it, por lo que typing y clicking a suggestion no puede disagree.
     it('derives the selected contexts from the typed token text', () => {
         const { getByLabelText, getByRole } = render(<QuickPanelHarness />);
 

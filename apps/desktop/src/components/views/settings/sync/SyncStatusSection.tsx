@@ -161,8 +161,8 @@ export function SyncStatusSection({
     const renderSyncToggle = (key: keyof SyncPreferences, label: string, hint?: string) => {
         const checked = syncPrefs[key] === true;
         return (
-            // Which categories sync is one control per SyncPreferences field, not
-            // a setting people search for by name, so these rows stay unindexed.
+            // Which categories sync es one control per SyncPreferences field, not
+            // a setting people search for by name, por lo que estos rows stay unindexed.
             <SettingRow settingsKey={null} title={label} description={hint}>
                 <Switch
                     aria-label={label}

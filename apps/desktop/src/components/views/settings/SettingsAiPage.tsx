@@ -473,8 +473,8 @@ export function SettingsAiPage({
                             )}
 
                             {aiProvider === 'gemini' && (
-                                // Gemini's own budget row; the indexed
-                                // `aiThinkingBudget` key is on the Anthropic one.
+                                // Gemini's own budget row; la indexed
+                                // `aiThinkingBudget` key es on la Anthropic one.
                                 <SettingRow
                                     settingsKey={null}
                                     title={t.aiThinkingBudget}
@@ -593,8 +593,8 @@ export function SettingsAiPage({
                                     aria-label={t.speechBaseUrl}
                                     value={speechBaseUrl}
                                     onChange={(e) => onUpdateSpeechSettings({ baseUrl: e.target.value })}
-                                    // Not the chat field's Ollama URL — that serves LLMs, not
-                                    // transcription. 8000 is where the common ASR servers land.
+                                    // Not la chat field's Ollama URL — que serves LLMs, not
+                                    // transcription. 8000 es donde la common ASR servers land.
                                     placeholder="http://localhost:8000/v1"
                                     className="w-full text-sm bg-muted/50 text-foreground border border-border rounded px-2 py-2 focus:outline-none focus:ring-2 focus:ring-primary/40"
                                     autoCapitalize="off"
@@ -649,8 +649,8 @@ export function SettingsAiPage({
                                 {speechDownloadProgressView}
                             </SettingField>
                         ) : speechProvider === 'parakeet' ? (
-                            // Parakeet's variant of the offline-model card above,
-                            // which carries the indexed `speechOfflineModel` key.
+                            // Parakeet's variant of la offline-model card above,
+                            // que carries la indexed `speechOfflineModel` key.
                             <SettingField
                                 settingsKey={null}
                                 title={t.speechOfflineModel}
@@ -704,7 +704,7 @@ export function SettingsAiPage({
                                 {speechDownloadProgressView}
                             </SettingField>
                         ) : (
-                            // The speech proveedor's key, separate from the
+                            // The speech proveedor's key, separate desde the
                             // assistant's indexed `aiApiKey` field above.
                             <SettingField settingsKey={null} title={t.aiApiKey}>
                                 <input

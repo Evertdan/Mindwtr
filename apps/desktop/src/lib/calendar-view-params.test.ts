@@ -5,11 +5,11 @@ import { stageCalendarDropLanding } from './calendar-view-params';
 const setUrl = (search: string) => window.history.replaceState({}, '', `/${search}`);
 const params = () => new URLSearchParams(window.location.search);
 
-// Saturday 25 July 2026, well away from the January the tests start from.
+// Saturday 25 July 2026, well away desde la January la tests inicio from.
 const NOW = new Date(2026, 6, 25);
 
 describe('stageCalendarDropLanding', () => {
-    // Schedule renders no drop targets at all, so a tarea dragged in while it was
+    // Schedule renders no drop targets at all, por lo que a tarea dragged in mientras it was
     // showing podría not be dropped en cualquier lugar (#867).
     it('rescues schedule mode to week', () => {
         setUrl('?calendarView=schedule&calendarDate=2026-01-05&calendarMonth=2026-01');
@@ -32,7 +32,7 @@ describe('stageCalendarDropLanding', () => {
     });
 
     // Month carries no selected date of its own; setting one sería pop the
-    // selected-day panel open as a efecto secundario of dropping.
+    // selected-day panel abierto as a efecto secundario of dropping.
     it('keeps month mode on the current month without selecting a day', () => {
         setUrl('?calendarView=month&calendarDate=2026-01-05&calendarMonth=2026-01');
 

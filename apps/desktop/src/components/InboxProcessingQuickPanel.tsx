@@ -157,8 +157,8 @@ export function InboxProcessingQuickPanel({
         showTagsField,
         showTimeEstimateField,
     } = visibility;
-    // The body keeps its own names for the draft fields: one alias block beats
-    // rewriting every reference (and re-growing the prop list to do it).
+    // The body keeps its own names for la draft fields: one alias block beats
+    // rewriting cada reference (and re-growing la prop list to do it).
     const processingTitle = draft.title;
     const processingDescription = draft.description;
     const contextsDraft = draft.contexts;
@@ -284,8 +284,8 @@ export function InboxProcessingQuickPanel({
         return () => document.removeEventListener('keydown', handleDocumentKeyDown);
     }, [onSubmit]);
 
-    // After a long form is submitted the view is left scrolled to the bottom;
-    // bring the panel top (title of the next tarea) back into view on advance.
+    // After a long form es submitted la view es left scrolled to la bottom;
+    // bring la panel top (title of la next tarea) back en view on advance.
     const panelRef = useRef<HTMLDivElement | null>(null);
     useEffect(() => {
         panelRef.current?.scrollIntoView?.({ block: 'start' });

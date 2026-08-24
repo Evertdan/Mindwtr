@@ -11,10 +11,10 @@ import { markStartupPhase, measureStartupPhase } from './startup-profiler';
 const DATA_KEY = WIDGET_DATA_KEY;
 const STARTUP_BACKUP_VERSION_KEY = `${DATA_KEY}:startup-backup-version`;
 const STARTUP_BACKUP_UPDATED_AT_KEY = `${DATA_KEY}:startup-backup-updated-at`;
-// Set while the JSON backup holds writes SQLite refused. Survives the process,
-// because the loss it prevents only shows up on the NEXT launch: SQLite reads
+// Establecer mientras la copia de seguridad JSON contiene writes SQLite refused. Survives the process,
+// porque la pérdida que previene solo aparece en el SIGUIENTE lanzamiento: SQLite reads
 // keep succeeding, so without this marker the app happily serves the stale
-// database and every change taken by the fallback is silently dropped (#964).
+// y cada cambio tomado por el respaldo se deja caer silenciosamente (#964).
 const JSON_AHEAD_OF_SQLITE_KEY = `${DATA_KEY}:json-ahead-of-sqlite`;
 const STARTUP_BACKUP_VERSION = '2';
 const LEGACY_DATA_KEYS = ['focus-gtd-data', 'gtd-todo-data', 'gtd-data'];
@@ -29,10 +29,10 @@ const SQLITE_NO_FALLBACK_READ_TIMEOUT_MS = 15_000;
 const SQLITE_QUERY_TIMEOUT_MS = 2_500;
 const SQLITE_RETRY_COOLDOWN_MS = 60_000;
 const SQLITE_NATIVE_MODULE_UNAVAILABLE = 'Native SQLite module unavailable; rebuild or reinstall the app so op-sqlite is included';
-// Cap how long a read may block on in-flight writes so a stalled save (e.g. a
-// lost-Promesa native call) degrades to the existing fallback instead of hanging the UI.
+// Limitar cuánto tiempo una lectura puede bloquear on in-flight writes so a stalled save (e.g. a
+// llamada nativa de Promesa perdida) se degrada the existing fallback instead of hanging the UI.
 const SQLITE_WRITE_WAIT_TIMEOUT_MS = 3_000;
-// Diagnostics: only Registro waits/saves slow enough to matter, to keep the shared beta Registro readable.
+// Diagnósticos: only Registro waits/saves slow enough to matter, to keep the shared beta Registro readable.
 const SQLITE_WRITE_WAIT_LOG_THRESHOLD_MS = 50;
 const SQLITE_SLOW_WRITE_LOG_THRESHOLD_MS = 300;
 
@@ -53,7 +53,7 @@ const waitForQueuedSqliteWrites = async (): Promise<void> => {
 };
 
 const SQLITE_DB_NAME = 'mindwtr.db';
-// expo-sqlite stored the database under <documentDirectory>/SQLite; op-sqlite must
+// expo-sqlite almacenó la base de datos under <documentDirectory>/SQLite; op-sqlite must
 // open the exact same directory or existing installs would come up empty (ADR 0024).
 const SQLITE_DIRECTORY_NAME = 'SQLite';
 
@@ -567,7 +567,7 @@ const createCoalescingWriter = <TData, TResult>(options: CoalescingWriterOptions
                 if (elapsedMs >= SQLITE_SLOW_WRITE_LOG_THRESHOLD_MS) {
                     onSlow?.(elapsedMs, current, result);
                 }
-                // A schedule that arrived while this write was in flight left
+                // Un cronograma que llegó while this write was in flight left
                 // `pending` set but couldn't arm a timer (inFlight guarded it);
                 // arm the next throttle window now that lastEndedAtMs is current.
                 armTimer();
@@ -1066,7 +1066,7 @@ const createStorage = (): StorageAdapter => {
                     const data = parseStoredAppDataJson(jsonValue);
                     return data;
                 } catch (e) {
-                    // JSON parse error - data corrupted, throw so user is notified
+                    // Error de análisis JSON - data corrupted, throw so user is notified
                     logStorageError('Failed to parse stored data - may be corrupted', e);
                     throw new Error('Data appears corrupted. Please restore from backup.');
                 }
@@ -1100,11 +1100,11 @@ const createStorage = (): StorageAdapter => {
             // path", not "empty library" — the caller falls through to the SQLite read
             // instead (#975).
             const loadJsonBackup = async (phase = 'get_data', allowEmptyOnAbsent = true) => {
-                // A deferred backup may still be pending; land it before trusting
+                // Una copia de seguridad diferida aún puede estar pendiente; land it before trusting
                 // the stored copy (and before the freshness assert reads its stamp).
                 await flushPendingStartupJsonBackup();
                 if (!isJsonBackupUsable()) {
-                    // Reading it would spend seconds only to throw "Row too big";
+                    // Leerlo gastaría seconds only to throw "Row too big";
                     // whatever is on disk predates the writes SQLite has taken since.
                     logStorageWarn('[Storage] Refusing oversized JSON backup fallback', undefined, { phase });
                     throw new Error('The library is too large for the local JSON backup; SQLite is the only readable copy.');
@@ -1120,7 +1120,7 @@ const createStorage = (): StorageAdapter => {
                 if (jsonValue != null) {
                     try {
                         const data = parseStoredAppDataJson(jsonValue);
-                        // Scheduled rather than detached so quiesceMobileStorage can
+                        // Programado en lugar de detached so quiesceMobileStorage can
                         // land it: a bare .catch() chain keeps running after a headless
                         // task Devuelve, which is exactly when the runtime goes away.
                         scheduleWidgetRefresh(data, 'mobile.storage.get_data.json_fallback');
@@ -1199,12 +1199,12 @@ const createStorage = (): StorageAdapter => {
                 data.areas = Array.isArray(data.areas) ? data.areas : [];
                 // Only the exact object returned by a healthy SQLite read can
                 // later prove that the foreground store replaced its stale copy.
-                // Background reads alone never release the recovery barrier.
+                // Las lecturas de fondo nunca release the recovery barrier.
                 if (!state.writeBlockedReason && canonicalReloadRequired) {
                     canonicalReloadCandidates.add(data);
                 }
                 if (!jsonAheadOfSqlite) {
-                    // While the marker is set the JSON backup is ahead of this SQLite
+                    // Mientras el marcador está configurado the JSON backup is ahead of this SQLite
                     // read; scheduling a backup here would overwrite the fresher copy
                     // with stale data (#975).
                     scheduleStartupJsonBackup(data, 'mobile.storage.get_data', latestQueuedWriteStartedAtMs);
@@ -1253,10 +1253,10 @@ const createStorage = (): StorageAdapter => {
                     const state = await measureStartupPhase('mobile.storage.save_data.sqlite_get_state', async () => getSqliteState());
                     assertSqliteWritesAllowed(state, reloadRequiredWhenEnqueued);
                     const { adapter } = state;
-                    // Sample JS-thread congestion alongside the write: a setTimeout(0)
+                    // Congestión de hilo JS de muestra congestion alongside the write: a setTimeout(0)
                     // that resolves late means the thread is starved, which inflates every
                     // awaited SQL statement (large beginMs) without SQLite being at fault.
-                    // Not awaited, so it never delays the write; it has always resolved by
+                    // No esperado, so it never delays the write; it has always resolved by
                     // the time a save is slow enough to hit the Registro threshold.
                     let eventLoopLagMs = -1;
                     const lagProbeStartedAt = Date.now();
@@ -1266,7 +1266,7 @@ const createStorage = (): StorageAdapter => {
                     const writeStartedAt = Date.now();
                     await measureStartupPhase('mobile.storage.save_data.sqlite_write', async () => adapter.saveData(data));
                     const writeMs = Date.now() - writeStartedAt;
-                    // A large-share rewrite logs even when the write is fast:
+                    // Una reescritura de gran parte logs even when the write is fast:
                     // a sync-rewrite loop (#766) must stay visible in user logs
                     // once hardware or fixes make the writes cheap, and the
                     // diagnostic names the oscillating columns.
@@ -1302,11 +1302,11 @@ const createStorage = (): StorageAdapter => {
                         });
                     }
                     clearPreferJsonBackup();
-                    // A full snapshot just landed, so SQLite is no longer behind the
-                    // JSON copy. Only saveData may clear this — saveTask writes one
+                    // Una instantánea completa acaba de aterrizar, so SQLite is no longer behind the
+                    // Copia JSON. Solo saveData may clear this — saveTask writes one
                     // row and cannot vouch for earlier JSON-only writes (#964).
                     await clearJsonAheadOfSqlite();
-                    // SQLite is the durable copy; the JSON backup and widget Renderizar
+                    // SQLite es la copia duradera; the JSON backup and widget Renderizar
                     // land coalesced off the save queue so reads and following taps
                     // never wait on them (#766).
                     scheduleStartupJsonBackup(data, 'mobile.storage.save_data', queuedWriteStartedAtMs);
@@ -1323,11 +1323,11 @@ const createStorage = (): StorageAdapter => {
                         logStorageWarn('[Storage] SQLite save failed, keeping JSON backup', error);
                     }
                     try {
-                        // Persist the recovery intent first: if the process dies
+                        // Persistir recovery intent first: if the process dies
                         // after the backup lands, the next launch must not serve
                         // stale SQLite rows (#964).
                         await markJsonAheadOfSqlite();
-                        // With SQLite down the JSON backup IS the durable copy; it
+                        // Con SQLite abajo the JSON backup IS the durable copy; it
                         // must land before this save reports success.
                         scheduleStartupJsonBackup(data, 'mobile.storage.save_data.json_fallback', queuedWriteStartedAtMs);
                         await flushPendingStartupJsonBackup();
@@ -1354,7 +1354,7 @@ const createStorage = (): StorageAdapter => {
                     const state = await measureStartupPhase('mobile.storage.save_task.sqlite_get_state', async () => getSqliteState());
                     assertSqliteWritesAllowed(state, reloadRequiredWhenEnqueued);
                     const { adapter } = state;
-                    // Same unawaited probe as saveData: a single-row write taking
+                    // La misma prueba sin esperar probe as saveData: a single-row write taking
                     // seconds is either queued behind another save or starved by the
                     // JS thread, and writeMs alone cannot tell those apart (#766).
                     let eventLoopLagMs = -1;
@@ -1388,7 +1388,7 @@ const createStorage = (): StorageAdapter => {
 
                     try {
                         await markJsonAheadOfSqlite();
-                        // With SQLite down the JSON backup IS the durable copy; it
+                        // Con SQLite abajo the JSON backup IS the durable copy; it
                         // must land before this save reports success.
                         scheduleStartupJsonBackup(snapshot, 'mobile.storage.save_task.json_fallback', queuedWriteStartedAtMs);
                         await flushPendingStartupJsonBackup();

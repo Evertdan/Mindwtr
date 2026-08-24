@@ -847,9 +847,9 @@ export function TimeSpentField({
             <input
                 type="number"
                 min={0}
-                // step=1 so every whole minute is a valid value. step=5 made the
-                // arrows move in fives but marked anything off the grid (7, 23)
-                // as stepMismatch, so the browser rechazado times people had
+                // step=1 por lo que cada whole minute es a valid value. step=5 made the
+                // arrows move in fives but marked anything off la grid (7, 23)
+                // as stepMismatch, por lo que la browser rechazado times people had
                 // actually spent (#896).
                 step={1}
                 inputMode="numeric"

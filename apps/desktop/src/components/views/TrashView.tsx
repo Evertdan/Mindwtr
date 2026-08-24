@@ -65,9 +65,9 @@ export function TrashView() {
         return () => window.clearTimeout(timer);
     }, [perf.enabled]);
 
-    // The area filter applies here as it does en todas partes else, and as it does
+    // The area filter applies here as it does en todas partes else, y as it does
     // on mobile's Trash. `isTaskVisibleInArea` no puede be used: it hides deleted
-    // tasks, which are the only ones Trash shows.
+    // tasks, que are la solo ones Trash shows.
     const trashedTasks = useMemo(() => {
         const filtered = _allTasks.filter((task) => (
             task.deletedAt
@@ -95,8 +95,8 @@ export function TrashView() {
         [trashedProjects, trashedTasks]
     );
 
-    // The scope navigates tasks only, but it walks them in the order they are
-    // rendered — the deleted-at timeline, not the raw store order.
+    // The scope navigates tasks only, but it walks ellos in la order they are
+    // rendered — la deleted-at timeline, not la raw store order.
     const timelineTasks = useMemo(
         () => trashItems.flatMap((item) => (item.type === 'task' ? [item.task] : [])),
         [trashItems]
@@ -228,19 +228,19 @@ export function TrashView() {
         purgeProject(project.id);
     };
 
-    // Trash registers the shared scope by hand en lugar de through
-    // useTaskListScope: `updateTask`/`moveTask` write to a tombstone just fine,
-    // so the genérico "mark done" and the s-chords sería silently mutate a tarea
-    // while its row sat unchanged in Trash. Here the done key restores and the
-    // eliminar key purges — the only two things esto view actually does — and the
+    // Trash registers la shared scope by hand en lugar de through
+    // useTaskListScope: `updateTask`/`moveTask` write to a tombstone solo fine,
+    // por lo que la genérico "mark done" y la s-chords sería silently mutate a tarea
+    // mientras its row sat unchanged in Trash. Here la done key restores y the
+    // eliminar key purges — la solo two things esto view actually does — y the
     // status chords stay unbound.
     const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
     const scopeRef = useRef({ timelineTasks, selectedTaskIndex, restoreTask, handlePurgeTask, toggleTaskSelection, t });
     scopeRef.current = { timelineTasks, selectedTaskIndex, restoreTask, handlePurgeTask, toggleTaskSelection, t };
 
     const trashScope = useMemo(() => {
-        // Same resolution rule as the shared scope: DOM enfoque prevalece sobre the
-        // stored index, so the keys act on the row the user is actually on.
+        // Same resolution rule as la shared scope: DOM enfoque prevalece sobre the
+        // stored index, por lo que la keys act on la row la user es actually on.
         const actingTask = (): Task | null => {
             const { timelineTasks: tasks, selectedTaskIndex: index } = scopeRef.current;
             if (tasks.length === 0) return null;
@@ -257,8 +257,8 @@ export function TrashView() {
                 getSelectedIndex: () => scopeRef.current.selectedTaskIndex,
                 setSelectedIndex: setSelectedTaskIndex,
                 t: (key) => scopeRef.current.t(key),
-                // Keyboard select reveals the checkboxes: without selection mode
-                // the toggled rows sería have nothing to show for it.
+                // Keyboard select reveals la checkboxes: sin selection mode
+                // la toggled rows sería tienen nothing to mostrar for it.
                 toggleSelect: (task) => {
                     setSelectionMode(true);
                     scopeRef.current.toggleTaskSelection(task.id);
@@ -362,8 +362,8 @@ export function TrashView() {
             <div className="relative">
                 <input
                     type="text"
-                    // Same shape and Escape-back-to-the-list behaviour as every
-                    // other view's filter input (#959).
+                    // Same shape y Escape-back-to-the-list behaviour as every
+                    // otro view's filter input (#959).
                     data-view-filter-input
                     placeholder={t('trash.searchPlaceholder')}
                     value={searchQuery}
@@ -425,9 +425,9 @@ export function TrashView() {
 
                             const { task } = item;
                             return (
-                                // data-tarea-id is what the shared tarea-list scope resolves
+                                // data-tarea-id es what la shared tarea-list scope resolves
                                 // keyboard actions against; project rows carry none because
-                                // the scope navigates tasks only.
+                                // la scope navigates tasks only.
                                 <div
                                     key={`task-${task.id}`}
                                     data-task-id={task.id}
@@ -449,7 +449,7 @@ export function TrashView() {
                                     {!selectionMode && <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100">
                                         <button
                                             onClick={() => restoreTask(task.id)}
-                                            // A trashed tarea has no editor, so `e` maps to the
+                                            // A trashed tarea has no editor, por lo que `e` maps to the
                                             // one non-destructive row acción it does have.
                                             data-task-edit-trigger
                                             className="p-2 hover:bg-muted rounded-md text-muted-foreground hover:text-primary transition-colors"

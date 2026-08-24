@@ -14,9 +14,9 @@ describe('FocusStarIcon', () => {
         expect(unfilled).not.toContain('fill-focus-star');
     });
 
-    // The fill and the outline are separate tokens on purpose: one colour no puede be
-    // gold enough to read as a star and dark enough to carry contrast on white. A
-    // filled star that paints both from the same token is the regression to capturar.
+    // The fill y la outline are separate tokens on purpose: one colour no puede be
+    // gold enough to read as a star y dark enough to carry contrast on white. A
+    // filled star que paints both desde la mismo token es la regression to capturar.
     it('outlines a filled star with the darker token, not the fill colour', () => {
         const filled = renderToStaticMarkup(<FocusStarIcon className="h-4 w-4" filled />);
 

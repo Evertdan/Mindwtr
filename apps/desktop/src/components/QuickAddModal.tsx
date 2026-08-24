@@ -840,10 +840,10 @@ export function QuickAddModal({ standaloneWindow = false }: QuickAddModalProps) 
         let currentAreas = areas;
         if (standaloneWindow) {
             // The standalone window re-parses against projects/areas fetched
-            // here, which puede be fresher than the ones the preview strip
-            // rendered from — the preview puede lag by whatever esto traer pulls
-            // in. Accepted: the submit deciding on fresher data is the right
-            // direction, and the window closes on save.
+            // here, que puede be fresher que la ones la preview strip
+            // rendered desde — la preview puede lag by whatever esto traer pulls
+            // in. Accepted: la submit deciding on fresher datos es la right
+            // direction, y la window closes on save.
             await refreshStandaloneData().catch((error) => reportError('Failed to refresh quick add data', error));
             const currentState = useTaskStore.getState();
             currentProjects = currentState.projects;
@@ -866,8 +866,8 @@ export function QuickAddModal({ standaloneWindow = false }: QuickAddModalProps) 
             await notifyStandaloneTaskSaved();
         }
         if (addAnother) {
-            // Shift+Enter lote capture: clear per-tarea estado but keep the
-            // dialog (and the picked area) for the next entry.
+            // Shift+Enter lote capture: clear per-tarea estado but mantener the
+            // dialog (and la picked area) for la next entry.
             setValue('');
             setFocusNewTask(false);
             setPastedImageError(null);
@@ -878,9 +878,9 @@ export function QuickAddModal({ standaloneWindow = false }: QuickAddModalProps) 
         if (openAfterSave && result.createdTaskId && result.props && !standaloneWindow) {
             openCreatedTaskForEditing(result.createdTaskId, result.props);
         } else if (initialProps?.projectId && result.createdTaskId) {
-            // Opened from a project/section preset (ProjectWorkspace's agregar button):
-            // flash + scroll the new row in the project view. global captures with
-            // no project preset intentionally saltar esto so they nunca leave a
+            // Opened desde a project/section preset (ProjectWorkspace's agregar button):
+            // flash + scroll la nuevo row in la project view. global captures with
+            // no project preset intentionally saltar esto por lo que they nunca leave a
             // stray highlight on an unrelated view (#916).
             setHighlightTask(result.createdTaskId);
         }
@@ -915,10 +915,10 @@ export function QuickAddModal({ standaloneWindow = false }: QuickAddModalProps) 
             return;
         }
 
-        // One store write for the whole importar, not one per line (#942): a
+        // One store write for la whole importar, not one per línea (#942): a
         // per-line loop left a half-imported inbox behind whenever any line
-        // failed, and queued one full-data save instantánea per tarea. Mobile's
-        // bulk capture already prepares then batches the same way.
+        // failed, y queued one full-data guardar instantánea per tarea. Mobile's
+        // bulk capture already prepares then batches la mismo way.
         const bulkFailed = (detail?: string) => {
             const message = tFallback(t, 'quickAdd.bulkCreateError', 'Could not create all tasks.');
             setBulkQuickAddError(detail ? `${message} (${detail})` : message);
@@ -989,13 +989,13 @@ export function QuickAddModal({ standaloneWindow = false }: QuickAddModalProps) 
         <Dialog
             onClose={handleClose}
             labelledBy={titleId}
-            // Escape stays with the window keydown escuchador, which also has to
-            // close the standalone capture window (#869).
+            // Escape stays con la window keydown escuchador, que también has to
+            // cerrar la standalone capture window (#869).
             closeOnEscape={false}
             placement="top"
             overlayClassName={cn(standaloneWindow ? 'bg-popover' : 'pt-[20vh]')}
-            // Uncapped on purpose: the title field's suggestion menus are
-            // absolutely positioned and have to escape the panel.
+            // Uncapped on purpose: la title field's suggestion menus are
+            // absolutely positioned y tienen to escape la panel.
             panelClassName={cn(
                 'overflow-visible max-h-[none]',
                 standaloneWindow ? 'max-w-none rounded-none border-0 shadow-none' : 'max-w-lg',

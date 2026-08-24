@@ -340,7 +340,7 @@ export default function ArchivedScreen() {
         [_allTasks],
     );
     const sortedArchivedTasks = useMemo(() => (
-        // Archive is a log like Done: with no explicit sort, newest completion first
+        // El archivo es a log like Done: with no explicit sort, newest completion first
         // beats the global task sort, which ranks by due date and priority — neither
         // of which means anything once a task is filed away.
         sortBy === 'default' ? sortDoneTasksForListView(archivedByStatus) : sortTasksBy(archivedByStatus, sortBy)
@@ -363,7 +363,7 @@ export default function ArchivedScreen() {
     );
     // view: 'list' on purpose — Archive shares its filter selections with the other
     // task lists, the same way desktop does, so a context picked in Next narrows
-    // Archive too rather than each list holding a private set.
+    // Archivar también rather than each list holding a private set.
     const selections = useTaskFilterSelections({
         view: 'list',
         t,

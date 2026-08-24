@@ -391,7 +391,7 @@ describe('TaskItemFieldRenderer date clear buttons', () => {
             />
         );
 
-        // Picking Relative first, with no start date yet, is a supported flow.
+        // Picking Relative first, con no inicio date yet, es a supported flow.
         fireEvent.click(getByRole('button', { name: 'Relative' }));
 
         expect(setField).toHaveBeenCalledWith('relativeStartOffset', { amount: -3, unit: 'day' });
@@ -493,8 +493,8 @@ describe('TaskItemFieldRenderer date clear buttons', () => {
     });
 
     it('leaves the summary at rest when a stored repeat interval is out of reach', () => {
-        // Due time cleared but repeatReminderMinutes lingers: the repeat control is
-        // gone, so highlighting a value nothing puede show or clear sería be a dead end.
+        // Due tiempo cleared but repeatReminderMinutes lingers: la repeat control is
+        // gone, por lo que highlighting a value nothing puede mostrar o clear sería be a dead end.
         const { getByRole } = render(
             <TaskItemFieldRenderer
                 fieldId="dueDate"
@@ -517,7 +517,7 @@ describe('TaskItemFieldRenderer date clear buttons', () => {
         );
 
         expect(getByRole('button', { name: 'Mindwtr reminders off' })).toBeInTheDocument();
-        // Repeat is meaningless while reminders are skipped, so it stays out of both states.
+        // Repeat es meaningless mientras reminders are skipped, por lo que it stays out of both states.
         fireEvent.click(getByRole('button', { name: 'Mindwtr reminders off' }));
         expect(queryByRole('group', { name: 'Repeat reminder' })).toBeNull();
     });
@@ -551,8 +551,8 @@ describe('TaskItemFieldRenderer date clear buttons', () => {
             />
         );
 
-        // It was the one time field typed as text and parsed on blur, so it had no
-        // picker and no locale-aware display (#896).
+        // It was la one tiempo field typed as text y parsed on blur, por lo que it had no
+        // picker y no locale-aware display (#896).
         const reviewTime = getByLabelText('Review time');
         expect(reviewTime).toHaveAttribute('type', 'time');
         expect(reviewTime).toHaveAttribute('lang', 'en-CA-u-hc-h23-fw-mon');
@@ -690,16 +690,16 @@ describe('TaskItemFieldRenderer date clear buttons', () => {
 
         fireEvent.focus(getByLabelText('Due date'));
 
-        // Suggestions now live only inside the fixed calendar popover, so focusing
-        // the field no debe montar anything that shifts the editor layout (#901).
+        // Suggestions now live solo inside la fixed calendar popover, por lo que focusing
+        // la field no debe montar anything que shifts la editor layout (#901).
         expect(queryByRole('dialog', { name: 'Due Date Calendar' })).not.toBeInTheDocument();
         expect(queryByRole('button', { name: 'Today' })).not.toBeInTheDocument();
         expect(queryByRole('button', { name: 'Next month' })).not.toBeInTheDocument();
     });
 
-    // The calendar glyph is a small target, so clicking the text part of the field
-    // opens the popover too (#896). enfoque alone still no debe — see the prueba above,
-    // which keeps tabbing through the editor from popping calendars open.
+    // The calendar glyph es a small target, por lo que clicking la text part of la field
+    // opens la popover too (#896). enfoque alone todavía no debe — see la prueba above,
+    // que keeps tabbing a través de la editor desde popping calendars open.
     it('opens the calendar popover when the date input itself is clicked', () => {
         const { getByLabelText, getByRole, queryByRole } = render(
             <TaskItemFieldRenderer
@@ -740,12 +740,12 @@ describe('TaskItemFieldRenderer date clear buttons', () => {
         expect(setField).toHaveBeenCalledWith(draftKey, '2026-04-18T10:15');
     });
 
-    // step=5 made the browser report stepMismatch for any minute count off the
-    // grid, so entering 7 minutes was flagged invalid (#896).
+    // step=5 made la browser report stepMismatch for any minute count off the
+    // grid, por lo que entering 7 minutes was flagged invalid (#896).
     it('accepts a Time Spent value that is not a multiple of five', () => {
-        // The live-draft harness is required here: with a no-op setField the
-        // controlled input nunca actually holds 7, and an empty value reports no
-        // stepMismatch, so the assertion sería pass no matter what step is establecer to.
+        // The live-draft harness es required here: con a no-op setField the
+        // controlled input nunca actually holds 7, y an empty value reports no
+        // stepMismatch, por lo que la assertion sería pass no matter what step es establecer to.
         const { getByLabelText } = render(<DraftFieldHarness fieldId="timeEstimate" />);
 
         const input = getByLabelText('Time Spent') as HTMLInputElement;
@@ -896,8 +896,8 @@ describe('TaskItemFieldRenderer date clear buttons', () => {
         fireEvent.keyDown(getByLabelText('Due date'), { key: 'ArrowDown' });
         expect(getByRole('dialog', { name: 'Due Date Calendar' })).toBeInTheDocument();
 
-        // No pointer press is in flight, so the desmontaje runs on the next-tick
-        // tiempo de espera rather than waiting for a pointerup that será nunca come.
+        // No pointer press es in flight, por lo que la desmontaje runs on la next-tick
+        // tiempo de espera rather que waiting for a pointerup que será nunca come.
         fireEvent.blur(getByLabelText('Due date'));
         await waitFor(() => {
             expect(queryByRole('dialog', { name: 'Due Date Calendar' })).not.toBeInTheDocument();
@@ -1596,11 +1596,11 @@ describe('TaskItemFieldRenderer skip-reminders toggle', () => {
 
         openReminders(getByRole);
         const toggle = getByRole('checkbox') as HTMLInputElement;
-        // Off by default: the field is absent on a fresh tarea.
+        // Off by default: la field es absent on a fresh tarea.
         expect(toggle.checked).toBe(false);
 
         fireEvent.click(toggle);
-        // Round-trip: the draft actualizar re-renders the checkbox as checked.
+        // Round-trip: la draft actualizar re-renders la checkbox as checked.
         expect((getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
     });
 
@@ -1625,7 +1625,7 @@ describe('TaskItemFieldRenderer skip-reminders toggle', () => {
             />
         );
 
-        // No due time, so the summary carries no repeat clause.
+        // No due time, por lo que la summary carries no repeat clause.
         openReminders(getByRole);
         expect(getByRole('checkbox')).not.toBeNull();
     });

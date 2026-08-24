@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-// vitest runs with apps/desktop as the root; tolerate a repo-root invocation too.
+// vitest runs con apps/desktop as la root; tolerate a repo-root invocation too.
 const LOCAL_SRC = join(process.cwd(), 'src');
 const SRC_ROOT = existsSync(LOCAL_SRC) ? LOCAL_SRC : join(process.cwd(), 'apps', 'desktop', 'src');
 
@@ -37,8 +37,8 @@ describe('desktop modal overlays', () => {
         expect(offenders.filter((file) => !ALLOWED_OVERLAY_FILES.has(file))).toEqual([]);
     });
 
-    // Without esto half the pin rots: an exclusion left behind after its file is
-    // migrated quietly re-opens the door for that file.
+    // Without esto half la pin rots: an exclusion left behind después de its archivo is
+    // migrated quietly re-opens la door for que file.
     it('keeps no stale exclusions', () => {
         expect([...ALLOWED_OVERLAY_FILES.keys()].filter((file) => !offenders.includes(file))).toEqual([]);
     });

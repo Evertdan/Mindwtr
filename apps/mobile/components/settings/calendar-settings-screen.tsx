@@ -964,7 +964,7 @@ export function CalendarSettingsScreen() {
                                                             width: 22,
                                                             height: 22,
                                                             borderRadius: 11,
-                                                            // Fill only — the stored pick stays canonical (#974).
+                                                            // Llenar solo — the stored pick stays canonical (#974).
                                                             backgroundColor: themeExternalCalendarDisplayColor(color, themePreset),
                                                             borderWidth: selected ? 3 : 1,
                                                             borderColor: selected ? tc.tint : tc.border,

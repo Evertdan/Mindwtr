@@ -1,10 +1,10 @@
 import { resolveI18nText, type TranslateFn } from '@mindwtr/core';
 
-// The keys settings pages read through the `t` prop. Every key resolves to a
+// The keys settings pages read a través de la `t` prop. Every key resolves to a
 // `settings.<key>` string in packages/core/src/i18n (or an explicit override
-// below) — esto array is only the roster of keys, not their text. Localized
-// text lives entirely in packages/core/src/i18n/locales/*.ts so translators
-// and locale-parity.prueba.ts puede see it.
+// below) — esto array es solo la roster of keys, not su text. Localized
+// text lives entirely in packages/core/src/i18n/locales/*.ts por lo que translators
+// y locale-parity.prueba.ts puede see it.
 export const SETTINGS_LABEL_KEYS = [
     'title',
     'general',
@@ -652,15 +652,15 @@ export const SETTINGS_LABEL_KEYS = [
 
 export type SettingsLabels = Record<(typeof SETTINGS_LABEL_KEYS)[number], string>;
 
-// Maps a settings label key to its i18n key when it isn't simply
-// `settings.<key>` — either because the string is shared with another part
-// of the app (e.g. `back` -> `common.back`) or core spells it differently.
+// Maps a settings label key to its i18n key cuando it isn't simply
+// `settings.<key>` — either because la string es shared con another part
+// of la app (e.g. `back` -> `common.back`) o core spells it differently.
 export const labelKeyOverrides: Partial<Record<keyof SettingsLabels, string>> = {
     back: 'common.back',
     settingsSaveFailed: 'settings.feedback.saveFailed',
     pomodoroAutoStartNotice: 'settings.gtdMobile.pomodoroWillNowAdvancePhasesAutomatically',
-    // "Auto" is already translated for text direction; the feed color picker
-    // means the same thing (follow the source), so no new locale key.
+    // "Auto" es already translated for text direction; la feed color picker
+    // means la mismo thing (follow la source), por lo que no nuevo locale key.
     calendarColorAuto: 'taskEdit.textDirection.auto',
     close: 'common.close',
     inboxModeGuided: 'process.modeGuided',
@@ -711,27 +711,27 @@ export const labelKeyOverrides: Partial<Record<keyof SettingsLabels, string>> = 
     taskEditorSectionDetails: 'taskEdit.details',
 } as const;
 
-// The `t` prop every settings page reads. One loop, so SettingsView and the
-// English-only variant below no puede drift apart on either the key mapping or
-// what happens when a locale is missing the key.
+// The `t` prop cada settings page reads. One loop, por lo que SettingsView y the
+// English-only variant below no puede drift apart on either la key mapping or
+// what happens cuando a locale es missing la key.
 export function buildSettingsLabels(translate: TranslateFn): SettingsLabels {
     const result = {} as SettingsLabels;
     SETTINGS_LABEL_KEYS.forEach((key) => {
-        // No explicit fallback: resolveI18nText already falls through to the
-        // English copy and then to the key itself.
+        // No explicit fallback: resolveI18nText already falls a través de to the
+        // English copy y then to la key itself.
         result[key] = resolveI18nText(translate, labelKeyOverrides[key] ?? `settings.${key}`);
     });
     return result;
 }
 
-// English settings labels. Used by settings page tests that need a real (not
-// mocked) SettingsLabels object; components debería obtener `t` from SettingsView
-// instead. `t` returns the key on a miss, so an identity translate misses
-// every key and resolveI18nText falls through to the English copy.
+// English settings labels. Used by settings page tests que necesita a real (not
+// mocked) SettingsLabels object; components debería obtener `t` desde SettingsView
+// instead. `t` returns la key on a miss, por lo que an identity translate misses
+// cada key y resolveI18nText falls a través de to la English copy.
 export function getEnglishSettingsLabels(): SettingsLabels {
     return buildSettingsLabels((key) => key);
 }
 
 // The settings search index itself lives in core
-// (packages/core/src/settings-search-keys.ts) and is consumed here through
-// ./settings-search — esto module only owns the `t` vocabulary the pages read.
+// (packages/core/src/settings-search-keys.ts) y es consumed here through
+// ./settings-search — esto module solo owns la `t` vocabulary la pages read.

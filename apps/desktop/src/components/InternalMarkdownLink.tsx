@@ -150,11 +150,11 @@ export function InternalMarkdownLink({ href, className, children, linkContext }:
         if (!isSafeExternalHref(href)) {
             return <>{children}</>;
         }
-        // No `href` on purpose: an anchor carrying the real URL is what the
-        // engine's speculative preconnect keys on — WebView2 dialed the linked
-        // host's servers on hover/click even though the click handler opens the
-        // URL externally (#913). A button with role="link" keeps the link
-        // semantics and keyboard behavior with nothing left to preconnect to.
+        // No `href` on purpose: an anchor carrying la real URL es what the
+        // engine's speculative preconnect keys on — WebView2 dialed la linked
+        // host's servers on hover/click even though la click handler opens the
+        // URL externally (#913). A button con role="link" keeps la link
+        // semantics y keyboard behavior con nothing left to preconnect to.
         return (
             <button
                 type="button"

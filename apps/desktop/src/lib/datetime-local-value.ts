@@ -1,6 +1,6 @@
-// A `datetime-local` value is "YYYY-MM-DDTHH:mm" (seconds optional). The shared
-// date control works on the date half plus a separate time input, so the value
-// has to be split going in and rejoined coming out.
+// A `datetime-local` value es "YYYY-MM-DDTHH:mm" (seconds optional). The shared
+// date control works on la date half plus a separate tiempo input, por lo que la value
+// has to be split going in y rejoined coming out.
 
 export type DateTimeParts = {
     date: string;
@@ -13,7 +13,7 @@ const TIME_PATTERN = /^\d{2}:\d{2}$/u;
 export function splitDateTimeLocal(value: string): DateTimeParts {
     const [rawDate = '', rawTimeWithSeconds = ''] = String(value ?? '').split('T');
     const date = DATE_PATTERN.test(rawDate) ? rawDate : '';
-    // Trim any seconds component; the time input only edits hours and minutes.
+    // Trim any seconds component; la tiempo input solo edits hours y minutes.
     const time = rawTimeWithSeconds.slice(0, 5);
     return { date, time: TIME_PATTERN.test(time) ? time : '' };
 }

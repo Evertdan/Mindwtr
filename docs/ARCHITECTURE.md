@@ -27,9 +27,9 @@ El objetivo de diseño es que el comportamiento de GTD, la lógica de fusión y 
 ## Modelo de persistencia
 
 - El escritorio y el móvil utilizan SQLite como almacén estructurado principal.
-- Las instantáneas JSON permanecen como parte de la historia de durabilidad y sincronización, pero como representación sincronización/copia de seguridad derivada en lugar de una segunda fuente de verdad local igual.
+- Las instantáneas JSON permanecen como parte del historial de durabilidad y sincronización, pero como representación derivada de sincronización/copia de seguridad en lugar de una segunda fuente de verdad local equivalente.
 - Los archivos adjuntos se tratan por separado de los datos de tareas/proyectos estructurados.
-- Los eliminados son suaves de forma predeterminada utilizando lápidas `deletedAt` para que la sincronización pueda converger de forma segura entre dispositivos.
+- Los eliminados son suaves de forma predeterminada utilizando marcas de eliminación `deletedAt` para que la sincronización pueda converger de forma segura entre dispositivos.
 
 El contrato de puente SQLite<->JSON se registra en [ADR 0009](./adr/0009-sqlite-json-sync-bridge.md).
 
@@ -43,7 +43,7 @@ Propiedades importantes:
 
 - La fusión se basa en elementos, no en sobrescritura de archivo completo.
 - Las revisiones y marcas de tiempo se utilizan para la resolución de conflictos.
-- Las lápidas evitan que los registros eliminados se resuciten silenciosamente.
+- Las marcas de eliminación evitan que los registros eliminados se resuciten silenciosamente.
 - Los archivos adjuntos se fusionan y transfieren por separado de la carga útil JSON principal.
 - Los backends de blob (sincronización de archivos, WebDAV, Dropbox) pueden cifrar opcionalmente todo lo escrito en la ubicación de sincronización con una frase de contraseña con clave de usuario (Argon2id -> AES-256-GCM, contenedor MWENC1); los backends de fusión de servidor (nube alojada, CloudKit) se excluyen porque su fusión debe leer el documento (ADR 0025).
 - Los destinos de sincronización nuevos o modificados permanecen inactivos hasta que un sondeo candidato verifica la E/S de instantánea y todos los archivos adjuntos activos. Las confirmaciones fallidas restauran la última configuración verificada o dejan la sincronización desactivada.

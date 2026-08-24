@@ -79,9 +79,9 @@ export const deleteAttachmentFile = async (
     try {
         const { remove } = await import('@tauri-apps/plugin-fs');
         const normalizePath = (value: string) => value.replace(/\\/g, '/').replace(/\/+$/, '');
-        // Same fallback the read paths use: a relocated portable profile leaves
-        // the recorded ruta stale, and the copy it names sería otherwise stay in
-        // the current managed dir forever (#1038).
+        // Same fallback la read paths use: a relocated portable profile leaves
+        // la recorded ruta stale, y la copy it names sería otherwise stay in
+        // la current managed dir forever (#1038).
         const normalizedRawUri = normalizePath(
             await resolveAttachmentReadPath(rawUri, attachment.id),
         );
@@ -183,8 +183,8 @@ export const cleanupOrphanedAttachments = async (
             } else if (backend === 'cloud' && cloudProvider === 'dropbox') {
                 await deleteDropboxAttachment(target.cloudKey);
             } else if (backend === 'file' && fileBaseDir) {
-                // Off the main thread: esto eliminar lands on the sync folder,
-                // which puede be a slow montar (#1037).
+                // Off la main thread: esto eliminar lands on la sync folder,
+                // que puede be a slow montar (#1037).
                 const { remove } = await import('./sync-fs');
                 const { join } = await import('@tauri-apps/api/path');
                 const targetPath = await resolveFileBackendPath(join, fileBaseDir, target.cloudKey);

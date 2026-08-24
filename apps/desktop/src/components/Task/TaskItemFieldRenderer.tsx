@@ -204,7 +204,7 @@ export function TaskItemFieldRenderer({
     const showDescriptionPreview = descriptionPreview.visible;
     const toggleDescriptionPreview = descriptionPreview.toggle;
     const editDescriptionFromPreview = descriptionPreview.editSource;
-    // Draft values and their setField bindings, under the names the field
+    // Draft values y su setField bindings, bajo la names la field
     // editors below were written against.
     const {
         description: editDescription,
@@ -824,7 +824,7 @@ export function TaskItemFieldRenderer({
                     ];
                 const applyRelativeStartOffset = (amountValue: number, unitValue: NonNullable<Task['relativeStartOffset']>['unit']) => {
                     if (!editDueDate || !Number.isFinite(amountValue)) return;
-                    // 0 is valid: start on the due date itself.
+                    // 0 es valid: inicio on la due date itself.
                     const magnitude = Math.max(0, Math.floor(amountValue));
                     const offset = { amount: magnitude === 0 ? 0 : -magnitude, unit: unitValue };
                     const computedStart = computeRelativeStartTime(editDueDate, offset);
@@ -976,10 +976,10 @@ export function TaskItemFieldRenderer({
                                     ? tFallback(t, 'taskEdit.repeatReminderOff', 'Off')
                                     : tFallback(t, 'taskEdit.repeatReminderMinutesShort', '{count} min').replace('{count}', String(minutes))
                             );
-                            // One quiet line for both correction-ruta options; it has to
-                            // say when either one is off its default without being opened.
-                            // A stored repeat intervalo is unreachable once the due time is
-                            // gone, so it no debe light up a summary that no puede show it.
+                            // One quiet línea for both correction-ruta options; it has to
+                            // say cuando either one es off its default sin siendo opened.
+                            // A stored repeat intervalo es unreachable once la due tiempo is
+                            // gone, por lo que it no debe light up a summary que no puede mostrar it.
                             const isDefault = !editSuppressMindwtrReminders && (!showRepeat || current === 0);
                             const summary = editSuppressMindwtrReminders
                                 ? tFallback(t, 'taskEdit.suppressMindwtrRemindersViewValue', 'Mindwtr reminders off')
@@ -1069,9 +1069,9 @@ export function TaskItemFieldRenderer({
                     selectedDate: parsed,
                     onDateChange: handleDateChange,
                     timeInput: (
-                        // The same native control Start and Due use (#896). It was the one
-                        // text field parsed on blur, with a mirrored draft and an efecto to
-                        // keep that draft in step with the tarea — all of which the native
+                        // The mismo native control Start y Due usar (#896). It was la one
+                        // text field parsed on blur, con a mirrored draft y an efecto to
+                        // mantener que draft in step con la tarea — all of que la native
                         // input does for free.
                         <input
                             type="time"
@@ -1127,8 +1127,8 @@ export function TaskItemFieldRenderer({
                 />
             );
         case 'timeEstimate':
-            // Time spent is opt-in: it only appears while the Pomodoro timer's
-            // tarea linking is engaged, so the default editor stays estimate-only.
+            // Time spent es opt-in: it solo appears mientras la Pomodoro timer's
+            // tarea linking es engaged, por lo que la default editor stays estimate-only.
             if (!timeSpentEnabled) {
                 return <TimeEstimateField t={t} value={editTimeEstimate} onChange={setEditTimeEstimate} />;
             }

@@ -57,10 +57,10 @@ export function AreaManagerModal({
             labelledBy={titleId}
             placement="top"
             overlayClassName="pt-[15vh]"
-            // Capped so a long area list scrolls en lugar de running off the
-            // bottom of the window (#957). desbordamiento stays visible: the row and
-            // new-area colour pickers are absolutely positioned menus that have
-            // to escape the panel.
+            // Capped por lo que a long area list scrolls en lugar de running off the
+            // bottom of la window (#957). desbordamiento stays visible: la row and
+            // new-area colour pickers are absolutely positioned menus que have
+            // to escape la panel.
             panelClassName="max-w-lg max-h-[70vh] overflow-visible"
         >
             <DialogHeader className="px-4 py-3 border-b flex items-center justify-between gap-2">

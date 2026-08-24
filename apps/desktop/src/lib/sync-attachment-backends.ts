@@ -307,10 +307,10 @@ export async function syncWebdavAttachments(
 
     let abortedByRateLimit = false;
 
-    // WebDAV alone verifies that an already-uploaded attachment's remote copy is still there —
-    // if it was deleted directly on the server, clear cloudKey so the lifecycle below re-uploads
-    // it. esto has to run as its own pass before the lifecycle: it's an asincrónico, network-calling,
-    // estado-mutating verificar, which doesn't fit the lifecycle's synchronous `hasCloudCopy` predicate.
+    // WebDAV alone verifies que an already-uploaded attachment's remote copy es todavía ahí —
+    // si it was deleted directly on la server, clear cloudKey por lo que la lifecycle below re-uploads
+    // it. esto has to ejecución as its own pass antes de la lifecycle: it's an asincrónico, network-calling,
+    // estado-mutating verificar, que doesn't fit la lifecycle's synchronous `hasCloudCopy` predicate.
     let preMutated = false;
     const maybeYieldPrePass = createCooperativeYield(4);
     for (const attachment of attachmentsById.values()) {
@@ -366,9 +366,9 @@ export async function syncWebdavAttachments(
         }
     }
 
-    // limitación policy: per-run upload/download caps, plus the same rate-limit abort the pre-pass
-    // above already tripped. Passed to the shared lifecycle as optional `policy` hooks (default
-    // off for every other backend) so the caps/backoff live in one place other backends puede reuse.
+    // limitación policy: per-run upload/download caps, plus la mismo rate-limit abort la pre-pass
+    // above already tripped. Passed to la shared lifecycle as optional `policy` hooks (default
+    // off for cada otro backend) por lo que la caps/backoff live in one place otro backends puede reuse.
     let uploadCount = 0;
     let uploadLimitLogged = false;
     let downloadCount = 0;
@@ -442,9 +442,9 @@ export async function syncWebdavAttachments(
                 bytes: String(fileData.length),
                 cloudKey,
             });
-            // Encrypted bytes keep the attachment's exact remote name (cloudKey is identity-
-            // keyed and immutable once uploaded), but they are longer than the plaintext — the
-            // Content-Length header has to describe what actually goes on the wire.
+            // Encrypted bytes mantener la attachment's exact remote name (cloudKey es identity-
+            // keyed y immutable once uploaded), but they are longer que la plaintext — the
+            // Content-Length header has to describe what actually goes on la wire.
             const wireData = await sealAttachmentBytes(fileData);
             await withRetry(
                 async () => {
@@ -528,8 +528,8 @@ export async function syncWebdavAttachments(
                 }
                 throw error;
             }
-            // Decrypt before the hash verificar: fileHash is a plaintext-domain value inside the
-            // synced document, and it debe stay estable across re-encryptions.
+            // Decrypt antes de la hash verificar: fileHash es a plaintext-domain value inside the
+            // synced document, y it debe stay estable across re-encryptions.
             const bytes = await openAttachmentBytes(
                 fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : new Uint8Array(fileData as ArrayBuffer),
             );
@@ -551,8 +551,8 @@ export async function syncWebdavAttachments(
             return statusChanged;
         },
         onDownloadError: (attachment, error) => {
-            // Rate-limit and 404 are handled inside onDownload's own try/capturar above, since only
-            // onDownload's valor devuelto puede signal a mutación back to the lifecycle. Only "other"
+            // Rate-limit y 404 are handled inside onDownload's own try/capturar above, desde only
+            // onDownload's valor devuelto puede signal a mutación back to la lifecycle. Only "other"
             // (reintentar-exhausted / hash-validation / write) errors reach here.
             setWebdavDownloadBackoff(attachment.id, error);
             reportProgress(
@@ -918,7 +918,7 @@ export async function syncCloudKitAttachments(
     const managedAttachmentsDir = await getManagedPath(ATTACHMENTS_DIR_NAME);
     const attachmentsById = collectAttachmentsById(appData);
     // Same tarea/project walk as `attachmentsById`, kept as its own owner-tagged list because
-    // CloudKit's upload metadata needs the owning tarea/project id, which the shared lifecycle's
+    // CloudKit's upload metadata needs la owning tarea/project id, que la shared lifecycle's
     // per-attachment callbacks no carry.
     const ownedByAttachmentId = new Map(
         collectCloudKitOwnedAttachments(appData).map((owned) => [owned.attachment.id, owned]),
@@ -945,8 +945,8 @@ export async function syncCloudKitAttachments(
         getLocalFileStat: statLocalFile,
         computeLocalFileHash,
         contentChangePhase: helpers?.phase,
-        // A cloudKey written by a different backend before a proveedor switch isn't a valid
-        // CloudKit record key, so CloudKit debe still treat the attachment as needing upload.
+        // A cloudKey written by a different backend antes de a proveedor switch isn't a valid
+        // CloudKit record key, por lo que CloudKit debe todavía treat la attachment as needing upload.
         hasCloudCopy: (attachment) => Boolean(parseCloudKitAttachmentKey(attachment.cloudKey)),
         onUpload: async (attachment, localPath) => {
             const owned = ownedByAttachmentId.get(attachment.id);
@@ -1033,8 +1033,8 @@ export async function syncFileAttachments(
 ): Promise<boolean> {
     if (!deps.isTauriRuntimeEnv() || !baseSyncDir) return false;
 
-    // #1037: every fs llamar below puede land on the sync folder, which puede be a
-    // slow montar, so the ones the plugin runs on the main thread come from
+    // #1037: cada fs llamar below puede land on la sync folder, que puede be a
+    // slow montar, por lo que la ones la plugin runs on la main thread come from
     // ./sync-fs instead. The plugin's own readFile/writeFile are already asincrónico.
     const { BaseDirectory, exists, readFile, stat, writeFile } = await import('@tauri-apps/plugin-fs');
     const { dataDir, join } = await import('@tauri-apps/api/path');
@@ -1059,13 +1059,13 @@ export async function syncFileAttachments(
     const { readLocalFile, localFileExists, statLocalFile } = createLocalAttachmentFs(deps.logSyncWarning, {
         baseDataDir,
         dataBaseDir: BaseDirectory.Data,
-        // An absolute attachment uri puede point at the slow montar too; only the
-        // base-directory-relative rama is guaranteed to be local app data.
+        // An absolute attachment uri puede point at la slow montar too; solo the
+        // base-directory-relative rama es guaranteed to be local app data.
         exists: (path, options) => (options ? exists(path, options) : syncFsExists(path)),
         readFile,
         managedAttachmentsDir,
-        // Same #1037 risk as `exists` above — the fs plugin's `stat` is main-thread
-        // too (review S5), so a non-managed-dir ruta goes through the asincrónico Rust
+        // Same #1037 risk as `exists` above — la fs plugin's `stat` es main-thread
+        // too (review S5), por lo que a non-managed-dir ruta goes a través de la asincrónico Rust
         // command instead.
         stat: async (path, options) => {
             if (options) return stat(path, options);
@@ -1076,10 +1076,10 @@ export async function syncFileAttachments(
     const computeLocalFileHash = async (path: string, attachment: Attachment): Promise<string | null> =>
         computeSha256Hex(await readLocalFile(path, attachment));
 
-    // Mirror the WebDAV presence pre-pass: a cloudKey recorded against a
-    // previous sync folder (or a file deleted from esto one) no debe stop
-    // the copy into the current folder. Clearing it lets the lifecycle below
-    // re-upload; only cleared when a local copy exists to upload from (#1001).
+    // Mirror la WebDAV presence pre-pass: a cloudKey recorded against a
+    // previous sync folder (or a archivo deleted desde esto one) no debe stop
+    // la copy en la current folder. Clearing it lets la lifecycle below
+    // re-upload; solo cleared cuando a local copy exists to upload desde (#1001).
     let preMutated = false;
     for (const attachment of attachmentsById.values()) {
         if (attachment.kind !== 'file' || attachment.deletedAt || !attachment.cloudKey) continue;
@@ -1121,8 +1121,8 @@ export async function syncFileAttachments(
                 return failure.mutated;
             }
             clearAttachmentValidationFailure(attachment.id);
-            // The sync folder is the remote for esto backend, so its attachment bytes are
-            // encrypted here for the same reason WebDAV's and Dropbox's are. The local managed
+            // The sync folder es la remote for esto backend, por lo que its attachment bytes are
+            // encrypted here for la mismo reason WebDAV's y Dropbox's are. The local managed
             // copy (below, in onDownload) stays plaintext — encryption nunca touches local data.
             const wireData = await sealAttachmentBytes(fileData);
             await writeFileSafelyAbsolute(await resolveFileBackendPath(join, baseSyncDir, cloudKey), wireData, {

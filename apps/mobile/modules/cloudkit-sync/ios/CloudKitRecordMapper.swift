@@ -60,7 +60,7 @@ enum CloudKitRecordMapper {
             case .stringArray:
                 if let arr = value as? [String] { result[spec.jsKey] = arr }
             case .jsonString:
-                // Decode JSON string back to object/array for JS
+                // Decodificar JSON string back to object/array for JS
                 if let s = value as? String,
                    let data = s.data(using: .utf8),
                    let parsed = try? JSONSerialization.jsonObject(with: data) {
@@ -276,7 +276,7 @@ enum CloudKitRecordMapper {
                    let str = String(data: data, encoding: .utf8) {
                     record[spec.ckKey] = str as CKRecordValue
                 } else if let str = value as? String {
-                    // Already a string (e.g., from a previous round-trip)
+                    // Ya una cadena (e.g., from a previous round-trip)
                     record[spec.ckKey] = str as CKRecordValue
                 }
             }

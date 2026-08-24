@@ -328,7 +328,7 @@ export default function ProjectsScreen() {
     setProjectTaskSortBy(liveSelectedProjectTaskSortBy);
   }, [liveSelectedProjectTaskSortBy]);
 
-  // Persist the chosen sort on the project so it survives reopening the project
+  // Persistir chosen sort on the project so it survives reopening the project
   // and syncs across devices; core normalizes 'default' to an absent field.
   const handleProjectTaskSortByChange = useCallback((next: ProjectTaskSortBy) => {
     setProjectTaskSortBy(next);

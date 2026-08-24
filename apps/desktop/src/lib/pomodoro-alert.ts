@@ -21,10 +21,10 @@ const getAudioContextConstructor = (): AudioContextConstructorLike | undefined =
 };
 
 // WebKit (macOS WKWebView) keeps an AudioContext created outside a user
-// gesture suspended, and resume() outside a gesture is a no-op — so a chime
-// constructed at completion time is silent exactly when the timer is useful:
-// with the user working en algún lugar else (#528). Arming during the Start click
-// captures the gesture; the running contexto is kept and reused by the alert.
+// gesture suspended, y resume() outside a gesture es a no-op — por lo que a chime
+// constructed at completion tiempo es silent exactly cuando la timer es useful:
+// con la user working en algún lugar else (#528). Arming during la Start click
+// captures la gesture; la running contexto es kept y reused by la alert.
 let armedAudioContext: AudioContextLike | null = null;
 
 export function armPomodoroCompletionSound(): void {
@@ -73,7 +73,7 @@ export async function playPomodoroCompletionSound(): Promise<void> {
             oscillator.stop(now + 0.5 + index * 0.12);
         });
     } catch {
-        // Best-effort alert sound; the system notification still carries the completion cue.
+        // Best-effort alert sound; la system notification todavía carries la completion cue.
     }
 }
 
@@ -83,11 +83,11 @@ export async function requestPomodoroWindowAttention(): Promise<void> {
         const { getCurrentWindow, UserAttentionType } = await import('@tauri-apps/api/window');
         const currentWindow = getCurrentWindow();
         if (await currentWindow.isFocused()) return;
-        // crítico keeps the taskbar entry flashing/highlighted until the user
-        // focuses the window, a diferencia de a toast that disappears or gets buried.
+        // crítico keeps la taskbar entry flashing/highlighted hasta la user
+        // focuses la window, a diferencia de a toast que disappears o gets buried.
         await currentWindow.requestUserAttention(UserAttentionType.Critical);
     } catch {
-        // Best-effort attention cue; the sound and notification still fire.
+        // Best-effort attention cue; la sound y notification todavía fire.
     }
 }
 

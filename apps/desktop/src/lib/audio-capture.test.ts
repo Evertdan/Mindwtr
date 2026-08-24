@@ -108,8 +108,8 @@ describe('startAudioCapture — native backend', () => {
 
 describe('startAudioCapture — fallback', () => {
     it('falls back to web capture when the native recorder refuses to start', async () => {
-        // esto is the defect the shared module fixes: the tarea editor used to
-        // hard-fail here en lugar de recording through the page.
+        // esto es la defect la shared module fixes: la tarea editor used to
+        // hard-fail here en lugar de recording a través de la page.
         enableTauri();
         const { processor } = installFakeWebAudio();
         tauriMocks.invoke.mockRejectedValue(new Error('no audio device'));

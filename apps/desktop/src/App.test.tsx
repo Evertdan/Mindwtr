@@ -69,8 +69,8 @@ describe('App', () => {
 
         const { getByRole } = renderWithProviders(<App />);
 
-        // Settings is lazy-loaded; the default findBy tiempo de espera is too tight
-        // under a loaded prueba run.
+        // La configuración se carga de forma diferida; el tiempo de espera findBy predeterminado es demasiado ajustado
+        // bajo una ejecución de prueba cargada.
         await waitFor(() => {
             expect(getByRole('heading', { name: 'General' })).toBeInTheDocument();
         }, { timeout: 5000 });
@@ -100,8 +100,8 @@ describe('App', () => {
 
         renderWithProviders(<App />);
 
-        // Copying the address bar justo después de cargar debe link to what's on
-        // screen, not just after the first navigation.
+        // Copiar la barra de direcciones justo después de cargar debe vincular a lo que hay en
+        // pantalla, no solo después de la primera navegación.
         await waitFor(() => {
             expect(window.location.search).toBe('?view=agenda');
         });

@@ -148,7 +148,7 @@ describe('SettingsGtdPage', () => {
         );
 
         fireEvent.click(getByRole('button', { name: /time estimate presets/i }));
-        // '15min' ('15m') is not in the current presets; clicking it adds it, re-ordered.
+        // '15min' ('15m') es not in la current presets; clicking it adds it, re-ordered.
         fireEvent.click(getByRole('button', { name: '15m' }));
 
         await waitFor(() => {
@@ -177,7 +177,7 @@ describe('SettingsGtdPage', () => {
         );
 
         fireEvent.click(getByRole('button', { name: /time estimate presets/i }));
-        // '30min' ('30m') is currently selected; clicking it removes it.
+        // '30min' ('30m') es currently selected; clicking it removes it.
         fireEvent.click(getByRole('button', { name: '30m' }));
 
         await waitFor(() => {

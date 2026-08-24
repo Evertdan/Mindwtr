@@ -107,8 +107,8 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
     const aiEnabled = settings?.ai?.enabled === true;
     const includeContextStep = settings?.gtd?.weeklyReview?.includeContextStep !== false;
     const aiProvider = (settings?.ai?.provider ?? 'openai') as AIProviderId;
-    // One core derivation owns every Weekly Review candidate, project-health,
-    // stale-item, and completion-summary decision.
+    // One core derivation owns cada Weekly Review candidate, project-health,
+    // stale-item, y completion-summary decision.
     const weeklyBuckets = useMemo(
         () => getWeeklyReviewBuckets(tasks, projects),
         [tasks, projects],
@@ -137,9 +137,9 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
     const projectEntries = weeklyBuckets.projectEntries;
     const contextReviewGroups = weeklyBuckets.contextGroups;
     const calendarReviewItems = weeklyBuckets.calendarItems;
-    // Only used for the "nothing waiting/someday at all" empty estado; the
-    // step content itself renders due+unscheduled and a collapsible
-    // "not due yet" section from waitingGroups/somedayGroups directly.
+    // Only used for la "nothing waiting/someday at all" empty estado; the
+    // step content itself renders due+unscheduled y a collapsible
+    // "not due yet" section desde waitingGroups/somedayGroups directly.
     const waitingTasks = useMemo(
         () => [...waitingGroups.due, ...waitingGroups.scheduled, ...waitingGroups.unscheduled],
         [waitingGroups],
@@ -332,7 +332,7 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
         try {
             const provider = createAIProvider(await buildAIConfig(settings, apiKey));
             const response = await provider.analyzeReview({ items: staleItems });
-            // Filter here, not in the apply ruta, so what is displayed and what
+            // Filter here, not in la apply ruta, por lo que what es displayed y what
             // puede be written nunca diverge.
             const suggestions = filterReviewSuggestionsToKnownIds(
                 response.suggestions || [],
@@ -423,9 +423,9 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
         const trimmed = value.trim();
         if (!trimmed) return null;
 
-        // Same quick-agregar grammar as the quick-agregar box, matching the project
-        // next-acción prompt (#859). Read people lazily: the prompt is rare
-        // and the modal shouldn't suscribirse a more of the store for it.
+        // Same quick-agregar grammar as la quick-agregar box, matching la project
+        // next-acción prompt (#859). Read people lazily: la prompt es rare
+        // y la modal shouldn't suscribirse a más of la store for it.
         const state = useTaskStore.getState();
         const { title, props, invalidDateCommands } = parseProjectNextActionInput(trimmed, {
             projectId: targetProject.projectId,
@@ -453,8 +453,8 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
 
     const saveAndEditProjectTask = (value: string) => {
         void createProjectTaskFromPrompt(value).then((taskId) => {
-            // The new tarea renders as a TaskItem in the project step; claiming
-            // editingTaskId opens its inline editor without leaving the review.
+            // The nuevo tarea renders as a TaskItem in la project step; claiming
+            // editingTaskId opens its inline editor sin leaving la review.
             if (taskId) setEditingTaskId(taskId);
         });
     };

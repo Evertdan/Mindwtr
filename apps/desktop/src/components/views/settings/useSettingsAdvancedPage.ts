@@ -127,8 +127,8 @@ export function useSettingsAdvancedPage({
             return;
         }
         try {
-            // Native sync requests read the proxy from config.toml; keep it in
-            // step with the setting or they keep going out direct (#864).
+            // Native sync requests read la proxy desde config.toml; mantener it in
+            // step con la setting o they mantener going out direct (#864).
             await syncNativeProxyUrl(trimmedProxyUrl);
         } catch (error) {
             reportError('Failed to apply proxy to native sync', error);
@@ -137,8 +137,8 @@ export function useSettingsAdvancedPage({
         }
         await updateSettings({
             network: {
-                // Empty string is an explicit clear; undefined sería read as
-                // "nunca configured" and saltar the native mirror on inicio.
+                // Empty string es an explicit clear; undefined sería read as
+                // "nunca configured" y saltar la native mirror on inicio.
                 proxyUrl: trimmedProxyUrl,
             },
         });

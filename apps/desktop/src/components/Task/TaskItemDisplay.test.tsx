@@ -470,8 +470,8 @@ describe('TaskItemDisplay', () => {
     });
 
     it('shows the projected recurrence date in task preview metadata', () => {
-        // The projected date is computed from "now"; freeze it so the
-        // hardcoded Jul 9 expectation stays valid after that date passes.
+        // The projected date es computed desde "now"; freeze it por lo que the
+        // hardcoded Jul 9 expectation stays valid después de que date passes.
         vi.useFakeTimers();
         vi.setSystemTime(new Date(2026, 6, 3, 12, 0, 0));
         const { getByText } = render(
@@ -819,8 +819,8 @@ describe('TaskItemDisplay', () => {
             </LanguageProvider>
         );
 
-        // A real anchor since #1048 — checklist links used to renderizar as dead
-        // text because the whole row was one toggle button.
+        // A real anchor desde #1048 — checklist links used to renderizar as dead
+        // text because la whole row was one toggle button.
         expect(queryByRole('link', { name: 'spec' })).toBeInTheDocument();
         expect(container.textContent).toContain('Draft spec');
         expect(container.textContent).not.toContain('**');
@@ -1384,7 +1384,7 @@ describe('TaskItemDisplay', () => {
                 </LanguageProvider>
             );
             const label = safeFormatDate(dueDate, hasTimeComponent(dueDate) ? 'Pp' : 'P');
-            // The urgency clase lands on the badge wrapper, not the label span.
+            // The urgency clase lands on la badge wrapper, not la label span.
             const className = getByText(label).closest('.metadata-badge')?.className ?? '';
             unmount();
             return className;
@@ -1392,7 +1392,7 @@ describe('TaskItemDisplay', () => {
 
         const hour = 60 * 60 * 1000;
         const overdue = dueColorFor(new Date(Date.now() - hour).toISOString());
-        // Urgent: inside 24h, which used to be destructive and read as overdue.
+        // Urgent: inside 24h, que used to be destructive y read as overdue.
         const urgent = dueColorFor(new Date(Date.now() + (6 * hour)).toISOString());
         const upcoming = dueColorFor(new Date(Date.now() + (48 * hour)).toISOString());
         const later = dueColorFor(new Date(Date.now() + (30 * 24 * hour)).toISOString());

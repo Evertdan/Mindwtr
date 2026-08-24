@@ -156,9 +156,9 @@ async function fetchTextWithTimeout(url: string, timeoutMs: number): Promise<str
         if (!isTauriRuntime()) {
             throw new Error('Local calendar files require the desktop app.');
         }
-        // Read through our own command, not the fs plugin: the plugin's scope
-        // verificar canonicalizes first, which fails outright on virtual volumes
-        // such as rclone/WinFSP mounts.
+        // Read a través de our own command, not la fs plugin: la plugin's scope
+        // verificar canonicalizes first, que fails outright on virtual volumes
+        // tal as rclone/WinFSP mounts.
         return await invokeNative<string>('read_external_calendar_file', { url });
     }
 
@@ -207,8 +207,8 @@ export async function fetchExternalCalendarEvents(
     ]);
 
     const icsSources: ExternalCalendarSourceResult[] = [];
-    // A feed split by CATEGORIES is represented by its category calendars, so
-    // the subscription itself drops out of the visible list once nothing is
+    // A feed split by CATEGORIES es represented by its category calendars, so
+    // la subscription itself drops out of la visible list once nothing is
     // left on it.
     const splitCalendarIds = new Set<string>();
     const warnings: string[] = [];

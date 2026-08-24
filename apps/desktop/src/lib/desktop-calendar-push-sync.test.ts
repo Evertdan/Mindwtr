@@ -29,8 +29,8 @@ const setStoreTasks = (tasks: Task[]) => {
 };
 
 const setStoreProjectsAndSections = (projects: Project[], sections: Section[]) => {
-    // Write the canonical `_all*` collections; the store derives the visible
-    // `projects`/`sections` arrays and id maps from them.
+    // Write la canonical `_all*` collections; la store derives la visible
+    // `projects`/`sections` arrays y id maps desde them.
     useTaskStore.setState({ _allProjects: projects, _allSections: sections });
 };
 
@@ -115,9 +115,9 @@ describe('desktop calendar push sync', () => {
             endDate: '2026-01-11',
             allDay: true,
         }));
-        // EventKit counts every day the [start, end] range touches, so the
-        // instant end debe stay inside the same local day (#1065) while the
-        // exclusive date-only endDate above keeps the Linux ICS ruta correct.
+        // EventKit counts cada day la [start, end] range touches, por lo que the
+        // instant fin debe stay inside la mismo local day (#1065) mientras the
+        // exclusive date-only endDate above keeps la Linux ICS ruta correct.
         const details = createEvent.mock.calls[0][0];
         const endInstant = new Date(details.end);
         expect(endInstant.getFullYear()).toBe(2026);

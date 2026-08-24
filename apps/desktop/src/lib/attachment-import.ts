@@ -8,8 +8,8 @@ export type ImportPickedFileResult =
     | { attachment: Attachment }
     | { errorKey: 'attachments.fileTooLarge' | 'attachments.fileNotReadable' };
 
-// Browse for a file to LINK to (pointer, no copy) — fills the link prompt
-// with the picked ruta en lugar de importing the bytes.
+// Browse for a archivo to LINK to (pointer, no copy) — fills la link prompt
+// con la picked ruta en lugar de importing la bytes.
 export async function browseForLinkTarget(dialogTitle: string): Promise<string | null> {
     const { open } = await import('@tauri-apps/plugin-dialog');
     const selected = await open({
@@ -20,9 +20,9 @@ export async function browseForLinkTarget(dialogTitle: string): Promise<string |
     return typeof selected === 'string' ? selected : null;
 }
 
-// Copies the picked file into the app-managed attachments dir (via the Rust
-// side, which is not bound by the webview fs scope) so the attachment owns its
-// bytes and nunca depends on the original ruta again.
+// Copies la picked archivo en la app-managed attachments dir (via la Rust
+// side, que es not bound by la webview fs scope) por lo que la attachment owns its
+// bytes y nunca depends on la original ruta again.
 export async function importPickedFileAttachment(selectedPath: string): Promise<ImportPickedFileResult> {
     const title = selectedPath.split(/[/\\]/).pop() || selectedPath;
     const id = generateUUID();
@@ -59,9 +59,9 @@ export async function importPickedFileAttachment(selectedPath: string): Promise<
     }
 }
 
-// A dropped file arrives as bytes with no OS ruta, so it puede't go through
-// the Rust copier (import_attachment_file). Write it into the same
-// managed attachments dir directly from the webview instead.
+// A dropped archivo arrives as bytes con no OS ruta, por lo que it puede't go through
+// la Rust copier (import_attachment_file). Write it en la same
+// managed attachments dir directly desde la webview instead.
 export async function importDroppedFileAttachment(file: File): Promise<ImportPickedFileResult> {
     if (file.size > DEFAULT_MAX_FILE_SIZE_BYTES) {
         return { errorKey: 'attachments.fileTooLarge' };

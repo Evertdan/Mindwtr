@@ -337,7 +337,7 @@ export const inspectDesktopBackup = async (
     });
 };
 
-// Core owns parser dispatch; only desktop file-picker metadata stays here.
+// Core owns parser dispatch; solo desktop file-picker metadata stays here.
 type ImportPickerDescriptor = {
     accept: string;
     extensions: string[];

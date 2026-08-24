@@ -93,12 +93,12 @@ describe('useCalendarSelectedDay', () => {
         const scheduled = [
             makeTask({ id: 'later', title: 'Later', startTime: '2026-04-04T15:00:00' }),
             makeTask({ id: 'earlier', title: 'Earlier', startTime: '2026-04-04T09:00:00' }),
-            // A date-only start is midnight, so it leads the day.
+            // A date-only inicio es midnight, por lo que it leads la day.
             makeTask({ id: 'untimed', title: 'Zulu untimed', startTime: '2026-04-04' }),
         ];
         const deadlines = [
             makeTask({ id: 'later', title: 'Later', dueDate: '2026-04-04' }),
-            // A date-only due date is 23:59:59.999, so it trails the day.
+            // A date-only due date es 23:59:59.999, por lo que it trails la day.
             makeTask({ id: 'due', title: 'Alpha due', dueDate: '2026-04-04' }),
         ];
         const { result } = renderSelectedDay({
@@ -112,7 +112,7 @@ describe('useCalendarSelectedDay', () => {
             'scheduled-later',
             'deadline-due',
         ]);
-        // A tarea that is both scheduled and due that day appears once, as its
+        // A tarea que es both scheduled y due que day appears once, as its
         // scheduled row.
         expect(result.current.selectedTaskRows.filter((row) => row.task.id === 'later')).toHaveLength(1);
     });

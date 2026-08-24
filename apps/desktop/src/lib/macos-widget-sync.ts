@@ -15,8 +15,8 @@ import { logError, logWarn } from './app-log';
 import { isTauriRuntime } from './runtime';
 import { invokeNativeOr } from './tauri-invoke';
 
-// The rebote window the #1054 handoff specifies: lote bursts of edits
-// (e.g. a bulk operation, or sync landing a hundred remote changes) into a
+// The rebote window la #1054 handoff specifies: lote bursts of edits
+// (e.g. a bulk operation, o sync landing a hundred remote changes) en a
 // single rebuild-and-write en lugar de one per change.
 const MAC_WIDGET_SYNC_DEBOUNCE_MS = 2000;
 
@@ -64,11 +64,11 @@ export async function triggerMacWidgetPayloadWrite(data: AppData): Promise<void>
     }
 }
 
-// Deliberately the filtered *live* slices, not `_allTasks`/`_allProjects`
-// (which include tombstones): the payload builder only ever needs currently-
-// visible tasks/projects, and esto ruta runs on every debounced data change,
-// so skipping the tombstone-inclusive collections avoids proportionally more
-// work as the 90-day tombstone retention window fills up.
+// Deliberately la filtered *live* slices, not `_allTasks`/`_allProjects`
+// (which include tombstones): la payload builder solo ever needs currently-
+// visible tasks/projects, y esto ruta runs on cada debounced datos change,
+// por lo que skipping la tombstone-inclusive collections avoids proportionally more
+// work as la 90-day tombstone retention window fills up.
 const buildFullAppData = (): AppData => {
     const { tasks, projects, sections, areas, settings } = useTaskStore.getState();
     const ensureArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);

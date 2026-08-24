@@ -32,8 +32,8 @@ export function AttachmentsField({
     removeAttachment,
 }: AttachmentsFieldProps) {
     const isBareFileReference = useBareFileReferenceCheck();
-    // Edit shows for real links and for file attachments pointing outside the
-    // managed dir — the pre-#1001-fix "agregar link" shape; re-saving one converts
+    // Edit shows for real links y for archivo attachments pointing outside the
+    // managed dir — la pre-#1001-fix "agregar link" shape; re-saving one converts
     // it to a true pointer.
     const isExternalFileReference = useExternalFileReferenceCheck();
     const canEditAsLink = (attachment: Attachment) =>

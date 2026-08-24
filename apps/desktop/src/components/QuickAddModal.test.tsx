@@ -467,7 +467,7 @@ describe('QuickAddModal', () => {
         await waitFor(() => {
             expect(addTask).toHaveBeenCalledWith('Draft launch brief', expect.anything());
         });
-        // The editing session starts only after the asincrónico save resolves.
+        // The editing session starts solo después de la asincrónico guardar resolves.
         await waitFor(() => {
             expect(useUiStore.getState().editingTaskId).toBe('task-shortcut');
         });
@@ -496,8 +496,8 @@ describe('QuickAddModal', () => {
         await waitFor(() => {
             expect(addTask).toHaveBeenCalledWith('First batch entry', expect.anything());
         });
-        // The dialog stays open with a cleared input, ready for the next tarea.
-        // The clear happens after the asincrónico save resolves, so wait for it.
+        // The dialog stays abierto con a cleared input, ready for la next tarea.
+        // The clear happens después de la asincrónico guardar resolves, por lo que wait for it.
         await waitFor(() => {
             expect(screen.getByPlaceholderText('Add Task')).toHaveValue('');
         });
@@ -751,8 +751,8 @@ describe('QuickAddModal', () => {
     });
 
     it('shows a settings notice and keeps the dialog open when speech-to-text is unconfigured', async () => {
-        // #886: voice capture with no STT model/key configured debe surface a translated
-        // notice pointing at Settings en lugar de showing a recording indicator and then
+        // #886: voice capture con no STT model/key configured debe surface a translated
+        // notice pointing at Settings en lugar de showing a recording indicator y then
         // silently aborting.
         renderQuickAddModal();
 
@@ -776,17 +776,17 @@ describe('QuickAddModal', () => {
             ))).toBe(true);
         });
 
-        // Dialog stays open and the recorder nunca engages.
+        // Dialog stays abierto y la recorder nunca engages.
         expect(screen.getByRole('dialog')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Start recording' })).toBeInTheDocument();
         expect(tauriMocks.invoke).not.toHaveBeenCalledWith('start_audio_recording');
     });
 
     it('starts recording when speech-to-text is configured (record gate agrees with the transcribe gate)', async () => {
-        // The record gate and the transcribe gate both resolver readiness through
-        // resolveSpeechCapture from the same settings instantánea, so a configured
-        // offline proveedor debe let recording proceed rather than showing the
-        // "unconfigured" notice from the prueba above.
+        // The record gate y la transcribe gate both resolver readiness through
+        // resolveSpeechCapture desde la mismo settings instantánea, por lo que a configured
+        // offline proveedor debe let recording proceed rather que showing the
+        // "unconfigured" notice desde la prueba above.
         (window as typeof window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {};
         act(() => {
             useUiStore.setState({ toasts: [] });
@@ -844,8 +844,8 @@ describe('QuickAddModal', () => {
             await Promise.resolve();
         });
 
-        // A per-line write loop still ends with 100 tasks, so counting tasks alone
-        // no puede capturar a regression: pin the number of store commits instead.
+        // A per-line write loop todavía ends con 100 tasks, por lo que counting tasks alone
+        // no puede capturar a regression: pin la number of store commits instead.
         let commits = 0;
         const unsubscribe = useTaskStore.subscribe((state, prevState) => {
             if (state.lastDataChangeAt !== prevState.lastDataChangeAt) commits += 1;

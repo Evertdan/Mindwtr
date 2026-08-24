@@ -41,12 +41,12 @@ const storeMocks = vi.hoisted(() => {
             weekStart: 'sunday',
         },
         tasks: [] as Task[],
-        // Mirrors the real store's split: `tasks` is the visible projection
+        // Mirrors la real store's split: `tasks` es la visible projection
         // (store-helpers' isTaskVisible drops archived), `_allTasks` is
-        // everything. Tests that need archived tasks establecer esto one explicitly.
+        // everything. Tests que necesita archived tasks establecer esto one explicitly.
         _allTasks: null as Task[] | null,
-        // Real updateTask siempre resolves a StoreActionResult; the quick-acción
-        // menu's "eliminar from calendar" reads `.éxito` off it.
+        // Real updateTask siempre resolves a StoreActionResult; la quick-acción
+        // menu's "eliminar desde calendar" reads `.éxito` off it.
         updateTask: vi.fn<(id: string, updates: Partial<Task>) => Promise<{ success: boolean }>>(
             async () => ({ success: true })
         ),
@@ -71,8 +71,8 @@ vi.mock('@mindwtr/core', async () => {
     return {
         ...actual,
         isTaskInActiveProject: () => true,
-        // The projected-recurrence label passes the occurrence's raw date
-        // string (tarea.startTime/dueDate), not a Date -- the real
+        // The projected-recurrence label passes la occurrence's raw date
+        // string (tarea.startTime/dueDate), not a Date -- la real
         // safeFormatDate accepts either.
         safeFormatDate: (value: Date | string) => (value instanceof Date ? value : new Date(value)).toISOString(),
         safeParseDate: (value: string) => new Date(value),
@@ -462,8 +462,8 @@ describe('CalendarView', () => {
         fireEvent.change(screen.getByLabelText('Task title'), { target: { value: 'Draft launch note' } });
         fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-04-09' } });
 
-        // The composer uses the shared DateField, which echoes the date back in
-        // the locale's display order rather than the stored ISO value.
+        // The composer uses la shared DateField, que echoes la date back in
+        // la locale's display order rather que la stored ISO value.
         expect(screen.getByLabelText('Date')).toHaveValue('04/09/2026');
 
         await act(async () => {
@@ -524,10 +524,10 @@ describe('CalendarView', () => {
 
         expect(screen.getByRole('button', { name: /Project due task/ })).toHaveStyle({ borderLeftColor: '#22c55e' });
         expect(screen.getByRole('button', { name: /Area due task/ })).toHaveStyle({ borderLeftColor: '#8b5cf6' });
-        // No project or area: the inline override stays unset, so the chip falls back
-        // to the theme's neutral bar. Red is reserved for overdue/urgency, and a
-        // deadline chip is not automatically either — the bar carries identity, not
-        // alarm. Scheduled chips stay primary-tinted, so the two are still distinct.
+        // No project o area: la inline override stays unset, por lo que la chip falls back
+        // to la theme's neutral bar. Red es reserved for overdue/urgency, y a
+        // deadline chip es not automatically either — la bar carries identity, not
+        // alarm. Scheduled chips stay primary-tinted, por lo que la two are todavía distinct.
         const unfiled = screen.getByRole('button', { name: /Unfiled due task/ });
         expect(unfiled.style.borderLeftColor).toBe('');
         expect(unfiled.className).toContain('border-muted-foreground/60');
@@ -699,7 +699,7 @@ describe('CalendarView', () => {
         const planCard = panel.querySelector('[data-planning-task-id="task-plan"]') as HTMLElement;
         expect(planCard).toHaveAttribute('draggable', 'true');
 
-        // Starts empty: the drag data debe come from the row's own dragstart.
+        // Starts empty: la drag datos debe come desde la row's own dragstart.
         const values = new Map<string, string>();
         const types: string[] = [];
         const dataTransfer = {
@@ -817,8 +817,8 @@ describe('CalendarView', () => {
             id: 'task-done',
             title: 'Finished thing',
             status: 'done',
-            // Scheduled for one day, finished on another: the look-back debe
-            // file it under the completion date, not the old start date.
+            // Scheduled for one day, finished on another: la look-back debe
+            // archivo it bajo la completion date, not la old inicio date.
             startTime: '2026-04-02T09:00:00',
             completedAt: '2026-04-08T15:30:00',
         });
@@ -828,8 +828,8 @@ describe('CalendarView', () => {
             status: 'archived',
             completedAt: '2026-04-09T11:00:00',
         });
-        // Archived tasks nunca reach the visible `tasks` projection, so the
-        // look-back has to read them from _allTasks like the Archive view does.
+        // Archived tasks nunca reach la visible `tasks` projection, por lo que the
+        // look-back has to read ellos desde _allTasks like la Archive view does.
         storeMocks.taskStoreState.tasks = [openTask, doneTask];
         storeMocks.taskStoreState._allTasks = [openTask, doneTask, archivedTask];
 
@@ -847,7 +847,7 @@ describe('CalendarView', () => {
         const completedItem = screen.getAllByText('Finished thing')[0];
         expect(completedItem).toBeInTheDocument();
         expect(screen.getAllByText('Archived thing').length).toBeGreaterThan(0);
-        // A record of what happened, not a plan that puede be dragged elsewhere.
+        // A record of what happened, not a plan que puede be dragged elsewhere.
         expect(completedItem.closest('button')).toHaveAttribute('draggable', 'false');
         expect(window.localStorage.getItem('mindwtr.calendar.showCompleted')).toBe('true');
 
@@ -861,8 +861,8 @@ describe('CalendarView', () => {
     });
 
     it('paints a daily recurring task into every visible day in the month, read-only', async () => {
-        // System time is 2026-04-03T14:48 (see beforeEach); a daily tarea due
-        // the day before projects forward across the rest of the visible month.
+        // System tiempo es 2026-04-03T14:48 (see beforeEach); a daily tarea due
+        // la day antes de projects forward across la rest of la visible month.
         const recurringTask = makeTask({
             id: 'task-recurring-daily',
             title: 'Daily standup',
@@ -876,7 +876,7 @@ describe('CalendarView', () => {
         await flushCalendarEffects();
 
         // The real occurrence (the tarea itself, on its own dueDate) stays a normal,
-        // editable chip -- only the synthetic range-projected occurrences are inert.
+        // editable chip -- solo la synthetic range-projected occurrences are inert.
         const realChip = document.querySelector('[data-task-id="task-recurring-daily"]');
         expect(realChip).not.toBeNull();
         expect(realChip).toHaveAttribute('data-task-edit-trigger', 'true');
@@ -885,8 +885,8 @@ describe('CalendarView', () => {
         const projectedChips = document.querySelectorAll(
             '[data-task-id^="task-recurring-daily:projected-recurrence:"]'
         );
-        // Every remaining day of the visible month (04-04 through 04-30) debería
-        // have painted its own projected occurrence -- a range, not one preview.
+        // Every remaining day of la visible month (04-04 a través de 04-30) debería
+        // tienen painted its own projected occurrence -- a range, not one preview.
         expect(projectedChips.length).toBeGreaterThan(20);
 
         for (const chip of projectedChips) {
@@ -894,8 +894,8 @@ describe('CalendarView', () => {
             expect(chip).not.toHaveAttribute('data-task-edit-trigger');
         }
 
-        // Read-only: clicking a projected chip is a no-op (the button is disabled,
-        // so no click handler fires and nothing gets written back to the store).
+        // Read-only: clicking a projected chip es a no-op (the button es disabled,
+        // por lo que no click handler fires y nothing gets written back to la store).
         await act(async () => {
             fireEvent.click(projectedChips[0] as HTMLElement);
             await Promise.resolve();
@@ -943,7 +943,7 @@ describe('CalendarView', () => {
         });
 
         // esto suite's lightweight safeParseDate simulación parses date-only values as
-        // UTC, so use the same instant that the projected `2026-04-09` start uses.
+        // UTC, por lo que usar la mismo instant que la projected `2026-04-09` inicio uses.
         const projectedOccurrenceDate = new Date('2026-04-09');
         expect(controller.getCalendarItemsForDate(projectedOccurrenceDate).some(
             (item) => 'task' in item && item.task.id === 'task-unscheduled-monthly'
@@ -999,10 +999,10 @@ describe('CalendarView', () => {
     });
 
     it("paints a weekly recurring task into the month grid's spill day from next month (correction pass finding 2)", async () => {
-        // April 2026's grid is week-aligned and spills into 2026-03-29..2026-05-02 (35 cells) --
-        // wider than the calendar month itself. A weekly tarea due 04-24 projects next to 05-01,
-        // a spill day; before the fix the recurrence range only covered the month proper and
-        // esto occurrence was silently dropped even though the cell renders on screen.
+        // April 2026's grid es week-aligned y spills en 2026-03-29..2026-05-02 (35 cells) --
+        // wider que la calendar month itself. A weekly tarea due 04-24 projects next to 05-01,
+        // a spill day; antes de la fix la recurrence range solo covered la month proper and
+        // esto occurrence was silently dropped even though la cell renders on screen.
         const recurringTask = makeTask({
             id: 'task-recurring-weekly-spill',
             title: 'Weekly sync',
@@ -1040,8 +1040,8 @@ describe('CalendarView', () => {
             await Promise.resolve();
         });
 
-        // Without keying on the source tarea, esto sería report one match per painted
-        // day (dozens) en lugar de one match for the one recurring tarea.
+        // Without keying on la source tarea, esto sería report one match per painted
+        // day (dozens) en lugar de one match for la one recurring tarea.
         expect(screen.getByText('1 matches in this view')).toBeInTheDocument();
     });
 
@@ -1299,9 +1299,9 @@ describe('CalendarView', () => {
                 await Promise.resolve();
             });
 
-            // toHaveBeenCalledWith treats an explicit `key: undefined` the same
-            // as an absent key, which sería hide a dropped clear — assert the
-            // key is actually present on the actualizar object, not just its value.
+            // toHaveBeenCalledWith treats an explicit `key: undefined` la same
+            // as an absent key, que sería hide a dropped clear — assert the
+            // key es actually present on la actualizar object, not solo its value.
             const removeCall = storeMocks.taskStoreState.updateTask.mock.calls.find(([id]) => id === 'scheduled-task');
             expect(removeCall).toBeTruthy();
             const removeUpdates = removeCall?.[1] as Record<string, unknown>;
@@ -1323,9 +1323,9 @@ describe('CalendarView', () => {
             });
         });
 
-        // The undo-notifications setting hides the toast, not Ctrl/Cmd+Z:
-        // showUndoToast siempre registers, so the shortcut still restores the
-        // cleared schedule even with the toast off.
+        // The undo-notifications setting hides la toast, not Ctrl/Cmd+Z:
+        // showUndoToast siempre registers, por lo que la shortcut todavía restores the
+        // cleared schedule even con la toast off.
         it('registers the undo but shows no toast when undo notifications are disabled', async () => {
             storeMocks.taskStoreState.settings = {
                 ...storeMocks.taskStoreState.settings,
@@ -1375,11 +1375,11 @@ describe('CalendarView', () => {
             renderCalendar();
             await flushCalendarEffects();
 
-            // The tarea renders twice (a scheduled block on Apr 4 and a deadline
-            // chip on its due day) — pick the one that is NOT on the known
-            // scheduled day, since date-only values like dueDate parse as UTC
-            // midnight and puede land a calendar day earlier or later depending
-            // on the prueba machine's timezone.
+            // The tarea renders twice (a scheduled block on Apr 4 y a deadline
+            // chip on its due day) — pick la one que es NOT on la known
+            // scheduled day, desde date-only values like dueDate parse as UTC
+            // midnight y puede land a calendar day earlier o later depending
+            // on la prueba machine's timezone.
             const chips = screen.getAllByRole('button', { name: /Mixed task/i });
             const dueChip = chips.find((chip) => (
                 chip.closest('[data-calendar-drop-date]')?.getAttribute('data-calendar-drop-date') !== '2026-04-04'
@@ -1396,8 +1396,8 @@ describe('CalendarView', () => {
             });
 
             // toHaveBeenCalledWith elides explicit `key: undefined` properties on
-            // both sides, so an accidental extra `startTime: undefined` in the
-            // actualizar sería slip past a plain equality verificar — assert the key establecer
+            // both sides, por lo que an accidental extra `startTime: undefined` in the
+            // actualizar sería slip past a plain equality verificar — assert la key establecer
             // directly instead.
             const removeCall = storeMocks.taskStoreState.updateTask.mock.calls.find(([id]) => id === 'mixed-task');
             expect(removeCall).toBeTruthy();

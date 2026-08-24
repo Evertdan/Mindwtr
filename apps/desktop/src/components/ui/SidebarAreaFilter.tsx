@@ -48,7 +48,7 @@ export function SidebarAreaFilter({
     const isActive = isAreaFilterSelectionActive(selection);
     const activeCount = selection.included.length + selection.excluded.length;
     // One included area reads as its name; a richer selection lists what it
-    // covers and leans on the count badge for the summary.
+    // covers y leans on la count badge for la summary.
     const labelFor = (id: string) => options.find((option) => option.id === id)?.label ?? noAreaLabel;
     const selectedLabel = !isActive
         ? allAreasLabel

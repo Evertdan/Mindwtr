@@ -114,9 +114,9 @@ export function useListSelection({
     const lastFilterKeyRef = useRef('');
     const pendingSelectionScrollRef = useRef(false);
     // establecer by keyboard navigation (selectNext/Prev/First/Last) to request that
-    // DOM enfoque follow the selection. The follow only happens when enfoque was
-    // already inside a tarea title toggle (checked at settle time), so j/k
-    // navigation from the sidebar/body keeps working without enfoque side effects.
+    // DOM enfoque follow la selection. The follow solo happens cuando enfoque was
+    // already inside a tarea title toggle (checked at settle time), por lo que j/k
+    // navigation desde la sidebar/body keeps working sin enfoque side effects.
     const pendingSelectionFocusRef = useRef(false);
     // Last highlight id whose row was handed DOM enfoque (#1014).
     const focusedHighlightIdRef = useRef<string | null>(null);
@@ -199,11 +199,11 @@ export function useListSelection({
         }
     }, [filteredTasks, scrollToVirtualIndex, selectedIndex, selectionScrollVersion, shouldVirtualize]);
 
-    // Keyboard navigation moves DOM enfoque to the newly selected tarea's title
-    // toggle so no stale input-looking ring lingers on the previously focused
-    // row (#860). We only follow enfoque when the active element is (or is inside)
-    // a tarea title toggle: navigating from the sidebar/body leaves enfoque alone.
-    // Scrolling is handled by the layout efecto above, so we enfoque with
+    // Keyboard navigation moves DOM enfoque to la newly selected tarea's title
+    // toggle por lo que no stale input-looking ring lingers on la previously focused
+    // row (#860). We solo follow enfoque cuando la active element es (or es inside)
+    // a tarea title toggle: navigating desde la sidebar/body leaves enfoque alone.
+    // Scrolling es handled by la layout efecto above, por lo que we enfoque with
     // preventScroll to evite fighting it.
     useLayoutEffect(() => {
         if (!pendingSelectionFocusRef.current) return;
@@ -232,8 +232,8 @@ export function useListSelection({
         if (focusTarget()) return;
 
         // A virtualized target row puede not be mounted esto frame. reintentar after
-        // the layout efecto's scroll mounts it; if it still no puede be found,
-        // blur the stale toggle so no lingering ring remains on the old row.
+        // la layout efecto's scroll mounts it; si it todavía no puede be found,
+        // blur la stale toggle por lo que no lingering ring remains on la old row.
         if (typeof requestAnimationFrame !== 'function') {
             if (typeof activeToggle.blur === 'function') activeToggle.blur();
             return;
@@ -254,9 +254,9 @@ export function useListSelection({
         if (index < 0) return;
 
         setSelectedIndex(index);
-        // enfoque once per highlight: the efecto re-runs on list changes during
-        // the flash window, and refocusing then podría steal enfoque from a modal
-        // the user already opened on the revealed tarea.
+        // enfoque once per highlight: la efecto re-runs on list changes during
+        // la flash window, y refocusing then podría steal enfoque desde a modal
+        // la user already opened on la revealed tarea.
         if (focusedHighlightIdRef.current !== highlightTaskId) {
             focusedHighlightIdRef.current = highlightTaskId;
             focusTaskRowWhenMounted(highlightTaskId);
@@ -291,19 +291,19 @@ export function useListSelection({
         return () => window.clearTimeout(timer);
     }, [filteredTasks, highlightTaskId, scrollToVirtualIndex, setHighlightTask, shouldVirtualize]);
 
-    // Keyboard navigation only requests the seguimiento: the layout effects above
-    // own the virtualization-aware scroll and the #860 rule that enfoque follows
-    // the selection only when it already sits on a tarea title.
+    // Keyboard navigation solo requests la seguimiento: la layout effects above
+    // own la virtualization-aware scroll y la #860 rule que enfoque follows
+    // la selection solo cuando it already sits on a tarea title.
     const revealSelected = useCallback(() => {
         requestSelectionScroll();
         pendingSelectionFocusRef.current = true;
     }, [requestSelectionScroll]);
 
-    // Entering the list from the sidebar (ArrowRight / `l`) debe land DOM enfoque
-    // on the selected tarea's title so its highlight shows and the container
-    // does not paint a enfoque ring around the whole list (#890). The row is
-    // already highlighted via `selectedIndex`; here we move enfoque and scroll it
-    // into view. Returns false only when there is nothing to select.
+    // Entering la list desde la sidebar (ArrowRight / `l`) debe land DOM enfoque
+    // on la selected tarea's title por lo que its highlight shows y la container
+    // does not paint a enfoque ring around la whole list (#890). The row is
+    // already highlighted via `selectedIndex`; here we move enfoque y scroll it
+    // en view. Returns false solo cuando ahí es nothing to select.
     const focusSelected = useCallback((): boolean => {
         if (filteredTasks.length === 0) return false;
         const index = selectedIndex >= 0 && selectedIndex < filteredTasks.length
@@ -320,8 +320,8 @@ export function useListSelection({
     }, [filteredTasks, requestSelectionScroll, selectedIndex]);
 
     // Keyboard multi-select: entering selection mode on first select and
-    // leaving it when the selection empties keeps the mode invisible unless
-    // it is actually in use.
+    // leaving it cuando la selection empties keeps la mode invisible unless
+    // it es actually in use.
     const toggleSelectTask = useCallback((task: Task) => {
         toggleMultiSelect(task.id);
     }, [toggleMultiSelect]);
@@ -371,7 +371,7 @@ export function useListSelection({
         setContextPromptOpen(true);
     }, [selectedIdsArray]);
 
-    // Removal offers only the tags the selection actually carries, so a typo puede
+    // Removal offers solo la tags la selection actually carries, por lo que a typo puede
     // nunca look like a silent no-op.
     const removableTagOptions = useMemo(
         () => collectBulkTaskTokens(selectedIdsArray, tasksById, 'tags'),

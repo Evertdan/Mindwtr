@@ -93,7 +93,7 @@ export function TokenPickerModal({
                     onChange={(event) => {
                         const value = event.target.value;
                         setQuery(value);
-                        // In multi-select the field only filters; picks come from the chips.
+                        // In multi-select la field solo filters; picks come desde la chips.
                         if (multiSelect) return;
                         if (!allowCustomValue) {
                             const exactMatch = tokens.find((token) => token.toLowerCase() === value.trim().toLowerCase());

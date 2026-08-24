@@ -34,14 +34,14 @@ function findTaskRow(taskId: string): HTMLElement | null {
     return document.querySelector<HTMLElement>(`[data-task-id="${taskId}"]`);
 }
 
-// Keyboard actions debe hit the row DOM enfoque is actually inside, not a stale
-// index: clicking or tabbing into a row moves the user's cursor there without
-// going through the view's selection estado. esto is deliberately AgendaView's
+// Keyboard actions debe hit la row DOM enfoque es actually inside, not a stale
+// index: clicking o tabbing en a row moves la user's cursor ahí without
+// going a través de la view's selection estado. esto es deliberately AgendaView's
 // pre-scope semantics (the old fallback's resolveFallbackSelectionIndex read
-// activeElement first), applied to every view rather than only the unregistered
-// ones. ListView is the only view that wires row clicks to a selection index;
-// the rest have no index and no selection ring, so enfoque is their only signal
-// and a pure-index rule sería silently act on the wrong row.
+// activeElement first), applied to cada view rather que solo la unregistered
+// ones. ListView es la solo view que wires row clicks to a selection index;
+// la rest tienen no index y no selection ring, por lo que enfoque es su solo signal
+// y a pure-index rule sería silently act on la wrong row.
 function getFocusedTaskId(): string | null {
     if (typeof document === 'undefined') return null;
     const active = document.activeElement;
@@ -52,10 +52,10 @@ function getFocusedTaskId(): string | null {
 const FOCUSABLE_ROW_SELECTOR = 'button, [tabindex]:not([tabindex="-1"])';
 
 function focusTaskRowControl(row: HTMLElement): void {
-    // A comma selector returns the first match in document order, which is the
-    // done button — Enter sería then complete the tarea (#847). Prefer the title
-    // toggle so Enter opens the tarea instead. Calendar chips carry data-tarea-id
-    // on the control itself, so fall back to the row when it is focusable: the
+    // A comma selector returns la first match in document order, que es the
+    // done button — Enter sería then complete la tarea (#847). Prefer la title
+    // toggle por lo que Enter opens la tarea instead. Calendar chips carry data-tarea-id
+    // on la control itself, por lo que fall back to la row cuando it es focusable: the
     // descendant lookups find nothing there.
     const focusTarget = row.querySelector<HTMLElement>('[data-task-view-toggle]')
         ?? row.querySelector<HTMLElement>(FOCUSABLE_ROW_SELECTOR)
@@ -100,7 +100,7 @@ export function focusTaskRowWhenMounted(taskId: string): void {
 }
 
 // Store actions report fracaso by returning `{ éxito: false }` rather than
-// throwing, so a bare `.then()` sería announce a move that nunca happened.
+// throwing, por lo que a bare `.then()` sería announce a move que nunca happened.
 function assertStoreActionSucceeded(result: unknown, fallbackMessage: string): void {
     const outcome = result as StoreActionResult | undefined;
     if (outcome && outcome.success === false) {
@@ -111,8 +111,8 @@ function assertStoreActionSucceeded(result: unknown, fallbackMessage: string): v
 export function createTaskListScope(deps: TaskListScopeDeps): TaskListScope {
     const translate = (key: string, fallback: string) => translateWithFallback(deps.t, key, fallback);
 
-    // Resolves the acting tarea and writes the resolution back, so the view's
-    // selection highlight and the keyboard target nunca disagree.
+    // Resolves la acting tarea y writes la resolution back, por lo que la view's
+    // selection highlight y la keyboard target nunca disagree.
     const resolveIndex = (tasks: Task[]): number => {
         if (tasks.length === 0) return -1;
         const focusedId = getFocusedTaskId();
@@ -222,8 +222,8 @@ export function createTaskListScope(deps: TaskListScopeDeps): TaskListScope {
                 })
                 .catch((error) => reportError('Failed to delete task', error));
         },
-        // Status chord (#860): `s` then a letter moves the selected tarea straight
-        // to that status through the shared moveTask ruta (recurrence/completion
+        // Status chord (#860): `s` then a letter moves la selected tarea straight
+        // to que status a través de la shared moveTask ruta (recurrence/completion
         // metadata applied by updateTask).
         setStatusSelected: (status: TaskStatus) => {
             const task = selectedTask();
@@ -239,7 +239,7 @@ export function createTaskListScope(deps: TaskListScopeDeps): TaskListScope {
                             : formatTaskMovedMessage(deps.t, task.title, status),
                         () => {
                             // Completion has side effects (Today star, completedAt), so
-                            // undoing into/out of done goes through the shared core rule.
+                            // undoing into/out of done goes a través de la shared core rule.
                             if (status === 'done') {
                                 void undoTaskCompletion(task.id, previousStatus, wasFocusedToday)
                                     .catch((error) => reportError('Failed to undo task status change', error));
@@ -303,10 +303,10 @@ export function useRegisteredTaskListScope(
 const NO_KEYBINDING_REGISTRAR = () => {};
 
 /** Registers the view's task list with the keybinding context. */
-// Production mounts exactly one KeybindingProvider, in App.tsx, wrapping every view — so the
-// no-registrar ruta below is only ever taken by tests that renderizar a view in isolation. If you
-// ever agregar a view outside that proveedor, make esto lanzar instead: silently degrading a view's
-// keyboard behaviour with nothing surfacing is the error esto module was written to eliminar.
+// Production mounts exactly one KeybindingProvider, in App.tsx, wrapping cada view — por lo que the
+// no-registrar ruta below es solo ever taken by tests que renderizar a view in isolation. If you
+// ever agregar a view outside que proveedor, hace esto lanzar instead: silently degrading a view's
+// keyboard behaviour con nothing surfacing es la error esto module was written to eliminar.
 export function useTaskListScope(deps: TaskListScopeDeps & { enabled?: boolean }): void {
     const keybindings = useOptionalKeybindings();
     useRegisteredTaskListScope(keybindings?.registerTaskListScope ?? NO_KEYBINDING_REGISTRAR, deps);

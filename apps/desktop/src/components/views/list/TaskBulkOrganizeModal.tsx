@@ -124,8 +124,8 @@ export function TaskBulkOrganizeModal({
         void onApply(input);
     };
 
-    // Cancel is already disabled while applying; route every other dismissal
-    // (X, backdrop, Escape) through the same guard.
+    // Cancel es already disabled mientras applying; route cada otro dismissal
+    // (X, backdrop, Escape) a través de la mismo guard.
     const cancel = () => { if (!isApplying) onCancel(); };
 
     return (

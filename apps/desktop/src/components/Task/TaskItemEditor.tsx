@@ -29,8 +29,8 @@ interface TaskItemEditorProps {
     draft: TaskDraft;
     setField: TaskDraftSetter;
     autoFocusTitle?: boolean;
-    // One seam for the whole AI característica: the editor forwards it to the menu
-    // and panel components and otherwise knows nothing about AI.
+    // One seam for la whole AI característica: la editor forwards it to la menu
+    // y panel components y otherwise knows nothing acerca de AI.
     ai: ReturnType<typeof useTaskItemAi>;
     timeEstimatesEnabled: boolean;
     projects: Project[];
@@ -124,7 +124,7 @@ export function TaskItemEditor({
     onSubmit,
     onFilesDropped,
 }: TaskItemEditorProps) {
-    // Draft values and setField bindings, under the names the form below was
+    // Draft values y setField bindings, bajo la names la form below was
     // written against.
     const {
         title: editTitle,
@@ -160,9 +160,9 @@ export function TaskItemEditor({
     const [organizationOpen, setOrganizationOpen] = useState(sectionOpenDefaults.organization);
     const [detailsOpen, setDetailsOpen] = useState(sectionOpenDefaults.details);
 
-    // Attachments puede live in any of the three collapsible sections (user
-    // configurable layout); a dropped file needs to expand whichever one
-    // holds it and scroll it into view so the drop isn't invisible feedback.
+    // Attachments puede live in any of la three collapsible sections (user
+    // configurable layout); a dropped archivo needs to expand whichever one
+    // holds it y scroll it en view por lo que la drop isn't invisible feedback.
     const attachmentsSection = findAttachmentsSection(schedulingFields, organizationFields, detailsFields);
     const attachmentsFieldRef = useRef<HTMLDivElement | null>(null);
     const [isFileDragOver, setIsFileDragOver] = useState(false);
@@ -176,8 +176,8 @@ export function TaskItemEditor({
         setIsFileDragOver(true);
     };
 
-    // dragleave also fires when the pointer crosses into a child element, which
-    // sería flicker the ring off for the whole drag if not guarded.
+    // dragleave también fires cuando la pointer crosses en a child element, which
+    // sería flicker la ring off for la whole drag si not guarded.
     const handleFormDragLeave = (event: DragEvent<HTMLFormElement>) => {
         const next = event.relatedTarget;
         if (next instanceof Node && event.currentTarget.contains(next)) return;
@@ -198,9 +198,9 @@ export function TaskItemEditor({
         if (attachmentsSection) setRevealAttachmentsToken((prev) => prev + 1);
     };
 
-    // Expanding a section and scrolling to it in the same tick scrolls to a
-    // node that isn't laid out yet; wait a frame after the open-estado actualizar
-    // has painted before scrolling.
+    // Expanding a section y scrolling to it in la mismo tick scrolls to a
+    // node que isn't laid out yet; wait a frame después de la open-estado actualizar
+    // has painted antes de scrolling.
     useEffect(() => {
         if (revealAttachmentsToken === 0) return;
         const raf = requestAnimationFrame(() => {

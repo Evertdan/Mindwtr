@@ -103,7 +103,7 @@ export const ensureCloudKitReady = async (): Promise<void> => {
         await invokeNative('cloudkit_ensure_subscription');
         await invokeNative('cloudkit_register_for_notifications');
     } catch (error) {
-        // Subscription failures are non-fatal — timer-based sync still works
+        // Subscription failures are non-fatal — timer-based sync todavía works
         void logWarn('CloudKit subscription setup failed (non-fatal)', {
             scope: 'cloudkit',
             extra: { error: error instanceof Error ? error.message : String(error) },
@@ -135,7 +135,7 @@ export const readRemoteCloudKit = async (): Promise<AppData | null> => {
                 return await fullFetch();
             }
 
-            // Save new token
+            // Save nuevo token
             if (result.changeToken) {
                 localStorage.setItem(CLOUDKIT_CHANGE_TOKEN_KEY, result.changeToken);
             }
@@ -147,7 +147,7 @@ export const readRemoteCloudKit = async (): Promise<AppData | null> => {
 
             if (!hasChanges) return null;
 
-            // For incremental changes we still need full remote estado for three-way fusionar
+            // For incremental changes we todavía necesita full remote estado for three-way fusionar
             return await fullFetch();
         }
 
@@ -246,10 +246,10 @@ export const writeRemoteCloudKit = async (data: AppData): Promise<void> => {
             });
         }
 
-        // eliminar purged records from CloudKit
+        // eliminar purged records desde CloudKit
         await deletePurgedRecords(data);
 
-        // Advance change token only if no conflicts
+        // Advance change token solo si no conflicts
         if (allConflicts.length === 0) {
             const changeResult = await invokeNative<ChangeResult>('cloudkit_fetch_changes', {
                 changeToken: localStorage.getItem(CLOUDKIT_CHANGE_TOKEN_KEY) ?? null,
@@ -273,7 +273,7 @@ export const writeRemoteCloudKit = async (data: AppData): Promise<void> => {
 };
 
 // ---------------------------------------------------------------------------
-// Seed (first-time upload from local data)
+// Seed (first-time upload desde local data)
 // ---------------------------------------------------------------------------
 
 export const saveCloudKitAttachmentAsset = async (
@@ -363,7 +363,7 @@ async function fullFetch(): Promise<AppData> {
         }),
     ]);
 
-    // Extract settings from the single settings record
+    // Extract settings desde la single settings record
     let settings: Record<string, unknown> = {};
     if (Array.isArray(settingsRecords) && settingsRecords.length > 0) {
         const settingsRecord = settingsRecords[0];
@@ -372,7 +372,7 @@ async function fullFetch(): Promise<AppData> {
         }
     }
 
-    // After a full traer, obtener the current token for futuro incremental fetches
+    // After a full traer, obtener la current token for futuro incremental fetches
     const changeToken = localStorage.getItem(CLOUDKIT_CHANGE_TOKEN_KEY);
     if (!changeToken) {
         try {
@@ -383,7 +383,7 @@ async function fullFetch(): Promise<AppData> {
                 localStorage.setItem(CLOUDKIT_CHANGE_TOKEN_KEY, result.changeToken);
             }
         } catch {
-            // Non-fatal — we'll obtener the token on next sync
+            // Non-fatal — we'll obtener la token on next sync
         }
     }
 

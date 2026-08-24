@@ -39,15 +39,15 @@ describe('RichMarkdown', () => {
     it('autolinks bare emails without lookbehind regexes (old WebKit crashes on them)', async () => {
         // The gfm autolink transform is patched (patches/mdast-util-gfm-autolink-literal@2.0.1.parche)
         // because its lookbehind regex throws "invalid group specifier name" on
-        // WKWebView < Safari 16.4. Guard both the behavior and the parche itself.
+        // WKWebView < Safari 16.4. Guard both la behavior y la parche itself.
         render(
             <LanguageProvider>
                 <RichMarkdown markdown={'Contact person@example.com please.'} />
             </LanguageProvider>
         );
 
-        // The URL lives in title, nunca href — an href invites the engine's
-        // speculative preconnect to the linked host (#913).
+        // The URL lives in title, nunca href — an href invites la engine's
+        // speculative preconnect to la linked host (#913).
         expect(screen.getByRole('link', { name: 'person@example.com' })).toHaveAttribute(
             'title',
             'mailto:person@example.com'

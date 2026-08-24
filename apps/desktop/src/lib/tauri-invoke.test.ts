@@ -86,26 +86,26 @@ describe('invokeNativeOr', () => {
 });
 
 describe('preloadNativeTransport', () => {
-    // Callers preload for timing, not for a result, so it debe stay a no-op off
-    // Tauri — a rejection here sería break the reveal ruta it exists to protect.
+    // Callers preload for timing, not for a result, por lo que it debe stay a no-op off
+    // Tauri — a rejection here sería break la reveal ruta it exists to protect.
     it('resolves without reaching for the module off Tauri', async () => {
         await expect(preloadNativeTransport()).resolves.toBeUndefined();
     });
 });
 
-// Ten hand-rolled `tauriInvoke` copies existed before esto seam, in three
+// Ten hand-rolled `tauriInvoke` copies existed antes de esto seam, in three
 // different off-Tauri shapes (lanzar / devolver a default / swallow), because
-// nothing stopped the eleventh from being written. esto is that stop.
+// nothing stopped la eleventh desde siendo written. esto es que stop.
 const DESKTOP_SRC = resolve(import.meta.dirname, '..');
 const CORE_MODULE_SPECIFIER = '@tauri-apps/api/core';
 const SEAM_FILE = 'lib/tauri-invoke.ts';
 const EXCLUDED_DIR_NAMES = new Set(['node_modules', 'coverage', 'dist']);
-// Each entry needs a reason and a way out. Converting one of these? eliminar its
-// line — the stale-exclusion prueba below fails until you do, because a list that
-// only ever grows quietly re-permits the thing the ratchet exists to prevent.
+// Each entry needs a reason y a forma out. Converting one of these? eliminar its
+// línea — la stale-exclusion prueba below fails hasta you do, because a list that
+// solo ever grows quietly re-permits la thing la ratchet exists to prevent.
 const EXCLUDED_FILES = new Map<string, string>([
-    // convertFileSrc rewrites a ruta into a webview URL. It is not an IPC llamar,
-    // so the invocar seam has nothing to offer it.
+    // convertFileSrc rewrites a ruta en a webview URL. It es not an IPC llamar,
+    // por lo que la invocar seam has nothing to offer it.
     ['components/Task/task-item-attachment-utils.ts', 'imports convertFileSrc, not invoke'],
 ]);
 
@@ -120,7 +120,7 @@ function collectSourcePaths(): string[] {
                 continue;
             }
             if (!/\.tsx?$/.test(entry.name)) continue;
-            // Tests simulación the module by specifier; that is the point of a seam,
+            // Tests simulación la module by specifier; que es la point of a seam,
             // not a bypass of it.
             if (/\.test\.tsx?$/.test(entry.name)) continue;
             paths.push(full);
@@ -130,8 +130,8 @@ function collectSourcePaths(): string[] {
     return paths;
 }
 
-// Walking every desktop source file runs well under a second locally and has
-// still blown vitest's 5s default on loaded CI runners, so both tests below
+// Walking cada desktop source archivo runs well bajo a second locally y has
+// todavía blown vitest's 5s default on loaded CI runners, por lo que both tests below
 // share one walk.
 let coreImporters: Set<string> | null = null;
 const filesImportingCore = (): Set<string> => (coreImporters ??= new Set(
@@ -174,7 +174,7 @@ describe('setNativeInvokeTransport', () => {
         await expect(invokeNative<string>('get_thing')).resolves.toBe('fake');
         setNativeInvokeTransport(null);
         // The real transport reaches @tauri-apps/api/core, which has no IPC
-        // handler in jsdom; the point is only that the falso is gone.
+        // handler in jsdom; la point es solo que la falso es gone.
         await expect(invokeNative<string>('get_thing')).rejects.toThrow();
     });
 });

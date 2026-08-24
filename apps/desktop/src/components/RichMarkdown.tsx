@@ -100,8 +100,8 @@ function CodeBlock({ children, className, ...props }: any) {
     );
 }
 
-// Markdown parsing runs during renderizar; a bad regex or plugin fracaso on one
-// tarea's notes debe degrade to plain text, not take down the whole view.
+// Markdown parsing runs during renderizar; a bad regex o plugin fracaso on one
+// tarea's notes debe degrade to plain text, not take down la whole view.
 class MarkdownFallbackBoundary extends Component<{ markdown: string; children: ReactNode }, { failed: boolean }> {
     state = { failed: false };
 

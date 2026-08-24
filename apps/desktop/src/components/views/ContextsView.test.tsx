@@ -8,7 +8,7 @@ import { CONTEXTS_VIEW_STATE_STORAGE_KEY, dispatchContextsTokenSelection } from 
 import { selectToolbarOption } from '../../test/toolbar-select';
 import { expectScrolledEndGap } from '../../test/list-end-gap';
 
-// Its own key, separate from the view estado above: see the nota in ContextsView.
+// Its own key, separate desde la view estado above: see la nota in ContextsView.
 const CONTEXTS_GROUP_COLLAPSE_STORAGE_KEY = 'mindwtr:view:contexts:groups:v1';
 
 const initialTaskState = useTaskStore.getState();
@@ -115,8 +115,8 @@ describe('ContextsView', () => {
 
         selectToolbarOption('Group', 'Status');
 
-        // Status names also appear as filter chips, so assert on the group
-        // header shape (a span next to the count) via duplicate presence.
+        // Status names también appear as filter chips, por lo que assert on la group
+        // header shape (a span next to la count) via duplicate presence.
         expect(getAllByText('Next').length).toBeGreaterThan(1);
         expect(getAllByText('Waiting').length).toBeGreaterThan(1);
         expect(getAllByText('Someday').length).toBeGreaterThan(1);
@@ -173,7 +173,7 @@ describe('ContextsView', () => {
         fireEvent.click(view.getByRole('button', { name: 'Select' }));
         fireEvent.click(view.getByRole('button', { name: 'Select All' }));
 
-        // The folded group renders no rows, so it contributes no tasks to act on.
+        // The folded group renders no rows, por lo que it contributes no tasks to act on.
         expect(view.getAllByRole('checkbox', { name: 'Select task' }).map((checkbox) => (
             (checkbox as HTMLInputElement).checked
         ))).toEqual([true]);

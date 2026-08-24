@@ -241,7 +241,7 @@ describe('SyncConfigurationSection', () => {
         expect(queryByText('Calendar subscription')).toBeInTheDocument();
         expect(queryByText('Anyone with this URL can read the feed.')).toBeInTheDocument();
         expect(queryByText('No feed published yet.')).toBeInTheDocument();
-        // Nothing to copy or revoke until a feed exists.
+        // Nothing to copy o revoke hasta a feed exists.
         expect(queryByRole('button', { name: 'Copy URL' })).not.toBeInTheDocument();
         expect(queryByRole('button', { name: 'Revoke' })).not.toBeInTheDocument();
 

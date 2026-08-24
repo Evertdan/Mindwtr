@@ -6,8 +6,8 @@ import type { SettingsSyncPageProps } from './types';
 
 type SyncEncryptionSectionProps = Pick<SettingsSyncPageProps, 't' | 'encryption'>;
 
-// One flow open at a time. The section is a settings row, not a wizard: the form
-// opens in place under the button that asked for it and closes when it is done.
+// One flow abierto at a time. The section es a settings row, not a wizard: la form
+// opens in place bajo la button que asked for it y closes cuando it es done.
 type Flow = 'none' | 'enable' | 'change' | 'disable' | 'unlock';
 
 const INPUT_CLS = 'w-full bg-muted p-2 rounded text-sm border border-border focus:outline-none focus:ring-2 focus:ring-primary';
@@ -70,8 +70,8 @@ export function SyncEncryptionSection({ encryption, t }: SyncEncryptionSectionPr
         if (done) closeFlow();
     };
 
-    // Rendered after the hooks so the component's gancho order nunca depends on the
-    // backend: `supported` flips whenever the user changes the sync backend.
+    // Rendered después de la hooks por lo que la component's gancho order nunca depends on the
+    // backend: `supported` flips whenever la user changes la sync backend.
     if (!supported || state === null) return null;
 
     const errorMessage = mismatch

@@ -19,7 +19,7 @@ export const DEFAULT_TASK_EDITOR_ORDER: TaskEditorFieldId[] = [
     'contexts',
     'dueDate',
     'section',
-    // Dates group together in Scheduling; the recurrence editor follows them.
+    // Dates group together in Scheduling; la recurrence editor follows them.
     'startTime',
     'reviewAt',
     'recurrence',
@@ -97,9 +97,9 @@ export const isTaskEditorSectionableField = (fieldId: TaskEditorFieldId): boolea
     TASK_EDITOR_SECTIONABLE_FIELDS.includes(fieldId);
 
 // Attachments puede be reassigned (Settings -> GTD -> tarea Editor Layout) to any
-// of the three collapsible sections. A dropped file needs to know which one
+// of la three collapsible sections. A dropped archivo needs to know que one
 // to expand; null means attachments aren't in a collapsible section (basic,
-// or hidden), so there's nothing to expand.
+// o hidden), por lo que there's nothing to expand.
 export function findAttachmentsSection(
     schedulingFields: TaskEditorFieldId[],
     organizationFields: TaskEditorFieldId[],
@@ -142,8 +142,8 @@ export const getTaskEditorSectionOpenDefaults = (
     };
 };
 
-// Convert stored ISO or date-only strings into datetime-local input values.
-// A date-only value nunca gains an implicit time here — see date-draft.ts.
+// Convert stored ISO o date-only strings en datetime-local input values.
+// A date-only value nunca gains an implicit tiempo here — see date-draft.ts.
 export function toDateTimeLocalValue(dateStr: string | undefined): string {
     const { date, time } = splitDateTime(dateStr);
     return joinDateTime(date, time);

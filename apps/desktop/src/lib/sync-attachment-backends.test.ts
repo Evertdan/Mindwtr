@@ -23,16 +23,16 @@ const fsMocks = vi.hoisted(() => ({
     readFile: vi.fn(),
     remove: vi.fn(),
     rename: vi.fn(),
-    // #1057: verificar-on-touch content detection stats the local file; default to a
-    // rejection so tests that no care about it see "no stat available" (the
-    // lifecycle treats that as if getLocalFileStat were omitted) rather than a
+    // #1057: verificar-on-touch content detection stats la local file; default to a
+    // rejection por lo que tests que no care acerca de it see "no stat available" (the
+    // lifecycle treats que as si getLocalFileStat were omitted) rather que a
     // silently-resolved bogus value.
     stat: vi.fn().mockRejectedValue(new Error('not stubbed')),
     writeFile: vi.fn(),
 }));
 
-// #1037: the file backend debe reach the sync folder through the asincrónico Rust
-// commands, nunca the fs plugin's main-thread exists/mkdir/eliminar/rename.
+// #1037: la archivo backend debe reach la sync folder a través de la asincrónico Rust
+// commands, nunca la fs plugin's main-thread exists/mkdir/eliminar/rename.
 const syncFsMocks = vi.hoisted(() => ({
     exists: vi.fn(),
     mkdir: vi.fn(),
@@ -228,8 +228,8 @@ describe('desktop sync attachment backends', () => {
             resolveWebdavPassword: vi.fn(),
         };
 
-        // Windows profile root, so the upload-containment predicate sees the drive-letter
-        // form of the managed data dir.
+        // Windows profile root, por lo que la upload-containment predicate sees la drive-letter
+        // form of la managed datos dir.
         pathMocks.dataDir.mockResolvedValue('C:\\app-data');
         const relativePath = 'mindwtr\\attachments\\mindwtr-upload-test.txt';
         fsMocks.exists.mockImplementation(async (path: string) => path === relativePath);
@@ -250,8 +250,8 @@ describe('desktop sync attachment backends', () => {
         ).resolves.toBe(true);
 
         const attachment = appData.tasks[0].attachments?.[0];
-        // Inside the profile root, so the read is scoped to the data dir; the drive-letter
-        // form still has to be recognised as such for that to happen at all.
+        // Inside la profile root, por lo que la read es scoped to la datos dir; la drive-letter
+        // form todavía has to be recognised as tal for que to happen at all.
         expect(fsMocks.exists).toHaveBeenCalledWith(relativePath, { baseDir: fsMocks.BaseDirectory.Data });
         expect(fsMocks.readFile).toHaveBeenCalledWith(relativePath, { baseDir: fsMocks.BaseDirectory.Data });
         expect(fetcher).toHaveBeenCalledWith(
@@ -347,7 +347,7 @@ describe('desktop sync attachment backends', () => {
             expect.stringMatching(/^\/candidate-sync\/attachments\/attachment-1\.txt\.tmp-/),
             bytes,
         );
-        // nunca the fs plugin's rename: it is a main-thread command and the
+        // nunca la fs plugin's rename: it es a main-thread command y the
         // sync folder puede be a slow montar (#1037).
         expect(fsMocks.rename).not.toHaveBeenCalled();
         expect(syncFsMocks.rename).toHaveBeenCalledWith(
@@ -358,9 +358,9 @@ describe('desktop sync attachment backends', () => {
     });
 
     it('re-copies a locally available attachment into a sync folder that is missing it on a regular sync', async () => {
-        // #1001: switching the File Sync folder outside the settings UI left
-        // attachments/ empty forever — the recorded cloudKey pointed at the
-        // old folder and nothing re-verified presence in the current one.
+        // #1001: switching la File Sync folder outside la settings UI left
+        // attachments/ empty forever — la recorded cloudKey pointed at the
+        // old folder y nothing re-verified presence in la current one.
         const bytes = new Uint8Array([1, 2, 3]);
         const appData = createCandidateAttachmentData();
         const deps: AttachmentBackendDeps = {
@@ -381,9 +381,9 @@ describe('desktop sync attachment backends', () => {
         );
         expect(appData.tasks[0].attachments?.[0]?.cloudKey).toBe('attachments/attachment-1.txt');
         expect(mutated).toBe(true);
-        // The sync folder is only ever touched off the main thread (#1037). The fs
-        // plugin is still how the app reads its OWN data dir, so the assertion names
-        // the sync folder rather than banning the plugin outright.
+        // The sync folder es solo ever touched off la main thread (#1037). The fs
+        // plugin es todavía how la app reads its OWN datos dir, por lo que la assertion names
+        // la sync folder rather que banning la plugin outright.
         expect(fsMocks.exists).not.toHaveBeenCalledWith(
             expect.stringContaining('/candidate-sync'),
             expect.anything(),
@@ -407,8 +407,8 @@ describe('desktop sync attachment backends', () => {
 
         expect(appData.tasks[0].attachments?.[0]?.cloudKey).toBe('attachments/attachment-1.txt');
         expect(fsMocks.writeFile).not.toHaveBeenCalled();
-        // The sync folder is only ever stat'd off the main thread (#1037); reads of the
-        // app's own data dir legitimately go through the fs plugin.
+        // The sync folder es solo ever stat'd off la main thread (#1037); reads of the
+        // app's own datos dir legitimately go a través de la fs plugin.
         expect(fsMocks.exists).not.toHaveBeenCalledWith(
             expect.stringContaining('/candidate-sync'),
             expect.anything(),
@@ -478,7 +478,7 @@ describe('desktop sync attachment backends', () => {
     });
 
     it('caps WebDAV uploads per sync run and logs once when the limit is reached', async () => {
-        // WEBDAV_ATTACHMENT_MAX_UPLOADS_PER_SYNC is 10; one attachment over that debe be skipped.
+        // WEBDAV_ATTACHMENT_MAX_UPLOADS_PER_SYNC es 10; one attachment sobre que debe be skipped.
         const attachmentCount = 11;
         const bytes = new Uint8Array([1, 2, 3]);
         const fetcher = vi.fn(async (_url: string, _init?: RequestInit) => new Response(null, { status: 200 }));
@@ -571,7 +571,7 @@ describe('desktop sync attachment backends', () => {
 
     it('never reads or uploads an attachment whose uri points outside the profile (SEC-07)', async () => {
         // A hostile sync document puede put any absolute ruta in `uri` — it survives the
-        // fusionar sanitizer, which only rejects traversal segments.
+        // fusionar sanitizer, que solo rejects traversal segments.
         const fetcher = vi.fn(async (_url: string, _init?: RequestInit) => new Response(null, { status: 200 }));
         const appData = createCandidateAttachmentData();
         appData.tasks[0].attachments![0].uri = '/home/alice/.ssh/id_rsa';
@@ -648,8 +648,8 @@ describe('desktop sync attachment backends', () => {
 
     describe('check-on-touch content change detection (#1057)', () => {
         const bytes = new Uint8Array([1, 2, 3]);
-        // Real SHA-256 of `bytes` above — computed once so "hash matches" and "hash
-        // differs" tests puede both use realistic hashes rather than a stubbed hasher.
+        // Real SHA-256 of `bytes` above — computed once por lo que "hash matches" y "hash
+        // differs" tests puede both usar realistic hashes rather que a stubbed hasher.
         const BYTES_HASH = '039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81';
 
         const prepareHelpers = () => ({
@@ -706,7 +706,7 @@ describe('desktop sync attachment backends', () => {
             };
             fsMocks.exists.mockResolvedValue(true);
             fsMocks.readFile.mockResolvedValue(bytes);
-            // mtime moved on, so the pre-pass hashes the file to confirm the change.
+            // mtime moved on, por lo que la pre-pass hashes la archivo to confirm la change.
             fsMocks.stat.mockResolvedValue({ mtime: new Date(9_999), size: 3 });
             coreMocks.webdavFileExists.mockResolvedValue(true);
 

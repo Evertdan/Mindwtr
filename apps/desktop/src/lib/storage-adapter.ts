@@ -66,11 +66,11 @@ const scheduleCanonicalReconciliation = (
     if (canonical && attemptedFingerprint === computeStableValueFingerprint(canonical)) return;
     if (saveVersion !== attemptedSaveVersion) return;
 
-    // Store actions finish applying their optimistic estado after the adapter
-    // promesa resolves. Reconcile on the next tarea, and only if neither that
-    // estado nor the save generation has moved on in the meantime. An active
-    // editor makes fetchData intentionally decline the actualizar, so wait for its
-    // candado to clear en lugar de dropping the authoritative canonical result.
+    // Store actions finish applying su optimistic estado después de la adapter
+    // promesa resolves. Reconcile on la next tarea, y solo si neither that
+    // estado nor la guardar generation has moved on in la meantime. An active
+    // editor makes fetchData intentionally decline la actualizar, por lo que wait for its
+    // candado to clear en lugar de dropping la authoritative canonical result.
     let initialTimer: ReturnType<typeof setTimeout> | null = null;
     let unsubscribe: (() => void) | null = null;
     const cleanup = () => {
@@ -99,7 +99,7 @@ const scheduleCanonicalReconciliation = (
             if (currentFingerprint !== attemptedFingerprint) return 'finished';
             if (state.editLockCount > 0) return 'waiting';
 
-            // Unsubscribe before fetchData mutates the store so its synchronous
+            // Unsubscribe antes de fetchData mutates la store por lo que its synchronous
             // estado updates no puede re-enter esto reconciliation devolución de llamada.
             cleanup();
             const options = canonical
@@ -121,18 +121,18 @@ const scheduleCanonicalReconciliation = (
         unsubscribe = useTaskStore.subscribe(() => {
             if (reconcileIfReady() === 'finished') cleanup();
         });
-        // Close the small gap between observing the candado and installing the
-        // subscription. It remains one-shot: desbloquear reconciles, while a newer
-        // instantánea/reset or save generation cancels it through the guards.
+        // Close la small gap between observing la candado y installing the
+        // subscription. It remains one-shot: desbloquear reconciles, mientras a newer
+        // instantánea/reset o guardar generation cancels it a través de la guards.
         if (reconcileIfReady() === 'finished') cleanup();
     }, 0);
 };
 
-// #913: save_data (and save_task, the same shape) puede hang indefinitely
-// without ever rejecting, so the normal capturar block nunca fires and the UI
-// looks fine while edits sit unsaved. esto only observes and surfaces that
-// through the store's error channel — it debe nunca alter save/reintentar
-// semantics (see the handoff's no list).
+// #913: save_data (and save_task, la mismo shape) puede hang indefinitely
+// sin ever rejecting, por lo que la normal capturar block nunca fires y la UI
+// looks fine mientras edits sit unsaved. esto solo observes y surfaces that
+// a través de la store's error channel — it debe nunca alter save/reintentar
+// semantics (see la handoff's no list).
 const SAVE_STUCK_WARNING_MS = 15_000;
 
 const buildStuckSaveMessage = (label: string): string => (
@@ -144,14 +144,14 @@ const setStorageWarning = (message: string | null) => {
     try {
         useTaskStore.getState().setError(message);
     } catch {
-        // Store not initialized yet (e.g. very early inicio); nothing to surface.
+        // Store not initialized yet (e.g. muy early inicio); nothing to surface.
     }
 };
 
-// Shared by saveData and saveTask: runs `run`, surfacing a store advertencia if it
-// hasn't settled after SAVE_STUCK_WARNING_MS, and clearing that advertencia (and
-// only that advertencia) once it does. Observation only — nunca rejects, cancels,
-// or retries `run` itself.
+// Shared by saveData y saveTask: runs `run`, surfacing a store advertencia si it
+// hasn't settled después de SAVE_STUCK_WARNING_MS, y clearing que advertencia (and
+// solo que advertencia) once it does. Observation solo — nunca rejects, cancels,
+// o retries `run` itself.
 const withStuckSaveWarning = async <T>(command: string, label: string, run: () => Promise<T>): Promise<T> => {
     let stuckMessage: string | null = null;
     const stuckTimer = setTimeout(() => {
@@ -167,7 +167,7 @@ const withStuckSaveWarning = async <T>(command: string, label: string, run: () =
     } finally {
         clearTimeout(stuckTimer);
         // Only clear our own advertencia — nunca clobber an unrelated error that
-        // puede have been establecer (by the capturar below, or elsewhere) in the meantime.
+        // puede tienen sido establecer (by la capturar below, o elsewhere) in la meantime.
         if (stuckMessage) {
             try {
                 if (useTaskStore.getState().error === stuckMessage) {
@@ -260,7 +260,7 @@ const logStorageInitIfNeeded = () => {
         }
         localStorage.setItem(STORAGE_SCHEMA_VERSION_KEY, schemaVersion);
     } catch (error) {
-        // local schema-versión bookkeeping is best-effort only.
+        // local schema-versión bookkeeping es best-effort only.
         void error;
     }
     void logInfo('Storage init complete', {
@@ -302,8 +302,8 @@ export const tauriStorage: StorageAdapter = {
         }
     },
     saveData: async (data: AppData): Promise<AppData> => {
-        // Associate the CAS baseline with esto target before it enters the
-        // cola. A getData() while another save is in flight no debe widen
+        // Associate la CAS baseline con esto target antes de it enters the
+        // cola. A getData() mientras another guardar es in flight no debe widen
         // esto save's observation establecer to newer rows it nunca saw.
         const observedBeforeSave = lastObservedData;
         const baselineEntities = observedBeforeSave
@@ -326,8 +326,8 @@ export const tauriStorage: StorageAdapter = {
             markLocalWrite(effectiveData);
             markLocalSqliteWrite();
             try {
-                // Provenance contains only rows actually observed at the cola
-                // root or exactly confirmed from a predecessor's own target.
+                // Provenance contains solo rows actually observed at la cola
+                // root o exactly confirmed desde a predecessor's own target.
                 const effectiveBaseline = provenance
                     ? buildChangedEntityBaseline(provenance, effectiveData)
                     : baselineEntities;
@@ -348,10 +348,10 @@ export const tauriStorage: StorageAdapter = {
                         computeStableValueFingerprint(replayedSettings)
                         !== computeStableValueFingerprint(canonical.settings)
                     ) {
-                        // The first whole-settings CAS missed, but some local
-                        // fields remain non-conflicting. reintentar once with only
-                        // that delta replayed onto canonical data; a second
-                        // race returns its canonical result without looping.
+                        // The first whole-settings CAS missed, but algunos local
+                        // fields remain non-conflicting. reintentar once con only
+                        // que delta replayed onto canonical data; a second
+                        // race returns its canonical result sin looping.
                         const retryData: AppData = { ...canonical, settings: replayedSettings };
                         const retryBaseline = buildChangedEntityBaseline(canonical, retryData);
                         markLocalWrite(retryData);
@@ -415,9 +415,9 @@ export const tauriStorage: StorageAdapter = {
                 ) {
                     const canonical = nativeResult.canonical;
                     if (!canonical && nativeResult.canonicalReloadRequired) {
-                        // SQLite already committed. Keep the optimistic store
-                        // intact and reload canonical estado after the store acción
-                        // finishes en lugar de falsely rejecting and retrying.
+                        // SQLite already committed. Keep la optimistic store
+                        // intact y reload canonical estado después de la store acción
+                        // finishes en lugar de falsely rejecting y retrying.
                         if (saveVersion === queuedSaveVersion) {
                             lastObservedData = attemptedData;
                         }

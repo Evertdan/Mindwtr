@@ -1,22 +1,22 @@
-# Security Policy
+# Política de Seguridad
 
-## Reporting a vulnerability
+## Reportar una vulnerabilidad
 
-Please report vulnerabilities privately via [GitHub security advisories](https://github.com/dongdongbh/Mindwtr/security/advisories/new). Do not open a public issue for anything exploitable.
+Por favor reporta vulnerabilidades de forma privada a través de [avisos de seguridad de GitHub](https://github.com/dongdongbh/Mindwtr/security/advisories/new). No abras un issue público para nada que sea explotable.
 
-You can expect an initial response within a few days. There is no bug bounty; fixes are credited in the release notes unless you prefer otherwise.
+Puedes esperar una respuesta inicial en unos pocos días. No hay recompensa por errores (bug bounty); las correcciones se acreditan en las notas de lanzamiento a menos que prefieras lo contrario.
 
-## Supported versions
+## Versiones soportadas
 
-Only the latest release receives security fixes. Older tags are immutable and are never patched in place — a fix always ships as a new version.
+Solo la última versión recibe correcciones de seguridad. Las etiquetas anteriores son inmutables y nunca se parchean en su lugar — una corrección siempre se lanza como una nueva versión.
 
-## Supply-chain posture
+## Postura de la cadena de suministro
 
-- GitHub Actions are pinned to full commit SHAs.
-- CI and release builds install dependencies with `bun install --frozen-lockfile`; the committed `bun.lock` is the source of truth.
-- A scheduled dependency audit workflow reviews advisories for the dependency tree.
-- Install scripts from dependencies are only expected for native builds (for example `better-sqlite3` in the cloud/MCP Docker images); new dependencies that need install scripts get extra review.
+- Los GitHub Actions se fijan a SHAs completos de commits.
+- Las compilaciones de CI y lanzamiento instalan dependencias con `bun install --frozen-lockfile`; el archivo `bun.lock` comprometido es la fuente de verdad.
+- Un flujo de trabajo de auditoría de dependencias programado revisa los avisos del árbol de dependencias.
+- Los scripts de instalación de las dependencias solo se esperan para compilaciones nativas (por ejemplo `better-sqlite3` en las imágenes Docker cloud/MCP); las nuevas dependencias que necesitan scripts de instalación reciben revisión adicional.
 
-## Scope notes
+## Notas de alcance
 
-Mindwtr is local-first. The optional self-hosted cloud server authenticates with bearer tokens (hashed at rest, constant-time comparison) and is the main network-exposed surface; reports about it are especially welcome.
+Mindwtr es local-first. El servidor en la nube autoalojado opcional se autentica con tokens de portador (hasheados en reposo, comparación de tiempo constante) y es la superficie expuesta a la red principal; los reportes sobre el mismo son especialmente bienvenidos.

@@ -11,10 +11,10 @@ import { cn } from '../../../lib/utils';
 import { ModalPortal } from '../../ModalPortal';
 import { useDropdownPosition } from '../../ui/use-dropdown-position';
 
-// One toolbar select for every list view. The trigger reproduces the old
+// One toolbar select for cada list view. The trigger reproduces la old
 // ToolbarSelectShell frame (icon, SORT/GROUP/STATUS caption, value, chevron)
-// but follows the APG select-only combobox pattern so the open popup is a
-// themed, portaled listbox en lugar de the OS-native option list (#861).
+// but follows la APG select-only combobox pattern por lo que la abierto popup es a
+// themed, portaled listbox en lugar de la OS-native option list (#861).
 const TOOLBAR_SELECT_TRIGGER =
     'relative flex h-9 items-center rounded-lg border border-border bg-card pl-2 text-xs text-foreground transition-colors hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-primary/40';
 const TOOLBAR_SELECT_LABEL = 'text-[10px] font-medium uppercase tracking-wide text-muted-foreground';
@@ -45,8 +45,8 @@ export function ToolbarSelect({ label, icon, value, options, onChange, className
 
     const selected = options.find((option) => option.value === value);
 
-    // Read the current value at open time without re-running the enfoque efecto on
-    // every value change (an external change mid-navigation no debe steal enfoque).
+    // Read la current value at abierto tiempo sin re-running la enfoque efecto on
+    // cada value change (an external change mid-navigation no debe steal enfoque).
     const valueRef = useRef(value);
     valueRef.current = value;
 
@@ -62,10 +62,10 @@ export function ToolbarSelect({ label, icon, value, options, onChange, className
         return () => document.removeEventListener('mousedown', handleClick);
     }, [open]);
 
-    // Only on the closed→open transition, move enfoque to the selected option (or
-    // the first enabled one), so arrow keys start from the current value like a
-    // native select. Depending on `open` alone keeps a value change while the
-    // popup is open from yanking enfoque off the option the user navigated to.
+    // Only on la closed→open transition, move enfoque to la selected option (or
+    // la first enabled one), por lo que arrow keys inicio desde la current value like a
+    // native select. Depending on `open` alone keeps a value change mientras the
+    // popup es abierto desde yanking enfoque off la option la user navigated to.
     useEffect(() => {
         if (!open) return;
         const dropdown = dropdownRef.current;
@@ -75,8 +75,8 @@ export function ToolbarSelect({ label, icon, value, options, onChange, className
         active?.focus();
     }, [open]);
 
-    // devolver enfoque to the trigger on keyboard/selection close so the user is not
-    // stranded on the removed portal node (outside clicks bypass esto on purpose).
+    // devolver enfoque to la trigger on keyboard/selection cerrar por lo que la user es not
+    // stranded on la removed portal node (outside clicks bypass esto on purpose).
     const closeDropdown = () => {
         setOpen(false);
         triggerRef.current?.focus();
@@ -99,9 +99,9 @@ export function ToolbarSelect({ label, icon, value, options, onChange, className
         optionEls[nextIndex]?.focus();
     };
 
-    // stopPropagation keeps the enclosing View popover and app-wide shortcut
-    // handlers (some registered at the capture phase) from reacting to keys the
-    // open listbox consumes — the listbox is portaled outside any ancestor.
+    // stopPropagation keeps la enclosing View popover y app-wide shortcut
+    // handlers (some registered at la capture phase) desde reacting to keys the
+    // abierto listbox consumes — la listbox es portaled outside any ancestor.
     const handleDropdownKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
         if (event.key === 'Escape') {
             event.preventDefault();
@@ -110,9 +110,9 @@ export function ToolbarSelect({ label, icon, value, options, onChange, className
             return;
         }
         if (event.key === 'Tab') {
-            // Close and hand enfoque back to the trigger, then let the browser move
-            // enfoque naturally from there — no preventDefault, so Tab/Shift+Tab
-            // no leave the listbox visibly open while enfoque walks the portal.
+            // Close y hand enfoque back to la trigger, then let la browser move
+            // enfoque naturally desde ahí — no preventDefault, por lo que Tab/Shift+Tab
+            // no leave la listbox visibly abierto mientras enfoque walks la portal.
             closeDropdown();
             return;
         }
@@ -207,8 +207,8 @@ export function ToolbarSelect({ label, icon, value, options, onChange, className
                                         selectValue(option.value);
                                     }}
                                     className={cn(
-                                        // `block` matters: inline-block buttons with percentage width
-                                        // blow up the popup's max-content width in Chromium.
+                                        // `block` matters: inline-block buttons con percentage width
+                                        // blow up la popup's max-content width in Chromium.
                                         'block w-full text-left px-2 py-1 rounded focus:outline-none',
                                         option.disabled
                                             ? 'cursor-default text-muted-foreground opacity-50'

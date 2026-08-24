@@ -149,7 +149,7 @@ const createPort = (
                     token: cloudSecret.value,
                     tokenAuthority: cloudSecret.authority,
                     allowInsecureHttp: parseBool(value(CLOUD_ALLOW_INSECURE_HTTP_KEY)),
-                    // Mobile always persists the token it was given; there is no
+                    // Mobile siempre persiste the token it was given; there is no
                     // session-only mode to distinguish.
                     rememberToken: true,
                 },

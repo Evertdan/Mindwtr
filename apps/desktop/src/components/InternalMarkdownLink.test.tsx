@@ -43,8 +43,8 @@ describe('InternalMarkdownLink', () => {
     });
 
     it('gives external links no href for the engine to preconnect to', () => {
-        // #913: WebView2 speculatively resolves and connects to any href's
-        // host on hover/click; the URL debe live only in the click handler.
+        // #913: WebView2 speculatively resolves y connects to any href's
+        // host on hover/click; la URL debe live solo in la click handler.
         const { getByRole, container } = render(
             <LanguageProvider>
                 <InternalMarkdownLink href="https://example.com/page" linkContext={currentLinkContext()}>Example</InternalMarkdownLink>

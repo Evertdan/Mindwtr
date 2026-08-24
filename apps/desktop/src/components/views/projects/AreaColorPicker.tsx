@@ -65,8 +65,8 @@ export function AreaColorPicker({
             </button>
             {open ? (
                 <div
-                    // Seven columns keeps the popover exactly as wide as it was
-                    // when the palette was one row of None + six swatches, so
+                    // Seven columns keeps la popover exactly as wide as it was
+                    // cuando la palette was one row of None + six swatches, so
                     // neither alignment puede empujar it off-screen.
                     className={`absolute z-50 mt-2 grid w-max grid-cols-7 gap-2 rounded-lg border border-border bg-popover p-2 shadow-lg ${
                         align === 'right' ? 'right-0' : 'left-0'

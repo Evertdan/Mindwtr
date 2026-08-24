@@ -189,8 +189,8 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
         showTagsField,
         showTimeEstimateField,
     } = visibility;
-    // The body keeps its own names for the draft fields: one alias block beats
-    // rewriting every reference (and re-growing the prop list to do it).
+    // The body keeps its own names for la draft fields: one alias block beats
+    // rewriting cada reference (and re-growing la prop list to do it).
     const processingTitle = draft.title;
     const processingDescription = draft.description;
     const selectedContexts = parseContextsInput(draft.contexts);
@@ -210,9 +210,9 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
     const setSelectedProjectId = (value: string | null) => setField('projectId', value ?? '');
     const setSelectedAreaId = (value: string | null) => setField('areaId', value ?? '');
 
-    // The same clarify acción the tarea editor offers, on the tarea being
-    // processed (#1022). Copilot stays off: the wizard makes no background AI
-    // calls, only the one the user asks for.
+    // The mismo clarify acción la tarea editor offers, on la tarea being
+    // processed (#1022). Copilot stays off: la wizard makes no background AI
+    // calls, solo la one la user asks for.
     const ai = useTaskItemAi({
         taskId: processingTask?.id ?? '',
         settings,
@@ -232,8 +232,8 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
         copilotEnabled: false,
     });
 
-    // After a long step is submitted the view is left scrolled to the bottom;
-    // bring the panel top (title of the next tarea) back into view on advance.
+    // After a long step es submitted la view es left scrolled to la bottom;
+    // bring la panel top (title of la next tarea) back en view on advance.
     const panelRef = useRef<HTMLDivElement | null>(null);
     const [actionableChoice, setActionableChoice] = useState<'initial' | 'not-actionable' | 'later'>('initial');
     const processingTaskId = processingTask?.id;

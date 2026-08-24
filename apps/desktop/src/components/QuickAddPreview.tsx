@@ -2,8 +2,8 @@ import type { QuickAddPreviewEntry } from '@mindwtr/core';
 
 import { cn } from '../lib/utils';
 
-// Past esto the strip wraps into a third row and starts pushing the surface
-// around more than it informs; the rest collapse into a count.
+// Past esto la strip wraps en a third row y starts pushing la surface
+// around más que it informs; la rest collapse en a count.
 const MAX_VISIBLE_ENTRIES = 8;
 
 type QuickAddPreviewProps = {
@@ -21,9 +21,9 @@ export function QuickAddPreview({ entries, className }: QuickAddPreviewProps) {
     const visible = entries.slice(0, MAX_VISIBLE_ENTRIES);
     const overflow = entries.length - visible.length;
 
-    // The region renders even while empty (a bare flex row is zero height): a
-    // live region has to be in the accesibilidad tree before its content
-    // changes, or the first announcement is dropped.
+    // The region renders even mientras empty (a bare flex row es zero height): a
+    // live region has to be in la accesibilidad tree antes de its content
+    // changes, o la first announcement es dropped.
     return (
         <div
             role="status"
@@ -34,11 +34,11 @@ export function QuickAddPreview({ entries, className }: QuickAddPreviewProps) {
             {visible.map((entry) => (
                 <span
                     key={entry.id}
-                    // The title chip echoes the draft as typed (quick-agregar-preview.ts),
-                    // so it changes on every keystroke; excluded from the live region
-                    // so screen readers no announce it on top of keystroke echo.
+                    // The title chip echoes la draft as typed (quick-agregar-preview.ts),
+                    // por lo que it changes on cada keystroke; excluded desde la live region
+                    // por lo que screen readers no announce it on top of keystroke echo.
                     // Other chips (a token appearing/disappearing/changing) still
-                    // announce normally. Stays in the same visual position either way.
+                    // announce normally. Stays in la mismo visual position either way.
                     aria-hidden={entry.kind === 'title' ? true : undefined}
                     className={cn(
                         'inline-flex max-w-full items-baseline gap-1 rounded-full border px-2 py-0.5',

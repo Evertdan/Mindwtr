@@ -113,90 +113,90 @@ Mindwtr is simple by default and powerful when you need it:
 - Fewer fields, fewer knobs, fewer distractions.
 - Clarity beats clutter: we say no to feature creep.
 
-## Features
+## Características
 
-- The full GTD loop, guided: capture, sort, do, review.
-- Focus view puts today's schedule and your next actions on one screen.
-- Your data lives on your device. Sync is optional, and you pick where: iCloud on Apple devices, Dropbox, a shared folder, your own server, or WebDAV.
-- Projects with sections, areas, and manual task ordering for bigger plans.
-- Import tasks from your Obsidian notes, with links back to the source (desktop).
-- Optional AI helper: connect your own OpenAI, Gemini, or Claude account, or run a private AI on your own computer. Off by default.
-- Apps for Windows, macOS, Linux, iPhone, and Android, plus a web app that works offline.
-- For developers: a local REST API, a CLI, and the [`mindwtr-mcp`](https://www.npmjs.com/package/mindwtr-mcp) server so AI assistants can manage your tasks.
+- El ciclo GTD completo, guiado: capturar, clasificar, hacer, revisar.
+- La vista Focus pone el calendario de hoy y tus siguientes acciones en una pantalla.
+- Tus datos viven en tu dispositivo. La sincronización es opcional, y tú eliges dónde: iCloud en dispositivos Apple, Dropbox, una carpeta compartida, tu propio servidor, o WebDAV.
+- Proyectos con secciones, áreas y orden manual de tareas para planes más grandes.
+- Importa tareas desde tus notas de Obsidian, con enlaces de vuelta a la fuente (escritorio).
+- Asistente de IA opcional: conecta tu propia cuenta de OpenAI, Gemini o Claude, o ejecuta una IA privada en tu propio ordenador. Desactivada por defecto.
+- Aplicaciones para Windows, macOS, Linux, iPhone y Android, más una aplicación web que funciona sin conexión.
+- Para desarrolladores: una API REST local, una CLI, y el servidor [`mindwtr-mcp`](https://www.npmjs.com/package/mindwtr-mcp) para que los asistentes de IA gestionen tus tareas.
 
 [![MCP Toplist](https://mcptoplist.com/badge/io.github.dongdongbh%2Fmindwtr.svg)](https://mcptoplist.com/server/io.github.dongdongbh%2Fmindwtr)
 
 <details>
-<summary>See all features</summary>
+<summary>Ver todas las características</summary>
 
-### GTD Workflow
+### Flujo de trabajo GTD
 
-- **Capture** - Quick add tasks from anywhere (global hotkey popup, tray, share sheet, voice)
-- **Clarify** - Guided inbox processing with 2-minute rule
-- **Organize** - Projects, sections, contexts, and status lists
-- **Reflect** - Weekly review wizard with reminders
-- **Engage** - Context-filtered next actions
-- **AI Assist (Optional)** - Clarify, break down, and review with your own AI account (OpenAI, Gemini, Claude) or a local/self-hosted OpenAI-compatible model
+- **Capturar** - Añadir tareas rápidamente desde cualquier lugar (ventana de acceso rápido global, bandeja, hoja de compartir, voz)
+- **Aclarar** - Procesamiento guiado de la bandeja de entrada con regla de 2 minutos
+- **Organizar** - Proyectos, secciones, contextos y listas de estado
+- **Reflexionar** - Asistente de revisión semanal con recordatorios
+- **Participar** - Siguientes acciones filtradas por contexto
+- **Asistencia de IA (Opcional)** - Aclarar, desglosar y revisar con tu propia cuenta de IA (OpenAI, Gemini, Claude) o un modelo compatible con OpenAI local/autohospedado
 
-### Views
+### Vistas
 
-- 📥 **Inbox** - Capture zone with processing wizard
-- 🎯 **Focus** - Agenda (time-based) + Next Actions in one view
-- 📁 **Projects** - Multi-step outcomes with sections, areas, and manual task ordering
-- 🏷️ **Contexts** - Tag tasks by where or how you get them done; nested contexts like @work/meetings also match @work
-- ⏳ **Waiting For** - Delegated items
-- 💭 **Someday/Maybe** - Deferred ideas
-- 📅 **Calendar** - Time-based planning with adjustable mobile week density
-- 📋 **Board** - Kanban-style drag-and-drop
-- 📝 **Review** - Daily + weekly review workflows
-- 📦 **Archived** - Hidden history, searchable when needed
+- 📥 **Bandeja de entrada** - Zona de captura con asistente de procesamiento
+- 🎯 **Focus** - Agenda (basada en tiempo) + Siguientes acciones en una vista
+- 📁 **Proyectos** - Resultados de múltiples pasos con secciones, áreas y orden manual de tareas
+- 🏷️ **Contextos** - Etiqueta tareas según dónde o cómo las realizas; contextos anidados como @work/meetings también coinciden con @work
+- ⏳ **Esperando por** - Elementos delegados
+- 💭 **Algún día/Tal vez** - Ideas diferidas
+- 📅 **Calendario** - Planificación basada en tiempo con densidad de semana móvil ajustable
+- 📋 **Tablero** - Estilo Kanban con arrastrar y soltar
+- 📝 **Revisión** - Flujos de revisión diaria + semanal
+- 📦 **Archivado** - Historial oculto, buscable cuando sea necesario
 
-### Productivity Features
+### Características de productividad
 
-- 🔍 **Global Search** - Search all areas globally with operators (`status:`, `context:`, `assigned:`, `location:`, `where:`, `id:`, `-id:`, `due:<=7d`)
-- 📦 **Bulk Actions** - Multi-select, batch move/tag/delete
-- 📎 **Attachments** - Files and links on tasks
-- ✏️ **Markdown Notes** - Rich text descriptions with preview
-- 🗂️ **Project States** - Active, Waiting, Someday, Archived
-- ♾️ **Fluid Recurrence** - Next date is calculated after completion
-- ♻️ **Reusable Lists** - Duplicate tasks or reset checklists
-- ✅ **Checklist Mode** - Fast list-style checking for checklist tasks
-- ✅ **Audio Capture** - Quick voice capture with automatic transcription and task creation
-- 🧭 **Copilot Suggestions** - Optional context/tag/time hints while typing
-- 🍅 **Pomodoro Focus (Optional)** - 15/3, 25/5, 50/10 timer panel in Focus view with one optional custom preset
-- 🔔 **Notifications** - Separate start and due reminders with snooze
-- 📊 **Daily Digest** - Morning briefing + evening review
-- 📅 **Weekly Review** - Customizable weekly reminder
+- 🔍 **Búsqueda global** - Busca en todas las áreas globalmente con operadores (`status:`, `context:`, `assigned:`, `location:`, `where:`, `id:`, `-id:`, `due:<=7d`)
+- 📦 **Acciones en lote** - Seleccionar múltiples, mover/etiquetar/eliminar en lote
+- 📎 **Adjuntos** - Archivos y enlaces en tareas
+- ✏️ **Notas Markdown** - Descripciones de texto enriquecido con vista previa
+- 🗂️ **Estados del proyecto** - Activo, En espera, Algún día, Archivado
+- ♾️ **Recurrencia fluida** - La siguiente fecha se calcula después de completar
+- ♻️ **Listas reutilizables** - Duplicar tareas o reiniciar listas de verificación
+- ✅ **Modo de lista de verificación** - Marcar rápido estilo lista para tareas de lista de verificación
+- ✅ **Captura de audio** - Captura de voz rápida con transcripción automática y creación de tareas
+- 🧭 **Sugerencias de Copilot** - Sugerencias opcionales de contexto/etiqueta/hora mientras escribes
+- 🍅 **Focus Pomodoro (Opcional)** - Panel de temporizador 15/3, 25/5, 50/10 en vista Focus con un preset personalizado opcional
+- 🔔 **Notificaciones** - Recordatorios separados de inicio y vencimiento con posponer
+- 📊 **Resumen diario** - Briefing matutino + revisión vespertina
+- 📅 **Revisión semanal** - Recordatorio semanal personalizable
 
-### Data & Sync
+### Datos y sincronización
 
-- 🔄 **Sync Options** - See the [Data & Sync docs](https://docs.mindwtr.app/data-sync/) for supported backends and setup
-- 🍎 **iCloud Sync** - Built-in sync on supported iPhone, iPad, and macOS builds (CloudKit)
-- ☁️ **Dropbox Sync (Optional)** - Sign in with Dropbox and sync through a private app folder (store builds; not in FOSS builds)
-- 📤 **Export/Backup** - Export data to JSON
-- ♻️ **Restore from Backup** - Replace local data from a validated Mindwtr backup with a recovery snapshot first
-- 📥 **TickTick + Todoist + DGT GTD + OmniFocus + Apple Reminders + CSV Import** - Import TickTick CSV/ZIP, Todoist CSV/ZIP, DGT GTD JSON/ZIP, OmniFocus exports, incomplete Apple Reminders, or any app via a documented generic CSV format into Mindwtr
-- 🔗 **Obsidian Integration** - Desktop vault task import with deep links back to source notes
-- 🗓️ **External Calendars (System + ICS)** - Mobile reads system calendars and pushes dated tasks; macOS desktop reads Apple Calendar and can push dated tasks; desktop/web also support ICS subscriptions and task creation from events
+- 🔄 **Opciones de sincronización** - Ver la documentación de [Datos y sincronización](https://docs.mindwtr.app/data-sync/) para backend soportados y configuración
+- 🍎 **Sincronización iCloud** - Sincronización integrada en iPhone, iPad y compilaciones macOS soportadas (CloudKit)
+- ☁️ **Sincronización Dropbox (Opcional)** - Inicia sesión con Dropbox y sincroniza a través de una carpeta de aplicación privada (compilaciones de tienda; no en compilaciones FOSS)
+- 📤 **Exportar/Respaldar** - Exportar datos a JSON
+- ♻️ **Restaurar desde copia de seguridad** - Reemplazar datos locales desde una copia de seguridad validada de Mindwtr con una instantánea de recuperación primero
+- 📥 **TickTick + Todoist + DGT GTD + OmniFocus + Apple Reminders + Importar CSV** - Importar TickTick CSV/ZIP, Todoist CSV/ZIP, DGT GTD JSON/ZIP, exportaciones de OmniFocus, Apple Reminders incompleto o cualquier aplicación a través de un formato CSV genérico documentado en Mindwtr
+- 🔗 **Integración de Obsidian** - Importación de bóveda de escritorio con enlaces profundos de vuelta a notas fuente
+- 🗓️ **Calendarios externos (Sistema + ICS)** - Mobile lee calendarios del sistema e impulsa tareas fechadas; escritorio macOS lee Apple Calendar y puede impulsar tareas fechadas; escritorio/web también admiten suscripciones ICS y creación de tareas desde eventos
 
-### Automation
+### Automatización
 
-- 🔌 **CLI** - Add, list, complete, search from terminal by running the repo helper
-- 🌐 **REST API** - Optional desktop localhost API server for token-authenticated scripting
-- 🌍 **Web App** - Runs in your browser, works offline (PWA)
-- 🧠 **MCP Server** - Lets AI assistants read and manage your tasks (a local Model Context Protocol server), available as [`mindwtr-mcp`](https://www.npmjs.com/package/mindwtr-mcp) and in the [MCP Registry](https://registry.modelcontextprotocol.io/)
+- 🔌 **CLI** - Añadir, listar, completar, buscar desde terminal ejecutando el asistente del repositorio
+- 🌐 **API REST** - Servidor API localhost de escritorio opcional para scripting autenticado con token
+- 🌍 **Aplicación web** - Se ejecuta en tu navegador, funciona sin conexión (PWA)
+- 🧠 **Servidor MCP** - Permite que los asistentes de IA lean y gestionen tus tareas (un servidor local del Protocolo de contexto de modelo), disponible como [`mindwtr-mcp`](https://www.npmjs.com/package/mindwtr-mcp) y en el [Registro MCP](https://registry.modelcontextprotocol.io/)
 
-Desktop builds can start the local REST API from **Settings -> Advanced** on `127.0.0.1` with default port `3456` and a generated bearer token. The CLI remains a repo helper; the stdio MCP server can be installed from npm with `npm install -g mindwtr-mcp` or launched by MCP clients with `npx -y mindwtr-mcp`.
+Las compilaciones de escritorio pueden iniciar la API REST local desde **Configuración -> Avanzado** en `127.0.0.1` con puerto predeterminado `3456` y un token portador generado. La CLI sigue siendo un asistente del repositorio; el servidor MCP de stdio puede instalarse desde npm con `npm install -g mindwtr-mcp` o lanzarse por clientes MCP con `npx -y mindwtr-mcp`.
 
-### Cross-Platform
+### Multiplataforma
 
-- 🖥️ **Desktop** - Tauri v2 (macOS, Linux, Windows)
-- 📱 **Mobile** - React Native/Expo (iOS via App Store/TestFlight, Android) with in-app tips for gestures and app shortcuts
-- 📲 **Android Widget** - Home screen focus/next widget
-- ⌨️ **Keyboard Shortcuts** - Standard (Gmail-style), Vim, and Emacs presets
-- 🎨 **Themes** - Light, Dark, OLED, Nord, Catppuccin Macchiato, Dracula, Sepia, E-ink, and Material 3
-- 🌍 **i18n** - English, Vietnamese, Chinese (Simplified), Chinese (Traditional), Spanish, Hindi, Arabic, German, Russian, Japanese, French, Portuguese (Brazil), Polish, Korean, Czech, Italian, Turkish, Dutch, Persian, Swedish
-- 🐳 **Docker** - Run the PWA + self-hosted sync server with Docker
+- 🖥️ **Escritorio** - Tauri v2 (macOS, Linux, Windows)
+- 📱 **Móvil** - React Native/Expo (iOS a través de App Store/TestFlight, Android) con consejos en la aplicación para gestos y accesos directos de aplicación
+- 📲 **Widget de Android** - Widget Focus/siguiente en pantalla de inicio
+- ⌨️ **Atajos de teclado** - Presets estándar (estilo Gmail), Vim y Emacs
+- 🎨 **Temas** - Claro, Oscuro, OLED, Nord, Catppuccin Macchiato, Dracula, Sepia, Tinta electrónica y Material 3
+- 🌍 **i18n** - Inglés, vietnamita, chino (simplificado), chino (tradicional), español, hindi, árabe, alemán, ruso, japonés, francés, portugués (Brasil), polaco, coreano, checo, italiano, turco, holandés, persa, sueco
+- 🐳 **Docker** - Ejecuta la PWA + servidor de sincronización autohospedado con Docker
 
 </details>
 

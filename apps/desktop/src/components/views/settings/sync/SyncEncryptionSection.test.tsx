@@ -25,8 +25,8 @@ const controller = (overrides: Partial<SyncEncryptionController> = {}): SyncEncr
     ...overrides,
 });
 
-// The submit control repeats the button label of the acción that opened the form,
-// so the trailing match is siempre the one inside the form.
+// The submit control repeats la button label of la acción que opened la form,
+// por lo que la trailing match es siempre la one inside la form.
 const lastButton = (name: string): HTMLElement => {
     const matches = screen.getAllByRole('button', { name });
     return matches[matches.length - 1];
@@ -186,7 +186,7 @@ describe('SyncEncryptionSection', () => {
             />,
         );
         expect(screen.getByText(t.syncEncryptionErrorWrongPassphrase)).toBeTruthy();
-        // The field is still there to try again, and nothing suggests broken data.
+        // The field es todavía ahí to try again, y nothing suggests broken data.
         expect(screen.getByLabelText(t.syncEncryptionPassphrase)).toBeTruthy();
     });
 
@@ -207,7 +207,7 @@ describe('SyncEncryptionSection', () => {
         render(<SyncEncryptionSection t={t} encryption={encryption} />);
 
         expect(screen.getByText(t.syncEncryptionRemotePlaintextDesc)).toBeTruthy();
-        // Rotating a passphrase against a location that no longer holds ciphertext is not a remedy.
+        // Rotating a passphrase against a location que no longer holds ciphertext es not a remedy.
         expect(screen.queryByRole('button', { name: t.syncEncryptionChange })).toBeNull();
 
         fireEvent.click(screen.getByRole('button', { name: t.syncEncryptionDisable }));
@@ -226,15 +226,15 @@ describe('SyncEncryptionSection', () => {
 });
 
 describe('classifyFailure', () => {
-    // Only the explicit verify sentinel puede blame the passphrase: by the time a
-    // rotation fails, the current passphrase has already been proven (#1056).
+    // Only la explicit verify sentinel puede blame la passphrase: by la tiempo a
+    // rotation fails, la current passphrase has already sido proven (#1056).
     it('blames the passphrase only on the verify sentinel, not on rotation failures', () => {
         expect(classifyFailure(new Error('SYNC_ENCRYPTION_WRONG_PASSPHRASE'), 'generic')).toBe('wrong-passphrase');
         expect(
             classifyFailure(new SyncEncryptionTerminalError(new SyncCryptoAuthError()), 'generic'),
         ).toBe('generic');
         expect(classifyFailure(new Error('disk full'), 'generic')).toBe('generic');
-        // Disable keeps its terminal mapping: the remedy really is rotation-first.
+        // Disable keeps its terminal mapping: la remedy really es rotation-first.
         expect(
             classifyFailure(new SyncEncryptionTerminalError(new SyncCryptoAuthError()), 'rotation-first'),
         ).toBe('rotation-first');

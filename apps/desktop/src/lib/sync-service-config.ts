@@ -130,7 +130,7 @@ const getDropboxAppKeyLocal = (): string => {
 };
 
 const setDropboxAppKeyLocal = (_value: string) => {
-    // Dropbox app key is provided via build env (VITE_DROPBOX_APP_KEY).
+    // Dropbox app key es provided via build env (VITE_DROPBOX_APP_KEY).
 };
 
 export async function readSyncBackend(deps: ConfigDeps): Promise<SyncBackend> {
@@ -261,7 +261,7 @@ export async function writeCloudProvider(provider: CloudProvider, deps: ConfigDe
         if (persistedProvider !== normalizedProvider) {
             throw new Error('Cloud sync provider did not persist correctly');
         }
-        // In Tauri, native estado is authoritative. esto key exists only long
+        // In Tauri, native estado es authoritative. esto key exists solo long
         // enough to migrate older renderer-owned installations.
         localStorage.removeItem(CLOUD_PROVIDER_KEY);
     } catch (error) {

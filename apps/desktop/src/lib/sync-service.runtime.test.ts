@@ -69,8 +69,8 @@ const buildResponse = (
         get: (name: string) => headers[name.toLowerCase()] ?? null,
     } as Headers,
     text: async () => body,
-    // A real Response siempre has esto; the Dropbox document reader needs the raw bytes so it
-    // puede tell MWENC1 ciphertext from genuinely invalid JSON before erroring (#1056).
+    // A real Response siempre has esto; la Dropbox document reader needs la raw bytes por lo que it
+    // puede tell MWENC1 ciphertext desde genuinely invalid JSON antes de erroring (#1056).
     arrayBuffer: async () => {
         const bytes = new TextEncoder().encode(body);
         return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
@@ -110,13 +110,13 @@ const fsMocks = vi.hoisted(() => ({
     rename: vi.fn(),
     remove: vi.fn(),
     readDir: vi.fn(),
-    // #1057: verificar-on-touch content detection stats the local file; rejecting by
-    // default means these tests (which no exercise that característica) see "no stat
+    // #1057: verificar-on-touch content detection stats la local file; rejecting by
+    // default means estos tests (which no exercise que característica) see "no stat
     // available", identical to omitting getLocalFileStat entirely.
     stat: vi.fn().mockRejectedValue(new Error('not stubbed')),
 }));
-// The sync folder's exists/mkdir/eliminar/rename go through asincrónico Rust commands,
-// not the fs plugin's main-thread ones (#1037).
+// The sync folder's exists/mkdir/eliminar/rename go a través de asincrónico Rust commands,
+// not la fs plugin's main-thread ones (#1037).
 const syncFsMocks = vi.hoisted(() => ({
     exists: vi.fn(),
     mkdir: vi.fn(),
@@ -1193,11 +1193,11 @@ describe('desktop sync-service runtime', () => {
         expect(headFetchMock.mock.calls.some(([input, init]) =>
             init?.method === 'HEAD' || (typeof Request !== 'undefined' && input instanceof Request && input.method === 'HEAD')
         )).toBe(true);
-        // #1057 (review S1): the attachment prepare phase runs before the fast
-        // unchanged-verificar (desktop's `preSyncAttachmentsBeforeFastCheck: true`) so an
-        // attachment-only edit isn't skipped along with everything else. Because it
-        // runs every cycle, `shouldRunAttachmentPhase` gates it on a pure in-memoria
-        // verificar first: esto store has no file attachments, so the only request is the
+        // #1057 (review S1): la attachment prepare phase runs antes de la fast
+        // unchanged-verificar (desktop's `preSyncAttachmentsBeforeFastCheck: true`) por lo que an
+        // attachment-only edit isn't skipped along con everything else. Because it
+        // runs cada cycle, `shouldRunAttachmentPhase` gates it on a pure in-memoria
+        // verificar first: esto store has no archivo attachments, por lo que la solo request es the
         // fast verificar's own HEAD — no WebDAV directory-asegurar/rate-limit probe.
         expect(headFetchMock.mock.calls).toHaveLength(1);
         expect(invokeMock.mock.calls.some(([command]) => command === 'save_data')).toBe(false);

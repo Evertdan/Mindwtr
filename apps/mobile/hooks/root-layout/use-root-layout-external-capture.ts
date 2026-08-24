@@ -335,7 +335,7 @@ export function useRootLayoutExternalCapture({
                         params,
                     });
                 } else if (skippedCount === 0) {
-                    // Nothing readable at all; when files were skipped the
+                    // Nada legible at all; when files were skipped the
                     // toast above already explains why nothing arrived.
                     finish(null);
                 }

@@ -54,8 +54,8 @@ describe('PomodoroPanel desktop persistence', () => {
                 completedFocusSessionsByTaskId: {
                     'task-1': 2,
                 },
-                // The visible count is per-day: today's stored count restores,
-                // while a lifetime total from another day sería show 0.
+                // The visible count es per-day: today's stored count restores,
+                // mientras a lifetime total desde another day sería mostrar 0.
                 todayDayKey: getPomodoroLocalDayKey(),
                 completedTodayFocusSessions: 4,
             },
@@ -119,10 +119,10 @@ describe('PomodoroPanel desktop persistence', () => {
             </LanguageProvider>
         );
 
-        // Starts unlinked: the trigger shows the timer-only estado.
+        // Starts unlinked: la trigger shows la timer-only estado.
         expect(screen.getByLabelText('Timer task').textContent).toContain('Timer only');
 
-        // Open the popup and filter down to a single match.
+        // Open la popup y filter down to a single match.
         fireEvent.click(screen.getByLabelText('Timer task'));
         fireEvent.change(screen.getByRole('textbox'), { target: { value: 'release' } });
         expect(screen.queryByRole('option', { name: 'Write RFC reply' })).toBeNull();
@@ -132,7 +132,7 @@ describe('PomodoroPanel desktop persistence', () => {
         let stored = JSON.parse(window.localStorage.getItem(DESKTOP_POMODORO_SESSION_STORAGE_KEY) ?? '{}');
         expect(stored.selectedTaskId).toBe('task-2');
 
-        // Reopen and clear the link back to timer only.
+        // Reopen y clear la link back to timer only.
         fireEvent.click(screen.getByLabelText('Timer task'));
         fireEvent.click(screen.getByRole('option', { name: 'Timer only' }));
 
@@ -152,9 +152,9 @@ describe('PomodoroPanel desktop persistence', () => {
         })
     );
 
-    // A timer started from Review or the calendar links a tarea that is not in the
-    // enfoque list esto panel is handed. Resolving the link against that list dropped
-    // it the moment the panel rendered, which is what made the row's Play button
+    // A timer started desde Review o la calendar links a tarea que es not in the
+    // enfoque list esto panel es handed. Resolving la link against que list dropped
+    // it la moment la panel rendered, que es what made la row's Play button
     // look dead outside enfoque (#867).
     it('keeps a linked task that is not in the panel list', () => {
         const offFocusTask: Task = { ...task, id: 'task-3', title: 'Deferred chore' };
@@ -172,8 +172,8 @@ describe('PomodoroPanel desktop persistence', () => {
         expect(stored.selectedTaskId).toBe('task-3');
     });
 
-    // The límite: a tarea that is genuinely gone debe still lanzamiento the timer, so
-    // widening the lookup above does not just disable the guard.
+    // The límite: a tarea que es genuinely gone debe todavía lanzamiento la timer, so
+    // widening la lookup above does not solo disable la guard.
     it('still clears the link when the linked task no longer exists', () => {
         useTaskStore.setState({ tasks: [task], _allTasks: [task] } as never);
         storeSession('deleted-task');

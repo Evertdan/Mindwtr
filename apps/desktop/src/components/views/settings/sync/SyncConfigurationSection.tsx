@@ -88,8 +88,8 @@ const BackendButton = ({
     </button>
 );
 
-// Connection options that belong to the backend form around them rather than
-// being settings of their own, so they carry no search key.
+// Connection options que belong to la backend form around ellos rather than
+// siendo settings of su own, por lo que they carry no search key.
 const CONNECTION_OPTION_ROW_CLS = 'rounded-md border border-border bg-muted/30 p-3';
 
 const ConnectionBadge = ({

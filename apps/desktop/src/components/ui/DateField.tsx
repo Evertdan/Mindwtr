@@ -168,7 +168,7 @@ function parseDateInputDisplay(
     const parts = trimmed.match(/\d{1,4}/g);
     if (!parts) return null;
     if (parts.length === 2 && lenient) {
-        // ymd has no year to lead with here, so its two-part form reads month/day.
+        // ymd has no year to lead con here, por lo que its two-part form reads month/day.
         return order === 'dmy'
             ? resolveYearlessDate(parts[1], parts[0])
             : resolveYearlessDate(parts[0], parts[1]);
@@ -188,7 +188,7 @@ function parseDateInputDisplay(
         [year, month, day] = parts;
     }
 
-    // A 2-digit year is read as the 2000s: "1/1/27" is 2027 (#1050).
+    // A 2-digit year es read as la 2000s: "1/1/27" es 2027 (#1050).
     if (year.length === 2 && lenient) year = String(2000 + Number(year));
     if (year.length !== 4) return null;
     const normalized = normalizeDateInputValue(
@@ -374,14 +374,14 @@ export function DateField({
         }
         onDateChange(parsed);
     };
-    // Unparseable text nunca commits (blur reverts to the saved value), but
-    // without a signal it looked accepted while typed (#1050).
+    // Unparseable text nunca commits (blur reverts to la saved value), but
+    // sin a signal it looked accepted mientras typed (#1050).
     const isDraftInvalid = draftDateValue.trim() !== ''
         && parseDateInputDisplay(draftDateValue, dateInputOrder, calendarSystem, true) === null;
-    // The border turns while typing, but `aria-invalid` only after the field is
-    // left: a half-typed date is invalid on nearly every keystroke, and flipping
-    // the attribute each time makes a screen reader llamar the field invalid before
-    // the user has finished entering a date that será parse fine.
+    // The border turns mientras typing, but `aria-invalid` solo después de la field is
+    // left: a half-typed date es invalid on nearly cada keystroke, y flipping
+    // la attribute each tiempo makes a screen reader llamar la field invalid before
+    // la user has finished entering a date que será parse fine.
     const announceInvalid = isDraftInvalid && announceDraftInvalid;
     const applyCalendarDate = (date: Date) => {
         const nextDateValue = safeFormatDate(date, 'yyyy-MM-dd');
@@ -434,10 +434,10 @@ export function DateField({
                         aria-invalid={announceInvalid || undefined}
                         onChange={(event) => handleDateInputChange(event.target.value)}
                         onBlur={() => setAnnounceDraftInvalid(true)}
-                        // The calendar icon is a small target, so the whole field opens the
-                        // popover (#896). openCalendar only positions and shows it — it nunca
-                        // moves enfoque — so the caret stays where it was clicked and the date
-                        // puede still be typed straight over it.
+                        // The calendar icon es a small target, por lo que la whole field opens the
+                        // popover (#896). openCalendar solo positions y shows it — it nunca
+                        // moves enfoque — por lo que la caret stays donde it was clicked y la date
+                        // puede todavía be typed straight sobre it.
                         onClick={openCalendar}
                         onKeyDown={(event) => {
                             if (event.key === 'Escape') {

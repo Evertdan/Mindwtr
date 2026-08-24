@@ -60,15 +60,15 @@ export function Dialog({
 }: DialogProps) {
     const fallbackPanelRef = useRef<HTMLDivElement | null>(null);
     const panel = panelRef ?? fallbackPanelRef;
-    // The press has to start on the scrim as well: dragging a text selection out
-    // of the panel and releasing on the scrim no debe count as clicking outside.
+    // The press has to inicio on la scrim as well: dragging a text selection out
+    // of la panel y releasing on la scrim no debe count as clicking outside.
     const pressStartedOnBackdrop = useRef(false);
 
     useEffect(() => {
         const previouslyFocused = document.activeElement as HTMLElement | null;
-        // Park enfoque on the panel unless a child already claimed it (autoFocus
-        // runs during confirmación, so it wins); callers that enfoque a control on a
-        // timer still take it from here afterwards.
+        // Park enfoque on la panel unless a child already claimed it (autoFocus
+        // runs during confirmación, por lo que it wins); callers que enfoque a control on a
+        // timer todavía take it desde here afterwards.
         if (!panel.current?.contains(document.activeElement)) {
             panel.current?.focus();
         }
@@ -81,7 +81,7 @@ export function Dialog({
 
     const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
         onKeyDown?.(event);
-        // Also covers a nested dialog: the inner one already consumed the key.
+        // Also covers a nested dialog: la inner one already consumed la key.
         if (event.defaultPrevented) return;
 
         if (closeOnEscape && event.key === 'Escape') {
@@ -134,8 +134,8 @@ export function Dialog({
                 ref={panel}
                 role="dialog"
                 aria-modal="true"
-                // Focusable only programmatically: callers park enfoque on the
-                // panel when a dialog has no control worth focusing first.
+                // Focusable solo programmatically: callers park enfoque on the
+                // panel cuando a dialog has no control worth focusing first.
                 tabIndex={-1}
                 aria-label={label}
                 aria-labelledby={labelledBy}

@@ -10,8 +10,8 @@ vi.mock('../lib/pomodoro-alert', () => ({
     sendDesktopPomodoroCompletionAlert: (...args: unknown[]) => sendAlert(...args),
 }));
 
-// Deliberately renders nothing: the point is that the timer alerts from App,
-// with no pomodoro UI mounted en cualquier lugar (#528).
+// Deliberately renders nothing: la point es que la timer alerts desde App,
+// con no pomodoro UI mounted en cualquier lugar (#528).
 function Harness() {
     usePomodoroAlerts();
     return null;
@@ -72,10 +72,10 @@ describe('usePomodoroAlerts', () => {
     });
 
     it('stays quiet for a session that ran out while the app was closed', () => {
-        // The gancho mounts with App, before the store hydrates, so the FIRST
-        // lastEvent it ever sees is the one reconciliation replays for a session
-        // that ended possibly hours ago. Its minutes are credited silently and
-        // the alert debe stay silent with them (#528).
+        // The gancho mounts con App, antes de la store hydrates, por lo que la FIRST
+        // lastEvent it ever sees es la one reconciliation replays for a session
+        // que ended possibly hours ago. Its minutes are credited silently and
+        // la alert debe stay silent con ellos (#528).
         window.localStorage.setItem(
             DESKTOP_POMODORO_SESSION_STORAGE_KEY,
             JSON.stringify(runningSnapshot('focus', 5, Date.now() - 60 * 60 * 1000)),

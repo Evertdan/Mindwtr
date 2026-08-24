@@ -194,7 +194,7 @@ export function MobileAreaSwitcher() {
                   <TouchableOpacity
                     key={option.id}
                     accessibilityLabel={isExcluded ? `${option.label} (${excludedLabel})` : option.label}
-                    // Three states can't ride a boolean, and `selected` alone
+                    // Tres estados no pueden montar a boolean, and `selected` alone
                     // announces an excluded area as merely unpicked. Checkbox
                     // is the one RN role whose Estado takes 'mixed'.
                     accessibilityRole="checkbox"

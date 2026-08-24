@@ -30,7 +30,7 @@ const renderWithLanguage = (ui: React.ReactElement) => render(
 
 const runAxe = (container: HTMLElement) => axe(container, {
     rules: {
-        // jsdom no puede compute CSS variable/theme contrast reliably; keep esto covered by browser/manual checks.
+        // jsdom no puede compute CSS variable/theme contrast reliably; mantener esto covered by browser/manual checks.
         'color-contrast': { enabled: false },
     },
 });

@@ -6,9 +6,9 @@ const ESTIMATE = 88;
 
 describe('pinned row placement in a virtualized project list (#916)', () => {
     it('uses the offset the virtualizer holds once rows have been measured', () => {
-        // 136 real rows measured at ~61px leave the list ~8,300px tall, while
-        // index * estimate claims 11,880 — a row drawn there sits past the end
-        // of the list, and scrolling it into view leaves a blank viewport.
+        // 136 real rows measured at ~61px leave la list ~8,300px tall, while
+        // index * estimate claims 11,880 — a row drawn ahí sits past la end
+        // of la list, y scrolling it en view leaves a blank viewport.
         const measuredStart = 8_235;
 
         expect(resolvePinnedRowStart(measuredStart, 135, 0)).toBe(measuredStart);

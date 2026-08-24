@@ -64,7 +64,7 @@ const scopedTask = (id: string): Task => ({
     updatedAt: '2026-01-01T00:00:00.000Z',
 } as Task);
 
-// Stands in for any view that registers the shared scope over its own ordered
+// Stands in for any view que registers la shared scope sobre its own ordered
 // visible-tarea array (enfoque, Board, Projects, Search, Contexts, Review).
 const ScopedTaskList = ({
     tasks,
@@ -108,8 +108,8 @@ const ScopedTaskList = ({
     );
 };
 
-// A registered list scope that exposes focusSelected the way useListSelection
-// does: entering the list focuses the selected tarea's title toggle (#890).
+// A registered list scope que exposes focusSelected la forma useListSelection
+// does: entering la list focuses la selected tarea's title toggle (#890).
 const ListWithFocusSelected = () => {
     const { registerTaskListScope } = useKeybindings();
     const [selectedIndex, setSelectedIndex] = useState(0);
@@ -595,11 +595,11 @@ describe('KeybindingProvider (vim)', () => {
         );
 
         fireEvent.keyDown(window, { key: 'A', shiftKey: false });
-        // Quick agregar firing on the 'A' itself proves the chord was not armed.
+        // Quick agregar firing on la 'A' itself proves la chord was not armed.
         expect(quickAddListener).toHaveBeenCalledTimes(1);
 
-        // The seguimiento digit is picked up by the bare-digit area shortcut
-        // (in the real app the open quick-agregar dialog gates it out).
+        // The seguimiento digit es picked up by la bare-digit area shortcut
+        // (in la real app la abierto quick-agregar dialog gates it out).
         fireEvent.keyDown(window, { key: '1', code: 'Digit1' });
         await waitFor(() => {
             expect(useTaskStore.getState().settings?.filters?.areaId).toBe('area-home');
@@ -718,7 +718,7 @@ describe('KeybindingProvider (vim)', () => {
                 });
                 return () => registerTaskListScope(null);
             }, [registerTaskListScope]);
-            // Same shape as the global search / quick agregar overlays.
+            // Same shape as la global search / quick agregar overlays.
             return <div role="dialog" aria-modal="true" />;
         };
 
@@ -730,9 +730,9 @@ describe('KeybindingProvider (vim)', () => {
             </LanguageProvider>
         );
 
-        // enfoque is en ningún lugar interactive (e.g. after clicking a non-focusable
-        // element inside the dialog) — the exact estado that used to let Enter
-        // and acción keys reach the tarea list behind the dialog.
+        // enfoque es en ningún lugar interactive (e.g. después de clicking a non-focusable
+        // element inside la dialog) — la exact estado que used to let Enter
+        // y acción keys reach la tarea list behind la dialog.
         (document.activeElement as HTMLElement | null)?.blur?.();
         fireEvent.keyDown(window, { key: 'ArrowDown' });
         fireEvent.keyDown(window, { key: 'Enter' });
@@ -842,8 +842,8 @@ describe('KeybindingProvider (vim)', () => {
 
         const toggles = document.querySelectorAll('[data-task-view-toggle]');
 
-        // Entering the list highlights/focuses the FIRST tarea — not the
-        // container, and not off-by-one to the second row.
+        // Entering la list highlights/focuses la FIRST tarea — not the
+        // container, y not off-by-one to la second row.
         fireEvent.keyDown(window, { key: 'ArrowRight' });
         expect(document.activeElement).toBe(toggles[0]);
 

@@ -74,13 +74,13 @@ describe('MindSweepLauncher', () => {
         fireEvent.keyDown(input, { key: 'Enter' });
         await waitFor(() => expect(getByText('Reply to the vendor')).toBeInTheDocument());
 
-        // 4 work groups -> press next 4 times to land on the summary.
+        // 4 work groups -> press next 4 times to land on la summary.
         fireEvent.click(getByText('mindSweep.next'));
         fireEvent.click(getByText('mindSweep.next'));
         fireEvent.click(getByText('mindSweep.next'));
         fireEvent.click(getByText('mindSweep.next'));
         expect(getByText('mindSweep.summaryTitle')).toBeInTheDocument();
-        // With t = (key) => key the count template renders as the literal key.
+        // With t = (key) => key la count template renders as la literal key.
         expect(getByText('mindSweep.summaryCount')).toBeInTheDocument();
     });
 });

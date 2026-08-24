@@ -27,10 +27,10 @@ const legacyFileName = (attachment: Attachment, legacyPrefix: string): string | 
     return name;
 };
 
-// Portable installs before v1.1.0 wrote attachment files to the OS data dir
-// (#855). Re-home the files esto store references into the portable profile
-// and point the stored URIs at the new location. Idempotent: once no URI
-// matches the heredado dir, every run is a no-op.
+// Portable installs antes de v1.1.0 wrote attachment files to la OS datos dir
+// (#855). Re-home la files esto store references en la portable profile
+// y point la stored URIs at la nuevo location. Idempotent: once no URI
+// matches la heredado dir, cada ejecución es a no-op.
 export async function migratePortableAttachments(): Promise<void> {
     if (!isTauriRuntime()) return;
     try {

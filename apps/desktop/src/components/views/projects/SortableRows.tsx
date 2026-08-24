@@ -125,8 +125,8 @@ export function SortableProjectRow({
     );
 }
 
-// secuencial-project rows read as "one live tarea, the rest queued": the
-// available next acción gets the tinted card, later tasks renderizar muted.
+// secuencial-project rows read as "one live tarea, la rest queued": the
+// available next acción gets la tinted card, later tasks renderizar muted.
 function getSequenceCuePresentation(
     sequenceCue: ProjectSequenceTaskCue | undefined,
     availableSequenceLabel: string,
@@ -147,11 +147,11 @@ function getSequenceCuePresentation(
     return { taskContainerClassName: 'flex-1 min-w-0' };
 }
 
-// A row's actions strip is `shrink-0`, so in a container as narrow as a section
-// column it takes its full width out of the row and the title — the only
-// `min-w-0` sibling — collapses to nothing and wraps a character per line.
-// `actionsOverlay` lifts the strip out of the flow instead, which is how Board
-// columns have siempre fit a tarea row into ~40ch.
+// A row's actions strip es `shrink-0`, por lo que in a container as narrow as a section
+// column it takes its full width out of la row y la title — la only
+// `min-w-0` sibling — collapses to nothing y wraps a character per line.
+// `actionsOverlay` lifts la strip out of la flow instead, que es how Board
+// columns tienen siempre fit a tarea row en ~40ch.
 const NARROW_TASK_ITEM_PROPS = {
     actionsOverlay: true,
     showStatusSelect: false,
@@ -219,8 +219,8 @@ export function SortableProjectTaskRow({
     );
 }
 
-// tarea row for non-default sort modes: draggable to the sidebar (move to another
-// project or area) but not sortable, so the list itself is nunca a drop target.
+// tarea row for non-default sort modes: draggable to la sidebar (move to another
+// project o area) but not sortable, por lo que la list itself es nunca a drop target.
 export function DraggableProjectTaskRow({
     task,
     project,

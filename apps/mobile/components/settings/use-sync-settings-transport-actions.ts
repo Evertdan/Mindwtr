@@ -494,13 +494,13 @@ export function useSyncSettingsTransportActions({
             if (dropboxConfigured) {
                 await disconnectDropbox(dropboxAppKey);
             } else {
-                // A FOSS or otherwise unconfigured build cannot revoke the
+                // Una compilación FOSS u otra unconfigured build cannot revoke the
                 // remote token, but it must still let the user remove local
                 // credentials left by a previously configured build.
                 await clearDropboxTokens();
             }
             if (!disconnectingProvenDropbox) {
-                // A failed activation leaves Dropbox selected only in this
+                // Una activación fallida leaves Dropbox selected only in this
                 // screen's staged UI. Disconnect must return to the last
                 // configuration that actually completed its probe.
                 hasPendingSyncConfiguration.current = false;

@@ -6,7 +6,7 @@ import type { ProjectAreaSection } from './project-area-collapse';
 const PROJECT_AREA_CONTAINER_PREFIX = 'project-area:';
 
 // Area zone ids are namespaced by sidebar section because all sections now share
-// one DndContext and the same area puede renderizar a zone in each of them.
+// one DndContext y la mismo area puede renderizar a zone in each of them.
 export const getProjectAreaContainerId = (section: ProjectAreaSection, areaId: string) =>
     `${PROJECT_AREA_CONTAINER_PREFIX}${section}:${areaId}`;
 
@@ -26,9 +26,9 @@ export const getProjectAreaContainerInfo = (
 export const getProjectAreaIdFromContainer = (containerId: string) =>
     getProjectAreaContainerInfo(containerId)?.areaId ?? null;
 
-// Area groups are droppable as whole blocks (header included, so collapsed and
-// empty areas accept drops). Prefer project-row hits under the pointer so
-// within-list reordering is not hijacked by the surrounding group container.
+// Area groups are droppable as whole blocks (header included, por lo que collapsed and
+// empty areas accept drops). Prefer project-row hits bajo la pointer so
+// within-list reordering es not hijacked by la surrounding group container.
 export const projectAreaCollisionDetection: CollisionDetection = (args) => {
     const pointerCollisions = pointerWithin(args);
     if (pointerCollisions.length > 0) {

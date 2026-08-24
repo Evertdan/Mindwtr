@@ -60,9 +60,9 @@ export function useSettingsAboutPage({
     const [appVersion, setAppVersion] = useState('0.1.0');
     const [logPath, setLogPath] = useState('');
     const [installSource, setInstallSource] = useState<InstallSource>('unknown');
-    // The background actualizar verificar no debe run before detection settles: the
-    // initial 'unknown' sería pass the quiet-channel gate and phone GitHub even
-    // on installs (e.g. Scoop) that debe stay offline unless asked.
+    // The background actualizar verificar no debe ejecución antes de detection settles: the
+    // initial 'unknown' sería pass la quiet-channel gate y phone GitHub even
+    // on installs (e.g. Scoop) que debe stay offline unless asked.
     const [installSourceResolved, setInstallSourceResolved] = useState(false);
     const [installChannel, setInstallChannel] = useState<string | null>(null);
     const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
@@ -189,9 +189,9 @@ export function useSettingsAboutPage({
 
     useEffect(() => {
         if (!isTauri || !appVersion || appVersion === 'web') return;
-        // Quiet channels (e.g. Scoop) nunca phone home on their own; updates
-        // are only checked when the user clicks the button. Wait for install
-        // source detection so a quiet channel is nunca checked as 'unknown'.
+        // Quiet channels (e.g. Scoop) nunca phone home on su own; updates
+        // are solo checked cuando la user clicks la button. Wait for install
+        // source detection por lo que a quiet channel es nunca checked as 'unknown'.
         if (!installSourceResolved) return;
         if (!isAutoUpdateCheckAllowed(installSource)) return;
         let lastCheck = 0;

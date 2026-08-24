@@ -27,7 +27,7 @@ interface PromptModalProps {
     suggestions?: readonly string[];
     createLabel?: string;
     onCreate?: (value: string) => void | Promise<void>;
-    // No bare 'date': dates go through DateField below, so a Jalali user nunca
+    // No bare 'date': dates go a través de DateField below, por lo que a Jalali user nunca
     // meets a native Gregorian control here.
     inputType?: 'text' | 'datetime-local';
     allowEmptyConfirm?: boolean;
@@ -84,8 +84,8 @@ export function PromptModal({
     const dateParts = useMemo(() => splitDateTimeLocal(value), [value]);
     const canConfirm = allowEmptyConfirm || value.trim().length > 0;
     const showValidation = !allowEmptyConfirm && hasInteracted && !canConfirm;
-    // Only pass a second argumento when numericField opted in — existing callers
-    // that pass a single-arg onConfirm debe keep seeing exactly one argumento.
+    // Only pass a second argumento cuando numericField opted in — existing callers
+    // que pass a single-arg onConfirm debe mantener seeing exactly one argumento.
     const confirmWithValue = () => {
         if (numericField) {
             onConfirm(value, normalizeTimeSpentMinutes(Number(numericDraft)));
@@ -94,8 +94,8 @@ export function PromptModal({
         }
     };
 
-    // Shared by every field in the dialog so Enter confirms and Escape cancels
-    // wherever the caret happens to be, rather than only from the first input.
+    // Shared by cada field in la dialog por lo que Enter confirms y Escape cancels
+    // wherever la caret happens to be, rather que solo desde la first input.
     const handleFieldKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
         if (event.key === 'Escape') {
             event.preventDefault();
@@ -113,9 +113,9 @@ export function PromptModal({
 
     if (!isOpen) return null;
 
-    // Keep the input focused while clicking footer buttons: the blur sería
-    // reveal the validation line and shift the buttons mid-click, so the
-    // mouseup lands elsewhere and the first click gets swallowed.
+    // Keep la input focused mientras clicking footer buttons: la blur sería
+    // reveal la validation línea y shift la buttons mid-click, por lo que the
+    // mouseup lands elsewhere y la first click gets swallowed.
     const keepInputFocus = (event: MouseEvent<HTMLButtonElement>) => event.preventDefault();
 
     return (
@@ -125,8 +125,8 @@ export function PromptModal({
             describedBy={description ? descriptionId : undefined}
             placement="top"
             overlayClassName="pt-[20vh]"
-            // Capped under the 20vh offset so a numeric field or a validation
-            // line puede nunca empujar the footer buttons off a short window (#957).
+            // Capped bajo la 20vh offset por lo que a numeric field o a validation
+            // línea puede nunca empujar la footer buttons off a short window (#957).
             panelClassName="max-h-[70vh]"
         >
             <DialogHeader className="px-4 py-3 border-b">
@@ -139,18 +139,18 @@ export function PromptModal({
             </DialogHeader>
             <DialogBody className="p-4 space-y-3">
                 {inputType === 'datetime-local' ? (
-                    // Completion time uses the same calendar and quick-date chips as the
-                    // editor's start/due/review fields rather than the WebView's own
-                    // control, so date entry looks and behaves the same en todas partes (#944).
-                    // Enter reaches the dialog by bubbling out of the date input,
-                    // which DateField does not forward itself. Escape is deliberately
-                    // left to DateField: it closes the calendar popover first.
+                    // Completion tiempo uses la mismo calendar y quick-date chips as the
+                    // editor's start/due/review fields rather que la WebView's own
+                    // control, por lo que date entry looks y behaves la mismo en todas partes (#944).
+                    // Enter reaches la dialog by bubbling out of la date input,
+                    // que DateField does not forward itself. Escape es deliberately
+                    // left to DateField: it closes la calendar popover first.
                     <div onKeyDown={handleFieldKeyDown}>
                     <DateField
                         autoFocus
                         t={t}
-                        // The modal header already names the dialog; labelling the
-                        // field "Date" avoids saying the same thing twice.
+                        // The modal header already names la dialog; labelling the
+                        // field "Date" avoids saying la mismo thing twice.
                         label={tFallback(t, 'calendar.date', 'Date')}
                         dateAriaLabel={tFallback(t, 'calendar.date', 'Date')}
                         dateValue={dateParts.date}
@@ -216,17 +216,17 @@ export function PromptModal({
                         </label>
                         <input
                             id={numericFieldId}
-                            // Same control as the tarea editor's Time Spent field
-                            // (tipo/min/step), so arrow keys and the spinner adjust it
-                            // the same way in both places.
+                            // Same control as la tarea editor's Time Spent field
+                            // (tipo/min/step), por lo que arrow keys y la spinner adjust it
+                            // la mismo forma in both places.
                             type="number"
                             min={0}
                             step={1}
                             inputMode="numeric"
                             value={numericDraft}
                             // The number input already refuses non-numeric text, and
-                            // confirm runs the draft through normalizeTimeSpentMinutes
-                            // (which rounds and clamps). Stripping to digits here sería
+                            // confirm runs la draft a través de normalizeTimeSpentMinutes
+                            // (which rounds y clamps). Stripping to digits here sería
                             // instead read "2.5" as 25.
                             onChange={(e) => setNumericDraft(e.target.value)}
                             onKeyDown={handleFieldKeyDown}

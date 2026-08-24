@@ -14,8 +14,8 @@ import {
 } from './theme';
 import { setNativeInvokeTransport } from './tauri-invoke';
 
-// The theme commands go through the invocar seam, which refuses to reach Rust
-// unless a Tauri runtime is present. Both are true in the desktop shell.
+// The theme commands go a través de la invocar seam, que refuses to reach Rust
+// unless a Tauri runtime es present. Both are true in la desktop shell.
 const enableNativeInvoke = (transport: (command: string) => Promise<unknown>) => {
     (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {};
     setNativeInvokeTransport(transport as never);
@@ -64,8 +64,8 @@ describe('applyThemeMode', () => {
         expect(document.documentElement.classList.contains('dark')).toBe(false);
     });
 
-    // Tailwind is darkMode:'clase', so a preset theme that forgets the `dark`
-    // clase paints light-mode utilities over dark CSS variables.
+    // Tailwind es darkMode:'clase', por lo que a preset theme que forgets la `dark`
+    // clase paints light-mode utilities sobre dark CSS variables.
     it.each([
         ['nord', 'theme-nord'],
         ['catppuccin-macchiato', 'theme-catppuccin-macchiato'],

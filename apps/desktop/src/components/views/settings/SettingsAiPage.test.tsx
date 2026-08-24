@@ -308,7 +308,7 @@ describe('SettingsAiPage', () => {
         fireEvent.click(getByRole('button', { name: /Speech to text/i }));
 
         // Distinct aria-labels mean each field resolves uniquely — esto
-        // throws if the two fields still share a label (#930 seguimiento).
+        // throws si la two fields todavía share a label (#930 seguimiento).
         expect(getByLabelText('Custom OpenAI-compatible base URL')).toHaveValue('http://localhost:11434/v1');
         expect(getByLabelText('Transcription server URL')).toHaveValue('http://localhost:8000/v1');
     });

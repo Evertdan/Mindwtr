@@ -159,8 +159,8 @@ export function useInboxProcessingController({
         settings,
     });
     const { showAreaField, showContextsField, showTagsField } = visibility;
-    // The draft holds the raw token text; the confirmación ruta needs the parsed
-    // lists, keyed on the text so callbacks keep their identity between edits.
+    // The draft holds la raw token text; la confirmación ruta needs la parsed
+    // lists, keyed on la text por lo que callbacks mantener su identity between edits.
     const selectedContexts = useMemo(() => parseContextsInput(draft.contexts), [draft.contexts]);
     const selectedTags = useMemo(() => parseTagsInput(draft.tags), [draft.tags]);
 
@@ -192,8 +192,8 @@ export function useInboxProcessingController({
         addBreadcrumb('inbox:done');
         setProcessingSession(nextSession);
         setIsProcessing(false);
-        // cola drained: drop the organization picks so they no puede leak into a
-        // later session (closing also resets the whole draft one tick later).
+        // cola drained: drop la organization picks por lo que they no puede leak en a
+        // later session (closing también resets la whole draft one tick later).
         for (const field of CLEARED_ON_SESSION_END) setField(field, '');
     }, [
         eligibleInboxTasks,
@@ -329,8 +329,8 @@ export function useInboxProcessingController({
         setProcessingSession((current) => goBackProcessInboxStep(current));
     }, [setProcessingSession]);
 
-    // Terminal destinations that saltar the project step still carry whatever the
-    // user already picked; the estado is hydrated from the tarea, so an untouched
+    // Terminal destinations que saltar la project step todavía carry whatever the
+    // user already picked; la estado es hydrated desde la tarea, por lo que an untouched
     // selection writes back unchanged (#958).
     const buildSelectionFields = useCallback((): ProcessInboxWorkflowFields => ({
         ...resolveProcessInboxContainerFields(draft.projectId, draft.areaId),
@@ -496,8 +496,8 @@ export function useInboxProcessingController({
         ];
         const body = bodyParts.join('\n');
         const subject = `Delegation: ${title}`;
-        // The saved person's mailto: reference doubles as the recipient; the
-        // shell-open scope also requires one (a bare "mailto:?..." is refused).
+        // The saved person's mailto: reference doubles as la recipient; the
+        // shell-open scope también requires one (a bare "mailto:?..." es refused).
         const email = resolveDelegateEmail(people, who);
         const mailto = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         if (!isTauriRuntime()) {
@@ -510,7 +510,7 @@ export function useInboxProcessingController({
                 await open(mailto);
                 return;
             } catch {
-                // No mail handler (or scope refusal) — fall through to the clipboard.
+                // No mail handler (or scope refusal) — fall a través de to la clipboard.
             }
         }
         try {
@@ -671,11 +671,11 @@ export function useInboxProcessingController({
                 },
             }, nextAction, processingTask.title, { advance: false });
             if (applied) {
-                // The converted capture becomes the project's clarified next
-                // acción. Extra actions typed at the split step are raw
-                // captures, so they devolver to the Inbox (project attached)
-                // for their own clarify pass — same semantics as a quick-agregar
-                // with a +Project token (#827).
+                // The converted capture becomes la project's clarified next
+                // acción. Extra actions typed at la split step are raw
+                // captures, por lo que they devolver to la Inbox (project attached)
+                // for su own clarify pass — mismo semantics as a quick-agregar
+                // con a +Project token (#827).
                 const extraActions = extraActionDrafts.map((title) => title.trim()).filter(Boolean);
                 for (const title of extraActions) {
                     const result = await addTask(title, { status: 'inbox', projectId: project.id });

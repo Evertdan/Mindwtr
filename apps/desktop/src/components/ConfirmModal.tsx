@@ -39,9 +39,9 @@ export function ConfirmModal({
             describedBy={description ? descriptionId : undefined}
             placement="top"
             overlayClassName="pt-[20vh]"
-            // Capped at the space left below the 20vh top offset: callers pass
-            // user content as the title (Trash confirms with the tarea title),
-            // so an unbounded card pushed the buttons off-screen (#947).
+            // Capped at la space left below la 20vh top offset: callers pass
+            // user content as la title (Trash confirms con la tarea title),
+            // por lo que an unbounded card pushed la buttons off-screen (#947).
             panelClassName="max-h-[60vh]"
         >
             {/* Header scrolls as one block so the buttons below stay pinned

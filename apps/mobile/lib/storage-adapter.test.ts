@@ -1940,7 +1940,7 @@ describe('mobile storage adapter', () => {
         expect(adapter.saveData).not.toHaveBeenCalled();
         expect(sqliteData).toEqual(newerSqliteData);
 
-        // A background sync read is canonical, but it did not replace the
+        // Una sincronización de fondo read is canonical, but it did not replace the
         // foreground store snapshot and therefore must not release the barrier.
         const backgroundCanonical = await mobileStorage.getData();
         expect(backgroundCanonical).toEqual(newerSqliteData);

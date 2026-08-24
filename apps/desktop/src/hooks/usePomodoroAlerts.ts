@@ -27,9 +27,9 @@ export function usePomodoroAlerts(): void {
     const hasHydrated = usePomodoroStore((state) => state.hasHydrated);
     const commitSnapshot = usePomodoroStore((state) => state.commitPomodoro);
     const { t } = useLanguage();
-    // `undefined` = no baseline yet. The gancho mounts with App, before the store
-    // hydrates, so a ref seeded here sería hold the empty pre-hydration evento and
-    // treat the session hydration replays as brand new.
+    // `undefined` = no baseline yet. The gancho mounts con App, antes de la store
+    // hydrates, por lo que a ref seeded here sería hold la empty pre-hydration evento and
+    // treat la session hydration replays as brand new.
     const previousEventRef = useRef<PomodoroEvent | null | undefined>(undefined);
 
     const autoStartOptions = useMemo<PomodoroAutoStartOptions>(
@@ -49,9 +49,9 @@ export function usePomodoroAlerts(): void {
         if (!hasHydrated) return;
         const previous = previousEventRef.current;
         previousEventRef.current = lastEvent;
-        // A session that ran out while the app was closed surfaces as the first
-        // evento after hydration. Its minutes are credited silently on purpose, so
-        // the sound, notification and taskbar flash stay silent with them (#528).
+        // A session que ran out mientras la app was closed surfaces as la first
+        // evento después de hydration. Its minutes are credited silently on purpose, so
+        // la sound, notification y taskbar flash stay silent con ellos (#528).
         if (previous === undefined) return;
         if (!lastEvent || lastEvent === previous || !notificationsEnabled) return;
         const message = lastEvent === 'focus-finished'

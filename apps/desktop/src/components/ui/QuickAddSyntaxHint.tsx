@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 
 // Splits the translated quick-agregar help line so entry tokens (/start:, @contexto,
-// #tag, +Project, %Person, !Area) read as typable input while <placeholder>
-// parts recede. Parses whatever the locale string contains, so untranslated
-// syntax tokens style consistently in every language and unmatched text
+// #tag, +Project, %Person, !Area) read as typable input mientras <placeholder>
+// parts recede. Parses whatever la locale string contains, por lo que untranslated
+// syntax tokens style consistently in cada language y unmatched text
 // renders plain (#869).
 const HINT_SEGMENT = /((?:<[^>]+>)|(?:%"[^"]*")|(?:[/@#+%!][^\s,()<.]+))/g;
 

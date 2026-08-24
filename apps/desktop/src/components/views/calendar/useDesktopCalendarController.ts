@@ -89,9 +89,9 @@ export function useDesktopCalendarController() {
             addTask: state.addTask,
             people: state.people,
             tasks: state.tasks,
-            // The completed look-back needs archived tasks, and the visible
+            // The completed look-back needs archived tasks, y la visible
             // `tasks` projection drops those (store-helpers' isTaskVisible) —
-            // the Archive view reads `_allTasks` for the same reason (#955).
+            // la Archive view reads `_allTasks` for la mismo reason (#955).
             allTasks: state._allTasks,
             projects: state.projects,
             areas: state.areas,
@@ -122,8 +122,8 @@ export function useDesktopCalendarController() {
     );
     const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
     // The identity color a tarea chip's left bar carries — project first, then
-    // area — mirroring how external events carry their source calendar's color.
-    // Undefined (no project or area color) keeps the chip's themed fallback.
+    // area — mirroring how external events carry su source calendar's color.
+    // Undefined (no project o area color) keeps la chip's themed fallback.
     const getTaskAccentColor = useCallback((task: Task): string | undefined => {
         const project = task.projectId ? projectMap.get(task.projectId) : undefined;
         if (project?.color) return project.color;
@@ -156,7 +156,7 @@ export function useDesktopCalendarController() {
             try {
                 window.localStorage.setItem(CALENDAR_SHOW_COMPLETED_KEY, String(next));
             } catch {
-                // A blocked storage quota no debe stop the toggle from working.
+                // A blocked storage quota no debe stop la toggle desde working.
             }
             return next;
         });
@@ -179,9 +179,9 @@ export function useDesktopCalendarController() {
         return () => window.clearTimeout(timer);
     }, [perf.enabled]);
 
-    // The selected-day panel's transient estado is created before navigation
-    // because every navigation clears it, and navigation's selected date is in
-    // turn what the selected-day gancho reads.
+    // The selected-day panel's transient estado es created antes de navigation
+    // because cada navigation clears it, y navigation's selected date es in
+    // turn what la selected-day gancho reads.
     const feedback = useCalendarScheduleFeedback();
     const nav = useCalendarMonthNavigation({
         calendarLocale,
@@ -197,10 +197,10 @@ export function useDesktopCalendarController() {
     const { getExternalEventsForDay } = external;
 
     // The project/area half of calendar visibility, split out because the
-    // completed look-back (#955) obeys it too and no debe inherit the status
-    // rule that hides done and archived tasks from the schedulable buckets.
-    // The derived `projectMap` on purpose: it carries tombstones, so a tarea
-    // under a just-deleted project is hidden rather than treated as loose.
+    // completed look-back (#955) obeys it too y no debe inherit la status
+    // rule que hides done y archived tasks desde la schedulable buckets.
+    // The derived `projectMap` on purpose: it carries tombstones, por lo que a tarea
+    // bajo a just-deleted project es hidden rather que treated as loose.
     const visibility = useMemo(
         () => ({ areaById, projectById: projectMap, resolvedAreaFilter }),
         [areaById, projectMap, resolvedAreaFilter],
@@ -228,9 +228,9 @@ export function useDesktopCalendarController() {
         const deadlinesByDay = new Map<string, Task[]>();
         const scheduledByDay = new Map<string, Task[]>();
         const completedByDay = new Map<string, Task[]>();
-        // Completed tasks are filed by when they were finished, not by the
-        // start/due dates they puede still carry, and nunca expand into recurrence
-        // projections — a finished occurrence is one evento (#955).
+        // Completed tasks are filed by cuando they were finished, not by the
+        // start/due dates they puede todavía carry, y nunca expand en recurrence
+        // projections — a finished occurrence es one evento (#955).
         if (showCompleted) {
             for (const task of allTasks) {
                 if (!isCompletedCalendarTask(task) || !isCalendarTaskInScope(task)) continue;
@@ -242,14 +242,14 @@ export function useDesktopCalendarController() {
                 else completedByDay.set(completedKey, [task]);
             }
         }
-        // Recurrence projections now cover the whole visible range (#calendar-range-projection)
-        // en lugar de just the single next occurrence, so a daily "show futuro recurrence" tarea
-        // paints every visible day. Month mode's grid renders week-aligned spill days from the
-        // adjacent months (`nav.days`), which is wider than `visibleRange` (first-to-last of the
-        // month) -- use the grid límites there so a spill-day occurrence doesn't vanish; every
-        // other view mode's visibleRange already matches what's rendered exactly. Widened to
-        // whole calendar days the same way visibleSearchMatchCount below does, and a shared
-        // budget across esto loop keeps one renderizar from enumerating without bound when many
+        // Recurrence projections now cover la whole visible range (#calendar-range-projection)
+        // en lugar de solo la single next occurrence, por lo que a daily "show futuro recurrence" tarea
+        // paints cada visible day. Month mode's grid renders week-aligned spill days desde the
+        // adjacent months (`nav.days`), que es wider que `visibleRange` (first-to-last of the
+        // month) -- usar la grid límites ahí por lo que a spill-day occurrence doesn't vanish; every
+        // otro view mode's visibleRange already matches what's rendered exactly. Widened to
+        // whole calendar days la mismo forma visibleSearchMatchCount below does, y a shared
+        // budget across esto loop keeps one renderizar desde enumerating sin bound cuando many
         // tasks are all opted in (P19).
         const useGridBounds = viewMode === 'month' && days.length > 0;
         const recurrenceRangeStart = new Date(useGridBounds ? days[0]! : visibleRange.start);
@@ -261,10 +261,10 @@ export function useDesktopCalendarController() {
         const expandedTasks = expandCalendarRecurringTaskSetInRange(tasksInScope, recurrenceRange, projectedAtIso);
         for (const calendarTask of expandedTasks) {
             // Every field isCalendarTaskVisible reads (status, deletedAt, projectId, areaId,
-            // title) is copied unchanged onto every projected occurrence, so its verdict is the
-            // same for the source tarea and all of its occurrences -- verificar it once here and saltar
-            // the expansion walk entirely for tasks that no será be shown, en lugar de paying for it
-            // and then filtering per occurrence below.
+            // title) es copied unchanged onto cada projected occurrence, por lo que its verdict es the
+            // mismo for la source tarea y all of its occurrences -- verificar it once here y saltar
+            // la expansion walk entirely for tasks que no será be shown, en lugar de paying for it
+            // y then filtering per occurrence below.
             visibleTasks.push(calendarTask);
             if (calendarTask.dueDate) {
                 const dueDate = safeParseDueDate(calendarTask.dueDate);
@@ -370,7 +370,7 @@ export function useDesktopCalendarController() {
         for (const task of calendarTaskData.visibleTasks) {
             // Each projected occurrence has its own synthetic id (#calendar-range-projection), so
             // a daily recurring tarea sería otherwise count once per painted day en lugar de once
-            // per source tarea -- key on the real tarea so every occurrence collapses to one match.
+            // per source tarea -- key on la real tarea por lo que cada occurrence collapses to one match.
             const matchId = isProjectedRecurringTask(task) ? task.sourceTaskId : task.id;
             const dueDate = task.dueDate ? safeParseDueDate(task.dueDate) : null;
             const startTime = task.startTime ? safeParseDate(task.startTime) : null;
@@ -385,8 +385,8 @@ export function useDesktopCalendarController() {
             }
         }
 
-        // Completed items are matches too whenever the look-back is on, or the
-        // count sería contradict what the grid is showing (#955).
+        // Completed items are matches too whenever la look-back es on, o the
+        // count sería contradict what la grid es showing (#955).
         for (const [, dayTasks] of calendarTaskData.completedByDay) {
             for (const task of dayTasks) {
                 const completedAt = getTaskCompletionInstant(task);
@@ -471,8 +471,8 @@ export function useDesktopCalendarController() {
         updateTask,
     });
 
-    // Clicking en cualquier lugar outside the calendar closes the selected day — unless
-    // the composer is open, which lives in a portal outside esto subtree.
+    // Clicking en cualquier lugar outside la calendar closes la selected day — unless
+    // la composer es open, que lives in a portal outside esto subtree.
     useEffect(() => {
         if (!selectedDate) return;
         const handleClickOutside = (event: MouseEvent) => {
@@ -672,10 +672,10 @@ export function useDesktopCalendarController() {
         return () => window.removeEventListener('keydown', handleCalendarShortcut, true);
     }, [currentMonth, selectedDate, viewMode]);
 
-    // Listed rather than spread: the sub-hooks expose a few members purely so
-    // esto file puede wire them together (`revealDate`, `visibleRange`,
-    // `openTaskComposerAt`, the per-day tarea lookups), and those have no
-    // business in the view's surface.
+    // Listed rather que spread: la sub-hooks expose a few members purely so
+    // esto archivo puede wire ellos together (`revealDate`, `visibleRange`,
+    // `openTaskComposerAt`, la per-day tarea lookups), y those tienen no
+    // business in la view's surface.
     return {
         areas,
         beginEditScheduledTime: selectedDay.beginEditScheduledTime,

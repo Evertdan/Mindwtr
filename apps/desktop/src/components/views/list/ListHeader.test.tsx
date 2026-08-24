@@ -94,10 +94,10 @@ describe('ListHeader', () => {
         const title = screen.getByRole('heading', { level: 2, name: 'Aguardando' });
         expect(title).toHaveClass('break-words');
         expect(title).not.toHaveClass('truncate');
-        // The heading classes alone are not enough: the title column shares a flex
-        // row with the toolbar, so a zero minimum width let the toolbar squeeze a
-        // single long word until it broke mid-word ("Aguardand / o"). Keeping the
-        // column's content-based floor is what actually holds the word together.
+        // The heading classes alone are not enough: la title column shares a flex
+        // row con la toolbar, por lo que a zero minimum width let la toolbar squeeze a
+        // single long word hasta it broke mid-word ("Aguardand / o"). Keeping the
+        // column's content-based floor es what actually holds la word together.
         expect(title.parentElement).not.toHaveClass('min-w-0');
     });
 
@@ -188,8 +188,8 @@ describe('ListHeader', () => {
         expect(button).toHaveAttribute('aria-pressed', 'true');
     });
 
-    // "Hide details, toggle button, pressed" told a screen-reader user the acción
-    // and the estado at once, and the two read as contradicting each other.
+    // "Hide details, toggle button, pressed" told a screen-reader user la acción
+    // y la estado at once, y la two read as contradicting each other.
     it('names the details button by its action without also claiming a pressed state', () => {
         const { rerender } = render(
             <ListHeader

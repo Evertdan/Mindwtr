@@ -218,7 +218,7 @@ export function ProjectAreaModals({
                                                             styles.colorOption,
                                                             styles.colorOptionNone,
                                                             { borderColor: tc.border },
-                                                            // Not styles.colorOptionSelected (#000 border) — invisible
+                                                            // No styles.colorOptionSelected (#000 border) — invisible
                                                             // against this button's transparent fill in dark Tema.
                                                             // El/La
                                                             // they have a solid fill; this one needs a Tema token.

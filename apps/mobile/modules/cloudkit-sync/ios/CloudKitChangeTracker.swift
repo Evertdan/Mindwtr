@@ -58,7 +58,7 @@ enum CloudKitChangeTracker {
                         result.newChangeToken = serializeToken(serverChangeToken)
                         result.moreComing = moreComing
                     case .failure(let error):
-                        // Token expiry is reported per-zone, not in the overall completion.
+                        // Expiración del token is reported per-zone, not in the overall completion.
                         if let ckError = error as? CKError, ckError.code == .changeTokenExpired {
                             tokenExpired = true
                         } else {
@@ -71,7 +71,7 @@ enum CloudKitChangeTracker {
 
             op.fetchRecordZoneChangesResultBlock = { overallResult in
                 callbackQueue.sync {
-                    // Check zone-level token expiry first — it's the authoritative signal.
+                    // Comprueba el nivel de zona token expiry first — it's the authoritative signal.
                     if tokenExpired {
                         continuation.resume(throwing: ChangeTokenExpiredError())
                         return
@@ -84,7 +84,7 @@ enum CloudKitChangeTracker {
                     case .success:
                         continuation.resume(returning: result)
                     case .failure(let error):
-                        // Fallback: overall completion may also report token expiry
+                        // Respaldo: overall completion may also report token expiry
                         if let ckError = error as? CKError, ckError.code == .changeTokenExpired {
                             continuation.resume(throwing: ChangeTokenExpiredError())
                         } else {

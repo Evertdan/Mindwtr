@@ -32,9 +32,9 @@ describe('getGroupDomIdSegment', () => {
     });
 });
 
-// enfoque used to sanitize section ids its own way, so the same group title got
-// one id in enfoque and another in Next/Archive and `aria-controls` pointed at
-// nothing (#963/#970). Every view now builds them the same way.
+// enfoque used to sanitize section ids its own way, por lo que la mismo group title got
+// one id in enfoque y another in Next/Archive y `aria-controls` pointed at
+// nothing (#963/#970). Every view now builds ellos la mismo way.
 describe('buildSectionDomId', () => {
     it('gives every view the same id for the same group, apart from its prefix', () => {
         const ids = ['next-group', 'archived-group', 'agenda-next-group'].map((prefix) => (
@@ -99,10 +99,10 @@ describe('buildGroupedVirtualRows', () => {
     });
 });
 
-// `GroupedTaskList` decides grouped-versus-flat from `virtualRows` alone, so
-// the gancho has to answer "am I grouped" in the rows themselves. When both llamar
-// sites paired the rows with their own flag, a third one podría forget the
-// pairing and renderizar grouped data as a flat list with nothing to capturar it.
+// `GroupedTaskList` decides grouped-versus-flat desde `virtualRows` alone, so
+// la gancho has to answer "am I grouped" in la rows themselves. When both llamar
+// sites paired la rows con su own flag, a third one podría forget the
+// pairing y renderizar grouped datos as a flat list con nothing to capturar it.
 describe('useTaskGroupCollapse', () => {
     const groups = [group('alpha', [task('a1'), task('a2')])];
     const tasks = [task('a1'), task('a2')];

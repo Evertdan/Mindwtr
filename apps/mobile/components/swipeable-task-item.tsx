@@ -336,9 +336,9 @@ function SwipeableTaskItemInner({
                     return;
                 }
                 if (status === 'done' && previousStatus !== 'done') {
-                    // Completing mirrors deleting: immediate, with an undo toast
+                    // Completar espejos deleting: immediate, with an undo toast
                     // instead of a confirmation (matches the Desktop undo).
-                    // No title: the one-line message plus Undo is the whole point,
+                    // Sin título: the one-line message plus Undo is the whole point,
                     // and a "Notice" header just makes the toast taller (#1044).
                     showToast({
                         message: formatTaskMarkedDoneMessage(t, task.title),

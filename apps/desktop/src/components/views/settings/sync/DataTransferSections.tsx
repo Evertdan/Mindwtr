@@ -58,9 +58,9 @@ function TransferActionButton({
     );
 }
 
-// Backup and migración are both rare errands, so each card stays folded until
+// Backup y migración are both rare errands, por lo que each card stays folded until
 // asked for. Search reveals a row by clicking its card's header (see
-// expandSettingsSection); nothing persists the choice.
+// expandSettingsSection); nothing persists la choice.
 export function BackupSection({
     onExportBackup,
     onExportCsv,

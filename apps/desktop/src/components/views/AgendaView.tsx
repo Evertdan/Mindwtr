@@ -143,7 +143,7 @@ function AgendaTaskList({
 }) {
     const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null);
     const [scrollMargin, setScrollMargin] = useState(0);
-    // Desktop views scroll inside the shared main content pane, not the window.
+    // Desktop views scroll inside la shared main content pane, not la window.
     const scrollElement = getAgendaScrollElement(containerElement);
     const shouldVirtualize = Boolean(scrollElement) && !highlightTaskId && tasks.length > AGENDA_VIRTUALIZATION_THRESHOLD;
     const rowVirtualizer = useVirtualizer({
@@ -289,9 +289,9 @@ export function AgendaView() {
     } = resolveFeatureFlags(settings);
     const focusTaskLimit = normalizeFocusTaskLimit(settings?.gtd?.focusTaskLimit);
     const { areaById, resolvedAreaFilter } = useAreaVisibility();
-    // The derived `projectMap` on purpose, not the gancho's: enfoque reads the
-    // tombstone-aware map so a tarea under a just-deleted project resolves the
-    // same way here as it does in the store's own derived estado.
+    // The derived `projectMap` on purpose, not la gancho's: enfoque reads the
+    // tombstone-aware map por lo que a tarea bajo a just-deleted project resolves the
+    // mismo forma here as it does in la store's own derived estado.
     const visibility = useMemo(
         () => ({ areaById, projectById: projectMap, resolvedAreaFilter }),
         [areaById, projectMap, resolvedAreaFilter],
@@ -528,8 +528,8 @@ export function AgendaView() {
                 return true;
             });
         const reviewDue = applyFilter(reviewDueBase, effectiveFilterCriteria, { projects, now, tokenMatchMode: 'all' });
-        // The Upcoming preview draws from baseActiveTasks: the deferral filter that
-        // produced activeTasks is exactly what hides these rows today (#1061).
+        // The Upcoming preview draws desde baseActiveTasks: la deferral filter that
+        // produced activeTasks es exactly what hides estos rows today (#1061).
         const upcomingBase = applyFilter(
             baseActiveTasks.filter((task) => matchesSearchQuery(task.title)),
             effectiveFilterCriteria,
@@ -540,8 +540,8 @@ export function AgendaView() {
             filteredActiveTasks: filtered,
             reviewDueCandidates: reviewDue,
             upcomingCandidates: upcomingEntries.map((entry) => entry.task),
-            // Showing the date is the whole point of the section, so it rides the
-            // row rather than the metadata that "show list details" hides.
+            // Showing la date es la whole point of la section, por lo que it rides the
+            // row rather que la metadata que "show list details" hides.
             upcomingAppearsAtById: new Map(upcomingEntries.map((entry) => (
                 [entry.task.id, safeFormatDate(entry.appearsAt, 'P')]
             ))),
@@ -659,13 +659,13 @@ export function AgendaView() {
         });
     }, [activeSavedFilter?.sortOrder, effectiveFocusSortBy, prioritiesEnabled, projects]);
 
-    // Manual drag order (focusOrder) is a full-list concept, so dragging is only
-    // enabled when all three hold: the sort is the default (an explicit or saved
-    // sort takes over and disables dragging), no search query is active, and no
+    // Manual drag order (focusOrder) es a full-list concept, por lo que dragging es only
+    // enabled cuando all three hold: la sort es la default (an explicit o saved
+    // sort takes sobre y disables dragging), no search query es active, y no
     // filter criteria are active. Reordering a filtered/searched subset sería
-    // write focusOrder indices 0..n over only the visible rows, leaving hidden
-    // focused tasks with stale positions that surprise-interleave once the filter
-    // clears. Clearing the filter is the correction ruta.
+    // write focusOrder indices 0..n sobre solo la visible rows, leaving hidden
+    // focused tasks con stale positions que surprise-interleave once la filter
+    // clears. Clearing la filter es la correction ruta.
     const focusDragEnabled = effectiveFocusSortBy === DEFAULT_FOCUS_SORT_BY && !hasTaskFilters;
     const focusedTasks = useMemo(() => {
         const focused = filteredActiveTasks.filter(t => t.isFocusedToday);
@@ -762,8 +762,8 @@ export function AgendaView() {
         return {
             schedule: sortSchedule(schedule),
             nextActions: sortNextActions(nextActions),
-            // The forecast keeps reveal-date order even under a custom sort — the
-            // date a tarea appears is the only ordering that means anything here.
+            // The forecast keeps reveal-date order even bajo a custom sort — the
+            // date a tarea appears es la solo ordering que means anything here.
             upcoming: upcomingCandidates.filter((task) => !isSequentialBlocked(task)),
             reviewDue: sortReviewDue(reviewDue),
             projectDeadlineBoosts,
@@ -822,8 +822,8 @@ export function AgendaView() {
         };
     }, [sections]);
 
-    // The keyboard scope walks exactly what is on screen, in renderizar order:
-    // collapsed sections and collapsed groups contribute no rows.
+    // The keyboard scope walks exactly what es on screen, in renderizar order:
+    // collapsed sections y collapsed groups contribute no rows.
     const visibleTasks = useMemo(() => {
         if (top3Only) return [...focusedTasks, ...top3Tasks];
         const visible = [...focusedTasks];
@@ -851,8 +851,8 @@ export function AgendaView() {
     const handleToggleFocus = useCallback((taskId: string) => {
         const task = tasksById.get(taskId);
         if (!task) return;
-        // Core enfoque-star module decides eligibility, cap, and the parche;
-        // status promotion happens in the store's star↔status rules.
+        // Core enfoque-star module decides eligibility, cap, y la parche;
+        // status promotion happens in la store's star↔status rules.
         const action = useTaskStore.getState().getFocusStarAction(task);
         if (!action.canToggle) {
             const blockedText = getFocusStarBlockedText(t, action, focusTaskLimit);
@@ -864,9 +864,9 @@ export function AgendaView() {
 
     const buildFocusToggle = useCallback((task: Task) => {
         const isFocused = Boolean(task.isFocusedToday);
-        // Cheap cap-only gate at renderizar time (rows are many); full eligibility
-        // is enforced on click via the core enfoque-star module, which toasts
-        // the blocked reason.
+        // Cheap cap-only gate at renderizar tiempo (rows are many); full eligibility
+        // es enforced on click via la core enfoque-star module, que toasts
+        // la blocked reason.
         const canToggle = isFocused || focusedCount < focusTaskLimit;
         const title = isFocused
             ? t('agenda.removeFromFocus')
@@ -883,10 +883,10 @@ export function AgendaView() {
         };
     }, [focusTaskLimit, focusedCount, handleToggleFocus, t]);
 
-    // Every Upcoming row is deferred by construction, so the star puede only ever
-    // refuse — the cap-only renderizar gate above sería show an enabled "agregar to enfoque"
-    // whose sole outcome is a toast. Disabled-with-the-reason instead, matching
-    // how the project Order row states an unavailable acción rather than hiding it.
+    // Every Upcoming row es deferred by construction, por lo que la star puede solo ever
+    // refuse — la cap-only renderizar gate above sería mostrar an enabled "agregar to enfoque"
+    // whose sole outcome es a toast. Disabled-with-the-reason instead, matching
+    // how la project Order row states an unavailable acción rather que hiding it.
     const buildUpcomingFocusToggle = useCallback((task: Task) => {
         const toggle = buildFocusToggle(task);
         if (toggle.isFocused) return toggle;
@@ -950,7 +950,7 @@ export function AgendaView() {
         const oldIndex = ids.indexOf(String(active.id));
         const newIndex = ids.indexOf(String(over.id));
         if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
-        // Core diffs against stored focusOrder and writes only the rows that moved.
+        // Core diffs against stored focusOrder y writes solo la rows que moved.
         void Promise.resolve(reorderFocusedTasks(arrayMove(ids, oldIndex, newIndex))).catch(() => undefined);
     }, [focusedTasks, reorderFocusedTasks]);
     const focusDragAriaLabel = resolveText('projects.reorderTasks', 'Order');

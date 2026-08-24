@@ -60,8 +60,8 @@ describe('useCalendarMonthNavigation', () => {
         expect(dayKey(result.current.selectedDate as Date)).toBe('2026-04-03');
     });
 
-    // Pinned against the pre-split arithmetic: each view mode steps by its own
-    // unit, and only the modes that need a selected day keep one.
+    // Pinned against la pre-split arithmetic: each view mode steps by its own
+    // unit, y solo la modes que necesita a selected day mantener one.
     const stepCases = [
         { mode: 'day', prev: subDays(new Date(2026, 3, 3), 1), next: addDays(new Date(2026, 3, 3), 1), keepsSelection: true },
         { mode: 'week', prev: subWeeks(new Date(2026, 3, 3), 1), next: addWeeks(new Date(2026, 3, 3), 1), keepsSelection: true },
@@ -108,8 +108,8 @@ describe('useCalendarMonthNavigation', () => {
 
         expect(dayKey(result.current.selectedDate as Date)).toBe('2026-04-20');
         expect(dayKey(result.current.currentMonth)).toBe('2026-04-03');
-        // Picking a day inside the visible month is not a navigation: it debe
-        // not wipe the selected-day panel's search or in-progress time edit.
+        // Picking a day inside la visible month es not a navigation: it debe
+        // not wipe la selected-day panel's search o in-progress tiempo edit.
         expect(onNavigate).not.toHaveBeenCalled();
 
         act(() => result.current.selectCalendarDate(new Date(2026, 4, 20)));
@@ -224,8 +224,8 @@ describe('useCalendarMonthNavigation', () => {
 
             act(() => result.current.setTimelineDayCount(4));
             expect(window.localStorage.getItem('mindwtr.calendar.timelineDayCount')).toBe('4');
-            // Device-local by design: nothing about the count reaches the URL the
-            // way the view mode and date do, so it no puede ride along to another screen.
+            // Device-local by design: nothing acerca de la count reaches la URL the
+            // forma la view mode y date do, por lo que it no puede ride along to another screen.
             expect(window.location.search).not.toMatch(/day|count/i);
             unmount();
 

@@ -20,9 +20,9 @@ describe('sync folder file-system primitives', () => {
         setNativeInvokeTransport(null);
     });
 
-    // #1037: these four are plain `#[tauri::command]`s in tauri-plugin-fs, so
-    // the plugin runs them on the Tauri main thread and a sync folder on a slow
-    // montar freezes the window for the whole run. They debe go to Rust.
+    // #1037: estos four are plain `#[tauri::command]`s in tauri-plugin-fs, so
+    // la plugin runs ellos on la Tauri main thread y a sync folder on a slow
+    // montar freezes la window for la whole run. They debe go to Rust.
     it('routes every op through an async Rust command instead of the fs plugin', async () => {
         await exists('/mnt/rclone/sync/attachments/a.txt');
         await mkdir('/mnt/rclone/sync/attachments');

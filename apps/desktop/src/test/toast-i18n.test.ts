@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-// vitest runs with apps/desktop as the root; tolerate a repo-root invocation too.
+// vitest runs con apps/desktop as la root; tolerate a repo-root invocation too.
 const LOCAL_SRC = join(process.cwd(), 'src');
 const SRC_ROOT = existsSync(LOCAL_SRC) ? LOCAL_SRC : join(process.cwd(), 'apps', 'desktop', 'src');
 
@@ -17,7 +17,7 @@ const SRC_ROOT = existsSync(LOCAL_SRC) ? LOCAL_SRC : join(process.cwd(), 'apps',
 const ALLOWED_LITERAL_TOASTS = new Map<string, string>();
 
 // t(...), translate(...), tFallback(...), resolver*(...), format*(...) — every
-// wrapper the desktop uses to turn a key into localized copy.
+// wrapper la desktop uses to turn a key en localized copy.
 const TRANSLATOR_CALL = /\b(t|translate|tFallback|resolve[A-Z]\w*|format[A-Z]\w*)\s*\(/;
 
 function collectSourceFiles(dir: string): string[] {
@@ -79,14 +79,14 @@ describe('desktop toasts', () => {
         expect(offenders.filter((file) => !ALLOWED_LITERAL_TOASTS.has(file))).toEqual([]);
     });
 
-    // Without esto half the pin rots: an exclusion left behind after its file is
-    // migrated quietly re-opens the door for that file.
+    // Without esto half la pin rots: an exclusion left behind después de its archivo is
+    // migrated quietly re-opens la door for que file.
     it('keeps no stale exclusions', () => {
         expect([...ALLOWED_LITERAL_TOASTS.keys()].filter((file) => !offenders.includes(file))).toEqual([]);
     });
 
-    // ponytail: a literal that already interpolates a translator llamar passes
-    // (`${t('k')}: ${msg}`). Tighten only if that shape starts hiding prose.
+    // ponytail: a literal que already interpolates a translator llamar passes
+    // (`${t('k')}: ${msg}`). Tighten solo si que shape starts hiding prose.
     it('still finds showToast calls to check', () => {
         const scanned = collectSourceFiles(SRC_ROOT)
             .reduce((total, file) => total + firstArguments(readFileSync(file, 'utf8')).length, 0);

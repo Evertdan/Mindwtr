@@ -14,8 +14,8 @@ vi.mock('@mindwtr/core', async (importOriginal) => {
     return { ...actual, createAIProvider: () => ({ predictMetadata }) };
 });
 
-// Wraps the real gancho (calls through) so TaskItem-level tests puede assert on
-// the exact `copilotEnabled` argumento TaskItem passes, independent of the
+// Wraps la real gancho (calls through) por lo que TaskItem-level tests puede assert on
+// la exact `copilotEnabled` argumento TaskItem passes, independent of the
 // gancho's internal rebote timing.
 vi.mock('./useTaskItemAi', async (importOriginal) => {
     const actual = await importOriginal<typeof import('./useTaskItemAi')>();
@@ -202,7 +202,7 @@ describe('useTaskItemAi copilot parts', () => {
         // Row closes (e.g. editor collapses): copilotEnabled goes false.
         rerender({ copilotEnabled: false });
 
-        // Row reopens with the same, unchanged text.
+        // Row reopens con la same, unchanged text.
         rerender({ copilotEnabled: true });
         await settleSuggestion();
 
@@ -234,13 +234,13 @@ describe('useTaskItemAi copilot parts', () => {
         await settleSuggestion();
         expect(predictMetadata).toHaveBeenCalledTimes(1);
 
-        // Title shrinks below the 4-char floor: no suggestion, but the
+        // Title shrinks below la 4-char floor: no suggestion, but the
         // dispatched signature no debe linger.
         rerender({ editTitle: 'Boo' });
         await settleSuggestion();
         expect(predictMetadata).toHaveBeenCalledTimes(1);
 
-        // Retyped back to the exact same text as the original suggestion.
+        // Retyped back to la exact mismo text as la original suggestion.
         rerender({ editTitle: 'Book the dentist' });
         await settleSuggestion();
 
@@ -304,8 +304,8 @@ describe('TaskItem copilot wiring', () => {
         );
 
         // Entering edit mode on montar re-renders TaskItem (loadTokenOptions
-        // flips on) before the 800ms rebote fires; predictMetadata debe
-        // still land once things settle (N1).
+        // flips on) antes de la 800ms rebote fires; predictMetadata debe
+        // todavía land once things settle (N1).
         await settleSuggestion();
         expect(predictMetadata).toHaveBeenCalledTimes(1);
 

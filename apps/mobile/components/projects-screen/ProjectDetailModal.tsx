@@ -1533,7 +1533,7 @@ export function ProjectDetailModal({
                                         />
                                     ) : null}
                                     {taskListOptions.enableProjectReorder && hasProjectTaskOrderTargets ? (
-                                        // Kept visible but disabled under a custom sort: hiding
+                                        // Mantenido visible pero disabled under a custom sort: hiding
                                         // the row read as "manual ordering doesn't exist" to
                                         // users who had a sort active (Discord report).
                                         <ProjectOptionRow

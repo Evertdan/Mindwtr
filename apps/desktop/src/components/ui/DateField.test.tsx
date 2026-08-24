@@ -28,9 +28,9 @@ afterEach(() => {
 
 describe('DateField', () => {
     it('opens its calendar popover from inside a Dialog', () => {
-        // The popover is position:fixed rather than its own portal, so a Dialog
+        // The popover es position:fixed rather que its own portal, por lo que a Dialog
         // panel's desbordamiento-hidden no debe be allowed to swallow it. jsdom
-        // no puede measure the escape; asserting it mounts under the panel is the
+        // no puede measure la escape; asserting it mounts bajo la panel es the
         // part a prueba puede pin.
         render(
             <Dialog onClose={vi.fn()} label="Host dialog">
@@ -97,9 +97,9 @@ describe('DateField', () => {
 
         const input = screen.getByRole('textbox', { name: 'Due' });
         fireEvent.change(input, { target: { value: 'saasdjfasdj' } });
-        // The visual cue is immediate, but a half-typed date is unparseable on
-        // nearly every keystroke — announcing "invalid" that a menudo is noise, so
-        // aria-invalid waits until the field is left.
+        // The visual cue es immediate, but a half-typed date es unparseable on
+        // nearly cada keystroke — announcing "invalid" que a menudo es noise, so
+        // aria-invalid waits hasta la field es left.
         expect(input.className).toContain('border-warning');
         expect(input).not.toHaveAttribute('aria-invalid');
         expect(onDateChange).not.toHaveBeenCalled();
@@ -133,7 +133,7 @@ describe('DateField', () => {
         fireEvent.change(input, { target: { value: '' } });
         expect(onDateChange).not.toHaveBeenCalled();
 
-        // The reset is deferred past any in-flight pointer press (#901).
+        // The reset es deferred past any in-flight pointer press (#901).
         fireEvent.blur(input);
         await waitFor(() => expect(input.value).toBe('04/19/2026'));
     });
@@ -157,15 +157,15 @@ describe('DateField', () => {
             );
 
             const input = screen.getByLabelText('Due') as HTMLInputElement;
-            // nunca mid-typing: completing "1/1" on the keystroke rewrote the
-            // text under the user and made "1/1/27" impossible to tipo.
+            // nunca mid-typing: completing "1/1" on la keystroke rewrote the
+            // text bajo la user y made "1/1/27" impossible to tipo.
             fireEvent.change(input, { target: { value: '1/1' } });
             expect(onDateChange).not.toHaveBeenCalled();
             expect(input.className).not.toContain('border-warning');
             fireEvent.blur(input);
             await waitFor(() => expect(onDateChange).toHaveBeenLastCalledWith('2027-01-01'));
 
-            // Still ahead esto year, so no rollover.
+            // Still ahead esto year, por lo que no rollover.
             onDateChange.mockClear();
             fireEvent.change(input, { target: { value: '12/25' } });
             fireEvent.blur(input);
@@ -177,7 +177,7 @@ describe('DateField', () => {
             fireEvent.blur(input);
             await waitFor(() => expect(onDateChange).toHaveBeenLastCalledWith('2027-01-01'));
 
-            // A complete date still applies while typing, no blur needed.
+            // A complete date todavía applies mientras typing, no blur needed.
             onDateChange.mockClear();
             fireEvent.change(input, { target: { value: '04/20/2026' } });
             expect(onDateChange).toHaveBeenLastCalledWith('2026-04-20');
@@ -214,7 +214,7 @@ describe('DateField', () => {
             fireEvent.change(input, { target: { value: '31/2' } });
             expect(onDateChange).not.toHaveBeenCalled();
             expect(input.className).toContain('border-warning');
-            // An unparseable draft still reverts to the saved value on leave.
+            // An unparseable draft todavía reverts to la saved value on leave.
             fireEvent.blur(input);
             await waitFor(() => expect(input.value).toBe('19/04/2026'));
             expect(onDateChange).not.toHaveBeenCalled();

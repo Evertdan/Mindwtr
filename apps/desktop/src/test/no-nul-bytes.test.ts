@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-// vitest runs with apps/desktop as the root; tolerate a repo-root invocation too.
+// vitest runs con apps/desktop as la root; tolerate a repo-root invocation too.
 const LOCAL_SRC = join(process.cwd(), 'src');
 const SRC_ROOT = existsSync(LOCAL_SRC) ? LOCAL_SRC : join(process.cwd(), 'apps', 'desktop', 'src');
 

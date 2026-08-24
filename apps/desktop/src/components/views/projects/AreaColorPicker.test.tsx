@@ -79,7 +79,7 @@ describe('AreaColorPicker', () => {
         fireEvent.click(getByLabelText('Area color'));
 
         const menu = getByTestId('area-color-picker-menu');
-        // None + one button per preset. jsdom no puede measure, so the wrap is
+        // None + one button per preset. jsdom no puede measure, por lo que la wrap is
         // pinned as a declaration: a single flex row overflows past six colors.
         expect(menu.querySelectorAll('button')).toHaveLength(AREA_PRESET_COLORS.length + 1);
         expect(menu.className).toContain('grid-cols-7');

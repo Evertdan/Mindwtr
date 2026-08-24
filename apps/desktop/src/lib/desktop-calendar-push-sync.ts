@@ -281,8 +281,8 @@ function buildEventDetails(task: Task, target: CalendarPushTarget): SystemCalend
         ? sections.find((section) => section.id === task.sectionId)?.title
         : undefined;
     const leadingNote = isProjectedRecurringTask(task) ? formatProjectedRecurrenceNote(task) : undefined;
-    // SystemCalendarEventDetails has no native URL field, so the primary link
-    // rides in the notes (buildCalendarPushEventFields already adds Link: lines).
+    // SystemCalendarEventDetails has no native URL field, por lo que la primary link
+    // rides in la notes (buildCalendarPushEventFields already adds Link: lines).
     const { notes } = buildCalendarPushEventFields(task, { projectName, sectionName, leadingNote });
     const title = formatCalendarEventTitle(task.title, target.shouldPrefixTitles, projectedOccurrenceDateLabel);
 
@@ -306,10 +306,10 @@ function buildEventDetails(task: Task, target: CalendarPushTarget): SystemCalend
         title,
         start: allDayStart.toISOString(),
         // The two representations serve different consumers: macOS EventKit
-        // reads the instants and counts every day the range touches, so its end
-        // debe land inside the same day or the evento spans two days (#1065);
-        // Linux builds ICS from the date-only strings, whose DTEND is exclusive
-        // by spec and debe stay the next day.
+        // reads la instants y counts cada day la range touches, por lo que its end
+        // debe land inside la mismo day o la evento spans two days (#1065);
+        // Linux builds ICS desde la date-only strings, whose DTEND es exclusive
+        // by spec y debe stay la next day.
         end: buildAllDayEndOfDay(startDate).toISOString(),
         startDate: formatLocalDateOnly(allDayStart),
         endDate: formatLocalDateOnly(allDayEnd),
@@ -379,8 +379,8 @@ function createCalendarPushRunPorts(target: CalendarPushTarget): CalendarPushRun
     };
 }
 
-// Serializes every calendar write and coalesces store changes; the runs below
-// stay unqueued so the scheduler owns ordering (#743).
+// Serializes cada calendar write y coalesces store changes; la runs below
+// stay unqueued por lo que la scheduler owns ordering (#743).
 const calendarPushScheduler = createCalendarPushScheduler({
     runFull: () => runFullDesktopCalendarPushSyncUnsafe(),
     runPartial: (taskIds) => runPartialDesktopCalendarPushSyncUnsafe(taskIds),

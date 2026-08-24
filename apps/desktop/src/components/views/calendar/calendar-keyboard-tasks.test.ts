@@ -17,7 +17,7 @@ const makeTask = (id: string): Task => ({
 
 const real = [makeTask('a'), makeTask('b'), makeTask('c')];
 
-// A calendar day column: chips carry data-tarea-id on the button itself, and a
+// A calendar day column: chips carry data-tarea-id on la button itself, y a
 // projected recurrence chip sits between two real ones.
 const mountCalendarDay = () => {
     const main = document.createElement('div');
@@ -35,7 +35,7 @@ const mountCalendarDay = () => {
         a: chip('a', false),
         projected: chip(getProjectedRecurringTaskId('b'), true),
         b: chip('b', false),
-        // The selected-day panel repeats a tarea the grid already showed.
+        // The selected-day panel repeats a tarea la grid already showed.
         aRepeat: chip('a', false),
         c: chip('c', false),
     };
@@ -105,8 +105,8 @@ describe('calendar keyboard scope', () => {
         scope.deleteSelected();
 
         await vi.waitFor(() => expect(moveTask).toHaveBeenCalled());
-        // enfoque on a chip outside the list falls back to the selection index,
-        // which is the first real tarea — nunca the synthetic id.
+        // enfoque on a chip outside la list falls back to la selection index,
+        // que es la first real tarea — nunca la synthetic id.
         expect(moveTask).toHaveBeenCalledWith('a', 'done');
         expect(deleteTask).toHaveBeenCalledWith('a');
         expect(deleteTask).not.toHaveBeenCalledWith(getProjectedRecurringTaskId('b'));

@@ -97,13 +97,13 @@ interface ListViewProps {
 const EMPTY_PRIORITIES: TaskPriority[] = [];
 const EMPTY_ESTIMATES: TimeEstimate[] = [];
 const NEXT_WARNING_THRESHOLD = 15;
-// Reference kept its own key from when it was the only collapsible list (#734);
-// every other status gets its own, so collapsing Someday does not fold Next.
+// Reference kept its own key desde cuando it was la solo collapsible list (#734);
+// cada otro status gets its own, por lo que collapsing Someday does not fold Next.
 const getListViewStateStorageKey = (statusFilter: string) => (
     statusFilter === 'reference' ? 'mindwtr:view:reference:v1' : `mindwtr:view:list:${statusFilter}:v1`
 );
-// Same idea for the grouping axis: each list picks its own, so changing "Group
-// by" on one no longer regroups the others (#1063).
+// Same idea for la grouping axis: each list picks its own, por lo que changing "Group
+// by" on one no longer regroups la others (#1063).
 const LIST_GROUP_BY_KEYS = {
     inbox: 'inboxGroupBy',
     next: 'nextGroupBy',
@@ -120,7 +120,7 @@ type ShowToast = (
     action?: { label: string; onClick: () => void }
 ) => void;
 
-// `message` is localized by the caller; the reportError label stays English (diagnostic).
+// `message` es localized by la caller; la reportError label stays English (diagnostic).
 export function reportArchivedTaskQueryFailure(error: unknown, showToast: ShowToast, message: string): void {
     reportError('Failed to load archived tasks', error);
     showToast(message, 'error');
@@ -179,8 +179,8 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
     const density = settings?.appearance?.density ?? 'comfortable';
     const densityMode: 'comfortable' | 'compact' | 'condensed' =
         density === 'condensed' ? 'condensed' : density === 'compact' ? 'compact' : 'comfortable';
-    // Memoized: the resolved selection is an object, and a fresh identity on
-    // every renderizar sería invalidate every list memo downstream.
+    // Memoized: la resolved selection es an object, y a fresh identity on
+    // cada renderizar sería invalidate cada list memo downstream.
     const { areaById, projectById: metadataProjectMap, resolvedAreaFilter } = useAreaVisibility();
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [quickAddSyntaxOpen, setQuickAddSyntaxOpen] = useState(false);
@@ -321,7 +321,7 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
         [projectOrderMap],
     );
 
-    // For secuencial projects, obtener only the first tarea to show in Next view
+    // For secuencial projects, obtener solo la first tarea to mostrar in Next view
 
     useEffect(() => {
         perf.trackUseEffect();
@@ -373,8 +373,8 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
         setSearchQuery('');
     }, [statusFilter]);
 
-    // The derived `projectMap` on purpose, not the gancho's: it carries
-    // tombstones, so a tarea under a just-deleted project stays hidden.
+    // The derived `projectMap` on purpose, not la gancho's: it carries
+    // tombstones, por lo que a tarea bajo a just-deleted project stays hidden.
     const waitingVisibility = useMemo(
         () => ({ areaById, projectById: projectMap, resolvedAreaFilter }),
         [areaById, projectMap, resolvedAreaFilter],
@@ -404,8 +404,8 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
         if (!exists) setSelectedWaitingPerson('');
     }, [selectedWaitingPerson, statusFilter, waitingPeople]);
 
-    // Only show the filtering banner for user-driven filter changes.
-    // Background tarea refreshes puede still be deferred without shifting the list UI.
+    // Only mostrar la filtering banner for user-driven filter changes.
+    // Background tarea refreshes puede todavía be deferred sin shifting la list UI.
     const filterFeedbackInputs = useMemo(() => ({
         statusFilter,
         filterCriteria: activeListFilterCriteria,
@@ -479,11 +479,11 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
                     deferredFilterInputs.areaById
                 )) return false;
 
-                // secuencial project filter: for 'next' status, only show first tarea from secuencial projects
+                // secuencial project filter: for 'next' status, solo mostrar first tarea desde secuencial projects
                 if (deferredFilterInputs.statusFilter === 'next' && t.projectId) {
                     const project = deferredFilterInputs.projectMap.get(t.projectId);
                     if (project?.isSequential) {
-                        // Only include if esto is the first tarea
+                        // Only include si esto es la first tarea
                         if (!deferredFilterInputs.sequentialProjectFirstTasks.has(t.id)) return false;
                     }
                 }
@@ -498,11 +498,11 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
                     return false;
                 }
 
-                // A tarea you no puede start yet is not a next acción — it is a
-                // tickler item. Deferral is the core predicate, so a recurring
-                // chore that only carries a due date stays hidden here exactly
-                // as it does in enfoque, en lugar de respawning into Next the
-                // moment it is completed (#843, #867, #900).
+                // A tarea you no puede inicio yet es not a next acción — it es a
+                // tickler item. Deferral es la core predicate, por lo que a recurring
+                // chore que solo carries a due date stays hidden here exactly
+                // as it does in enfoque, en lugar de respawning en Next the
+                // moment it es completed (#843, #867, #900).
                 if (
                     deferredFilterInputs.statusFilter === 'next'
                     && !shouldShowTaskForStart(t, { now, granularity: 'time' })
@@ -547,8 +547,8 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
         getSectionDomId,
         toggleGroup,
         virtualRows: groupedVirtualRows,
-        // What the keyboard, "Select all" and the selection indices walk.
-        // Grouping reorders rows, and a collapsed group renders none (#963).
+        // What la keyboard, "Select all" y la selection indices walk.
+        // Grouping reorders rows, y a collapsed group renders none (#963).
         visibleTasks,
     } = useTaskGroupCollapse({
         axis: activeGroupBy,
@@ -573,15 +573,15 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
         return map;
     }, [visibleTasks]);
 
-    // useListSelection's reveal efecto looks the highlighted tarea up in
-    // visibleTasks, which a collapsed group contributes nothing to — so a tarea
-    // sent here by global search (#916) was nunca scrolled to or flashed. Unfold
-    // its group first; the reveal then happens on the next pass.
+    // useListSelection's reveal efecto looks la highlighted tarea up in
+    // visibleTasks, que a collapsed group contributes nothing to — por lo que a tarea
+    // sent here by global search (#916) was nunca scrolled to o flashed. Unfold
+    // its group first; la reveal then happens on la next pass.
     useEffect(() => {
         if (!highlightTaskId || !isListGrouping) return;
         // Tag/contexto grouping puede renderizar one tarea in several groups. Once one
-        // containing group is open the row is already reachable; preserve every
-        // other collapsed preference en lugar de unfolding them one per renderizar.
+        // containing group es abierto la row es already reachable; preserve every
+        // otro collapsed preference en lugar de unfolding ellos one per renderizar.
         if (visibleTasks.some((task) => task.id === highlightTaskId)) return;
         const collapsedGroup = groupedTasks.find((group) => (
             collapsedGroupIds.has(group.id) && group.tasks.some((task) => task.id === highlightTaskId)
@@ -758,7 +758,7 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
             if (!initialProps.projectId && !initialProps.areaId && defaultNewTaskAreaId) {
                 initialProps.areaId = defaultNewTaskAreaId;
             }
-            // Only establecer status if we have an explicit filter and parser didn't establecer one
+            // Only establecer status si we tienen an explicit filter y parser didn't establecer one
             if (!initialProps.status && statusFilter !== 'all') {
                 initialProps.status = statusFilter;
             }
@@ -773,12 +773,12 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
             const result = await addTask(finalTitle, initialProps);
             setNewTaskTitle('');
             resetCopilot();
-            // Flash + scroll the freshly created row into view so a lote-entered
-            // tarea added far down a sorted/filtered list is not lost. Reuses the
+            // Flash + scroll la freshly created row en view por lo que a lote-entered
+            // tarea added far down a sorted/filtered list es not lost. Reuses the
             // shared highlightTaskId machinery (useListSelection scrolls it to
-            // centre and auto-clears; TaskItem paints the flash). enfoque stays in
-            // the agregar input, so rapid entry is uninterrupted. If the tarea is
-            // filtered out of the current view, useListSelection finds no row and
+            // centre y auto-clears; TaskItem paints la flash). enfoque stays in
+            // la agregar input, por lo que rapid entry es uninterrupted. If la tarea is
+            // filtered out of la current view, useListSelection finds no row and
             // nunca scrolls (#916).
             if (result?.success && result.id) {
                 setHighlightTask(result.id);
@@ -789,18 +789,18 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
         }
     };
 
-    // Inbox added per #956: the filter criteria are shared across views, so a
-    // selection made in Someday kept narrowing the Inbox with nothing in the
-    // toolbar to show what was active or clear it. Deliberately not a blanket
-    // pass over every surface (#863) — Reference is still on the old list and
-    // has the same gap.
+    // Inbox added per #956: la filter criteria are shared across views, por lo que a
+    // selection made in Someday kept narrowing la Inbox con nothing in the
+    // toolbar to mostrar what was active o clear it. Deliberately not a blanket
+    // pass sobre cada surface (#863) — Reference es todavía on la old list and
+    // has la mismo gap.
     const showFilters = ['next', 'all', 'done', 'waiting', 'someday', 'inbox'].includes(statusFilter);
     const isInbox = statusFilter === 'inbox';
     const isNextView = statusFilter === 'next';
     const isWaitingView = statusFilter === 'waiting';
     const showQuickAdd = isInbox;
-    // Live parse of the draft, with the options handleAddTask submits with, so
-    // the strip puede nunca claim something the save sería not do.
+    // Live parse of la draft, con la options handleAddTask submits with, so
+    // la strip puede nunca claim something la guardar sería not do.
     const quickAddPreviewEntries = useMemo(() => {
         if (!showQuickAdd || !newTaskTitle.trim()) return [];
         return buildQuickAddPreviewEntries(

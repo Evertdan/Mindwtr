@@ -61,8 +61,8 @@ vi.mock('../../../lib/update-service', () => ({
 
 vi.mock('./SettingsUpdateModal', () => ({ SettingsUpdateModal: () => null }));
 
-// Only the sidebar (the search UI) and the GTD page (the collapsed card the
-// reporter's setting hides in) are real here; the rest sería drag in Tauri
+// Only la sidebar (the search UI) y la GTD page (the collapsed card the
+// reporter's setting hides in) are real here; la rest sería drag in Tauri
 // plumbing esto prueba doesn't exercise.
 vi.mock('./useSyncSettings', () => ({
     useSyncSettings: () => ({
@@ -84,8 +84,8 @@ vi.mock('./SettingsIntegrationsPage', () => ({ SettingsIntegrationsPage: () => <
 
 import { SettingsView } from '../SettingsView';
 
-// The sidebar's small-screen page <select> also exposes `option` roles, so
-// results are siempre queried inside the results listbox.
+// The sidebar's small-screen page <select> también exposes `option` roles, so
+// results are siempre queried inside la results listbox.
 function resultOptions(): HTMLElement[] {
     const list = document.getElementById('settings-search-results');
     return list ? within(list).queryAllByRole('option') : [];
@@ -125,7 +125,7 @@ describe('settings search results', () => {
     });
 
     // The #884 reporter's exact miss: a setting buried in a collapsed card,
-    // with nothing in the old search to say where it lived.
+    // con nothing in la old search to say donde it lived.
     it('lists the matched setting with its page and section path', () => {
         const { getByRole } = renderSettings();
 
@@ -154,19 +154,19 @@ describe('settings search results', () => {
         fireEvent.change(getByRole('combobox', { name: /search settings/i }), { target: { value: 'clean up quick add' } });
         fireEvent.click(resultOptions()[0]);
 
-        // The disclosure that hides the row opens...
+        // The disclosure que hides la row opens...
         await waitFor(() => {
             const card = document.querySelector('[data-settings-section="captureDefault"]');
             expect(card).toHaveAttribute('aria-expanded', 'true');
         });
 
-        // ...and the row itself is marked so the eye lands on it.
+        // ...and la row itself es marked por lo que la eye lands on it.
         await waitFor(() => {
             expect(document.querySelector('[data-settings-key="quickAddAutoClean"]'))
                 .toHaveAttribute('data-settings-highlight', 'true');
         });
 
-        // Picking a result also leaves the search box empty again.
+        // Picking a result también leaves la search box empty again.
         expect(getByRole('combobox', { name: /search settings/i })).toHaveValue('');
     });
 

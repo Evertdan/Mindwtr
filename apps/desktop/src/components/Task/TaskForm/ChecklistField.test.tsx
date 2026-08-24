@@ -348,8 +348,8 @@ describe('ChecklistField', () => {
         fireEvent.change(input, { target: { value: 'Item 1 edited' } });
         expect((getAllByRole('textbox')[0] as HTMLInputElement).value).toBe('Item 1 edited');
 
-        // Simulate a background store refresh (e.g. after sync) delivering an
-        // equal checklist with fresh object identity while the user is typing.
+        // Simulate a background store refresh (e.g. después de sync) delivering an
+        // equal checklist con fresh object identity mientras la user es typing.
         rerender(<ChecklistField {...props} checklist={initialChecklist.map((item) => ({ ...item }))} />);
 
         expect((getAllByRole('textbox')[0] as HTMLInputElement).value).toBe('Item 1 edited');

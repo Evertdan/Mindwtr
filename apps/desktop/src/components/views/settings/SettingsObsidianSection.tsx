@@ -107,8 +107,8 @@ export function SettingsObsidianSection({
     const [detectedVaults, setDetectedVaults] = useState<DetectedObsidianVault[]>([]);
 
     useEffect(() => {
-        // Obsidian publishes its vault registry, so known vaults are offered
-        // one-click en lugar de making everyone browse the filesystem.
+        // Obsidian publishes its vault registry, por lo que known vaults are offered
+        // one-click en lugar de making everyone browse la filesystem.
         if (!open || !isTauri) return;
         let cancelled = false;
         void listDetectedObsidianVaults().then((vaults) => {

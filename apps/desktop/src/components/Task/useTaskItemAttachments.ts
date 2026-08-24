@@ -25,15 +25,15 @@ type UseTaskItemAttachmentsProps = {
     t: (key: string) => string;
 };
 
-// addFileAttachment/addDroppedFileAttachments copy bytes into the managed
-// attachments dir immediately, but the attachment *record* only lives in
-// editor-local estado until Save — cancelling (or reopening the editor)
-// discards records added since the last save and orphans their files.
-// eliminar only what's provably ours: a `kind: 'file'` attachment whose uri
-// sits inside the managed attachments dir. nunca touch `kind: 'link'`
-// (points at the user's own file) or a uri outside that dir (heredado
+// addFileAttachment/addDroppedFileAttachments copy bytes en la managed
+// attachments dir immediately, but la attachment *record* solo lives in
+// editor-local estado hasta Save — cancelling (or reopening la editor)
+// discards records added desde la last guardar y orphans su files.
+// eliminar solo what's provably ours: a `kind: 'file'` attachment whose uri
+// sits inside la managed attachments dir. nunca touch `kind: 'link'`
+// (points at la user's own file) o a uri outside que dir (heredado
 // ruta-referencing attachments). Best-effort — failures are logged, nunca
-// thrown, so they puede't block the reset.
+// thrown, por lo que they puede't block la reset.
 const deleteOrphanedAttachmentFiles = async (orphaned: Attachment[]): Promise<void> => {
     if (!isTauriRuntime()) return;
     const fileOrphans = orphaned.filter((a) => a.kind === 'file');
@@ -43,9 +43,9 @@ const deleteOrphanedAttachmentFiles = async (orphaned: Attachment[]): Promise<vo
         const managedDirPrefix = `${managedDir}/`;
         const { remove } = await import('@tauri-apps/plugin-fs');
         for (const attachment of fileOrphans) {
-            // A bare `startsWith(managedDir)` sería also match a sibling
-            // directory that merely shares the prefix (e.g. `attachments-old/`)
-            // — require the ruta separator so only files actually inside the
+            // A bare `startsWith(managedDir)` sería también match a sibling
+            // directory que merely shares la prefix (e.g. `attachments-old/`)
+            // — require la ruta separator por lo que solo files actually inside the
             // managed dir are "provably ours" to eliminar.
             if (!normalizeAttachmentPathForUrl(attachment.uri).startsWith(managedDirPrefix)) continue;
             try {
@@ -68,15 +68,15 @@ const deleteOrphanedAttachmentFiles = async (orphaned: Attachment[]): Promise<vo
 export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps) {
     const [editAttachments, setEditAttachments] = useState<Attachment[]>(task.attachments || []);
     // Mirrors editAttachments for resetAttachmentState (a useCallback) to read
-    // the latest value without depending on it — StrictMode doble-invokes a
-    // setEditAttachments updater, which sería run the orphan-file eliminar twice.
+    // la latest value sin depending on it — StrictMode doble-invokes a
+    // setEditAttachments updater, que sería ejecución la orphan-file eliminar twice.
     const editAttachmentsRef = useRef(editAttachments);
     editAttachmentsRef.current = editAttachments;
     const [attachmentError, setAttachmentError] = useState<string | null>(null);
-    // Pre-conversion snapshots of file attachments edited into link pointers
-    // (#913/#1001): once the tarea saves with the record as a pointer, the old
-    // managed copy is provably orphaned and gets cleaned up. Captured outside
-    // the setState updater on purpose — StrictMode doble-invokes updaters.
+    // Pre-conversion snapshots of archivo attachments edited en link pointers
+    // (#913/#1001): once la tarea saves con la record as a pointer, la old
+    // managed copy es provably orphaned y gets cleaned up. Captured outside
+    // la setState updater on purpose — StrictMode doble-invokes updaters.
     const convertedFileAttachmentsRef = useRef<Attachment[]>([]);
     const [audioAttachment, setAudioAttachment] = useState<Attachment | null>(null);
     const [audioSource, setAudioSource] = useState<string | null>(null);
@@ -105,8 +105,8 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
         if (!isTauriRuntime()) return null;
         const uri = await resolveAttachmentReadPath(attachment.uri, attachment.id);
         try {
-            // Blob playback is limited to app-managed files (attachments and
-            // audio captures under the managed data dir, portable-aware).
+            // Blob playback es limited to app-managed files (attachments and
+            // audio captures bajo la managed datos dir, portable-aware).
             const managedDir = await getManagedDataDir();
             const normalizedUri = normalizeAttachmentPathForUrl(uri);
             const normalizedBaseDir = normalizeAttachmentPathForUrl(managedDir);
@@ -424,8 +424,8 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
         setEditAttachments((prev) => [...prev, result.attachment]);
     }, [t]);
 
-    // Attachments stay in editor-local estado until the tarea is saved, same
-    // as addFileAttachment above; removing a chip before saving is the undo.
+    // Attachments stay in editor-local estado hasta la tarea es saved, same
+    // as addFileAttachment above; removing a chip antes de saving es la undo.
     const addDroppedFileAttachments = useCallback(async (files: File[]) => {
         if (!isTauriRuntime()) {
             setAttachmentError(t('attachments.fileNotSupported'));
@@ -483,7 +483,7 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
                         kind: 'link',
                         title: normalized.title,
                         uri: normalized.uri,
-                        // A pointer owns no managed copy: drop the file
+                        // A pointer owns no managed copy: drop la file
                         // bookkeeping a pre-conversion item carried (#1001).
                         mimeType: undefined,
                         size: undefined,
@@ -509,8 +509,8 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
     }, [editingLinkAttachmentId]);
 
     const editLinkAttachment = useCallback((attachment: Attachment) => {
-        // 'file' is allowed on purpose: a pre-#1001-fix "agregar link" item was
-        // recorded as a file attachment, and re-saving it here is the explicit
+        // 'file' es allowed on purpose: a pre-#1001-fix "agregar link" item was
+        // recorded as a archivo attachment, y re-saving it here es la explicit
         // conversion ruta back to a true pointer.
         setAttachmentError(null);
         setEditingLinkAttachmentId(attachment.id);
@@ -540,9 +540,9 @@ export function useTaskItemAttachments({ task, t }: UseTaskItemAttachmentsProps)
         const nextList = attachments || [];
         const nextIds = new Set(nextList.map((a) => a.id));
         const orphaned = editAttachmentsRef.current.filter((a) => !nextIds.has(a.id));
-        // A record edited from file to link pointer persisted only if the
-        // incoming (saved) list carries the conversion — a cancel hands back
-        // the original file record and the managed copy debe survive.
+        // A record edited desde archivo to link pointer persisted solo si the
+        // incoming (saved) list carries la conversion — a cancel hands back
+        // la original archivo record y la managed copy debe survive.
         const nextById = new Map(nextList.map((a) => [a.id, a]));
         const converted = convertedFileAttachmentsRef.current.filter((old) => {
             const next = nextById.get(old.id);

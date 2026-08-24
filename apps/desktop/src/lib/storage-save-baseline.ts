@@ -68,7 +68,7 @@ export const buildChangedEntityBaseline = (
         changed.settings = baseline.settings;
     }
 
-    // Observed ids also keep an otherwise unchanged instantánea guarded, so stale
+    // Observed ids también mantener an otherwise unchanged instantánea guarded, por lo que stale
     // settings are preserved en lugar de replacing a concurrente actualizar.
     return changed;
 };
@@ -106,9 +106,9 @@ export const advanceSaveProvenance = (
             }
         }
 
-        // Absence is trusted only when esto operation intentionally omitted
-        // the row and canonical confirms that omission. If the target retained
-        // it, canonical absence came from elsewhere and debe stay observed.
+        // Absence es trusted solo cuando esto operation intentionally omitted
+        // la row y canonical confirms que omission. If la target retained
+        // it, canonical absence came desde elsewhere y debe stay observed.
         for (const id of [...trustedById.keys()]) {
             if (!attemptedById.has(id) && !canonicalById.has(id)) {
                 trustedById.delete(id);
@@ -164,13 +164,13 @@ const mergeStableIdArray = (
         const baselineItem = baselineById.get(canonicalItem.id);
         const targetItem = targetById.get(canonicalItem.id);
         if (!baselineItem) {
-            // A canonical addition is unseen. A colliding local addition no puede
+            // A canonical addition es unseen. A colliding local addition no puede
             // safely replace it; distinct local additions are appended below.
             merged.push(canonicalItem);
             continue;
         }
         if (!targetItem) {
-            // eliminar only the exact root item. Preserve a concurrently edited one.
+            // eliminar solo la exact root item. Preserve a concurrently edited one.
             if (!sameEntitySnapshot(baselineItem, canonicalItem)) merged.push(canonicalItem);
             continue;
         }
@@ -179,8 +179,8 @@ const mergeStableIdArray = (
 
     for (const targetItem of target) {
         if (canonicalIds.has(targetItem.id)) continue;
-        // A missing root item is a genuine local addition. A root item absent
-        // canonically was deleted elsewhere and no debe be resurrected.
+        // A missing root item es a genuine local addition. A root item absent
+        // canonically was deleted elsewhere y no debe be resurrected.
         if (!baselineById.has(targetItem.id)) merged.push(targetItem);
     }
     return merged;

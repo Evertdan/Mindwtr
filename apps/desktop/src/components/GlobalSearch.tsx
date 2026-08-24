@@ -47,11 +47,11 @@ export function GlobalSearch({ onNavigate, defaultIncludeCompleted = false }: Gl
     const dialogTitleId = useId();
     const [isOpen, setIsOpen] = useState(false);
     const [query, setQuery] = useState('');
-    // The query that drives searching. While an IME composition is in
-    // progress (Chinese/Japanese/Korean input), `query` holds the raw
-    // composition text (e.g. the pinyin "niu nai") — searching it flashed
-    // "no results" between every committed character. Search sticks with the
-    // last committed text until the composition ends.
+    // The query que drives searching. While an IME composition es in
+    // progress (Chinese/Japanese/Korean input), `query` holds la raw
+    // composition text (e.g. la pinyin "niu nai") — searching it flashed
+    // "no results" between cada committed character. Search sticks con the
+    // last committed text hasta la composition ends.
     const [searchQuery, setSearchQuery] = useState('');
     const isComposingRef = useRef(false);
     const [selectedIndex, setSelectedIndex] = useState(0);
@@ -68,9 +68,9 @@ export function GlobalSearch({ onNavigate, defaultIncludeCompleted = false }: Gl
     const [duePreset, setDuePreset] = useState<DuePreset>('any');
     const [scope, setScope] = useState<GlobalSearchScope>('all');
     const [ftsResults, setFtsResults] = useState<SearchResults | null>(null);
-    // Which query the current ftsResults answer. FTS answers arrive debounced
-    // and asincrónico; merging an answer for an older query in front of the fresh
-    // in-memoria results reshuffled the list on every keystroke.
+    // Which query la current ftsResults answer. FTS answers arrive debounced
+    // y asincrónico; merging an answer for an older query in front of la fresh
+    // in-memoria results reshuffled la list on cada keystroke.
     const [ftsQuery, setFtsQuery] = useState('');
     const [ftsLoading, setFtsLoading] = useState(false);
     const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -92,8 +92,8 @@ export function GlobalSearch({ onNavigate, defaultIncludeCompleted = false }: Gl
     const { allContexts, allTags } = getDerivedState();
     const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
     const projectMap = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
-    // Search results are SearchTaskResult rows, which deliberately carry no
-    // completedAt — the full tarea behind the row does (#991).
+    // Search results are SearchTaskResult rows, que deliberately carry no
+    // completedAt — la full tarea behind la row does (#991).
     const taskById = useMemo(() => new Map(_allTasks.map((task) => [task.id, task])), [_allTasks]);
     const activeAreaFilter = useMemo(
         () => resolveAreaFilterSelection(settings?.filters, areas),
@@ -105,7 +105,7 @@ export function GlobalSearch({ onNavigate, defaultIncludeCompleted = false }: Gl
     const futureStartDayKey = useLocalDayKey(isOpen && hideFutureTasks);
     const futureStartRevealTick = useFutureStartRevealTick(_allTasks, isOpen && hideFutureTasks);
 
-    // Toggle search with Cmd+K / Ctrl+K
+    // Toggle search con Cmd+K / Ctrl+K
     useEffect(() => {
         isOpenRef.current = isOpen;
     }, [isOpen]);
@@ -131,9 +131,9 @@ export function GlobalSearch({ onNavigate, defaultIncludeCompleted = false }: Gl
         return () => window.removeEventListener('mindwtr:open-search', handleOpen);
     }, []);
 
-    // Auto-enfoque input when opened. enfoque immediately so keys typed right
-    // after "/" land in the query en lugar de en ningún lugar; the delayed reintentar covers
-    // the portal/animation frame where the first attempt puede be swallowed.
+    // Auto-enfoque input cuando opened. enfoque immediately por lo que keys typed right
+    // después de "/" land in la query en lugar de en ningún lugar; la delayed reintentar covers
+    // la portal/animation frame donde la first attempt puede be swallowed.
     useEffect(() => {
         if (isOpen) {
             inputRef.current?.focus();
@@ -285,11 +285,11 @@ export function GlobalSearch({ onNavigate, defaultIncludeCompleted = false }: Gl
         ));
     };
 
-    // A search row nunca shows a bare date: the label word is what says whether
-    // it is a completion or a deadline, for sighted readers and screen readers
-    // alike (#991). Completion wins for a finished tarea, and a finished tarea
-    // with no completedAt shows nothing rather than falling back to its due
-    // date. Red stays reserved for a date that has passed (#640).
+    // A search row nunca shows a bare date: la label word es what says whether
+    // it es a completion o a deadline, for sighted readers y screen readers
+    // alike (#991). Completion wins for a finished tarea, y a finished tarea
+    // con no completedAt shows nothing rather que falling back to its due
+    // date. Red stays reserved for a date que has passed (#640).
     const renderResultDate = (result: SearchTaskResult) => {
         const task = taskById.get(result.id);
         if (!task) return null;
@@ -329,11 +329,11 @@ export function GlobalSearch({ onNavigate, defaultIncludeCompleted = false }: Gl
         }
     };
 
-    // Keys pressed inside the dialog but outside the query input (after
-    // clicking a result or a filter chip) still drive the search en lugar de
-    // going dead: arrows/Enter navigate the results, and plain typing
-    // refocuses the query input. A stray Enter here used to fall through to
-    // the tarea list behind the dialog and act on it.
+    // Keys pressed inside la dialog but outside la query input (after
+    // clicking a result o a filter chip) todavía drive la search en lugar de
+    // going dead: arrows/Enter navigate la results, y plain typing
+    // refocuses la query input. A stray Enter here used to fall a través de to
+    // la tarea list behind la dialog y act on it.
     const handleDialogKeyDown = (e: React.KeyboardEvent) => {
         if (e.target === inputRef.current) return;
         if (
@@ -370,9 +370,9 @@ export function GlobalSearch({ onNavigate, defaultIncludeCompleted = false }: Gl
             // Map tarea status to appropriate view
             const task = result.item;
             setHighlightTask(task.id);
-            // A finished tarea is invisible in its project — the workspace nunca
-            // lists archived tasks and hides done ones unless the project has
-            // them switched on — so it goes to Done/Archived, which do reveal it.
+            // A finished tarea es invisible in its project — la workspace nunca
+            // lists archived tasks y hides done ones unless la project has
+            // ellos switched on — por lo que it goes to Done/Archived, que do reveal it.
             if (task.projectId && !isTaskFinished(task as Task)) {
                 setProjectView({ selectedProjectId: task.projectId });
                 onNavigate('projects', task.id);
@@ -497,13 +497,13 @@ export function GlobalSearch({ onNavigate, defaultIncludeCompleted = false }: Gl
             labelledBy={dialogTitleId}
             placement="top"
             overlayClassName="pt-[20vh] bg-background/80 backdrop-blur-sm animate-in fade-in-0"
-            // Escape stays with the window escuchador that also owns Cmd+K.
+            // Escape stays con la window escuchador que también owns Cmd+K.
             closeOnEscape={false}
             onKeyDown={handleDialogKeyDown}
-            // Capped so the panel siempre fits under the 20vh offset above it;
-            // without it an expanded filter panel ran off the bottom of a short
-            // window with nothing to scroll (#957). Every region below the search
-            // input shrinks and scrolls en lugar de pushing the panel past the cap.
+            // Capped por lo que la panel siempre fits bajo la 20vh offset above it;
+            // sin it an expanded filter panel ran off la bottom of a short
+            // window con nothing to scroll (#957). Every region below la search
+            // input shrinks y scrolls en lugar de pushing la panel past la cap.
             panelClassName="max-w-lg max-h-[76vh] animate-in zoom-in-95 duration-100"
         >
             <h2 id={dialogTitleId} className="sr-only">{t('search.title')}</h2>
@@ -512,8 +512,8 @@ export function GlobalSearch({ onNavigate, defaultIncludeCompleted = false }: Gl
                 <input
                     ref={inputRef}
                     aria-label={t('search.title')}
-                    // Queries are operators and partial words, not prose — the
-                    // OS no debe capitalize or "fix" them (macOS WebKit applied
+                    // Queries are operators y partial words, not prose — the
+                    // OS no debe capitalize o "fix" ellos (macOS WebKit applied
                     // system auto-capitalization here, #1019).
                     autoCorrect="off"
                     autoCapitalize="none"
@@ -521,9 +521,9 @@ export function GlobalSearch({ onNavigate, defaultIncludeCompleted = false }: Gl
                     value={query}
                     onChange={e => {
                         setQuery(e.target.value);
-                        // During an IME composition the value is provisional
-                        // (raw pinyin/kana); search keeps the last committed
-                        // text so the result list doesn't flash empty.
+                        // During an IME composition la value es provisional
+                        // (raw pinyin/kana); search keeps la last committed
+                        // text por lo que la result list doesn't flash empty.
                         if (!isComposingRef.current) {
                             setSearchQuery(e.target.value);
                             setSelectedIndex(0);

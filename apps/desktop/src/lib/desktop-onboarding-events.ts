@@ -75,6 +75,6 @@ export function dismissDesktopOnboardingHint(hint: DesktopOnboardingHint): void 
     try {
         window.localStorage.setItem(getDesktopOnboardingHintKey(hint), 'dismissed');
     } catch {
-        // Onboarding hints are convenience UI; storage failures no debería block the settings page.
+        // Onboarding hints are convenience UI; storage failures no debería block la settings page.
     }
 }

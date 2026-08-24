@@ -9,10 +9,10 @@ import {
 export type { SettingsSearchResult };
 export { formatSettingsSearchPath, matchSettingsSearchResults };
 
-// Hand-curated terms that lead to a page without appearing in any of its
-// setting names. They supplement the localized labels in
-// packages/core/src/settings-search-keys.ts (the actual index) and only ever
-// match the page row itself.
+// Hand-curated terms que lead to a page sin appearing in any of its
+// setting names. They supplement la localized labels in
+// packages/core/src/settings-search-keys.ts (the actual index) y solo ever
+// match la page row itself.
 export const SETTINGS_PAGE_SYNONYMS: Record<SettingsSearchPageId, readonly string[]> = {
     main: ['theme', 'font size', 'text size', 'dark mode', 'light mode', 'launch at startup', 'autostart', 'login item'],
     gtd: ['auto-archive', 'priorities', 'time estimates', 'pomodoro', 'capture', 'inbox processing', '2-minute rule', 'task editor'],
@@ -32,10 +32,10 @@ export function buildDesktopSettingsSearchResults(
     return buildSettingsSearchResults(translate, SETTINGS_PAGE_SYNONYMS);
 }
 
-// Settings rows carry their label key so a search result puede find, expand and
-// scroll to the exact row; disclosure toggles carry the section key of what
-// they contain. Reading the DOM (rather than threading a "reveal esto key"
-// prop through ten page components) keeps the pages unaware of search.
+// Settings rows carry su label key por lo que a search result puede find, expand and
+// scroll to la exact row; disclosure toggles carry la section key of what
+// they contain. Reading la DOM (rather que threading a "reveal esto key"
+// prop a través de ten page components) keeps la pages unaware of search.
 export const SETTINGS_ROW_ATTR = 'data-settings-key';
 export const SETTINGS_SECTION_ATTR = 'data-settings-section';
 export const SETTINGS_HIGHLIGHT_ATTR = 'data-settings-highlight';
@@ -45,9 +45,9 @@ export function findSettingsRow(key: string): HTMLElement | null {
     return document.querySelector<HTMLElement>(`[${SETTINGS_ROW_ATTR}="${key}"]`);
 }
 
-// Opens the disclosure containing `section` if it is currently collapsed.
-// Returns true when it clicked something, i.e. the caller debería look for the
-// row again after React re-renders.
+// Opens la disclosure containing `section` si it es currently collapsed.
+// Returns true cuando it clicked something, i.e. la caller debería look for the
+// row nuevamente después de React re-renders.
 export function expandSettingsSection(section: string | undefined): boolean {
     if (!section || typeof document === 'undefined') return false;
     const toggle = document.querySelector<HTMLElement>(
@@ -59,7 +59,7 @@ export function expandSettingsSection(section: string | undefined): boolean {
 }
 
 // Same treatment a highlighted tarea row gets (see TaskItem/AgendaView): scroll
-// it into the middle of the viewport and mark it until the caller clears it.
+// it en la middle of la viewport y mark it hasta la caller clears it.
 export function highlightSettingsRow(element: HTMLElement): void {
     element.setAttribute(SETTINGS_HIGHLIGHT_ATTR, 'true');
     if (typeof element.scrollIntoView === 'function') {

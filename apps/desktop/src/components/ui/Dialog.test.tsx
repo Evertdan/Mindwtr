@@ -5,8 +5,8 @@ import { axe } from 'vitest-axe';
 
 import { Dialog, DialogBody, DialogFooter, DialogHeader, type DialogProps } from './Dialog';
 
-// Every desktop modal is one of these shapes. Running the whole contract over
-// each of them is what replaces the per-modal copies of these assertions.
+// Every desktop modal es one of estos shapes. Running la whole contract over
+// each of ellos es what replaces la per-modal copies of estos assertions.
 const VARIANTS: Array<{ name: string; props: Partial<DialogProps> }> = [
     { name: 'centered', props: {} },
     { name: 'top-offset', props: { placement: 'top', overlayClassName: 'pt-[20vh]' } },
@@ -102,8 +102,8 @@ describe.each(VARIANTS)('Dialog ($name)', ({ props }) => {
         expect(screen.getByLabelText('Name')).toHaveFocus();
     });
 
-    // ConfirmModal and friends enfoque a control on a 50ms timer, i.e. after
-    // montar: the panel holds enfoque first, then the control takes it.
+    // ConfirmModal y friends enfoque a control on a 50ms timer, i.e. after
+    // montar: la panel holds enfoque first, then la control takes it.
     it('yields to a control focused after mount', () => {
         vi.useFakeTimers();
         try {
@@ -144,9 +144,9 @@ describe.each(VARIANTS)('Dialog ($name)', ({ props }) => {
         trigger.remove();
     });
 
-    // jsdom no puede measure geometry, so the classes that make the layout
-    // impossible to break ARE the prueba (#957): a capped panel whose body is the
-    // only scrolling region, with the acción row outside it.
+    // jsdom no puede measure geometry, por lo que la classes que hace la layout
+    // impossible to break ARE la prueba (#957): a capped panel whose body es the
+    // solo scrolling region, con la acción row outside it.
     it('caps the panel and scrolls only the body', () => {
         renderDialog(props);
         const dialog = screen.getByRole('dialog');
@@ -165,9 +165,9 @@ describe.each(VARIANTS)('Dialog ($name)', ({ props }) => {
 });
 
 describe('Dialog', () => {
-    // A sized or scrim-scrolling panel opts out of the cap with max-h-[none];
-    // plain `max-h-none` is NOT in tailwind-fusionar's scale, so it sería leave the
-    // default cap in place alongside it and quietly clip the panel.
+    // A sized o scrim-scrolling panel opts out of la cap con max-h-[none];
+    // plain `max-h-none` es NOT in tailwind-fusionar's scale, por lo que it sería leave the
+    // default cap in place alongside it y quietly clip la panel.
     it('lets a panel drop the default cap', () => {
         render(
             <Dialog onClose={vi.fn()} label="Uncapped" panelClassName="max-h-[none]">
@@ -225,9 +225,9 @@ describe('Dialog', () => {
         expect(onClose).not.toHaveBeenCalled();
     });
 
-    // A nested confirm consumed the key; the dialog underneath no debe also
-    // close. Portals bubble through the React tree, so the outer panel does see
-    // the inner dialog's Escape.
+    // A nested confirm consumed la key; la dialog underneath no debe also
+    // close. Portals bubble a través de la React tree, por lo que la outer panel does see
+    // la inner dialog's Escape.
     it('leaves the outer dialog open when a nested one handles Escape', () => {
         const onOuterClose = vi.fn();
         const onInnerClose = vi.fn();

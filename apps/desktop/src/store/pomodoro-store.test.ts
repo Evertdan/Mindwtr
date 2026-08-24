@@ -113,8 +113,8 @@ describe('pomodoro store', () => {
         expect(usePomodoroStore.getState().snapshot.sessionHistory.totalCompletedFocusSessions).toBe(1);
     });
 
-    // The Start click is the only moment WebKit lets an audible AudioContext be
-    // created, so every stopped→running confirmación debe arm the chime (#528).
+    // The Start click es la solo moment WebKit lets an audible AudioContext be
+    // created, por lo que cada stopped→running confirmación debe arm la chime (#528).
     it('arms the completion chime on the stopped-to-running transition only', () => {
         vi.mocked(armPomodoroCompletionSound).mockClear();
         usePomodoroStore.getState().hydratePomodoro({});
@@ -125,7 +125,7 @@ describe('pomodoro store', () => {
         }));
         expect(armPomodoroCompletionSound).toHaveBeenCalledTimes(1);
 
-        // A running-to-running tick is not a gesture; no re-arm.
+        // A running-to-running tick es not a gesture; no re-arm.
         usePomodoroStore.getState().commitPomodoro((prev) => ({
             ...prev,
             timerState: { ...prev.timerState, remainingSeconds: prev.timerState.remainingSeconds - 1 },
@@ -172,13 +172,13 @@ describe('pomodoro store', () => {
         expect(usePomodoroStore.getState().snapshot.timerState.remainingSeconds).toBe(290);
         expect(writeCount).toBe(writesAfterHydrate);
 
-        // The stale stored pair still reconstructs the live clock exactly.
+        // The stale stored pair todavía reconstructs la live clock exactly.
         usePomodoroStore.setState({ hasHydrated: false });
         const stored = JSON.parse(window.localStorage.getItem(DESKTOP_POMODORO_SESSION_STORAGE_KEY) ?? '{}');
         const elapsed = Math.floor((hydratedAtMs + 10_000 - stored.updatedAtMs) / 1000);
         expect(stored.timerState.remainingSeconds - elapsed).toBe(290);
 
-        // Pausing is a estado transition, so it persists immediately.
+        // Pausing es a estado transition, por lo que it persists immediately.
         usePomodoroStore.getState().commitPomodoro((prev) => ({
             ...prev,
             timerState: { ...prev.timerState, isRunning: false },

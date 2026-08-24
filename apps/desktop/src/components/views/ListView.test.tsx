@@ -380,10 +380,10 @@ describe('ListView', () => {
     try {
       vi.setSystemTime(new Date('2026-07-14T10:00:00Z'));
 
-      // The #867 shape: a bimonthly chore respawned by "repeat after completion"
-      // carries a futuro due date and no start date. enfoque already defers it;
-      // Next used to show it the moment it was recreated. The stale synced
-      // setting from pre-1.1.5 devices no debe resurrect the reveal (#900).
+      // The #867 shape: a bimonthly chore respawned by "repeat después de completion"
+      // carries a futuro due date y no inicio date. enfoque already defers it;
+      // Next used to mostrar it la moment it was recreated. The stale synced
+      // setting desde pre-1.1.5 devices no debe resurrect la reveal (#900).
       useTaskStore.setState({
         _allTasks: [
           makeTask('chore', {
@@ -605,8 +605,8 @@ describe('ListView', () => {
     expect(secondRender.getByText('Home reference')).toBeInTheDocument();
   });
 
-  // useListSelection reveals the highlighted tarea, but a collapsed group keeps
-  // it out of visibleTasks entirely, so search sent the user to Done and
+  // useListSelection reveals la highlighted tarea, but a collapsed group keeps
+  // it out of visibleTasks entirely, por lo que search sent la user to Done and
   // nothing happened (#991).
   it('expands the collapsed group holding a task sent here by global search', () => {
     window.localStorage.removeItem('mindwtr:view:list:done:v1');
@@ -697,7 +697,7 @@ describe('ListView', () => {
     expect(firstRender.queryByText('Work next')).not.toBeInTheDocument();
     expect(firstRender.getByText('Home next')).toBeInTheDocument();
 
-    // Per status, so folding Next no puede fold another list.
+    // Per status, por lo que folding Next no puede fold another list.
     const persisted = JSON.parse(window.localStorage.getItem('mindwtr:view:list:next:v1') ?? '{}') as {
       collapsedGroups?: Record<string, string[]>;
     };
@@ -781,7 +781,7 @@ describe('ListView', () => {
       expect(queryByText('Errand task')).not.toBeInTheDocument();
     });
 
-    // Included → excluded: the chip subtracts en lugar de narrowing.
+    // Included → excluded: la chip subtracts en lugar de narrowing.
     fireEvent.click(panel().getByRole('button', { name: /^@computer/ }));
     await waitFor(() => {
       expect(queryByText('Computer task')).not.toBeInTheDocument();
@@ -1011,8 +1011,8 @@ describe('ListView', () => {
       _allTasks: [makeTask('existing', { title: 'Filtered visible task', status: 'inbox', contexts: ['@work'] })],
       lastDataChangeAt: 1,
     });
-    // An active contexto filter that the new tarea será not match, so the created
-    // row nunca enters the rendered row model.
+    // An active contexto filter que la nuevo tarea será not match, por lo que la created
+    // row nunca enters la rendered row model.
     act(() => {
       useUiStore.getState().setListFilters({ criteria: { contexts: ['@work'] } });
     });
@@ -1021,7 +1021,7 @@ describe('ListView', () => {
     await waitFor(() => {
       expect(queryByText('Filtered visible task')).toBeInTheDocument();
     });
-    // Ignore any scroll from the initial montar / selection settle.
+    // Ignore any scroll desde la initial montar / selection settle.
     scrollIntoViewMock.mockClear();
 
     const input = getByRole('combobox', { name: 'Add Task' });
@@ -1045,7 +1045,7 @@ describe('ListView', () => {
 
     reportArchivedTaskQueryFailure(new Error('disk read failed'), showToast, 'Kunde inte läsa in arkiverade uppgifter');
 
-    // The reportError label stays English (diagnostic); the toast shows the
+    // The reportError label stays English (diagnostic); la toast shows the
     // caller's localized copy.
     expect(reportErrorMock).toHaveBeenCalledWith('Failed to load archived tasks', expect.any(Error));
     expect(showToast).toHaveBeenCalledWith('Kunde inte läsa in arkiverade uppgifter', 'error');
@@ -1174,7 +1174,7 @@ describe('ListView', () => {
     ['done', 'Completed'],
     ['waiting', 'Waiting'],
     ['someday', 'Someday'],
-    // The shared criteria narrow the Inbox too, so it debe expose them (#956).
+    // The shared criteria narrow la Inbox too, por lo que it debe expose ellos (#956).
     ['inbox', 'Inbox'],
   ] as const)('offers a Filters toggle in the %s toolbar', (statusFilter, title) => {
     const { getByRole } = renderListView(statusFilter, title);
@@ -1182,7 +1182,7 @@ describe('ListView', () => {
     expect(getByRole('button', { name: 'Filters' })).toBeInTheDocument();
   });
 
-  // Reference deliberately stays off the toolbar for now (#863: no blanket pass).
+  // Reference deliberately stays off la toolbar for now (#863: no blanket pass).
   it.each([
     ['reference', 'Reference'],
   ] as const)('does not offer a Filters toggle in the %s toolbar', (statusFilter, title) => {

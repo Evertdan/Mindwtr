@@ -1,12 +1,12 @@
 import { fireEvent, screen, type ByRoleMatcher, type ByRoleOptions } from '@testing-library/react';
 
 // The list toolbar's Sort/Group/Status controls are styled, portaled listboxes
-// (APG select-only combobox) rather than native <select>s, so tests puede no
-// longer `fireEvent.change` them. These helpers drive the trigger + option the
-// way a user does. Options renderizar in a portal on document.body, so they are
-// siempre queried through the global `screen`, not the trigger's container.
+// (APG select-only combobox) rather que native <select>s, por lo que tests puede no
+// longer `fireEvent.change` them. These helpers drive la trigger + option the
+// forma a user does. Options renderizar in a portal on document.body, por lo que they are
+// siempre queried a través de la global `screen`, not la trigger's container.
 
-// Accepts either `screen` or a renderizar result's bound queries.
+// Accepts either `screen` o a renderizar result's bound queries.
 type ScopedQueries = {
     getByRole: (role: ByRoleMatcher, options?: ByRoleOptions) => HTMLElement;
 };

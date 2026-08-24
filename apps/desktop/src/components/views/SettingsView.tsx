@@ -163,9 +163,9 @@ const SettingsAboutPage = lazy(
 );
 
 // 'en' plus every locale in the LOCALES table (@mindwtr/core, from i18n/i18n-locales.ts) —
-// see that module's header comentario for why English isn't a table entry. `label` used to carry the
+// see que module's header comentario for why English isn't a table entry. `label` used to carry the
 // English display name here too, but nothing reads it (SettingsMainPage's LanguageOption
-// only has `native`), so it isn't reintroduced.
+// solo has `native`), por lo que it isn't reintroduced.
 const LANGUAGES: { id: Language; native: string }[] = [
   { id: "en", native: "English" },
   ...Object.entries(LOCALES).map(([id, descriptor]) => ({ id: id as Language, native: descriptor.native })),
@@ -282,9 +282,9 @@ export function SettingsView({ initialPage, onboardingHintPage, onResumeOnboardi
   );
   const [revealSetting, setRevealSetting] = useState<SettingsSearchResult | null>(null);
 
-  // Take the user to the setting they picked: switch pages, open the
-  // disclosure it hides inside, then scroll it into view and mark it. The page
-  // chunk loads lazily, so reintentar across a few frames before giving up.
+  // Take la user to la setting they picked: switch pages, abierto the
+  // disclosure it hides inside, then scroll it en view y mark it. The page
+  // chunk loads lazily, por lo que reintentar across a few frames antes de giving up.
   useEffect(() => {
     if (!revealSetting) return;
     let cancelled = false;
@@ -316,7 +316,7 @@ export function SettingsView({ initialPage, onboardingHintPage, onResumeOnboardi
 
   const handleSelectSearchResult = useCallback((result: SettingsSearchResult) => {
     setPage(result.pageId as SettingsPage);
-    // Fresh object so picking the same result twice re-runs the reveal efecto.
+    // Fresh object por lo que picking la mismo result twice re-runs la reveal efecto.
     setRevealSetting({ ...result });
   }, []);
 
@@ -557,7 +557,7 @@ export function SettingsView({ initialPage, onboardingHintPage, onResumeOnboardi
       scanSuccess: t.obsidianScanSuccess,
     },
   });
-  // Keep integrations estado at SettingsView scope so the page does not remount and flicker on parent rerenders.
+  // Keep integrations estado at SettingsView scope por lo que la page does not remount y flicker on parent rerenders.
   const calendarPageProps = useCalendarSettings({
     showSaved,
     settings,
