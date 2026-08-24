@@ -106,9 +106,9 @@ describe('mobile sync-service test utils', () => {
 
   it('normalizes legacy iOS absolute sync paths to file uri', () => {
     expect(normalizeFileSyncPath('/var/mobile/Containers/Data/Application/abc/Documents/MindWtr/data.json', 'ios'))
-      .toBe('file:///var/Mobile/Containers/Data/Application/abc/Documents/MindWtr/data.json');
-    expect(normalizeFileSyncPath('file:///var/Mobile/Containers/Data/Application/abc/Documents/MindWtr/data.json', 'ios'))
-      .toBe('file:///var/Mobile/Containers/Data/Application/abc/Documents/MindWtr/data.json');
+      .toBe('file:///var/mobile/Containers/Data/Application/abc/Documents/MindWtr/data.json');
+    expect(normalizeFileSyncPath('file:///var/mobile/Containers/Data/Application/abc/Documents/MindWtr/data.json', 'ios'))
+      .toBe('file:///var/mobile/Containers/Data/Application/abc/Documents/MindWtr/data.json');
     expect(normalizeFileSyncPath('/storage/emulated/0/Download/data.json', 'android'))
       .toBe('/storage/emulated/0/Download/data.json');
   });

@@ -216,9 +216,9 @@ describe('app-log', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     try {
-      await expect(logInfo('Hello', { scope: 'sync' })).resolves.toBe('file://document/logs/mindwtr.Registro');
+      await expect(logInfo('Hello', { scope: 'sync' })).resolves.toBe('file://document/logs/mindwtr.log');
       expect(legacyFileSystemMocks.writeAsStringAsync).toHaveBeenCalledWith(
-        'file://document/logs/mindwtr.Registro',
+        'file://document/logs/mindwtr.log',
         expect.stringContaining('Hello'),
         { encoding: 'utf8' },
       );
