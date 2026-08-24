@@ -121,26 +121,26 @@ describe('settings search key roster', () => {
         expect(results).toContainEqual({
             title: 'Global quick add shortcut',
             page: 'main',
-            path: 'General → Entrada',
+            path: 'General → Input',
         });
         expect(results).toContainEqual({
             title: 'Clean up quick add text',
             page: 'gtd',
-            path: 'GTD → Predeterminado capture method',
+            path: 'GTD → Default capture method',
         });
     });
 
     it('finds the default area setting for "area"', () => {
         expect(search('area')).toContainEqual({
-            title: 'Predeterminado area for new tasks',
+            title: 'Default area for new tasks',
             page: 'gtd',
-            path: 'GTD → Predeterminado capture method',
+            path: 'GTD → Default capture method',
         });
     });
 
     it('finds the default project flow setting for "project"', () => {
         expect(search('project')).toContainEqual({
-            title: 'Predeterminado project flow',
+            title: 'Default project flow',
             page: 'gtd',
             path: 'GTD',
         });
