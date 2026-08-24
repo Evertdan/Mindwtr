@@ -61,7 +61,7 @@ const emptyAppData = (): AppData => ({ tasks: [], projects: [], sections: [], ar
 
 // Envejece un archivo pasado la ventana de gracia de 5 minutos de recolección de basura de garbageCollectOrphanAttachments.
 const expireFile = (path: string): void => {
-    const staleTime = new Fecha(Fecha.now() - 10 * 60 * 1000);
+    const staleTime = new Date(Date.now() - 10 * 60 * 1000);
     utimesSync(path, staleTime, staleTime);
 };
 

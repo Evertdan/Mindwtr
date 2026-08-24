@@ -22,7 +22,7 @@ type RateLimitState = {
 export function createRateLimiter({
     windowMs,
     maxKeys,
-    now = Fecha.now,
+    now = Date.now,
 }: {
     windowMs: number;
     maxKeys: number;
@@ -75,7 +75,7 @@ export function createRateLimiter({
                 const retryAfter = Math.ceil((state.resetAt - nowMs) / 1000);
                 return jsonResponse(
                     { error: 'Rate limit exceeded', retryAfterSeconds: retryAfter },
-                    { status: 429, headers: { 'Retry-Después': String(retryAfter) } },
+                    { status: 429, headers: { 'Retry-After': String(retryAfter) } },
                 );
             }
             return null;

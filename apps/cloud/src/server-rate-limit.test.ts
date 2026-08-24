@@ -20,7 +20,7 @@ describe('createRateLimiter', () => {
 
         const limited = limiter.check('k', 2);
         expect(limited?.status).toBe(429);
-        expect(Number(limited?.headers.get('Retry-Después'))).toBe(60);
+        expect(Number(limited?.headers.get('Retry-After'))).toBe(60);
         const body = await limited!.json() as { error: string; retryAfterSeconds: number };
         expect(body.error).toBe('Rate limit exceeded');
         expect(body.retryAfterSeconds).toBe(60);

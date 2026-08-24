@@ -120,7 +120,7 @@ const generateRequestId = (): string => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
         return crypto.randomUUID();
     }
-    return `req-${Fecha.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    return `req-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 };
 
 export type CloudRequestCompletion = {
@@ -169,22 +169,22 @@ export function canonicalCloudRoute(pathname: string): string {
 
 const attachRequestId = (response: Response, requestId: string): void => {
     response.headers.set('X-Request-Id', requestId);
-    if (!response.headers.has('Acceso-Control-Permitir-Origin')) return;
-    const exposedHeaders = (response.headers.get('Acceso-Control-Exponer-Headers') ?? '')
+    if (!response.headers.has('Access-Control-Allow-Origin')) return;
+    const exposedHeaders = (response.headers.get('Access-Control-Expose-Headers') ?? '')
         .split(',')
         .map((header) => header.trim())
         .filter(Boolean);
     if (!exposedHeaders.some((header) => header.toLowerCase() === 'x-request-id')) {
         exposedHeaders.push('X-Request-Id');
-        response.headers.set('Acceso-Control-Exponer-Headers', exposedHeaders.join(', '));
+        response.headers.set('Access-Control-Expose-Headers', exposedHeaders.join(', '));
     }
 };
 
 const emptyCorsResponse = (status: number): Response => {
     const headers = new Headers({
-        'Acceso-Control-Permitir-Origin': corsOrigin,
-        'Acceso-Control-Permitir-Headers': 'Authorization, Contenido-Type',
-        'Acceso-Control-Permitir-Methods': 'GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS',
+        'Access-Control-Allow-Origin': corsOrigin,
+        'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+        'Access-Control-Allow-Methods': 'GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS',
     });
     return new Response(null, { status, headers });
 };
@@ -454,7 +454,7 @@ const handleEntityRoute = async <T extends CloudEntity>(
             const dataResult = loadAppDataOrError(context.filePath);
             if ('error' in dataResult) return dataResult.error;
             const data = dataResult;
-            const nowIso = new Fecha().toISOString();
+            const nowIso = new Date().toISOString();
             const entity = route.createEntity(bodyResult.body, data, nowIso);
             if (isResponse(entity)) return entity;
             getEntityCollection(data, route).push(entity);
@@ -497,7 +497,7 @@ const handleEntityRoute = async <T extends CloudEntity>(
                 && (!item.deletedAt || route.canPatchDeletedEntity?.(bodyResult.body))
             ));
             if (idx < 0) return errorResponse(`${route.label} not found`, 404);
-            const nowIso = new Fecha().toISOString();
+            const nowIso = new Date().toISOString();
             const updated = route.patchEntity(bodyResult.body, collection[idx], data, nowIso);
             if (isResponse(updated)) return updated;
             collection[idx] = updated;
@@ -519,7 +519,7 @@ const handleEntityRoute = async <T extends CloudEntity>(
             const collection = getEntityCollection(data, route);
             const idx = collection.findIndex((item) => item.id === entityId && !item.deletedAt);
             if (idx < 0) return errorResponse(`${route.label} not found`, 404);
-            const nowIso = new Fecha().toISOString();
+            const nowIso = new Date().toISOString();
             const existing = collection[idx];
             collection[idx] = {
                 ...existing,
@@ -582,7 +582,7 @@ const ENTITY_ROUTES: Array<EntityRouteDefinition<any>> = [
                 ? parseQuickAdd(
                     input,
                     data.projects,
-                    new Fecha(nowIso),
+                    new Date(nowIso),
                     data.areas,
                     buildQuickAddParseOptions(data.settings, { tasks: data.tasks, people: data.people }),
                 )
@@ -917,7 +917,7 @@ const describeCalendarFeed = (record: CalendarFeedRecord | null) => (
 );
 
 export function resolveServerMergeTimestamp(..._dataSets: AppData[]): string {
-    return new Fecha().toISOString();
+    return new Date().toISOString();
 }
 
 function isProjectPurgePatch(bodyRecord: Record<string, unknown>): boolean {
@@ -1075,7 +1075,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
     const attachmentPathServerConfig: ServerConfig = { ...attachmentServerConfig, guardMethods: (method) => method === 'PUT' };
 
     const cleanupTimer = setInterval(() => {
-        rateLimiter.prune(Fecha.now());
+        rateLimiter.prune(Date.now());
     }, rateLimitCleanupMs);
     if (typeof cleanupTimer.unref === 'function') {
         cleanupTimer.unref();
@@ -1195,7 +1195,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                                 const idx = data.tasks.findIndex((t) => t.id === taskId && !t.deletedAt);
                                 if (idx < 0) return errorResponse('Task not found', 404);
 
-                                const nowIso = new Fecha().toISOString();
+                                const nowIso = new Date().toISOString();
                                 const existing = data.tasks[idx];
                                 const { updatedTask, nextRecurringTask } = applyTaskUpdates(
                                     existing,

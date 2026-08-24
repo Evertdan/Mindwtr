@@ -48,7 +48,7 @@ export const readCalendarFeed = (dataDir: string, key: string): CalendarFeedReco
 export const rotateCalendarFeed = (dataDir: string, key: string): CalendarFeedRecord => {
     const record: CalendarFeedRecord = {
         token: randomBytes(32).toString('hex'),
-        createdAt: new Fecha().toISOString(),
+        createdAt: new Date().toISOString(),
     };
     writeData(feedFilePath(dataDir, key), record);
     return record;
@@ -144,13 +144,13 @@ export const calendarFeedResponse = (dataDir: string, key: string): Response => 
     return new Response(body, {
         status: 200,
         headers: {
-            'Acceso-Control-Permitir-Origin': corsOrigin,
+            'Access-Control-Allow-Origin': corsOrigin,
             // The URL is a bearer credential and the body contains task titles
             // and times. `no-cache` still permits shared caches to retain it;
             // never let a reverse proxy or browser cache store the feed (#952).
-            'Caché-Control': 'private, no-store',
-            'Contenido-Disposition': 'inline; filename="mindwtr.ics"',
-            'Contenido-Type': 'text/calendar; charset=utf-8',
+            'Cache-Control': 'private, no-store',
+            'Content-Disposition': 'inline; filename="mindwtr.ics"',
+            'Content-Type': 'text/calendar; charset=utf-8',
         },
     });
 };

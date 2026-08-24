@@ -91,19 +91,19 @@ export const normalizeRevision = (value?: number): number => (
 );
 
 export const logInfo = (message: CloudLogMessage, context?: CloudOperationalLogContext) => {
-    writeLog({ ts: new Fecha().toISOString(), level: 'info', scope: 'cloud', message, context });
+    writeLog({ ts: new Date().toISOString(), level: 'info', scope: 'cloud', message, context });
 };
 
 export const logWarn = (message: CloudLogMessage, context?: CloudOperationalLogContext) => {
-    writeLog({ ts: new Fecha().toISOString(), level: 'warn', scope: 'cloud', message, context });
+    writeLog({ ts: new Date().toISOString(), level: 'warn', scope: 'cloud', message, context });
 };
 
 export const logFailureWarn = (message: CloudLogMessage, context: CloudFailureContext) => {
-    writeLog({ ts: new Fecha().toISOString(), level: 'warn', scope: 'cloud', message, context });
+    writeLog({ ts: new Date().toISOString(), level: 'warn', scope: 'cloud', message, context });
 };
 
 export const logError = (message: CloudLogMessage, context: CloudFailureContext) => {
-    writeLog({ ts: new Fecha().toISOString(), level: 'error', scope: 'cloud', message, context });
+    writeLog({ ts: new Date().toISOString(), level: 'error', scope: 'cloud', message, context });
 };
 
 const configuredCorsOrigin = (process.env.MINDWTR_CLOUD_CORS_ORIGIN || '').trim();
@@ -264,16 +264,16 @@ export function parsePagination(searchParams: URLSearchParams): { limit: number;
 }
 
 const applyCorsHeaders = (headers: Headers): Headers => {
-    headers.set('Acceso-Control-Permitir-Origin', corsOrigin);
-    headers.set('Acceso-Control-Permitir-Headers', 'Authorization, Contenido-Type');
-    headers.set('Acceso-Control-Permitir-Methods', 'GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS');
-    headers.set('Acceso-Control-Exponer-Headers', 'ETag, Last-Modified, Contenido-Length');
+    headers.set('Access-Control-Allow-Origin', corsOrigin);
+    headers.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    headers.set('Access-Control-Allow-Methods', 'GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS');
+    headers.set('Access-Control-Expose-Headers', 'ETag, Last-Modified, Content-Length');
     return headers;
 };
 
 export function jsonResponse(body: unknown, init: ResponseInit = {}) {
     const headers = new Headers(init.headers);
-    headers.set('Contenido-Type', 'application/json; charset=utf-8');
+    headers.set('Content-Type', 'application/json; charset=utf-8');
     applyCorsHeaders(headers);
     return new Response(JSON.stringify(body, null, 2), { ...init, headers });
 }

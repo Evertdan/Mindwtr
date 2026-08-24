@@ -256,11 +256,11 @@ export const getDataFileMetadata = (filePath: string): DataFileMetadata => {
 export const dataMetadataResponse = (filePath: string): Response => {
     const metadata = getDataFileMetadata(filePath);
     const headers = new Headers({
-        'Acceso-Control-Permitir-Origin': corsOrigin,
-        'Acceso-Control-Permitir-Headers': 'Authorization, Contenido-Type',
-        'Acceso-Control-Permitir-Methods': 'GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS',
-        'Acceso-Control-Exponer-Headers': 'ETag, Last-Modified, Contenido-Length',
-        'Contenido-Length': String(metadata.size),
+        'Access-Control-Allow-Origin': corsOrigin,
+        'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+        'Access-Control-Allow-Methods': 'GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS',
+        'Access-Control-Expose-Headers': 'ETag, Last-Modified, Content-Length',
+        'Content-Length': String(metadata.size),
         'ETag': metadata.etag,
         'Last-Modified': metadata.lastModified,
     });
@@ -275,11 +275,11 @@ export const jsonFileResponse = (body: string | Uint8Array): Response => {
         ? body
         : body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as ArrayBuffer;
     const headers = new Headers({
-        'Acceso-Control-Permitir-Origin': corsOrigin,
-        'Acceso-Control-Permitir-Headers': 'Authorization, Contenido-Type',
-        'Acceso-Control-Permitir-Methods': 'GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS',
-        'Contenido-Length': String(contentLength),
-        'Contenido-Type': 'application/json; charset=utf-8',
+        'Access-Control-Allow-Origin': corsOrigin,
+        'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+        'Access-Control-Allow-Methods': 'GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS',
+        'Content-Length': String(contentLength),
+        'Content-Type': 'application/json; charset=utf-8',
     });
     return new Response(responseBody, { status: 200, headers });
 };

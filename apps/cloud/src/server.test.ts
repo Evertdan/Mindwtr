@@ -81,7 +81,7 @@ import {
 import { pruneOrphanedCalendarFeeds, revokeCalendarFeed } from './server-calendar-feed';
 
 const expireFileForOrphanGc = (path: string): void => {
-    const staleTime = new Fecha(Fecha.now() - 10 * 60 * 1000);
+    const staleTime = new Date(Date.now() - 10 * 60 * 1000);
     utimesSync(path, staleTime, staleTime);
 };
 
@@ -414,19 +414,19 @@ describe('cloud server utils', () => {
         const response = errorResponse('Unauthorized', 401);
 
         expect(response.status).toBe(401);
-        expect(response.headers.get('Contenido-Type')).toBe('application/json; charset=utf-8');
-        expect(response.headers.get('Acceso-Control-Permitir-Origin')).toBe(corsOrigin);
-        expect(response.headers.get('Acceso-Control-Permitir-Headers')).toBe('Authorization, Contenido-Type');
-        expect(response.headers.get('Acceso-Control-Permitir-Methods')).toBe('GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS');
+        expect(response.headers.get('Content-Type')).toBe('application/json; charset=utf-8');
+        expect(response.headers.get('Access-Control-Allow-Origin')).toBe(corsOrigin);
+        expect(response.headers.get('Access-Control-Allow-Headers')).toBe('Authorization, Content-Type');
+        expect(response.headers.get('Access-Control-Allow-Methods')).toBe('GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS');
     });
 
     test('returns no-content CORS preflight responses', async () => {
         const response = preflightResponse();
 
         expect(response.status).toBe(204);
-        expect(response.headers.get('Acceso-Control-Permitir-Origin')).toBe(corsOrigin);
-        expect(response.headers.get('Acceso-Control-Permitir-Headers')).toBe('Authorization, Contenido-Type');
-        expect(response.headers.get('Acceso-Control-Permitir-Methods')).toBe('GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS');
+        expect(response.headers.get('Access-Control-Allow-Origin')).toBe(corsOrigin);
+        expect(response.headers.get('Access-Control-Allow-Headers')).toBe('Authorization, Content-Type');
+        expect(response.headers.get('Access-Control-Allow-Methods')).toBe('GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS');
         expect(await response.text()).toBe('');
     });
 
@@ -1307,7 +1307,7 @@ describe('cloud server utils', () => {
     });
 
     test('uses server time for merge repair timestamps without spreading large payloads', () => {
-        const startedAt = Fecha.now();
+        const startedAt = Date.now();
         const iso = '2026-01-01T00:00:00.000Z';
         const data: AppData = {
             tasks: Array.from({ length: 60_000 }, (_, index) => makeTestTask({
@@ -1322,16 +1322,16 @@ describe('cloud server utils', () => {
             settings: {},
         };
 
-        const resolved = Fecha.parse(resolveServerMergeTimestamp(data));
+        const resolved = Date.parse(resolveServerMergeTimestamp(data));
         expect(Number.isFinite(resolved)).toBe(true);
         expect(resolved).toBeGreaterThanOrEqual(startedAt);
-        expect(resolved).toBeLessThanOrEqual(Fecha.now());
+        expect(resolved).toBeLessThanOrEqual(Date.now());
     });
 
     test('does not trust future payload timestamps for server merge repairs', () => {
-        const startedAt = Fecha.now();
+        const startedAt = Date.now();
         const iso = '2026-01-01T00:00:00.000Z';
-        const farFuture = new Fecha(startedAt + 365 * 24 * 60 * 60 * 1000).toISOString();
+        const farFuture = new Date(startedAt + 365 * 24 * 60 * 60 * 1000).toISOString();
         const data: AppData = {
             tasks: [makeTestTask({
                 id: 'task-future',
@@ -1345,10 +1345,10 @@ describe('cloud server utils', () => {
             settings: {},
         };
 
-        const resolved = Fecha.parse(resolveServerMergeTimestamp(data));
+        const resolved = Date.parse(resolveServerMergeTimestamp(data));
         expect(Number.isFinite(resolved)).toBe(true);
         expect(resolved).toBeGreaterThanOrEqual(startedAt);
-        expect(resolved).toBeLessThanOrEqual(Fecha.now());
+        expect(resolved).toBeLessThanOrEqual(Date.now());
     });
 });
 
@@ -1745,17 +1745,17 @@ describe('cloud server api', () => {
             method: 'OPTIONS',
             headers: {
                 Origin: corsOrigin,
-                'Acceso-Control-Request-Method': 'POST',
-                'Acceso-Control-Request-Headers': 'Authorization, Contenido-Type',
+                'Access-Control-Request-Method': 'POST',
+                'Access-Control-Request-Headers': 'Authorization, Content-Type',
             },
         });
 
         expect(response.status).toBe(204);
-        expect(response.headers.get('Acceso-Control-Permitir-Origin')).toBe(corsOrigin);
-        expect(response.headers.get('Acceso-Control-Permitir-Headers')).toBe('Authorization, Contenido-Type');
-        expect(response.headers.get('Acceso-Control-Permitir-Methods')).toBe('GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS');
+        expect(response.headers.get('Access-Control-Allow-Origin')).toBe(corsOrigin);
+        expect(response.headers.get('Access-Control-Allow-Headers')).toBe('Authorization, Content-Type');
+        expect(response.headers.get('Access-Control-Allow-Methods')).toBe('GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS');
         const requestId = getRequestId(response);
-        expect(response.headers.get('Acceso-Control-Exponer-Headers')).toContain('X-Request-Id');
+        expect(response.headers.get('Access-Control-Expose-Headers')).toContain('X-Request-Id');
         expectCompletion(completionRecords.at(-1)!, {
             requestId,
             method: 'OPTIONS',
@@ -4046,7 +4046,7 @@ describe('cloud server api', () => {
             settings: {},
         }));
 
-        const startedAt = Fecha.now();
+        const startedAt = Date.now();
         const putSection = await fetch(`${baseUrl}/v1/data`, {
             method: 'PUT',
             headers: {
@@ -4080,12 +4080,12 @@ describe('cloud server api', () => {
         expect(getResponse.status).toBe(200);
         const body = await getResponse.json();
         const section = (body.sections as Array<{ id: string; deletedAt?: string; updatedAt: string }>).find((item) => item.id === 'section-stale');
-        const repairedAt = Fecha.parse(section?.updatedAt ?? '');
+        const repairedAt = Date.parse(section?.updatedAt ?? '');
         expect(Number.isFinite(repairedAt)).toBe(true);
         expect(section?.deletedAt).toBe(section?.updatedAt);
         expect(section?.updatedAt).not.toBe(sectionAt);
         expect(repairedAt).toBeGreaterThanOrEqual(startedAt);
-        expect(repairedAt).toBeLessThanOrEqual(Fecha.now() + 1000);
+        expect(repairedAt).toBeLessThanOrEqual(Date.now() + 1000);
     });
 
     test('clamps adversarial future payload timestamps for server-side repairs', async () => {
@@ -4107,7 +4107,7 @@ describe('cloud server api', () => {
             settings: {},
         }));
 
-        const startedAt = Fecha.now();
+        const startedAt = Date.now();
         const putSection = await fetch(`${baseUrl}/v1/data`, {
             method: 'PUT',
             headers: {
@@ -4141,12 +4141,12 @@ describe('cloud server api', () => {
         expect(getResponse.status).toBe(200);
         const body = await getResponse.json();
         const section = (body.sections as Array<{ id: string; deletedAt?: string; updatedAt: string }>).find((item) => item.id === 'section-future');
-        const repairedAt = Fecha.parse(section?.updatedAt ?? '');
+        const repairedAt = Date.parse(section?.updatedAt ?? '');
         expect(Number.isFinite(repairedAt)).toBe(true);
         expect(section?.deletedAt).toBe(section?.updatedAt);
         expect(section?.updatedAt).not.toBe(futureSectionAt);
         expect(repairedAt).toBeGreaterThanOrEqual(startedAt);
-        expect(repairedAt).toBeLessThanOrEqual(Fecha.now() + 1000);
+        expect(repairedAt).toBeLessThanOrEqual(Date.now() + 1000);
     });
 
     test('serializes concurrent /v1/data edits to the same task with record-level merge rules', async () => {
