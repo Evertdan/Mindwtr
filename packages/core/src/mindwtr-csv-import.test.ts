@@ -350,7 +350,7 @@ describe('mindwtr csv import', () => {
     it('reuses IDs from the colon-scoped importer after tuple escaping is introduced', () => {
         const csv = buildCsv(
             ['Title', 'Project', 'Section', 'Area', 'ID'],
-            [['Keep lineage', 'Ops:Núcleo', 'Queue:Now', 'Work:North', 'task:1']]
+            [['Keep lineage', 'Ops:Core', 'Queue:Now', 'Work:North', 'task:1']]
         );
         const escaped = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: csv })
             .parsedData as ParsedMindwtrCsvImportData;
@@ -392,7 +392,7 @@ describe('mindwtr csv import', () => {
     it('reuses a task ID from the escaped project-scoped importer', () => {
         const csv = buildCsv(
             ['Title', 'Project', 'Section', 'Area', 'ID'],
-            [['Keep lineage', 'Ops:Núcleo', 'Queue:Now', 'Work:North', 'task:1']],
+            [['Keep lineage', 'Ops:Core', 'Queue:Now', 'Work:North', 'task:1']],
         );
         const parsed = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: csv })
             .parsedData as ParsedMindwtrCsvImportData;
@@ -419,11 +419,11 @@ describe('mindwtr csv import', () => {
     it('migrates a moved task from the project-scoped importer without changing its ID', () => {
         const beforeCsv = buildCsv(
             ['Title', 'Project', 'ID'],
-            [['Move prior import', 'Antes', 'stable-task']],
+            [['Move prior import', 'Before', 'stable-task']],
         );
         const afterCsv = buildCsv(
             ['Title', 'Project', 'ID'],
-            [['Move prior import', 'Después', 'stable-task']],
+            [['Move prior import', 'After', 'stable-task']],
         );
         const beforeParsed = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: beforeCsv })
             .parsedData as ParsedMindwtrCsvImportData;
@@ -436,7 +436,7 @@ describe('mindwtr csv import', () => {
             fileName: 'target.csv',
             text: buildCsv(
                 ['Title', 'Project', 'ID'],
-                [['Existing target task', 'Después', 'existing-after-task']],
+                [['Existing target task', 'After', 'existing-after-task']],
             ),
         }).parsedData as ParsedMindwtrCsvImportData;
         const seeded = applyMindwtrCsvImport(first.data, targetSeed, {
@@ -455,7 +455,7 @@ describe('mindwtr csv import', () => {
         const second = applyMindwtrCsvImport(priorData, afterParsed, {
             now: '2026-08-09T12:00:00.000Z',
         });
-        const afterProject = second.data.projects.find((project) => project.title === 'Después');
+        const afterProject = second.data.projects.find((project) => project.title === 'After');
         const migratedTask = second.data.tasks.find((task) => task.title === 'Move prior import');
 
         expect(second.importedTaskCount).toBe(0);
@@ -858,7 +858,7 @@ describe('mindwtr csv import', () => {
             fileName: 'export.csv',
             text: buildCsv(
                 ['Title', 'Project', 'Order', 'ID'],
-                [['Move to Inbox', 'Antes', '4', 'stable-task']],
+                [['Move to Inbox', 'Before', '4', 'stable-task']],
             ),
         }).parsedData as ParsedMindwtrCsvImportData;
         const afterParsed = parseMindwtrCsvImportSource({
@@ -1271,11 +1271,11 @@ describe('mindwtr csv import', () => {
     it('keeps a stable task identity when a corrected re-export moves it between projects', () => {
         const firstCsv = buildCsv(
             ['Title', 'Project', 'ID'],
-            [['Move me', 'Antes', 'stable-task']],
+            [['Move me', 'Before', 'stable-task']],
         );
         const movedCsv = buildCsv(
             ['Title', 'Project', 'ID'],
-            [['Move me', 'Después', 'stable-task']],
+            [['Move me', 'After', 'stable-task']],
         );
         const firstParsed = parseMindwtrCsvImportSource({ fileName: 'export.csv', text: firstCsv })
             .parsedData as ParsedMindwtrCsvImportData;
