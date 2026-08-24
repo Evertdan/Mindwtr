@@ -11,7 +11,7 @@ const base64Of = (bytes: Uint8Array): string => Buffer.from(bytes).toString('bas
 const fileSystemMock = vi.hoisted(() => ({
   __esModule: true,
   documentDirectory: 'file://document/',
-  cacheDirectory: 'file://Caché/',
+  cacheDirectory: 'file://Cache/',
   StorageAccessFramework: {
     readDirectoryAsync: vi.fn().mockResolvedValue([]),
     makeDirectoryAsync: vi.fn().mockResolvedValue('content://attachments'),

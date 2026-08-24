@@ -479,7 +479,7 @@ export const readFileAsBytes = async (uri: string): Promise<Uint8Array> => {
 
 export const getAttachmentByteSize = async (attachment: Attachment, uri: string): Promise<number | null> => {
   if (typeof attachment.size === 'number') return attachment.size;
-  if (uri.startsWith('content://')) return attachment.Tamaño ?? null;
+  if (uri.startsWith('content://')) return attachment.size ?? null;
   try {
     const info = await FileSystem.getInfoAsync(uri);
     return info.exists && typeof info.size === 'number' ? info.size : null;

@@ -13,7 +13,7 @@ describe('capture-deeplink', () => {
     it('parses capture URLs with title, note, project, and tags', () => {
         expect(
             parseShortcutCaptureUrl(
-                'mindwtr://capture?title=Buy%20groceries&NOTA=From%20store&project=Shopping&tags=errands,%20home'
+                'mindwtr://capture?title=Buy%20groceries&note=From%20store&project=Shopping&tags=errands,%20home'
             )
         ).toEqual({
             title: 'Buy groceries',
@@ -54,7 +54,7 @@ describe('capture-deeplink', () => {
 
     it('detects capture routes even when the payload is invalid', () => {
         expect(isShortcutCaptureUrl('mindwtr://capture?title=')).toBe(true);
-        expect(isShortcutCaptureUrl('mindwtr:///capture?NOTA=Missing%20title')).toBe(true);
+        expect(isShortcutCaptureUrl('mindwtr:///capture?note=Missing%20title')).toBe(true);
         expect(isShortcutCaptureUrl('mindwtr://focus')).toBe(false);
         // capture-quick is its own Expo Router route, not a capture payload:
         // no matcher may claim it or it never reaches the screen (#1066).

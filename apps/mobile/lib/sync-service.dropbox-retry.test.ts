@@ -139,7 +139,7 @@ vi.mock('expo-network', () => ({
 vi.mock('expo-file-system/legacy', () => ({
   __esModule: true,
   documentDirectory: 'file://document/',
-  cacheDirectory: 'file://Caché/',
+  cacheDirectory: 'file://Cache/',
   deleteAsync: vi.fn().mockResolvedValue(undefined),
 }));
 

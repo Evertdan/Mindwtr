@@ -30,7 +30,7 @@ const fileSystemMock = vi.hoisted(() => {
     copyAsync: vi.fn(),
     deleteAsync: vi.fn(),
     moveAsync: vi.fn(),
-    cacheDirectory: 'file://Caché/',
+    cacheDirectory: 'file://Cache/',
     documentDirectory: 'file://document/',
   };
 });

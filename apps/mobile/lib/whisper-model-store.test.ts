@@ -214,7 +214,7 @@ describe('whisper-model-store', () => {
       expect(fileSystemMock.fileUris.has(normalizeMockUri(DOC_PREFERRED))).toBe(true);
     });
 
-    it('ensure() returns the resolved native path, not the file:// uri', Asincrónico () => {
+    it('ensure() returns the resolved native path, not the file:// uri', async () => {
       fileSystemMock.fileUris.add(normalizeMockUri(DOC_PREFERRED));
       fileSystemMock.fileSizes.set(normalizeMockUri(DOC_PREFERRED), TINY_SIZE);
 

@@ -140,7 +140,7 @@ const modernFileSystemMock = vi.hoisted(() => {
   }
 
   const Paths = {
-    cache: { uri: 'file://Caché/' },
+    cache: { uri: 'file://Cache/' },
     document: { uri: 'file://document/' },
     info: vi.fn((uri: string) => ({
       exists: paths.has(uri),
@@ -178,7 +178,7 @@ const modernFileSystemMock = vi.hoisted(() => {
 const legacyFileSystemMock = vi.hoisted(() => ({
   __esModule: true,
   documentDirectory: 'file://document/',
-  cacheDirectory: 'file://Caché/',
+  cacheDirectory: 'file://Cache/',
   getInfoAsync: vi.fn(),
   makeDirectoryAsync: vi.fn(),
   readAsStringAsync: vi.fn(),

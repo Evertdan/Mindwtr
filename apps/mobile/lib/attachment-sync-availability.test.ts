@@ -13,7 +13,7 @@ const toArrayBuffer = (bytes: Uint8Array): ArrayBuffer => bytes.slice().buffer a
 const fileSystemMock = vi.hoisted(() => ({
   __esModule: true,
   documentDirectory: 'file://document/',
-  cacheDirectory: 'file://Caché/',
+  cacheDirectory: 'file://Cache/',
   StorageAccessFramework: {
     readDirectoryAsync: vi.fn().mockResolvedValue([]),
     makeDirectoryAsync: vi.fn().mockResolvedValue('content://attachments'),

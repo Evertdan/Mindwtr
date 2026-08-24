@@ -74,7 +74,7 @@ vi.mock('./file-system', () => {
       if (bytes) { fs.files.set(to, bytes); fs.files.delete(from); }
     }),
     makeDirectoryAsync: vi.fn(async () => undefined),
-    cacheDirectory: 'file://Caché/',
+    cacheDirectory: 'file://Cache/',
     documentDirectory: 'file://document/',
   };
 });
