@@ -251,7 +251,16 @@ export function TaskQuickActionMenu({
             onClose({ restoreFocus: false });
         };
         const handleScrollOrResize = (event: Event) => {
-            if (event.type === 'scroll' && !initialLayoutScrollSettledRef.current) return;
+            if (event.type === 'scroll') {
+                if (!initialLayoutScrollSettledRef.current) return;
+                // A scroll from the menu's own surface must not dismiss it: its
+                // panels and dropdowns scroll, and focusing a partially clipped
+                // item on mousedown scrolls it into view — closing here killed
+                // the click before mouseup, a menu tap that silently did
+                // nothing. The list scrolling behind the menu still closes it.
+                const scrollTarget = event.target instanceof Node ? event.target : null;
+                if (isInsideMenuSurface(scrollTarget)) return;
+            }
             onClose({ restoreFocus: false });
         };
         const getMenuItems = () => Array.from(

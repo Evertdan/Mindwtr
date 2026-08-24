@@ -205,6 +205,25 @@ describe('TaskQuickActionMenu', () => {
         }
     });
 
+    // Focusing a partially clipped item on mousedown scrolls it into view;
+    // dismissing on that scroll unmounted the menu before mouseup, so the tap
+    // silently did nothing (feedback 9cb87074).
+    it('stays open when the scroll comes from inside the menu surface', () => {
+        vi.useFakeTimers();
+        try {
+            const props = renderMenu();
+            vi.advanceTimersByTime(160);
+
+            fireEvent.scroll(screen.getByRole('menu'));
+            expect(props.onClose).not.toHaveBeenCalled();
+
+            fireEvent.scroll(window);
+            expect(props.onClose).toHaveBeenCalledTimes(1);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it('closes the due date mini calendar when clicking elsewhere in the quick panel', () => {
         const props = renderMenu({ task: { ...task, dueDate: '2026-04-12' } });
         fireEvent.click(screen.getByRole('menuitem', { name: 'Due Date…' }));
