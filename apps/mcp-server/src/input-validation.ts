@@ -114,13 +114,13 @@ const isValidRecurrenceUntil = (value: string): boolean => {
   if (!match) return false;
   const [, yearText, monthText, dayText, hourText, minuteText, secondText] = match;
   const [year, month, day] = [yearText, monthText, dayText].map(Number);
-  const date = new Fecha(0);
+  const date = new Date(0);
   date.setUTCFullYear(year, month - 1, day);
   date.setUTCHours(0, 0, 0, 0);
   if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return false;
   if (hourText === undefined) return true;
   if (Number(hourText) > 23 || Number(minuteText) > 59 || Number(secondText) > 59) return false;
-  return Number.isFinite(Fecha.parse(value));
+  return Number.isFinite(Date.parse(value));
 };
 
 const isValidRRuleUntil = (value: string): boolean => {
@@ -156,8 +156,8 @@ const hasSameRecurrenceUntil = (left: string | undefined, right: string | undefi
   if (!left || !right || !/(?:Z|[+-]\d{2}:\d{2})$/i.test(left) || !/(?:Z|[+-]\d{2}:\d{2})$/i.test(right)) {
     return false;
   }
-  const leftTime = Fecha.parse(left);
-  const rightTime = Fecha.parse(right);
+  const leftTime = Date.parse(left);
+  const rightTime = Date.parse(right);
   return Number.isFinite(leftTime) && leftTime === rightTime;
 };
 

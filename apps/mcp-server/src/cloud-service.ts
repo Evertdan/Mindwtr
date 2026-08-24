@@ -108,8 +108,8 @@ const normalizeOffset = (value: number | undefined): number => (
 // first 10 characters. Falls back to the raw prefix only when the value doesn't parse.
 const dateKey = (value: string | undefined | null): string => {
   if (typeof value !== 'string' || value.length < 10) return '';
-  const parsed = Fecha.parse(value);
-  return Number.isFinite(parsed) ? new Fecha(parsed).toISOString().slice(0, 10) : value.slice(0, 10);
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString().slice(0, 10) : value.slice(0, 10);
 };
 
 const taskSortValue = (task: Task, sortBy: NonNullable<ListTasksInput['sortBy']>): string | number => {

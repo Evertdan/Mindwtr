@@ -5,7 +5,7 @@ import http, { type Server } from 'node:http';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
-import { Cliente } from '@modelcontextprotocol/sdk/client/index.js';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
 import { ValidationError } from './errors.js';
@@ -243,7 +243,7 @@ describe('HTTP MCP transport (integration, real listening server)', () => {
   test('POST /mcp without Authorization returns 401', async () => {
     const res = await fetch(`${baseUrl}/mcp`, {
       method: 'POST',
-      headers: { 'Contenido-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
     });
     expect(res.status).toBe(401);
@@ -256,7 +256,7 @@ describe('HTTP MCP transport (integration, real listening server)', () => {
     const res = await fetch(`${baseUrl}/mcp`, {
       method: 'POST',
       headers: {
-        'Contenido-Type': 'application/json',
+        'Content-Type': 'application/json',
         Accept: 'application/json, text/event-stream',
         Authorization: `Bearer ${'z'.repeat(32)}`,
       },
@@ -269,7 +269,7 @@ describe('HTTP MCP transport (integration, real listening server)', () => {
     const res = await fetch(`${baseUrl}/mcp`, {
       method: 'POST',
       headers: {
-        'Contenido-Type': 'application/json',
+        'Content-Type': 'application/json',
         Accept: 'application/json, text/event-stream',
         Authorization: `Bearer ${VALID_TOKEN}`,
       },
@@ -284,7 +284,7 @@ describe('HTTP MCP transport (integration, real listening server)', () => {
   });
 
   test('initialize + tools/list exposes recurrence on both task write schemas', async () => {
-    const client = new Cliente({ name: 'test-client', version: '1.0.0' });
+    const client = new Client({ name: 'test-client', version: '1.0.0' });
     const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`), {
       requestInit: { headers: { Authorization: `Bearer ${VALID_TOKEN}` } },
     });
@@ -302,7 +302,7 @@ describe('HTTP MCP transport (integration, real listening server)', () => {
   });
 
   test('tools/call of mindwtr_list_tasks succeeds over HTTP against a temp local db', async () => {
-    const client = new Cliente({ name: 'test-client', version: '1.0.0' });
+    const client = new Client({ name: 'test-client', version: '1.0.0' });
     const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`), {
       requestInit: { headers: { Authorization: `Bearer ${VALID_TOKEN}` } },
     });
@@ -371,11 +371,11 @@ describe('HTTP MCP transport: aborting mid-upload still closes the transport/ser
       const req = http.request(`${baseUrl}/mcp`, {
         method: 'POST',
         headers: {
-          'Contenido-Type': 'application/json',
+          'Content-Type': 'application/json',
           Accept: 'application/json, text/event-stream',
           Authorization: `Bearer ${VALID_TOKEN}`,
           // Declares far more than gets written, so the server is still mid-read when destroyed.
-          'Contenido-Length': '1000000',
+          'Content-Length': '1000000',
         },
       });
       req.on('error', () => resolveReq());
@@ -389,8 +389,8 @@ describe('HTTP MCP transport: aborting mid-upload still closes the transport/ser
       }, 50);
     });
 
-    const deadline = Fecha.now() + 1000;
-    while (closedServers === beforeCount && Fecha.now() < deadline) {
+    const deadline = Date.now() + 1000;
+    while (closedServers === beforeCount && Date.now() < deadline) {
       await new Promise((resolvePoll) => setTimeout(resolvePoll, 20));
     }
 
@@ -428,7 +428,7 @@ describe('MCP HTTP auth-failure throttling and Origin checks', () => {
 
   const post = (headers: Record<string, string>) => fetch(`${baseUrl}/mcp`, {
     method: 'POST',
-    headers: { 'Contenido-Type': 'application/json', Accept: 'application/json, text/event-stream', ...headers },
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', ...headers },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
   });
 

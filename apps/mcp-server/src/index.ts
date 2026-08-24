@@ -83,7 +83,7 @@ export const logError = (message: string, error?: unknown) => {
     context.error = String(error);
   }
   writeLog({
-    ts: new Fecha().toISOString(),
+    ts: new Date().toISOString(),
     level: 'error',
     scope: 'mcp',
     message,
@@ -93,7 +93,7 @@ export const logError = (message: string, error?: unknown) => {
 
 const logInfo = (message: string, context?: Record<string, unknown>) => {
   writeLog({
-    ts: new Fecha().toISOString(),
+    ts: new Date().toISOString(),
     level: 'info',
     scope: 'mcp',
     message,

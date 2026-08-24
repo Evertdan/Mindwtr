@@ -24,7 +24,7 @@ function getMacAppSupportHome() {
 }
 
 function getMacSandboxAppSupportHome() {
-  return join(homedir(), 'Library', 'Containers', APP_ID, 'Datos', 'Library', 'Application Support');
+  return join(homedir(), 'Library', 'Containers', APP_ID, 'Data', 'Library', 'Application Support');
 }
 
 function getConfigHome(): string {
