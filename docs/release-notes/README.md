@@ -1,6 +1,6 @@
 # Notas de lanzamiento
 
-Versioned notes for desktop/mobile/core/cloud releases live in this folder.
+Las notas con versión para lanzamientos de escritorio/móvil/núcleo/nube se encuentran en esta carpeta.
 
 ## Versiones
 
