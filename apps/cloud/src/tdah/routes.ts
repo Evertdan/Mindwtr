@@ -7,8 +7,8 @@
  * bodies are always `{error: {code: 'TDAH_…'}}`; raw fs/sqlite `.message`
  * values never reach a response (cloud logging/privacy policy).
  */
-import { isBodyReadError, readJsonBody } from '../server-storage';
-import { jsonResponse } from '../server-config';
+import { getFsErrorCode, isBodyReadError, readJsonBody } from '../server-storage';
+import { jsonResponse, logError } from '../server-config';
 import { readTdahProfile, upsertTdahProfile } from './storage';
 import { isTdahMode, TDAH_ERRORS, type TdahErrorCode, type TdahMode, type TdahProfileResponse } from './types';
 
@@ -96,7 +96,12 @@ export async function handleTdahRequest(
             const profile = await readTdahProfile(options.dataDir, ctx.key);
             const responseBody: TdahProfileResponse = { profile };
             return jsonResponse(responseBody);
-        } catch {
+        } catch (error) {
+            logError('request failed', {
+                failureClass: 'filesystem',
+                failureCode: 'request_failed',
+                failureErrno: getFsErrorCode(error),
+            });
             return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
         }
     }
@@ -122,7 +127,12 @@ export async function handleTdahRequest(
             });
             const responseBody: TdahProfileResponse = { profile };
             return jsonResponse(responseBody);
-        } catch {
+        } catch (error) {
+            logError('request failed', {
+                failureClass: 'filesystem',
+                failureCode: 'request_failed',
+                failureErrno: getFsErrorCode(error),
+            });
             return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
         }
     }

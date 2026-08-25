@@ -142,6 +142,17 @@ describe('tdah module', () => {
         expect(raw.error !== undefined && 'message' in raw.error).toBe(false);
     });
 
+    test('syntactically valid but non-existent IANA time zone returns 400 TDAH_INVALID_TIME_ZONE', async () => {
+        // 'Fake/Placeholder' matches IANA_TIME_ZONE_PATTERN (/^[A-Za-z0-9+_/-]{1,64}$/,
+        // letters and a single '/' only) so it clears the syntactic check and
+        // exercises the semantic Intl.DateTimeFormat check in isValidTimeZone.
+        const response = await putProfile({ mode: 'on', timeZone: 'Fake/Placeholder' });
+        expect(response.status).toBe(400);
+        const raw = await response.json() as { error?: { code?: string } & Record<string, unknown> };
+        expect(raw.error?.code).toBe('TDAH_INVALID_TIME_ZONE');
+        expect(raw.error !== undefined && 'message' in raw.error).toBe(false);
+    });
+
     test('invalid ritual hour returns 400 TDAH_INVALID_RITUAL_HOUR', async () => {
         const response = await putProfile({ mode: 'on', ritualHour: '25:99' });
         expect(response.status).toBe(400);
@@ -229,5 +240,25 @@ describe('tdah module', () => {
         const betaProfile = await readProfile(await getProfile(TOKEN_BETA));
         expect(betaProfile?.timeZone).toBe('Asia/Tokyo');
         expect(betaProfile?.ritualHour).toBe('21:00');
+    });
+
+    test('concurrent PUTs for the same token all succeed and leave a coherent, non-mixed row', async () => {
+        const writes = [
+            { mode: 'on', timeZone: 'America/Mexico_City', ritualHour: '20:00' },
+            { mode: 'on', timeZone: 'Europe/Madrid', ritualHour: '21:15' },
+            { mode: 'on', timeZone: 'Asia/Tokyo', ritualHour: '22:30' },
+            { mode: 'on', timeZone: 'America/New_York', ritualHour: '23:45' },
+        ];
+
+        const responses = await Promise.all(writes.map((body) => putProfile(body)));
+        for (const response of responses) {
+            expect(response.status).toBe(200);
+        }
+
+        const profile = await readProfile(await getProfile());
+        const isCoherentCombination = writes.some((body) => (
+            body.timeZone === profile?.timeZone && body.ritualHour === profile?.ritualHour
+        ));
+        expect(isCoherentCombination).toBe(true);
     });
 });
