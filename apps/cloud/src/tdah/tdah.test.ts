@@ -46,6 +46,28 @@ describe('tdah module', () => {
         authedFetch('/v1/tdah/profile', { method: 'GET', token })
     );
 
+    const activate = (body: unknown, token?: string): Promise<Response> => (
+        authedFetch('/v1/tdah/activate', { method: 'POST', body: JSON.stringify(body), token })
+    );
+
+    const WORKDAY_ROUTINE = {
+        title: 'Día laboral',
+        blocks: [
+            { title: 'Mañana', startTime: '08:00', durationMinutes: 120 },
+            { title: 'Tarde', startTime: '14:00', durationMinutes: 180 },
+        ],
+    };
+
+    type TdahTestActivateResponse = {
+        profile: TdahTestProfile;
+        routineCreated: boolean;
+        dayPlan: { date: string; activityCount: number };
+    };
+
+    const readActivateResponse = async (response: Response): Promise<TdahTestActivateResponse> => (
+        await response.json() as TdahTestActivateResponse
+    );
+
     const readProfile = async (response: Response): Promise<TdahTestProfile | null> => {
         const body = await response.json() as { profile: TdahTestProfile | null };
         return body.profile;
@@ -260,5 +282,164 @@ describe('tdah module', () => {
             body.timeZone === profile?.timeZone && body.ritualHour === profile?.ritualHour
         ));
         expect(isCoherentCombination).toBe(true);
+    });
+
+    describe('POST /v1/tdah/activate', () => {
+        test('first activation with a routine persists the profile, the Rutina/Bloques and tomorrow\'s DayPlan with Actividades', async () => {
+            const response = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            });
+            expect(response.status).toBe(200);
+            const body = await readActivateResponse(response);
+            expect(body.profile.mode).toBe('on');
+            expect(body.profile.timeZone).toBe('America/Mexico_City');
+            expect(body.profile.ritualHour).toBe('22:00');
+            expect(body.routineCreated).toBe(true);
+            expect(body.dayPlan.activityCount).toBe(WORKDAY_ROUTINE.blocks.length);
+            expect(/^\d{4}-\d{2}-\d{2}$/.test(body.dayPlan.date)).toBe(true);
+
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(databasePath, { readonly: true });
+            try {
+                const routineRow = database.prepare('SELECT title, pattern_kind FROM tdah_routine;').get() as {
+                    title: string;
+                    pattern_kind: string;
+                };
+                expect(routineRow.title).toBe(WORKDAY_ROUTINE.title);
+                expect(routineRow.pattern_kind).toBe('weekday');
+
+                const blockRows = (database.prepare('SELECT title, start_time, duration_minutes, sort_order FROM tdah_routine_block ORDER BY sort_order;') as unknown as {
+                    all(): { title: string; start_time: string; duration_minutes: number; sort_order: number }[];
+                }).all();
+                expect(blockRows).toHaveLength(2);
+                expect(blockRows[0]?.title).toBe('Mañana');
+                expect(blockRows[0]?.sort_order).toBe(0);
+                expect(blockRows[1]?.title).toBe('Tarde');
+                expect(blockRows[1]?.sort_order).toBe(1);
+
+                const dayPlanRow = database.prepare('SELECT date FROM tdah_day_plan;').get() as { date: string };
+                expect(dayPlanRow.date).toBe(body.dayPlan.date);
+
+                const activityRows = (database.prepare('SELECT title, origin, state, day_plan_date FROM tdah_activity ORDER BY id;') as unknown as {
+                    all(): { title: string; origin: string; state: string; day_plan_date: string }[];
+                }).all();
+                expect(activityRows).toHaveLength(2);
+                for (const row of activityRows) {
+                    expect(row.origin).toBe('routine');
+                    expect(row.state).toBe('pending');
+                    expect(row.day_plan_date).toBe(body.dayPlan.date);
+                }
+            } finally {
+                database.close();
+            }
+        });
+
+        test('first activation without a routine yields an empty DayPlan (no Actividades)', async () => {
+            const response = await activate({ timeZone: 'Europe/Madrid' });
+            expect(response.status).toBe(200);
+            const body = await readActivateResponse(response);
+            expect(body.profile.mode).toBe('on');
+            expect(body.routineCreated).toBe(false);
+            expect(body.dayPlan.activityCount).toBe(0);
+        });
+
+        test('retrying the same activation after a timeout never duplicates the Rutina or the DayPlan (idempotent)', async () => {
+            const first = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            });
+            expect(first.status).toBe(200);
+            const firstBody = await readActivateResponse(first);
+
+            const retry = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            });
+            expect(retry.status).toBe(200);
+            const retryBody = await readActivateResponse(retry);
+            expect(retryBody.routineCreated).toBe(false);
+            expect(retryBody.dayPlan.date).toBe(firstBody.dayPlan.date);
+            expect(retryBody.dayPlan.activityCount).toBe(firstBody.dayPlan.activityCount);
+
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(databasePath, { readonly: true });
+            try {
+                const routineCount = database.prepare('SELECT COUNT(*) AS count FROM tdah_routine;').get() as { count: number };
+                expect(routineCount.count).toBe(1);
+                const dayPlanCount = database.prepare('SELECT COUNT(*) AS count FROM tdah_day_plan;').get() as { count: number };
+                expect(dayPlanCount.count).toBe(1);
+                const activityCount = database.prepare('SELECT COUNT(*) AS count FROM tdah_activity;').get() as { count: number };
+                expect(activityCount.count).toBe(WORKDAY_ROUTINE.blocks.length);
+            } finally {
+                database.close();
+            }
+        });
+
+        test('reactivating after off skips the routine step, keeps tz/ritualHour, and reuses the already-generated DayPlan', async () => {
+            const first = await activate({
+                timeZone: 'Europe/Madrid',
+                ritualHour: '22:30',
+                routine: WORKDAY_ROUTINE,
+            });
+            const firstBody = await readActivateResponse(first);
+            await putProfile({ mode: 'off' });
+
+            const reactivation = await activate({});
+            expect(reactivation.status).toBe(200);
+            const reactivationBody = await readActivateResponse(reactivation);
+            expect(reactivationBody.profile.mode).toBe('on');
+            expect(reactivationBody.profile.timeZone).toBe('Europe/Madrid');
+            expect(reactivationBody.profile.ritualHour).toBe('22:30');
+            expect(reactivationBody.routineCreated).toBe(false);
+            expect(reactivationBody.dayPlan.date).toBe(firstBody.dayPlan.date);
+            expect(reactivationBody.dayPlan.activityCount).toBe(firstBody.dayPlan.activityCount);
+        });
+
+        test('routine with an empty blocks array returns 400 TDAH_ROUTINE_INVALID', async () => {
+            const response = await activate({
+                timeZone: 'UTC',
+                routine: { title: 'Día laboral', blocks: [] },
+            });
+            expect(response.status).toBe(400);
+            expect(await readErrorCode(response)).toBe('TDAH_ROUTINE_INVALID');
+        });
+
+        test('routine block with duration_minutes<=0 returns 400 TDAH_ROUTINE_INVALID', async () => {
+            const response = await activate({
+                timeZone: 'UTC',
+                routine: {
+                    title: 'Día laboral',
+                    blocks: [{ title: 'Mañana', startTime: '08:00', durationMinutes: 0 }],
+                },
+            });
+            expect(response.status).toBe(400);
+            expect(await readErrorCode(response)).toBe('TDAH_ROUTINE_INVALID');
+        });
+
+        test('invalid time zone on activate returns 400 TDAH_INVALID_TIME_ZONE', async () => {
+            const response = await activate({ timeZone: 'No/Una::Zona' });
+            expect(response.status).toBe(400);
+            expect(await readErrorCode(response)).toBe('TDAH_INVALID_TIME_ZONE');
+        });
+
+        test('invalid ritual hour on activate returns 400 TDAH_INVALID_RITUAL_HOUR', async () => {
+            const response = await activate({ ritualHour: '25:99' });
+            expect(response.status).toBe(400);
+            expect(await readErrorCode(response)).toBe('TDAH_INVALID_RITUAL_HOUR');
+        });
+
+        test('GET /v1/tdah/activate returns 405 TDAH_METHOD_NOT_ALLOWED', async () => {
+            const response = await authedFetch('/v1/tdah/activate', { method: 'GET' });
+            expect(response.status).toBe(405);
+            expect(await readErrorCode(response)).toBe('TDAH_METHOD_NOT_ALLOWED');
+        });
     });
 });

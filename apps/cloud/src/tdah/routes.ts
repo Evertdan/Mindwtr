@@ -1,5 +1,6 @@
 /**
- * HTTP surface of the TDAH module: GET/PUT `/v1/tdah/profile`.
+ * HTTP surface of the TDAH module: GET/PUT `/v1/tdah/profile` and
+ * POST `/v1/tdah/activate` (story 1.3 — the only way to turn the mode on).
  *
  * Mounted additively by server.ts under its own prefix (ADR 0026) — every
  * request arrives already authenticated, rate-limited and namespace-admitted
@@ -9,11 +10,21 @@
  */
 import { getFsErrorCode, isBodyReadError, readJsonBody } from '../server-storage';
 import { jsonResponse, logError } from '../server-config';
-import { readTdahProfile, upsertTdahProfile } from './storage';
-import { isTdahMode, TDAH_ERRORS, type TdahErrorCode, type TdahMode, type TdahProfileResponse } from './types';
+import { createRoutineWithBlocks, generateTomorrowIfMissing, readTdahProfile, upsertTdahProfile } from './storage';
+import {
+    isTdahMode,
+    TDAH_ERRORS,
+    type TdahActivateResponse,
+    type TdahErrorCode,
+    type TdahMode,
+    type TdahProfileResponse,
+    type TdahRoutineBlockInput,
+    type TdahRoutineInput,
+} from './types';
 
 export const TDAH_PATH_PREFIX = '/v1/tdah';
 const TDAH_PROFILE_PATH = `${TDAH_PATH_PREFIX}/profile`;
+const TDAH_ACTIVATE_PATH = `${TDAH_PATH_PREFIX}/activate`;
 
 const IANA_TIME_ZONE_PATTERN = /^[A-Za-z0-9+_/-]{1,64}$/;
 const RITUAL_HOUR_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -81,12 +92,144 @@ const parseProfilePutBody = (body: unknown): { ok: true; body: TdahParsedProfile
     return { ok: true, body: parsed };
 };
 
+type TdahRoutineBlockBody = {
+    title?: unknown;
+    startTime?: unknown;
+    durationMinutes?: unknown;
+};
+
+type TdahRoutineBody = {
+    title?: unknown;
+    blocks?: unknown;
+};
+
+type TdahActivateBody = {
+    timeZone?: unknown;
+    ritualHour?: unknown;
+    routine?: unknown;
+};
+
+type TdahParsedActivate = {
+    timeZone?: string;
+    ritualHour?: string;
+    routine?: TdahRoutineInput;
+};
+
+const parseRoutineBlockInput = (value: unknown): TdahRoutineBlockInput | null => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+    const raw = value as TdahRoutineBlockBody;
+    if (typeof raw.title !== 'string' || raw.title.trim().length === 0) return null;
+    if (typeof raw.startTime !== 'string' || !RITUAL_HOUR_PATTERN.test(raw.startTime)) return null;
+    if (typeof raw.durationMinutes !== 'number' || !Number.isInteger(raw.durationMinutes) || raw.durationMinutes <= 0) {
+        return null;
+    }
+    return { title: raw.title, startTime: raw.startTime, durationMinutes: raw.durationMinutes };
+};
+
+const parseRoutineInput = (value: unknown): TdahRoutineInput | null => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+    const raw = value as TdahRoutineBody;
+    if (typeof raw.title !== 'string' || raw.title.trim().length === 0) return null;
+    if (!Array.isArray(raw.blocks) || raw.blocks.length === 0) return null;
+    const blocks: TdahRoutineBlockInput[] = [];
+    for (const rawBlock of raw.blocks) {
+        const block = parseRoutineBlockInput(rawBlock);
+        if (!block) return null;
+        blocks.push(block);
+    }
+    return { title: raw.title, blocks };
+};
+
+const parseActivateBody = (body: unknown): { ok: true; body: TdahParsedActivate } | { ok: false; code: TdahErrorCode } => {
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+        return { ok: false, code: TDAH_ERRORS.invalidBody };
+    }
+    const raw = body as TdahActivateBody;
+    if (raw.timeZone !== undefined && typeof raw.timeZone !== 'string') {
+        return { ok: false, code: TDAH_ERRORS.invalidBody };
+    }
+    if (raw.timeZone !== undefined && !isValidTimeZone(raw.timeZone)) {
+        return { ok: false, code: TDAH_ERRORS.invalidTimeZone };
+    }
+    if (raw.ritualHour !== undefined && typeof raw.ritualHour !== 'string') {
+        return { ok: false, code: TDAH_ERRORS.invalidBody };
+    }
+    if (raw.ritualHour !== undefined && !RITUAL_HOUR_PATTERN.test(raw.ritualHour)) {
+        return { ok: false, code: TDAH_ERRORS.invalidRitualHour };
+    }
+    const parsed: TdahParsedActivate = {};
+    if (raw.timeZone !== undefined) parsed.timeZone = raw.timeZone;
+    if (raw.ritualHour !== undefined) parsed.ritualHour = raw.ritualHour;
+    if (raw.routine !== undefined) {
+        const routine = parseRoutineInput(raw.routine);
+        if (!routine) {
+            return { ok: false, code: TDAH_ERRORS.routineInvalid };
+        }
+        parsed.routine = routine;
+    }
+    return { ok: true, body: parsed };
+};
+
+/**
+ * POST /v1/tdah/activate — the only way to turn the mode on, first time or
+ * on reactivation. Idempotent: a Rutina is created only if the body includes
+ * one and none exists yet; `generateTomorrowIfMissing` never duplicates
+ * tomorrow's DayPlan (see storage.ts).
+ */
+const handleActivate = async (
+    req: Request,
+    ctx: TdahRequestContext,
+    options: TdahRequestOptions,
+): Promise<Response> => {
+    const body = await readJsonBody(req, options.maxBodyBytes, options.signal);
+    if (isBodyReadError(body)) {
+        return tdahErrorResponse(TDAH_ERRORS.invalidBody, 413);
+    }
+    const parsed = parseActivateBody(body);
+    if (!parsed.ok) {
+        return tdahErrorResponse(parsed.code, 400);
+    }
+    try {
+        const profile = await upsertTdahProfile(options.dataDir, ctx.key, {
+            mode: 'on',
+            timeZone: parsed.body.timeZone,
+            ritualHour: parsed.body.ritualHour,
+        });
+        let routineCreated = false;
+        if (parsed.body.routine) {
+            const routineResult = await createRoutineWithBlocks(options.dataDir, ctx.key, parsed.body.routine);
+            routineCreated = routineResult.created;
+        }
+        const dayPlan = await generateTomorrowIfMissing(options.dataDir, ctx.key, profile);
+        const responseBody: TdahActivateResponse = {
+            profile,
+            routineCreated,
+            dayPlan: { date: dayPlan.date, activityCount: dayPlan.activityCount },
+        };
+        return jsonResponse(responseBody);
+    } catch (error) {
+        logError('request failed', {
+            failureClass: 'filesystem',
+            failureCode: 'request_failed',
+            failureErrno: getFsErrorCode(error),
+        });
+        return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
+    }
+};
+
 export async function handleTdahRequest(
     req: Request,
     pathname: string,
     ctx: TdahRequestContext,
     options: TdahRequestOptions,
 ): Promise<Response | null> {
+    if (pathname === TDAH_ACTIVATE_PATH) {
+        if (req.method !== 'POST') {
+            return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
+        }
+        return handleActivate(req, ctx, options);
+    }
+
     if (pathname !== TDAH_PROFILE_PATH) {
         return tdahErrorResponse(TDAH_ERRORS.notFound, 404);
     }

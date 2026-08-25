@@ -8,6 +8,7 @@ import { getLocaleCoverageTier, normalizeWeekStartSetting } from '@mindwtr/core'
 import type { DesktopThemeMode } from '../../../lib/theme';
 import { Switch } from '../../ui/Switch';
 import { SettingRow, SettingsCard, SettingsSectionHeader } from './SettingRow';
+import { TdahActivationSection } from './TdahActivationSection';
 
 const FLATPAK_QUICK_ADD_COMMAND = 'flatpak run tech.dongdongbh.mindwtr --quick-add';
 
@@ -442,6 +443,11 @@ export function SettingsMainPage({
                     />
                 </SettingRow>
             </SettingsCard>
+
+            {/* ADHD mode activation (T-14, spec 1.3) — self-contained: resolves its
+                own cloud config, profile state and i18n rather than threading
+                through this page's `t: Labels` prop. */}
+            <TdahActivationSection />
 
             {/* Window Behavior */}
             {hasWindowSection && (
