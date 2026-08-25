@@ -523,6 +523,17 @@
     --tertiary-foreground: 217.5 22.2% 7.1%;
     --secondary-container-foreground: 217.5 22.2% 7.1%;
     --dnd-foreground: 217.5 22.2% 7.1%;
+    /* Status badges reuse this scheme's own mapped roles rather than inventing
+     * hues, mirroring FOCUS_DARK_STATUS_COLORS in core's theme-scheme.ts:
+     * inbox/archived=outline-variant, next=primary, waiting=tertiary,
+     * someday=dnd, reference=secondary-container, done=success. */
+    --status-inbox: 215.2 12.4% 54.3%;
+    --status-next: 214.9 92.9% 66.7%;
+    --status-waiting: 39.3 64.7% 57.8%;
+    --status-someday: 255.1 91.7% 76.3%;
+    --status-reference: 187.2 56.2% 49.2%;
+    --status-done: 155.7 63.9% 57.6%;
+    --status-archived: 215.2 12.4% 54.3%;
   }
 
   :root.theme-focus-light {
@@ -556,6 +567,17 @@
     --tertiary-foreground: 216 45.5% 97.8%;
     --secondary-container-foreground: 216 45.5% 97.8%;
     --dnd-foreground: 216 45.5% 97.8%;
+    /* Status badges reuse this scheme's own mapped roles rather than inventing
+     * hues, mirroring FOCUS_LIGHT_STATUS_COLORS in core's theme-scheme.ts:
+     * inbox/archived=outline-variant, next=primary, waiting=tertiary,
+     * someday=dnd, reference=secondary-container, done=success. */
+    --status-inbox: 214.3 11.6% 47.5%;
+    --status-next: 219.2 70.8% 49.6%;
+    --status-waiting: 39 84% 29.4%;
+    --status-someday: 254.8 52.4% 51.4%;
+    --status-reference: 188.3 85.3% 26.7%;
+    --status-done: 159.5 83.5% 26.1%;
+    --status-archived: 214.3 11.6% 47.5%;
   }
 }
 
