@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
     Bell,
+    Brain,
     CalendarDays,
     Database,
     Info,
@@ -28,6 +29,7 @@ import { GeneralSettingsScreen } from '@/components/settings/general-settings-sc
 import { GtdSettingsScreen } from '@/components/settings/gtd-settings-screen';
 import { ManageSettingsScreen } from '@/components/settings/manage-settings-screen';
 import { NotificationsSettingsScreen } from '@/components/settings/notifications-settings-screen';
+import { TdahSettingsScreen } from '@/components/settings/tdah-settings-screen';
 import { MenuItem, SettingsTopBar } from '@/components/settings/settings.shell';
 import { styles } from '@/components/settings/settings.styles';
 import {
@@ -78,6 +80,7 @@ export default function SettingsPage() {
             notifications: t('settings.menuDesc.notifications'),
             sync: t('settings.menuDesc.sync'),
             data: t('settings.menuDesc.data'),
+            tdah: t('settings.menuDesc.tdah'),
             advanced: t('settings.menuDesc.advanced'),
             about: t('settings.menuDesc.about'),
             ai: t('settings.menuDesc.ai'),
@@ -125,6 +128,10 @@ export default function SettingsPage() {
 
     if (currentScreen === 'calendar') {
         return <CalendarSettingsScreen />;
+    }
+
+    if (currentScreen === 'tdah') {
+        return <TdahSettingsScreen />;
     }
 
     if (currentScreen === 'sync') {
@@ -194,6 +201,7 @@ export default function SettingsPage() {
                 indicatorAccessibilityLabel: syncBadgeAccessibilityLabel,
             },
             { id: 'data', title: dataLabel, description: menuDescriptions.data, icon: Database, onPress: () => pushSettingsScreen('data') },
+            { id: 'tdah', title: t('settings.tdah.title'), description: menuDescriptions.tdah, icon: Brain, onPress: () => pushSettingsScreen('tdah') },
         ],
         [
             { id: 'advanced', title: t('settings.advanced'), description: menuDescriptions.advanced, icon: Settings2, onPress: () => pushSettingsScreen('advanced') },

@@ -26,6 +26,7 @@ const ROW_TITLE_KEY: Record<SettingsMenuRowId, string> = {
     notifications: 'settings.notifications',
     sync: 'settings.sync',
     data: 'settings.data',
+    tdah: 'settings.tdah.title',
     advanced: 'settings.advanced',
     about: 'settings.about',
 };
@@ -76,6 +77,9 @@ const PREVIOUS_SETTINGS_MENU_KEYWORD_KEYS: Record<SettingsMenuRowId, readonly st
         'settings.aiProviderOpenAI', 'settings.aiProviderAnthropic', 'settings.aiProviderGemini',
         'settings.calendar', 'settings.calendarMobile.icsSubscriptions',
     ],
+    // The tdah row postdates this snapshot; its previously-indexed key set
+    // was empty by definition.
+    tdah: [],
     about: ['settings.about', 'settings.changelog', 'settings.checkForUpdates', 'settings.documentation'],
 };
 

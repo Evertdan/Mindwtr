@@ -104,6 +104,7 @@ import {
     rotateCalendarFeed,
     type CalendarFeedRecord,
 } from './server-calendar-feed';
+import { TDAH_PATH_PREFIX, handleTdahRequest } from './tdah';
 
 const ANY_TOKEN_NAMESPACE_LIMIT_DEFAULT = 32;
 const NAMESPACE_ADMISSION_LOCK_KEY = '__namespace_admission__';
@@ -152,6 +153,7 @@ const STATIC_CLOUD_ROUTES = new Set([
     '/v1/search',
     '/v1/sections',
     '/v1/tasks',
+    '/v1/tdah/profile',
 ]);
 
 export function canonicalCloudRoute(pathname: string): string {
@@ -1055,6 +1057,13 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
         // reservar un espacio de nombres vacío.
         initializeNamespace: () => undefined,
     };
+    const tdahServerConfig: ServerConfig = {
+        ...baseServerConfig,
+        // Espejo de calendarFeedServerConfig (ADR 0026): la admisión sigue
+        // verificando la cuota de espacios de nombres, pero activar el modo
+        // TDAH no debe reservar un documento de sincronización vacío.
+        initializeNamespace: () => undefined,
+    };
     const attachmentServerConfig: ServerConfig = { ...baseServerConfig, maxPerWindow: maxAttachmentPerWindow };
     // /v1/attachments/orphans previamente verificaba "¿es esto POST o DELETE?" *antes*
     // de consultar el guardián del espacio de nombres, por lo que un método no admitido
@@ -1493,6 +1502,17 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                         });
                     }, requestAbortController.signal);
                     if (attachmentPathResponse) return attachmentPathResponse;
+                }
+
+                if (pathname === TDAH_PATH_PREFIX || pathname.startsWith(`${TDAH_PATH_PREFIX}/`)) {
+                    const tdahResponse = await withNamespace(req, url, tdahServerConfig, async (ctx) => (
+                        handleTdahRequest(req, pathname, ctx, {
+                            dataDir,
+                            maxBodyBytes,
+                            signal: requestAbortController.signal,
+                        })
+                    ), requestAbortController.signal);
+                    if (tdahResponse) return tdahResponse;
                 }
 
                         return errorResponse('Not found', 404);

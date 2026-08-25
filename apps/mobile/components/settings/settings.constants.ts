@@ -28,6 +28,7 @@ export type SettingsScreen =
     | 'manage'
     | 'sync'
     | 'data'
+    | 'tdah'
     | 'about';
 
 export const SETTINGS_SCREEN_SET: Record<SettingsScreen, true> = {
@@ -48,6 +49,7 @@ export const SETTINGS_SCREEN_SET: Record<SettingsScreen, true> = {
     manage: true,
     sync: true,
     data: true,
+    tdah: true,
     about: true,
 };
 
@@ -62,6 +64,7 @@ export type SettingsMenuRowId =
     | 'notifications'
     | 'sync'
     | 'data'
+    | 'tdah'
     | 'advanced'
     | 'about';
 
@@ -77,6 +80,9 @@ const DESKTOP_PAGES_FOR_ROW: Record<SettingsMenuRowId, readonly SettingsSearchPa
     notifications: ['notifications'],
     sync: ['sync'],
     data: ['data'],
+    // Mobile-only for now: the TDAH mode's Desktop surface doesn't exist yet,
+    // so its search keywords come entirely from MOBILE_ROW_EXTRA_KEYS.
+    tdah: [],
     advanced: ['ai', 'advanced'],
     about: ['about'],
 };
@@ -144,6 +150,10 @@ const MOBILE_ROW_EXTRA_KEYS: Record<SettingsMenuRowId, readonly string[]> = {
         // row; Mobile renders them on the Calendar screen under Advanced.
         'settings.calendar', 'settings.calendarMobile.icsSubscriptions', 'settings.externalCalendars',
     ],
+    tdah: [
+        'settings.tdah.title', 'settings.tdah.enable', 'settings.tdah.timeZone',
+        'settings.tdah.ritualHour', 'settings.tdah.needsSync',
+    ],
     about: ['settings.changelog', 'settings.checkForUpdates', 'settings.documentation'],
 };
 
@@ -155,6 +165,7 @@ export const SETTINGS_MENU_KEYWORD_KEYS: Record<SettingsMenuRowId, readonly stri
     sync: [...derivedRowKeys('sync'), ...MOBILE_ROW_EXTRA_KEYS.sync],
     data: [...derivedRowKeys('data'), ...MOBILE_ROW_EXTRA_KEYS.data],
     advanced: [...derivedRowKeys('advanced'), ...MOBILE_ROW_EXTRA_KEYS.advanced],
+    tdah: [...derivedRowKeys('tdah'), ...MOBILE_ROW_EXTRA_KEYS.tdah],
     about: [...derivedRowKeys('about'), ...MOBILE_ROW_EXTRA_KEYS.about],
 };
 

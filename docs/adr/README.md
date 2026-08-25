@@ -29,6 +29,7 @@ Esta carpeta contiene pequeños documentos de decisión enfocados que explican *
 - [ADR 0023: DndContext unificado de vista de proyectos](0023-unified-projects-view-dnd-context.md)
 - [ADR 0024: Motor SQLite nativo móvil (op-sqlite)](0024-mobile-native-sqlite-engine.md)
 - [ADR 0025: Sin encriptación de la carga útil de sincronización combinada por el servidor; backends de blob encriptados con frase de contraseña son de primera parte](0025-no-first-party-payload-encryption.md)
+- [ADR 0026: Divergencia del módulo TDAH: estado de servidor fuera del documento de sincronización](0026-tdah-module-divergence.md)
 
 ## Plantilla
 

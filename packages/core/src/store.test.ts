@@ -3158,7 +3158,7 @@ describe('TaskStore', () => {
             "Star up to 3 tasks for Today's Focus",
             "Make Mindwtr yours: hide what you don't use",
             'Set up sync across your devices',
-            'Importar tasks from another app',
+            'Import tasks from another app',
             'Run your first weekly review',
         ]);
         expect(starterTasks.every((task) => task.status === 'next')).toBe(true);
@@ -3248,7 +3248,7 @@ describe('TaskStore', () => {
             "Star up to 3 tasks for Today's Focus",
             "Make Mindwtr yours: hide what you don't use",
             'Set up sync across your devices',
-            'Importar tasks from another app',
+            'Import tasks from another app',
             'Run your first weekly review',
         ]);
     });
@@ -3303,7 +3303,7 @@ describe('TaskStore', () => {
             "Star up to 3 tasks for Today's Focus",
             "Make Mindwtr yours: hide what you don't use",
             'Set up sync across your devices',
-            'Importar tasks from another app',
+            'Import tasks from another app',
             'Run your first weekly review',
         ]);
         expect(visibleStarterTasks.filter((task) => task.title === 'Start here: process your first inbox item')).toHaveLength(1);
@@ -3383,7 +3383,7 @@ describe('TaskStore', () => {
             "Star up to 3 tasks for Today's Focus",
             "Make Mindwtr yours: hide what you don't use",
             'Set up sync across your devices',
-            'Importar tasks from another app',
+            'Import tasks from another app',
             'Run your first weekly review',
         ]);
     });
