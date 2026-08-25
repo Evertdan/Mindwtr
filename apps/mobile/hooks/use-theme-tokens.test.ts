@@ -4,6 +4,8 @@ import { M3Colors } from '../constants/material3/m3-color';
 
 const m3Light = { isDark: false, themeStyle: 'material3', themePreset: 'default', themeMode: 'material3-light' } as const;
 const eink = { isDark: false, themeStyle: 'default', themePreset: 'eink', themeMode: 'eink' } as const;
+const focusDark = { isDark: true, themeStyle: 'default', themePreset: 'focus-dark', themeMode: 'focus-dark' } as const;
+const focusLight = { isDark: false, themeStyle: 'default', themePreset: 'focus-light', themeMode: 'focus-light' } as const;
 
 describe('resolveThemeTokens', () => {
   it('flags Material only for the material3 style', () => {
@@ -25,6 +27,20 @@ describe('resolveThemeTokens', () => {
     const t = resolveThemeTokens(m3Light);
     expect(t.elevation(3).backgroundColor).toBe(M3Colors.light.surfaceContainerHigh);
     expect(t.state.rippleColor).toBeDefined();
+  });
+
+  // El preset `focus` es Material 3 real aunque `themeStyle` siga en 'default' (dimensiones
+  // ortogonales) — isMaterial/roles deben poblarse igual que bajo themeStyle==='material3'.
+  it('flags Material and exposes full M3 roles (incl. dnd) for focus-* regardless of themeStyle', () => {
+    const dark = resolveThemeTokens(focusDark);
+    expect(dark.isMaterial).toBe(true);
+    expect(dark.roles).toEqual(M3Colors['focus-dark']);
+    expect(dark.roles?.dnd).toBe(M3Colors['focus-dark'].dnd);
+
+    const light = resolveThemeTokens(focusLight);
+    expect(light.isMaterial).toBe(true);
+    expect(light.roles).toEqual(M3Colors['focus-light']);
+    expect(light.roles?.dnd).toBe(M3Colors['focus-light'].dnd);
   });
 
   // Las filas memorizadas comparan `tc` por identidad (#766), y ThemeProvider entrega un

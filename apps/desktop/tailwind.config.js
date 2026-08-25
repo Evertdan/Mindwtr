@@ -41,6 +41,20 @@ export default {
                 border: "hsl(var(--border))",
                 input: "hsl(var(--input))",
                 ring: "hsl(var(--ring))",
+                // Additive M3 roles, only defined so far for `focus-dark`/`focus-light`
+                // (see index.css) — registered here so `bg-tertiary`, `text-dnd`, etc. actually
+                // generate a utility class; every other theme leaves these vars unset and falls
+                // back through the cascade like any other unset custom property.
+                "surface-container": "hsl(var(--surface-container))",
+                "surface-container-high": "hsl(var(--surface-container-high))",
+                "on-surface-variant": "hsl(var(--on-surface-variant))",
+                tertiary: "hsl(var(--tertiary))",
+                "tertiary-foreground": "hsl(var(--tertiary-foreground))",
+                "outline-variant": "hsl(var(--outline-variant))",
+                "secondary-container": "hsl(var(--secondary-container))",
+                "secondary-container-foreground": "hsl(var(--secondary-container-foreground))",
+                dnd: "hsl(var(--dnd))",
+                "dnd-foreground": "hsl(var(--dnd-foreground))",
             },
         },
     },

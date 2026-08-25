@@ -27,6 +27,8 @@ const EXPECTED_SCHEMES: Record<Exclude<AppTheme, 'system'>, ThemeColorScheme> = 
     'oled': 'dark',
     'catppuccin-macchiato': 'dark',
     'dracula': 'dark',
+    'focus-dark': 'dark',
+    'focus-light': 'light',
 };
 
 describe('resolveThemeColorScheme', () => {
@@ -98,7 +100,7 @@ describe('STATUS_COLORS_BY_THEME', () => {
     });
 
     it('keeps every status distinguishable within each new theme', () => {
-        for (const key of ['catppuccin-macchiato', 'dracula'] as const) {
+        for (const key of ['catppuccin-macchiato', 'dracula', 'focus-dark', 'focus-light'] as const) {
             // archived deliberately mirrors inbox, as it does in every other theme.
             const hues = TASK_STATUSES.filter((status) => status !== 'archived')
                 .map((status) => STATUS_COLORS_BY_THEME[key][status].text);

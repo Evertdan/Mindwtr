@@ -71,11 +71,19 @@ describe('applyThemeMode', () => {
         ['catppuccin-macchiato', 'theme-catppuccin-macchiato'],
         ['dracula', 'theme-dracula'],
         ['oled', 'theme-oled'],
+        ['focus-dark', 'theme-focus-dark'],
     ] as const)('marks %s as a dark theme and applies its class', (mode, className) => {
         applyThemeMode(mode, 'light');
 
         expect(document.documentElement.classList.contains('dark')).toBe(true);
         expect(document.documentElement.classList.contains(className)).toBe(true);
+    });
+
+    it('marks focus-light as a light theme and applies its class without dark', () => {
+        applyThemeMode('focus-light', 'dark');
+
+        expect(document.documentElement.classList.contains('dark')).toBe(false);
+        expect(document.documentElement.classList.contains('theme-focus-light')).toBe(true);
     });
 
     it('drops the previous theme class when switching between preset themes', () => {

@@ -43,21 +43,36 @@ function m3RolesFor(theme: ResolvableTheme): M3ColorRoles {
   return scheme === 'dark' ? M3Colors.dark : M3Colors.light;
 }
 
+// El preset `focus` (DESIGN.md §Colors) es Material 3 real, independiente de `themeStyle`
+// (dimensiones ortogonales hoy) — se resuelve indexando M3Colors por el propio id de preset.
+// Exportado: use-theme-color.ts (un hook distinto) necesita el mismo discriminante y antes
+// lo reimplementaba en línea por separado — un solo guard evita que ambos diverjan.
+export function isFocusPreset(preset: ResolvableTheme['themePreset']): preset is 'focus-dark' | 'focus-light' {
+  return preset === 'focus-dark' || preset === 'focus-light';
+}
+
+// Mismo patrón de remapeo M3 → ThemeColors genérico usado por `default` + material3 y por `focus-*`.
+function mapM3RolesToGenericColors(p: M3ColorRoles): ThemeColors {
+  return {
+    bg: p.background, cardBg: p.surfaceContainer, taskItemBg: p.surfaceContainerHigh,
+    text: p.text, secondaryText: p.secondaryText, icon: p.secondaryText,
+    border: p.outline, tint: p.primary, onTint: p.onPrimary,
+    tabIconDefault: p.secondaryText, tabIconSelected: p.primary,
+    inputBg: p.surfaceVariant, danger: p.error, success: p.success, warning: p.warning,
+    filterBg: p.surfaceVariant,
+  };
+}
+
 // Mapeo genérico de ThemeColors (conserva la salida no Material de hoy; se materializa cuando M3).
 function resolveGenericColors(theme: ResolvableTheme): ThemeColors {
+  if (isFocusPreset(theme.themePreset)) {
+    return mapM3RolesToGenericColors(M3Colors[theme.themePreset]);
+  }
   if (theme.themePreset !== 'default') {
     return THEME_PRESETS[theme.themePreset];
   }
   if (theme.themeStyle === 'material3') {
-    const p = m3RolesFor(theme);
-    return {
-      bg: p.background, cardBg: p.surfaceContainer, taskItemBg: p.surfaceContainerHigh,
-      text: p.text, secondaryText: p.secondaryText, icon: p.secondaryText,
-      border: p.outline, tint: p.primary, onTint: p.onPrimary,
-      tabIconDefault: p.secondaryText, tabIconSelected: p.primary,
-      inputBg: p.surfaceVariant, danger: p.error, success: p.success, warning: p.warning,
-      filterBg: p.surfaceVariant,
-    };
+    return mapM3RolesToGenericColors(m3RolesFor(theme));
   }
   const isDark = theme.isDark;
   return {
@@ -100,8 +115,10 @@ export function resolveThemeTokens(theme?: ResolvableTheme | null): ThemeTokens 
   if (!theme) return FALLBACK;
   const key = themeCacheKey(theme);
   if (cached?.key === key) return cached.tokens;
-  const isMaterial = theme.themeStyle === 'material3';
-  const roles = isMaterial ? m3RolesFor(theme) : null;
+  const isMaterial = theme.themeStyle === 'material3' || isFocusPreset(theme.themePreset);
+  const roles = isFocusPreset(theme.themePreset)
+    ? M3Colors[theme.themePreset]
+    : isMaterial ? m3RolesFor(theme) : null;
   const tokens: ThemeTokens = {
     colors: resolveGenericColors(theme),
     roles,

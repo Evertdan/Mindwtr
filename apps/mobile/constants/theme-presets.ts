@@ -24,7 +24,11 @@ export type ThemePresetColors = {
     tabIconSelected: ThemePresetColor;
 };
 
-export const THEME_PRESETS: Record<Exclude<ThemePresetName, 'default'>, ThemePresetColors> = {
+// `focus-dark`/`focus-light` are `ThemeStatusPreset` members but deliberately excluded here:
+// they route through the Material 3 contract (`M3Colors`, see use-theme-tokens.ts) instead of
+// this flat 16-field shape, which has no room for the preset's 13 named roles (see spec 1.2
+// Design Notes). `resolveGenericColors` never reaches this map for a focus preset.
+export const THEME_PRESETS: Record<Exclude<ThemePresetName, 'default' | 'focus-dark' | 'focus-light'>, ThemePresetColors> = {
     eink: {
         bg: '#FFFFFF',
         cardBg: '#FFFFFF',

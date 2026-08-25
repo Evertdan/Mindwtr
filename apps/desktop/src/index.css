@@ -486,6 +486,77 @@
     --badge-info-bg: 40.5 57.1% 86.3%;
     --badge-info-fg: 30 32.6% 36.1%;
   }
+
+  /* Focus Dark / Focus Light — Modo TDAH identity (DESIGN.md §Colors,
+     `focus-dark`/`focus-light`). Only the six mapped roles (surface,
+     onSurface, outline, primary, success, error) and the additive M3
+     container/variant roles below come from that table; every other
+     Tailwind token (secondary, muted, accent, warning, focus-star, info,
+     input, ring, status-*, badge-*) is intentionally left unset here so it
+     falls back through the cascade to `.dark`/`:root` rather than inventing
+     hues the table doesn't specify. `dark` + `theme-focus-dark` are applied
+     together (see theme.ts), so `.dark`'s dark-mode defaults are what those
+     unset roles resolve to; `theme-focus-light` runs without `dark`, so its
+     unset roles resolve to `:root`'s light defaults. */
+  :root.theme-focus-dark {
+    color-scheme: dark;
+    --background: 217.5 22.2% 7.1%;
+    --foreground: 216 25% 92.2%;
+    --border: 213.3 17.6% 20%;
+    --primary: 214.9 92.9% 66.7%;
+    --success: 155.7 63.9% 57.6%;
+    --destructive: 8.1 79.7% 71%;
+    /* Additive M3 roles — not consumed by any existing theme block. */
+    --surface-container: 214.3 20.6% 13.3%;
+    --surface-container-high: 213.3 20.5% 17.3%;
+    --on-surface-variant: 212.3 14.8% 65.5%;
+    --tertiary: 39.3 64.7% 57.8%;
+    --outline-variant: 215.2 12.4% 54.3%;
+    --secondary-container: 187.2 56.2% 49.2%;
+    --dnd: 255.1 91.7% 76.3%;
+    /*
+     * [ASSUMPTION] DESIGN.md's table has no on-tertiary/on-secondary-container/
+     * on-dnd colors; each of those three backgrounds is lighter than this
+     * scheme's own `surface`, so `surface` doubles as a legible foreground
+     * chip text/icon color without inventing an untabled hue.
+     */
+    --tertiary-foreground: 217.5 22.2% 7.1%;
+    --secondary-container-foreground: 217.5 22.2% 7.1%;
+    --dnd-foreground: 217.5 22.2% 7.1%;
+  }
+
+  :root.theme-focus-light {
+    color-scheme: light;
+    --background: 216 45.5% 97.8%;
+    --foreground: 213.3 31% 11.4%;
+    --border: 213.3 25.7% 86.3%;
+    --primary: 219.2 70.8% 49.6%;
+    --success: 159.5 83.5% 26.1%;
+    --destructive: 9 57.3% 45.9%;
+    /* Additive M3 roles — not consumed by any existing theme block. */
+    --surface-container: 216 38.5% 94.9%;
+    /*
+     * [ASSUMPTION] DESIGN.md's `focus-light` table has no surfaceContainerHigh
+     * entry (only `focus-dark` does). Derived by continuing the same
+     * surface -> surfaceContainer step one more increment (same hue/saturation,
+     * lightness nudged down proportionally to the dark variant's second step)
+     * rather than inventing an unrelated tone.
+     */
+    --surface-container-high: 216 38.5% 93%;
+    --on-surface-variant: 208.9 13.8% 38.2%;
+    --tertiary: 39 84% 29.4%;
+    --outline-variant: 214.3 11.6% 47.5%;
+    --secondary-container: 188.3 85.3% 26.7%;
+    --dnd: 254.8 52.4% 51.4%;
+    /*
+     * [ASSUMPTION] Same reasoning as `theme-focus-dark` above, mirrored: each
+     * of these three backgrounds is darker than this scheme's own `surface`,
+     * so `surface` doubles as a legible foreground.
+     */
+    --tertiary-foreground: 216 45.5% 97.8%;
+    --secondary-container-foreground: 216 45.5% 97.8%;
+    --dnd-foreground: 216 45.5% 97.8%;
+  }
 }
 
 @layer base {

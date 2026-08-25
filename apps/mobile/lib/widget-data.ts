@@ -15,7 +15,7 @@ import {
     sortTasksBy,
 } from '@mindwtr/core';
 import type { ColorProp } from 'react-native-android-widget';
-import { THEME_PRESETS, type ThemePresetName } from '../constants/theme-presets';
+import { THEME_PRESETS } from '../constants/theme-presets';
 
 export const WIDGET_DATA_KEY = 'mindwtr-data';
 export const WIDGET_LANGUAGE_KEY = 'mindwtr-language';
@@ -40,7 +40,10 @@ export const IOS_WIDGET_KIND = 'MindwtrTasksWidget';
 export const IOS_WIDGET_LOCK_KIND = 'MindwtrFocusLockWidget';
 export const WIDGET_FOCUS_URI = 'mindwtr:///focus';
 export const WIDGET_QUICK_CAPTURE_URI = 'mindwtr:///capture-quick?mode=text';
-type ConcreteThemePresetName = Exclude<ThemePresetName, 'default'>;
+// `focus-dark`/`focus-light` are excluded from `THEME_PRESETS` on purpose (they route through
+// the Material 3 contract instead, see theme-presets.ts) — `keyof typeof THEME_PRESETS` always
+// tracks that set, unlike a hand-maintained `Exclude<ThemePresetName, 'default'>` would.
+type ConcreteThemePresetName = keyof typeof THEME_PRESETS;
 
 export type WidgetSystemColorScheme = 'light' | 'dark' | null | undefined;
 

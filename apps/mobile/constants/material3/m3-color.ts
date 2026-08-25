@@ -1,3 +1,5 @@
+import { FOCUS_DARK_ROLE_HEX, FOCUS_LIGHT_ROLE_HEX } from '@mindwtr/core';
+
 export interface M3ColorRoles {
   primary: string; onPrimary: string; primaryContainer: string; onPrimaryContainer: string;
   secondary: string; onSecondary: string; secondaryContainer: string; onSecondaryContainer: string;
@@ -14,9 +16,11 @@ export interface M3ColorRoles {
   success: string; onSuccess: string; warning: string; onWarning: string;
   // legacy aliases consumed by the generic ThemeColors mapping
   text: string; secondaryText: string;
+  // roles nuevos del preset `focus` (DESIGN.md §Colors) — opcionales: no se rellenan en light/dark existentes.
+  dnd?: string; onDnd?: string;
 }
 
-export const M3Colors: { light: M3ColorRoles; dark: M3ColorRoles } = {
+export const M3Colors: Record<'light' | 'dark' | 'focus-dark' | 'focus-light', M3ColorRoles> = {
   light: {
     primary: '#1B6EF3', onPrimary: '#FFFFFF', primaryContainer: '#D7E2FF', onPrimaryContainer: '#001B3E',
     secondary: '#565E71', onSecondary: '#FFFFFF', secondaryContainer: '#DAE2F9', onSecondaryContainer: '#131C2B',
@@ -46,5 +50,44 @@ export const M3Colors: { light: M3ColorRoles; dark: M3ColorRoles } = {
     surfaceTint: '#AAC7FF', scrim: '#000000', shadow: '#000000',
     success: '#7CDC94', onSuccess: '#00391C', warning: '#F2C16E', onWarning: '#472A00',
     text: '#E3E2E6', secondaryText: '#C3C6CF',
+  },
+  // Preset `focus` (DESIGN.md §Colors) — los 13 roles nombrados + `dnd`/`onDnd` vienen de
+  // `@mindwtr/core`'s `FOCUS_*_ROLE_HEX` (fuente única, compartida con theme-scheme.ts y
+  // theme-contrast.test.ts — antes cada archivo tenía su propia copia hardcodeada, lo que
+  // dejó un bug real: `onSecondaryContainer` quedó con el valor viejo de `dark` mientras
+  // `secondaryContainer` cambiaba de hue, fallando su propio piso de contraste). El resto de
+  // campos M3 obligatorios que la tabla no cubre (Container/onX vestigiales, inverse*, etc.)
+  // reutilizan literalmente los valores ya usados por `dark`/`light` (misma heurística), sin
+  // inventar tonos nuevos. Ninguno de esos campos reutilizados es consumido hoy por ninguna
+  // pantalla.
+  'focus-dark': {
+    onPrimary: '#003063', primaryContainer: '#00458B', onPrimaryContainer: '#D7E2FF',
+    secondary: '#BEC6DC', onSecondary: '#283041',
+    onTertiary: '#3F2844', tertiaryContainer: '#573E5C', onTertiaryContainer: '#FAD8FD',
+    onError: '#690005', errorContainer: '#93000A', onErrorContainer: '#FFDAD6',
+    background: FOCUS_DARK_ROLE_HEX.surface, onBackground: FOCUS_DARK_ROLE_HEX.onSurface,
+    surfaceVariant: FOCUS_DARK_ROLE_HEX.surfaceContainerHigh,
+    surfaceContainerLowest: '#0C0E13', surfaceContainerLow: '#191C20',
+    surfaceContainerHighest: '#2D3037',
+    inverseSurface: '#E3E2E6', inverseOnSurface: '#2F3033', inversePrimary: '#1B6EF3',
+    surfaceTint: FOCUS_DARK_ROLE_HEX.primary, scrim: '#000000', shadow: '#000000',
+    onSuccess: '#00391C', warning: FOCUS_DARK_ROLE_HEX.tertiary, onWarning: '#3F2844',
+    text: FOCUS_DARK_ROLE_HEX.onSurface, secondaryText: FOCUS_DARK_ROLE_HEX.onSurfaceVariant,
+    ...FOCUS_DARK_ROLE_HEX,
+  },
+  'focus-light': {
+    onPrimary: '#FFFFFF', primaryContainer: '#D7E2FF', onPrimaryContainer: '#001B3E',
+    secondary: '#565E71', onSecondary: '#FFFFFF',
+    onTertiary: '#FFFFFF', tertiaryContainer: '#FAD8FD', onTertiaryContainer: '#28132E',
+    onError: '#FFFFFF', errorContainer: '#FFDAD6', onErrorContainer: '#410002',
+    background: FOCUS_LIGHT_ROLE_HEX.surface, onBackground: FOCUS_LIGHT_ROLE_HEX.onSurface,
+    surfaceVariant: FOCUS_LIGHT_ROLE_HEX.surfaceContainerHigh,
+    surfaceContainerLowest: '#FFFFFF', surfaceContainerLow: '#F3F4FA',
+    surfaceContainerHighest: '#DFE3EA',
+    inverseSurface: '#2F3033', inverseOnSurface: '#F1F0F4', inversePrimary: '#AAC7FF',
+    surfaceTint: FOCUS_LIGHT_ROLE_HEX.primary, scrim: '#000000', shadow: '#000000',
+    onSuccess: '#FFFFFF', warning: FOCUS_LIGHT_ROLE_HEX.tertiary, onWarning: '#FFFFFF',
+    text: FOCUS_LIGHT_ROLE_HEX.onSurface, secondaryText: FOCUS_LIGHT_ROLE_HEX.onSurfaceVariant,
+    ...FOCUS_LIGHT_ROLE_HEX,
   },
 };

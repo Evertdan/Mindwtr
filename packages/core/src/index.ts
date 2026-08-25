@@ -159,6 +159,7 @@ export * from './calendar-push-scheduler';
 export * from './date-draft';
 export * from './i18n/i18n-locales';
 export * from './theme-scheme';
+export * from './theme-focus-colors';
 export * from './startup-prompts';
 export * from './area-sync-schema';
 export * from './person-sync-schema';

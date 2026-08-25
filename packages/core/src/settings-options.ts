@@ -30,6 +30,8 @@ const THEME_VALUE_FLAGS: Record<ThemeValue, true> = {
     oled: true,
     'catppuccin-macchiato': true,
     dracula: true,
+    'focus-dark': true,
+    'focus-light': true,
 };
 
 const WEEK_START_VALUE_FLAGS: Record<WeekStartValue, true> = {

@@ -6,11 +6,12 @@
  * preference. Keep that classification here — do not re-derive it per platform.
  */
 import type { AppTheme, TaskStatus } from './types';
+import { FOCUS_DARK_ROLE_HEX, FOCUS_LIGHT_ROLE_HEX } from './theme-focus-colors';
 
 export type ThemeColorScheme = 'light' | 'dark';
 
 /** The themes with a bespoke, non-Material color identity. */
-export type ThemeStatusPreset = 'eink' | 'nord' | 'sepia' | 'oled' | 'catppuccin-macchiato' | 'dracula';
+export type ThemeStatusPreset = 'eink' | 'nord' | 'sepia' | 'oled' | 'catppuccin-macchiato' | 'dracula' | 'focus-dark' | 'focus-light';
 
 export type StatusColorSet = { bg: string; text: string; border: string };
 export type StatusPalette = Record<TaskStatus, StatusColorSet>;
@@ -42,6 +43,8 @@ export const THEME_DESCRIPTORS = {
     'oled': { scheme: 'dark', statusPreset: 'oled', desktop: true },
     'catppuccin-macchiato': { scheme: 'dark', statusPreset: 'catppuccin-macchiato', desktop: true },
     'dracula': { scheme: 'dark', statusPreset: 'dracula', desktop: true },
+    'focus-dark': { scheme: 'dark', statusPreset: 'focus-dark', desktop: true },
+    'focus-light': { scheme: 'light', statusPreset: 'focus-light', desktop: true },
 } as const satisfies Record<Exclude<AppTheme, 'system'>, ThemeDescriptor>;
 
 // A Map so inherited Object.prototype keys ('constructor', 'toString', …) in an
@@ -157,6 +160,31 @@ const DRACULA_STATUS_COLORS = buildPalette({
     archived: '#adb5cb',
 });
 
+// Preset `focus` (Modo TDAH, story 1.2): DESIGN.md solo define roles de estado de
+// Actividad, no de status GTD. Mapeo `[ASSUMPTION]` reutilizando esos mismos roles
+// (sin tonos nuevos, tomados de theme-focus-colors.ts — fuente única): inbox/archived=
+// outlineVariant, next=primary, waiting=tertiary, someday=dnd, reference=secondaryContainer,
+// done=success.
+const FOCUS_DARK_STATUS_COLORS = buildPalette({
+    inbox: FOCUS_DARK_ROLE_HEX.outlineVariant,
+    next: FOCUS_DARK_ROLE_HEX.primary,
+    waiting: FOCUS_DARK_ROLE_HEX.tertiary,
+    someday: FOCUS_DARK_ROLE_HEX.dnd,
+    reference: FOCUS_DARK_ROLE_HEX.secondaryContainer,
+    done: FOCUS_DARK_ROLE_HEX.success,
+    archived: FOCUS_DARK_ROLE_HEX.outlineVariant,
+});
+
+const FOCUS_LIGHT_STATUS_COLORS = buildPalette({
+    inbox: FOCUS_LIGHT_ROLE_HEX.outlineVariant,
+    next: FOCUS_LIGHT_ROLE_HEX.primary,
+    waiting: FOCUS_LIGHT_ROLE_HEX.tertiary,
+    someday: FOCUS_LIGHT_ROLE_HEX.dnd,
+    reference: FOCUS_LIGHT_ROLE_HEX.secondaryContainer,
+    done: FOCUS_LIGHT_ROLE_HEX.success,
+    archived: FOCUS_LIGHT_ROLE_HEX.outlineVariant,
+});
+
 const EINK_STATUS_COLORS = buildPalette({
     inbox: '#000000',
     next: '#000000',
@@ -181,4 +209,6 @@ export const STATUS_COLORS_BY_THEME: Record<ThemeStatusPreset | ThemeColorScheme
     oled: DARK_STATUS_COLORS,
     'catppuccin-macchiato': CATPPUCCIN_MACCHIATO_STATUS_COLORS,
     dracula: DRACULA_STATUS_COLORS,
+    'focus-dark': FOCUS_DARK_STATUS_COLORS,
+    'focus-light': FOCUS_LIGHT_STATUS_COLORS,
 };
