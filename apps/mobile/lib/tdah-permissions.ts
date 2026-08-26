@@ -107,15 +107,26 @@ export async function requestTdahBatteryPermission(): Promise<TdahPermissionStat
 
 async function recheckPendingBatteryPermission(): Promise<TdahPermissionStatus | null> {
     if (!isTdahBatteryPermissionApplicable()) return null;
+    let pending: string | null;
     try {
-        const pending = await AsyncStorage.getItem(BATTERY_PENDING_KEY);
-        if (pending !== 'true') return null;
-        await AsyncStorage.setItem(BATTERY_GRANTED_KEY, 'true');
-        await AsyncStorage.removeItem(BATTERY_PENDING_KEY);
-        return 'granted';
+        pending = await AsyncStorage.getItem(BATTERY_PENDING_KEY);
     } catch {
         return null;
     }
+    if (pending !== 'true') return null;
+
+    // No native API can confirm what the user actually did on the system
+    // settings screen (see file header) — report 'undetermined' instead of
+    // assuming 'granted', so declining or backing out without changing
+    // anything is never recorded as a grant.
+    try {
+        await AsyncStorage.removeItem(BATTERY_PENDING_KEY);
+    } catch {
+        // Cleanup failing is not the same as the permission check failing —
+        // still report the status below and let the next foreground event
+        // retry clearing the flag.
+    }
+    return 'undetermined';
 }
 
 /**
@@ -141,11 +152,19 @@ export function subscribeTdahBatteryPermissionForegroundRecheck(
 // Reuses `external-calendar.ts` as-is (already the same tri-state shape).
 
 export async function getTdahCalendarPermissionStatus(): Promise<TdahPermissionStatus> {
-    return getSystemCalendarPermissionStatus();
+    try {
+        return await getSystemCalendarPermissionStatus();
+    } catch {
+        return 'undetermined';
+    }
 }
 
 export async function requestTdahCalendarPermission(): Promise<TdahPermissionStatus> {
-    return requestSystemCalendarPermission();
+    try {
+        return await requestSystemCalendarPermission();
+    } catch {
+        return 'denied';
+    }
 }
 
 // --- Aggregate snapshot ------------------------------------------------------

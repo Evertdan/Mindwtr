@@ -111,6 +111,9 @@ export const allowedEnglishMirrorKeysByLocale: Record<string, readonly string[]>
         'taskEdit.descriptionLabel',
         'taskEdit.tagsLabel',
         'taskEdit.timeSpentPlaceholder',
+        // 'Notifications' is spelled identically in French, same reasoning as
+        // the pre-existing settings.notifications entry above.
+        'tdahOnboarding.permissions.notificationsTitle',
     ],
 };
 
@@ -124,6 +127,12 @@ export function stripAllowedEnglishTerms(value: string): string {
     let next = value
         .replace(/[A-Za-z][A-Za-z0-9+.-]*:\/\/\S*/g, '')
         .replace(/\{\{\s*[A-Za-z0-9_]+\s*\}\}/g, '')
+        // Single-brace placeholders (e.g. {date}, {count}) are as valid as the
+        // double-brace form the i18n runtime accepts (index.ts's interpolation
+        // regex matches both) — stripping only {{...}} left a translation that
+        // keeps a required {date}/{count} token verbatim flagged as untranslated
+        // English on every non-Latin locale that has to preserve it in place.
+        .replace(/\{\s*[A-Za-z0-9_]+\s*\}/g, '')
         .replace(/\/[A-Za-z][A-Za-z0-9:_-]*/g, '')
         .replace(/[+#@!][A-Za-z][A-Za-z0-9:_-]*/g, '');
 

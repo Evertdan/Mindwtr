@@ -27,8 +27,11 @@ const FALLBACK_SNAPSHOT: TdahPermissionsSnapshot = {
 
 /**
  * T-14 step 4 — permisos del teléfono. Stitch: Activación 4 — Permisos
- * (`34601f24286641c8b470e26341747eff`). Never blocks: "Continuar" is always
- * enabled regardless of what got granted (spec's transversal permissions rule).
+ * (`34601f24286641c8b470e26341747eff`). Never blocks on the outcome:
+ * "Continuar" is enabled regardless of what got granted or denied (spec's
+ * transversal permissions rule) — it is only disabled while the initial
+ * snapshot is still loading, so a fast tap can't submit the fallback
+ * "undetermined" snapshot instead of the real, resolved state.
  */
 export type TdahOnboardingStepPermissionsProps = {
     onContinue: (snapshot: TdahPermissionsSnapshot) => void;
@@ -45,12 +48,20 @@ export function TdahOnboardingStepPermissions({ onContinue, onBack }: TdahOnboar
 
     useEffect(() => {
         let active = true;
-        void getTdahPermissionsSnapshot().then((result) => {
-            if (active) {
-                setSnapshot(result);
-                setLoaded(true);
-            }
-        });
+        void getTdahPermissionsSnapshot()
+            .then((result) => {
+                if (active) {
+                    setSnapshot(result);
+                }
+            })
+            .catch(() => {
+                // Fall back to the "undetermined" snapshot already in state.
+            })
+            .finally(() => {
+                if (active) {
+                    setLoaded(true);
+                }
+            });
         return () => {
             active = false;
         };
@@ -70,6 +81,8 @@ export function TdahOnboardingStepPermissions({ onContinue, onBack }: TdahOnboar
             else if (kind === 'battery') status = await requestTdahBatteryPermission();
             else status = await requestTdahCalendarPermission();
             setSnapshot((prev) => ({ ...prev, [kind]: status }));
+        } catch {
+            // Leave the permission's status as it was before the attempt.
         } finally {
             setBusy(null);
         }
@@ -160,8 +173,10 @@ export function TdahOnboardingStepPermissions({ onContinue, onBack }: TdahOnboar
                 </TouchableOpacity>
                 <TouchableOpacity
                     accessibilityRole="button"
+                    accessibilityState={{ disabled: !loaded }}
+                    disabled={!loaded}
                     onPress={() => onContinue(snapshot)}
-                    style={[styles.button, { backgroundColor: filledButton.backgroundColor }]}
+                    style={[styles.button, { backgroundColor: filledButton.backgroundColor, opacity: loaded ? 1 : 0.5 }]}
                     testID="tdah-onboarding-permissions-continue"
                 >
                     <Text style={[styles.buttonText, { color: filledButton.textColor ?? tc.onTint }]}>

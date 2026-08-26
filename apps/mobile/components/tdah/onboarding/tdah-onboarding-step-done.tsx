@@ -22,9 +22,10 @@ export type TdahOnboardingStepDoneProps = {
     result: TdahActivateResult | null;
     onRetry: () => void;
     onDone: () => void;
+    onClose: () => void;
 };
 
-export function TdahOnboardingStepDone({ variant, status, result, onRetry, onDone }: TdahOnboardingStepDoneProps) {
+export function TdahOnboardingStepDone({ variant, status, result, onRetry, onDone, onClose }: TdahOnboardingStepDoneProps) {
     const tc = useThemeColors();
     const filledButton = useFilledButtonColors();
     const { t } = useLanguage();
@@ -52,6 +53,14 @@ export function TdahOnboardingStepDone({ variant, status, result, onRetry, onDon
                     <Text style={[styles.buttonText, { color: filledButton.textColor ?? tc.onTint }]}>
                         {t('tdahOnboarding.done.retry')}
                     </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    accessibilityRole="button"
+                    onPress={onClose}
+                    style={[styles.button, styles.buttonOutline, { borderColor: tc.border }]}
+                    testID="tdah-onboarding-done-close"
+                >
+                    <Text style={[styles.buttonText, { color: tc.text }]}>{t('tdahOnboarding.close')}</Text>
                 </TouchableOpacity>
             </View>
         );

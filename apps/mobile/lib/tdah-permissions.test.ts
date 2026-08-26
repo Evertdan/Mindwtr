@@ -145,7 +145,7 @@ describe('tdah-permissions', () => {
             expect(await getTdahBatteryPermissionStatus()).toBe('granted');
         });
 
-        it('resolves the pending request to granted on the next foreground event', async () => {
+        it('resolves the pending request to undetermined (never granted) on the next foreground event, since there is no native way to verify what the user did in system settings', async () => {
             const onResolved = vi.fn();
             mockGetItem.mockResolvedValue(null);
             const unsubscribe = subscribeTdahBatteryPermissionForegroundRecheck(onResolved);
@@ -160,12 +160,27 @@ describe('tdah-permissions', () => {
             ));
             appStateListeners.forEach((listener) => listener('active'));
             await flushAsync();
-            expect(onResolved).toHaveBeenCalledWith('granted');
-            expect(mockSetItem).toHaveBeenCalledWith('mindwtr:tdah:batteryUnrestrictedGranted', 'true');
+            expect(onResolved).toHaveBeenCalledWith('undetermined');
+            expect(mockSetItem).not.toHaveBeenCalledWith('mindwtr:tdah:batteryUnrestrictedGranted', 'true');
             expect(mockRemoveItem).toHaveBeenCalledWith('mindwtr:tdah:batteryUnrestrictedPending');
 
             unsubscribe();
             expect(mockAppStateRemove).toHaveBeenCalled();
+        });
+
+        it('still reports undetermined (and never drops the resolved status) when clearing the pending flag fails after a foreground return', async () => {
+            const onResolved = vi.fn();
+            mockGetItem.mockImplementation(async (key: string) => (
+                key === 'mindwtr:tdah:batteryUnrestrictedPending' ? 'true' : null
+            ));
+            mockRemoveItem.mockRejectedValue(new Error('storage unavailable'));
+            const unsubscribe = subscribeTdahBatteryPermissionForegroundRecheck(onResolved);
+
+            appStateListeners.forEach((listener) => listener('active'));
+            await flushAsync();
+
+            expect(onResolved).toHaveBeenCalledWith('undetermined');
+            unsubscribe();
         });
 
         it('never subscribes to AppState on iOS', () => {
@@ -183,6 +198,14 @@ describe('tdah-permissions', () => {
 
             mockRequestCalendarPermission.mockResolvedValue('granted');
             expect(await requestTdahCalendarPermission()).toBe('granted');
+        });
+
+        it('degrades to undetermined/denied instead of throwing when external-calendar.ts rejects', async () => {
+            mockGetCalendarStatus.mockRejectedValue(new Error('calendar unavailable'));
+            expect(await getTdahCalendarPermissionStatus()).toBe('undetermined');
+
+            mockRequestCalendarPermission.mockRejectedValue(new Error('calendar unavailable'));
+            expect(await requestTdahCalendarPermission()).toBe('denied');
         });
     });
 

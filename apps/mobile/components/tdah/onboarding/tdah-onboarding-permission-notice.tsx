@@ -19,10 +19,11 @@ type DegradedPermissionKind = 'notifications' | 'battery' | 'calendar';
  */
 export type TdahOnboardingPermissionNoticeProps = {
     permissions: TdahPermissionsSnapshot | null;
+    onBack: () => void;
     onContinue: () => void;
 };
 
-export function TdahOnboardingPermissionNotice({ permissions, onContinue }: TdahOnboardingPermissionNoticeProps) {
+export function TdahOnboardingPermissionNotice({ permissions, onBack, onContinue }: TdahOnboardingPermissionNoticeProps) {
     const tc = useThemeColors();
     const filledButton = useFilledButtonColors();
     const { t } = useLanguage();
@@ -59,6 +60,14 @@ export function TdahOnboardingPermissionNotice({ permissions, onContinue }: Tdah
                 ))}
             </ScrollView>
             <View style={styles.footer}>
+                <TouchableOpacity
+                    accessibilityRole="button"
+                    onPress={onBack}
+                    style={[styles.button, styles.buttonOutline, { borderColor: tc.border }]}
+                    testID="tdah-onboarding-permission-notice-back"
+                >
+                    <Text style={[styles.buttonText, { color: tc.text }]}>{t('tdahOnboarding.back')}</Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                     accessibilityRole="button"
                     onPress={onContinue}

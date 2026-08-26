@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { cloudGetJson, cloudRequestJson, getCloudBaseUrl, getTranslator } from '@mindwtr/core';
+import { CloudHttpError, cloudGetJson, cloudRequestJson, getCloudBaseUrl, getTranslator } from '@mindwtr/core';
 
 import { getCurrentUiLanguage } from '../../../contexts/language-context';
 import { getTauriHttpFetch } from '../../../lib/tauri-http';
@@ -25,6 +25,11 @@ const TDAH_ACTIVATE_PATH = '/tdah/activate';
 const TDAH_REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_RITUAL_HOUR = '23:00';
 const DEVICE_TIME_ZONE_PATTERN = /^[A-Za-z0-9+_/-]{1,64}$/;
+// Same shapes the server validates in `apps/cloud/src/tdah/routes.ts` and the
+// mobile onboarding ritual step validates in
+// `apps/mobile/components/tdah/onboarding/tdah-onboarding-step-ritual.tsx` —
+// kept in sync by hand since clients never import the server's types (ADR 0026).
+const RITUAL_HOUR_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 type TdahProfileState = {
     mode: 'on' | 'off';
@@ -49,6 +54,18 @@ const detectDeviceTimeZone = (): string => {
     }
 };
 
+const isValidTdahTimeZone = (value: string): boolean => {
+    if (!DEVICE_TIME_ZONE_PATTERN.test(value)) return false;
+    try {
+        new Intl.DateTimeFormat('en-US', { timeZone: value });
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+const isValidTdahRitualHour = (value: string): boolean => RITUAL_HOUR_PATTERN.test(value);
+
 const buildTdahUrl = (cloudUrl: string, path: string): string => `${getCloudBaseUrl(cloudUrl)}${path}`;
 
 const inputCls =
@@ -65,6 +82,11 @@ export function TdahActivationSection() {
     const [ritualHour, setRitualHour] = useState<string>(DEFAULT_RITUAL_HOUR);
     const [activating, setActivating] = useState(false);
     const [activateFailed, setActivateFailed] = useState(false);
+    const [activateInvalidInput, setActivateInvalidInput] = useState(false);
+
+    const timeZoneValid = useMemo(() => isValidTdahTimeZone(timeZone), [timeZone]);
+    const ritualHourValid = useMemo(() => isValidTdahRitualHour(ritualHour), [ritualHour]);
+    const canActivate = timeZoneValid && ritualHourValid;
 
     const mountedRef = useRef(true);
     useEffect(() => {
@@ -126,9 +148,10 @@ export function TdahActivationSection() {
     }, [reload]);
 
     const handleActivate = useCallback(async () => {
-        if (!cloud || activating) return;
+        if (!cloud || activating || !canActivate) return;
         setActivating(true);
         setActivateFailed(false);
+        setActivateInvalidInput(false);
         try {
             const options = await buildOptions(cloud);
             const result = await cloudRequestJson<{ profile: TdahProfileState }>(
@@ -138,17 +161,26 @@ export function TdahActivationSection() {
                 options,
             );
             if (!mountedRef.current) return;
-            const nextProfile = result?.profile ?? { mode: 'on' as const, timeZone, ritualHour };
-            setProfile(nextProfile);
-            setTimeZone(nextProfile.timeZone);
-            setRitualHour(nextProfile.ritualHour);
-        } catch {
+            if (!result?.profile) {
+                // The server resolved without throwing but did not actually
+                // confirm a profile (e.g. an unexpected empty 200 body) —
+                // treat this the same as a failed request rather than
+                // fabricating a client-side profile.
+                setActivateFailed(true);
+                return;
+            }
+            setProfile(result.profile);
+            setTimeZone(result.profile.timeZone);
+            setRitualHour(result.profile.ritualHour);
+        } catch (error) {
             if (!mountedRef.current) return;
+            const isInvalidInput = error instanceof CloudHttpError && error.status >= 400 && error.status < 500;
+            setActivateInvalidInput(isInvalidInput);
             setActivateFailed(true);
         } finally {
             if (mountedRef.current) setActivating(false);
         }
-    }, [activating, buildOptions, cloud, ritualHour, timeZone]);
+    }, [activating, buildOptions, canActivate, cloud, ritualHour, timeZone]);
 
     const isActive = profile?.mode === 'on';
 
@@ -217,6 +249,9 @@ export function TdahActivationSection() {
                                     className={inputCls}
                                 />
                                 <span className="text-xs text-muted-foreground">{t('tdahOnboarding.step2TimeZoneDetected')}</span>
+                                {!timeZoneValid && timeZone.length > 0 ? (
+                                    <span className="text-xs text-destructive">{t('tdahOnboarding.ritual.invalidTimeZone')}</span>
+                                ) : null}
                             </label>
                             <label className="flex flex-col gap-1">
                                 <span className="text-xs text-muted-foreground">{t('settings.tdah.ritualHour')}</span>
@@ -229,19 +264,26 @@ export function TdahActivationSection() {
                                     className={inputCls}
                                 />
                                 <span className="text-xs text-muted-foreground">{t('settings.tdah.ritualHourDesc')}</span>
+                                {!ritualHourValid && ritualHour.length > 0 ? (
+                                    <span className="text-xs text-destructive">{t('tdahOnboarding.ritual.invalidRitualHour')}</span>
+                                ) : null}
                             </label>
                         </div>
                         <div className="flex items-center gap-3">
                             <button
                                 type="button"
                                 onClick={() => void handleActivate()}
-                                disabled={activating}
+                                disabled={activating || !canActivate}
                                 className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {activating ? t('settings.tdah.activatePwaBusy') : t('settings.tdah.activatePwaButton')}
                             </button>
                             {activateFailed ? (
-                                <span className="text-xs text-destructive">{t('settings.tdah.activatePwaError')}</span>
+                                <span className="text-xs text-destructive">
+                                    {activateInvalidInput
+                                        ? t('tdahOnboarding.ritual.invalidTimeZone')
+                                        : t('settings.tdah.activatePwaError')}
+                                </span>
                             ) : null}
                         </div>
                     </div>

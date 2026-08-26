@@ -276,6 +276,103 @@ describe('TdahOnboardingFlow', () => {
         expect(tree.root.findByProps({ testID: 'tdah-onboarding-step-done-success' })).toBeTruthy();
     });
 
+    it('lets the user close out of a failed reactivation instead of being stuck on a repeated retry', async () => {
+        mockCloudRequestJson.mockRejectedValueOnce(new Error('network down'));
+        const onClose = vi.fn();
+        let tree!: renderer.ReactTestRenderer;
+        await renderer.act(async () => {
+            tree = renderer.create(
+                <TdahOnboardingFlow
+                    cloud={CLOUD}
+                    variant="reactivation"
+                    initialTimeZone="UTC"
+                    onFinished={vi.fn()}
+                    onClose={onClose}
+                />,
+            );
+        });
+
+        // Reactivation shows step 5 first — there is no earlier screen with a close
+        // button, so the error branch itself must offer one.
+        expect(tree.root.findByProps({ testID: 'tdah-onboarding-step-done-error' })).toBeTruthy();
+
+        await pressByTestId(tree, 'tdah-onboarding-done-close');
+
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not update state or call onFinished after the flow unmounts mid-activation', async () => {
+        let resolveActivate!: (value: unknown) => void;
+        mockCloudRequestJson.mockReturnValueOnce(new Promise((resolve) => {
+            resolveActivate = resolve;
+        }));
+        const onFinished = vi.fn();
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+        let tree!: renderer.ReactTestRenderer;
+        await renderer.act(async () => {
+            tree = renderer.create(
+                <TdahOnboardingFlow
+                    cloud={CLOUD}
+                    variant="reactivation"
+                    initialTimeZone="UTC"
+                    onFinished={onFinished}
+                    onClose={vi.fn()}
+                />,
+            );
+        });
+
+        await renderer.act(async () => {
+            tree.unmount();
+        });
+
+        await renderer.act(async () => {
+            resolveActivate({
+                profile: { mode: 'on', timeZone: 'UTC', ritualHour: '23:00' },
+                routineCreated: false,
+                dayPlan: { date: '2026-08-26', activityCount: 0 },
+            });
+            await flushAsync();
+        });
+
+        expect(onFinished).not.toHaveBeenCalled();
+        const stateUpdateWarning = consoleError.mock.calls.some(([message]) => (
+            typeof message === 'string' && message.includes("state update")
+        ));
+        expect(stateUpdateWarning).toBe(false);
+
+        consoleError.mockRestore();
+    });
+
+    it('lets the user go back from the permission notice to grant a permission properly', async () => {
+        mockGetSnapshot.mockResolvedValue({ notifications: 'denied', battery: 'granted', calendar: 'granted' });
+        let tree!: renderer.ReactTestRenderer;
+        await renderer.act(async () => {
+            tree = renderer.create(
+                <TdahOnboardingFlow
+                    cloud={CLOUD}
+                    variant="full"
+                    initialTimeZone="UTC"
+                    onFinished={vi.fn()}
+                    onClose={vi.fn()}
+                />,
+            );
+        });
+
+        await pressByTestId(tree, 'tdah-onboarding-promise-next');
+        await pressByTestId(tree, 'tdah-onboarding-ritual-next');
+        await pressByTestId(tree, 'tdah-onboarding-routine-skip');
+        await pressByTestId(tree, 'tdah-onboarding-permissions-continue');
+
+        expect(tree.root.findByProps({ testID: 'tdah-onboarding-permission-notice' })).toBeTruthy();
+
+        await pressByTestId(tree, 'tdah-onboarding-permission-notice-back');
+
+        expect(tree.root.findByProps({ testID: 'tdah-onboarding-step-permissions' })).toBeTruthy();
+        expect(tree.root.findAllByProps({ testID: 'tdah-onboarding-permission-notice' })).toHaveLength(0);
+        expect(mockCloudRequestJson).not.toHaveBeenCalled();
+    });
+
     it('closes without activating when the user backs out of step 1', async () => {
         const onClose = vi.fn();
         let tree!: renderer.ReactTestRenderer;

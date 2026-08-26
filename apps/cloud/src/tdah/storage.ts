@@ -398,10 +398,24 @@ export async function createRoutineWithBlocks(
     return await withWriteTransaction(databasePath, (database) => mutateCreateRoutineWithBlocks(database, input));
 }
 
-const formatDateInTimeZone = (date: Date, timeZone: string): string => (
-    // en-CA formats as YYYY-MM-DD, matching tdah_day_plan.date's sortable text key.
-    new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date)
-);
+/**
+ * Every caller today validates `timeZone` first (or falls back to
+ * `TDAH_DEFAULT_TIME_ZONE`), so `Intl.DateTimeFormat` should never actually
+ * throw here — but nothing in this function's signature enforces that
+ * invariant, and a previously-valid IANA zone can in principle be retired
+ * from tzdata. The try/catch is a defensive boundary, not a swallow: it
+ * surfaces a specific, controlled error instead of letting a raw `Intl`
+ * exception escape uncaught. Exported for direct unit testing only — every
+ * production caller still goes through `computeTomorrowDate`.
+ */
+export const formatDateInTimeZone = (date: Date, timeZone: string): string => {
+    try {
+        // en-CA formats as YYYY-MM-DD, matching tdah_day_plan.date's sortable text key.
+        return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+    } catch (error) {
+        throw new Error(`TDAH: failed to format date in time zone "${timeZone}"`, { cause: error });
+    }
+};
 
 /**
  * Tomorrow's calendar date in the profile's time zone, as a `YYYY-MM-DD`

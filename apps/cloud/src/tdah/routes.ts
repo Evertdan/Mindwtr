@@ -31,6 +31,9 @@ const TDAH_ACTIVATE_PATH = `${TDAH_PATH_PREFIX}/activate`;
 
 const IANA_TIME_ZONE_PATTERN = /^[A-Za-z0-9+_/-]{1,64}$/;
 const RITUAL_HOUR_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+// A single day's routine cannot reasonably need more Bloques than this —
+// caps the otherwise-unbounded `blocks` array on the input.
+const TDAH_ROUTINE_MAX_BLOCKS = 24;
 
 export type TdahRequestContext = {
     key: string;
@@ -129,21 +132,48 @@ const parseRoutineBlockInput = (value: unknown): TdahRoutineBlockInput | null =>
     if (typeof raw.durationMinutes !== 'number' || !Number.isInteger(raw.durationMinutes) || raw.durationMinutes <= 0) {
         return null;
     }
-    return { title: raw.title, startTime: raw.startTime, durationMinutes: raw.durationMinutes };
+    // Persist the trimmed title — the untrimmed raw.title was only used above
+    // to reject whitespace-only input.
+    return { title: raw.title.trim(), startTime: raw.startTime, durationMinutes: raw.durationMinutes };
+};
+
+/** `startTime` is already RITUAL_HOUR_PATTERN-validated ("HH:mm") by the time this runs. */
+const startTimeToMinutes = (startTime: string): number => {
+    const [hours, minutes] = startTime.split(':').map(Number);
+    return (hours as number) * 60 + (minutes as number);
+};
+
+/** True when any two Bloques' [start, start+duration) ranges intersect. */
+const hasOverlappingBlocks = (blocks: TdahRoutineBlockInput[]): boolean => {
+    const sorted = [...blocks].sort((a, b) => startTimeToMinutes(a.startTime) - startTimeToMinutes(b.startTime));
+    for (let i = 1; i < sorted.length; i += 1) {
+        const previous = sorted[i - 1] as TdahRoutineBlockInput;
+        const current = sorted[i] as TdahRoutineBlockInput;
+        const previousEnd = startTimeToMinutes(previous.startTime) + previous.durationMinutes;
+        if (startTimeToMinutes(current.startTime) < previousEnd) {
+            return true;
+        }
+    }
+    return false;
 };
 
 const parseRoutineInput = (value: unknown): TdahRoutineInput | null => {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
     const raw = value as TdahRoutineBody;
     if (typeof raw.title !== 'string' || raw.title.trim().length === 0) return null;
-    if (!Array.isArray(raw.blocks) || raw.blocks.length === 0) return null;
+    if (!Array.isArray(raw.blocks) || raw.blocks.length === 0 || raw.blocks.length > TDAH_ROUTINE_MAX_BLOCKS) {
+        return null;
+    }
     const blocks: TdahRoutineBlockInput[] = [];
     for (const rawBlock of raw.blocks) {
         const block = parseRoutineBlockInput(rawBlock);
         if (!block) return null;
         blocks.push(block);
     }
-    return { title: raw.title, blocks };
+    if (hasOverlappingBlocks(blocks)) return null;
+    // Persist the trimmed title — the untrimmed raw.title was only used above
+    // to reject whitespace-only input.
+    return { title: raw.title.trim(), blocks };
 };
 
 const parseActivateBody = (body: unknown): { ok: true; body: TdahParsedActivate } | { ok: false; code: TdahErrorCode } => {
@@ -192,7 +222,12 @@ const handleActivate = async (
 ): Promise<Response> => {
     const body = await readJsonBody(req, options.maxBodyBytes, options.signal);
     if (isBodyReadError(body)) {
-        return tdahErrorResponse(TDAH_ERRORS.invalidBody, 413);
+        // `body.__mindwtrError.status` already distinguishes a genuinely
+        // oversized payload (413) from a request abort/timeout (408) — see
+        // readRequestBytes in ../server-storage. Propagating it instead of a
+        // hardcoded 413 stops an abort/timeout from being misreported as
+        // Payload Too Large.
+        return tdahErrorResponse(TDAH_ERRORS.invalidBody, body.__mindwtrError.status);
     }
     const parsed = parseActivateBody(body);
     if (!parsed.ok) {

@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
+import { CloudHttpError } from '@mindwtr/core';
+
 import { TdahActivationSection } from './TdahActivationSection';
 
 const LABELS: Record<string, string> = {
@@ -22,18 +24,34 @@ const LABELS: Record<string, string> = {
     'settings.tdah.ritualHourDesc': 'Defaults to 23:00.',
     'tdahOnboarding.step2TimeZoneLabel': 'Time zone',
     'tdahOnboarding.step2TimeZoneDetected': 'Detected automatically — confirm or change it.',
+    'tdahOnboarding.ritual.invalidTimeZone': "That doesn't look like a valid time zone.",
+    'tdahOnboarding.ritual.invalidRitualHour': 'Enter a valid time in HH:mm format.',
 };
 
 const cloudGetJson = vi.fn();
 const cloudRequestJson = vi.fn();
 const getCloudConfig = vi.fn();
 
-vi.mock('@mindwtr/core', () => ({
-    cloudGetJson: (...args: unknown[]) => cloudGetJson(...args),
-    cloudRequestJson: (...args: unknown[]) => cloudRequestJson(...args),
-    getCloudBaseUrl: (url: string) => `${url.replace(/\/+$/, '')}/v1`,
-    getTranslator: () => (key: string) => LABELS[key] ?? key,
-}));
+vi.mock('@mindwtr/core', () => {
+    class CloudHttpError extends Error {
+        status: number;
+        statusCode: number;
+
+        constructor(message: string, status: number) {
+            super(message);
+            this.name = 'CloudHttpError';
+            this.status = status;
+            this.statusCode = status;
+        }
+    }
+    return {
+        CloudHttpError,
+        cloudGetJson: (...args: unknown[]) => cloudGetJson(...args),
+        cloudRequestJson: (...args: unknown[]) => cloudRequestJson(...args),
+        getCloudBaseUrl: (url: string) => `${url.replace(/\/+$/, '')}/v1`,
+        getTranslator: () => (key: string) => LABELS[key] ?? key,
+    };
+});
 
 vi.mock('../../../contexts/language-context', () => ({
     getCurrentUiLanguage: () => 'en',
@@ -147,6 +165,67 @@ describe('TdahActivationSection', () => {
 
         await screen.findByText('Could not activate ADHD mode. Try again.');
         expect(screen.getByRole('button', { name: 'Activate' })).not.toBeDisabled();
+    });
+
+    it('disables Activate and shows an inline error for an invalid time zone, without calling the server', async () => {
+        configureCloudSync();
+        cloudGetJson.mockResolvedValue({ profile: null });
+        render(<TdahActivationSection />);
+
+        await screen.findByText('Activate ADHD mode');
+        fireEvent.change(screen.getByLabelText('Time zone'), { target: { value: 'not a real time zone!!' } });
+
+        await screen.findByText("That doesn't look like a valid time zone.");
+        expect(screen.getByRole('button', { name: 'Activate' })).toBeDisabled();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Activate' }));
+        expect(cloudRequestJson).not.toHaveBeenCalled();
+    });
+
+    it('disables Activate when the ritual hour is cleared, without calling the server', async () => {
+        configureCloudSync();
+        cloudGetJson.mockResolvedValue({ profile: null });
+        render(<TdahActivationSection />);
+
+        await screen.findByText('Activate ADHD mode');
+        // A native type="time" input sanitizes out-of-range strings down to
+        // "" — clearing it is the reachable way to reproduce an invalid
+        // (non-HH:mm) ritual hour through the real widget.
+        fireEvent.change(screen.getByLabelText('Nightly ritual hour'), { target: { value: '' } });
+
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'Activate' })).toBeDisabled();
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Activate' }));
+        expect(cloudRequestJson).not.toHaveBeenCalled();
+    });
+
+    it('shows a fix-your-input error for a 400-class response, distinct from the generic network error copy', async () => {
+        configureCloudSync();
+        cloudGetJson.mockResolvedValue({ profile: null });
+        cloudRequestJson.mockRejectedValue(new CloudHttpError('Cloud POST failed (400): Bad Request', 400));
+        render(<TdahActivationSection />);
+
+        await screen.findByText('Activate ADHD mode');
+        fireEvent.click(screen.getByRole('button', { name: 'Activate' }));
+
+        await screen.findByText("That doesn't look like a valid time zone.");
+        expect(screen.queryByText('Could not activate ADHD mode. Try again.')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Activate' })).not.toBeDisabled();
+    });
+
+    it('treats a falsy/empty activation response as a failure instead of fabricating a profile', async () => {
+        configureCloudSync();
+        cloudGetJson.mockResolvedValue({ profile: null });
+        cloudRequestJson.mockResolvedValue(null);
+        render(<TdahActivationSection />);
+
+        await screen.findByText('Activate ADHD mode');
+        fireEvent.click(screen.getByRole('button', { name: 'Activate' }));
+
+        await screen.findByText('Could not activate ADHD mode. Try again.');
+        expect(screen.queryByText('Activated — tomorrow is already generated.')).not.toBeInTheDocument();
     });
 
     it('renders the load error with a retry that recovers', async () => {

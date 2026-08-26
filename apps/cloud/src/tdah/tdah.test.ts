@@ -4,7 +4,8 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { tokenToKey } from '../server-auth';
 import { startCloudServer } from '../server';
-import { activateTdahProfile, readTdahProfile, tdahDatabasePath } from './storage';
+import { activateTdahProfile, formatDateInTimeZone, readTdahProfile, tdahDatabasePath } from './storage';
+import { handleTdahRequest } from './routes';
 
 const TOKEN_ALPHA = 'tdah-token-alpha-1234567890';
 const TOKEN_BETA = 'tdah-token-beta-1234567890';
@@ -448,6 +449,109 @@ describe('tdah module', () => {
             expect(await readErrorCode(response)).toBe('TDAH_METHOD_NOT_ALLOWED');
         });
 
+        test('a request abort/timeout during activate is reported with its own status, not always 413', async () => {
+            // Bypasses HTTP/fetch on purpose: an aborted ReadableStream body,
+            // fed straight into the exported handleTdahRequest, is the only
+            // reliable way to force readJsonBody down the BodyReadError path
+            // for the "aborted mid-read" cause (status 408) rather than the
+            // "declared/observed length over the limit" cause (status 413).
+            const key = tokenToKey(TOKEN_ALPHA);
+            const abortController = new AbortController();
+            const req = new Request('http://localhost/v1/tdah/activate', {
+                method: 'POST',
+                body: new ReadableStream({
+                    start(streamController) {
+                        streamController.enqueue(new TextEncoder().encode('{"timeZone":'));
+                    },
+                    cancel() {
+                        return undefined;
+                    },
+                }),
+                duplex: 'half' as RequestDuplex,
+            });
+            abortController.abort(new Error('Request timed out'));
+
+            const response = await handleTdahRequest(req, '/v1/tdah/activate', { key }, {
+                dataDir,
+                maxBodyBytes: 1024,
+                signal: abortController.signal,
+            });
+            expect(response).not.toBeNull();
+            expect(response?.status).toBe(408);
+            expect(await readErrorCode(response as Response)).toBe('TDAH_INVALID_BODY');
+        });
+
+        test('a genuinely oversized activate body still returns 413 TDAH_INVALID_BODY', async () => {
+            const response = await authedFetch('/v1/tdah/activate', {
+                method: 'POST',
+                // startCloudServer's default maxBodyBytes is 2_000_000 (server.ts);
+                // pad well past it so this is unambiguously the oversized-body case.
+                body: JSON.stringify({ timeZone: 'UTC', routine: WORKDAY_ROUTINE, padding: 'x'.repeat(3 * 1024 * 1024) }),
+            });
+            expect(response.status).toBe(413);
+            expect(await readErrorCode(response)).toBe('TDAH_INVALID_BODY');
+        });
+
+        test('a routine with more than 24 blocks returns 400 TDAH_ROUTINE_INVALID', async () => {
+            const blocks = Array.from({ length: 25 }, (_, index) => ({
+                title: `Bloque ${index}`,
+                startTime: `00:${String(index).padStart(2, '0')}`,
+                durationMinutes: 1,
+            }));
+            const response = await activate({
+                timeZone: 'UTC',
+                routine: { title: 'Día laboral', blocks },
+            });
+            expect(response.status).toBe(400);
+            expect(await readErrorCode(response)).toBe('TDAH_ROUTINE_INVALID');
+        });
+
+        test('overlapping blocks in a routine return 400 TDAH_ROUTINE_INVALID', async () => {
+            const response = await activate({
+                timeZone: 'UTC',
+                routine: {
+                    title: 'Día laboral',
+                    blocks: [
+                        { title: 'Mañana', startTime: '08:00', durationMinutes: 120 },
+                        { title: 'Solapado', startTime: '09:00', durationMinutes: 30 },
+                    ],
+                },
+            });
+            expect(response.status).toBe(400);
+            expect(await readErrorCode(response)).toBe('TDAH_ROUTINE_INVALID');
+        });
+
+        test('a non-overlapping routine (existing coverage) still activates successfully', async () => {
+            const response = await activate({ timeZone: 'UTC', routine: WORKDAY_ROUTINE });
+            expect(response.status).toBe(200);
+            const body = await readActivateResponse(response);
+            expect(body.routineCreated).toBe(true);
+        });
+
+        test('leading/trailing whitespace in the routine title and a block title is trimmed before it is persisted', async () => {
+            const response = await activate({
+                timeZone: 'UTC',
+                routine: {
+                    title: '  Día laboral  ',
+                    blocks: [{ title: '  Mañana  ', startTime: '08:00', durationMinutes: 60 }],
+                },
+            });
+            expect(response.status).toBe(200);
+
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(databasePath, { readonly: true });
+            try {
+                const routineRow = database.prepare('SELECT title FROM tdah_routine;').get() as { title: string };
+                expect(routineRow.title).toBe('Día laboral');
+                const blockRow = database.prepare('SELECT title FROM tdah_routine_block;').get() as { title: string };
+                expect(blockRow.title).toBe('Mañana');
+            } finally {
+                database.close();
+            }
+        });
+
         test('a storage-level failure mid-activation rolls back the profile upsert too (atomic activate)', async () => {
             // Storage-unit test, bypassing HTTP/route validation on purpose:
             // `parseRoutineInput` rejects a non-string `startTime` long before it
@@ -467,13 +571,23 @@ describe('tdah module', () => {
                     title: 'Día laboral',
                     blocks: [
                         { title: 'Mañana', startTime: '08:00', durationMinutes: 60 },
-                        { title: 'Tarde', startTime: null as any, durationMinutes: 60 },
+                        { title: 'Tarde', startTime: null as unknown as string, durationMinutes: 60 },
                     ],
                 },
             })).rejects.toBeTruthy();
 
             const profile = await readTdahProfile(dataDir, key);
             expect(profile).toBeNull();
+        });
+    });
+
+    describe('formatDateInTimeZone', () => {
+        test('throws a controlled error instead of letting a raw Intl exception escape for a bogus IANA zone', () => {
+            // Every production caller validates the time zone first (or falls
+            // back to UTC) before this ever runs — this is a unit-level check
+            // of the defensive try/catch boundary itself, not a reachable
+            // production path.
+            expect(() => formatDateInTimeZone(new Date(), 'Bogus/Zone')).toThrow();
         });
     });
 });

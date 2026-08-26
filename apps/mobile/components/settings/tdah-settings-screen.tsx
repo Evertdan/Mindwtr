@@ -108,6 +108,10 @@ export function TdahSettingsScreen() {
 
     const handleToggleMode = useCallback(async (next: boolean) => {
         if (!cloud || mutating) return;
+        // A rapid double-tap can fire the handler again before the switch
+        // visually re-renders to reflect the first "on" tap; ignore a
+        // redundant on-tap instead of re-opening onboarding / re-activating.
+        if (next && profile?.mode === 'on') return;
         if (next) {
             // First-ever activation (profile never existed) runs the full T-14
             // onboarding; reactivating a previously-off profile skips straight
@@ -129,12 +133,14 @@ export function TdahSettingsScreen() {
         }
     }, [cloud, loadProfile, mutating, profile]);
 
-    const handleOnboardingFinished = useCallback((_result: TdahActivateResult) => {
-        // The onboarding flow already showed the server's real response on
-        // its own "Listo" step; re-reading here just syncs this screen's view.
+    const handleOnboardingFinished = useCallback((result: TdahActivateResult) => {
+        // The activate response already carries the server-confirmed profile
+        // (same shape as TdahProfileState) — seed this screen's state from it
+        // directly instead of firing an extra, unguarded GET whose failure
+        // would leave the toggle showing a stale "off" after a real "on".
         setOnboardingVariant(null);
-        if (cloud) void loadProfile(cloud);
-    }, [cloud, loadProfile]);
+        setProfile(result.profile);
+    }, []);
 
     const handleOnboardingClose = useCallback(() => {
         setOnboardingVariant(null);

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -69,6 +69,14 @@ export function TdahOnboardingFlow({ cloud, variant, initialTimeZone, onFinished
     const [activateStatus, setActivateStatus] = useState<TdahActivateStatus>('idle');
     const [activateResult, setActivateResult] = useState<TdahActivateResult | null>(null);
 
+    const mountedRef = useRef(true);
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+        };
+    }, []);
+
     const routineDraft = useMemo((): TdahRoutineDraft | undefined => {
         if (variant !== 'full' || routineChoice !== 'create') return undefined;
         return { title: TDAH_SUGGESTED_WEEKDAY_ROUTINE_TITLE, blocks: TDAH_SUGGESTED_WEEKDAY_BLOCKS };
@@ -86,6 +94,7 @@ export function TdahOnboardingFlow({ cloud, variant, initialTimeZone, onFinished
                 body,
                 buildTdahActivateOptions(cloud),
             );
+            if (!mountedRef.current) return;
             if (!result) {
                 setActivateStatus('error');
                 return;
@@ -94,6 +103,7 @@ export function TdahOnboardingFlow({ cloud, variant, initialTimeZone, onFinished
             setActivateStatus('success');
             onFinished(result);
         } catch {
+            if (!mountedRef.current) return;
             setActivateStatus('error');
         }
     }, [cloud, onFinished, ritualHour, routineDraft, timeZone, variant]);
@@ -145,10 +155,15 @@ export function TdahOnboardingFlow({ cloud, variant, initialTimeZone, onFinished
                     <TdahOnboardingStepPermissions onBack={() => setStep('routine')} onContinue={handlePermissionsContinue} />
                 ) : null}
                 {step === 'permission-notice' ? (
-                    <TdahOnboardingPermissionNotice onContinue={() => setStep('done')} permissions={permissions} />
+                    <TdahOnboardingPermissionNotice
+                        onBack={() => setStep('permissions')}
+                        onContinue={() => setStep('done')}
+                        permissions={permissions}
+                    />
                 ) : null}
                 {step === 'done' ? (
                     <TdahOnboardingStepDone
+                        onClose={onClose}
                         onDone={onClose}
                         onRetry={handleRetryActivate}
                         result={activateResult}
