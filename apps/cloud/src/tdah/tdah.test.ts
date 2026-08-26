@@ -4,7 +4,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { tokenToKey } from '../server-auth';
 import { startCloudServer } from '../server';
-import { activateTdahProfile, formatDateInTimeZone, readTdahProfile, tdahDatabasePath } from './storage';
+import { activateTdahProfile, formatDateInTimeZone, isValidMonthString, readTdahProfile, tdahDatabasePath } from './storage';
 import { handleTdahRequest } from './routes';
 
 const TOKEN_ALPHA = 'tdah-token-alpha-1234567890';
@@ -16,6 +16,29 @@ type TdahTestProfile = {
     ritualHour: string;
     createdAt: string;
     updatedAt: string;
+};
+
+type TdahTestPattern =
+    | { kind: 'weekday'; weekdays: number[] }
+    | { kind: 'nthWeekdayOfMonth'; ordinal: number; weekday: number };
+
+type TdahTestBlock = {
+    id: number;
+    routineId: number;
+    title: string;
+    startTime: string;
+    durationMinutes: number;
+    sortOrder: number;
+};
+
+type TdahTestRoutine = {
+    id: number;
+    title: string;
+    pattern: TdahTestPattern;
+    createdAt: string;
+    blocks: TdahTestBlock[];
+    overlapWarnings: { blockIndexA: number; blockIndexB: number }[];
+    crossesMidnightWarnings: { blockIndex: number }[];
 };
 
 describe('tdah module', () => {
@@ -51,8 +74,52 @@ describe('tdah module', () => {
         authedFetch('/v1/tdah/activate', { method: 'POST', body: JSON.stringify(body), token })
     );
 
+    const listRoutinesApi = (token?: string): Promise<Response> => (
+        authedFetch('/v1/tdah/routines', { method: 'GET', token })
+    );
+
+    const createRoutineApi = (body: unknown, token?: string): Promise<Response> => (
+        authedFetch('/v1/tdah/routines', { method: 'POST', body: JSON.stringify(body), token })
+    );
+
+    const getRoutineApi = (id: number, token?: string): Promise<Response> => (
+        authedFetch(`/v1/tdah/routines/${id}`, { method: 'GET', token })
+    );
+
+    const updateRoutineApi = (id: number, body: unknown, token?: string): Promise<Response> => (
+        authedFetch(`/v1/tdah/routines/${id}`, { method: 'PUT', body: JSON.stringify(body), token })
+    );
+
+    const deleteRoutineApi = (id: number, token?: string): Promise<Response> => (
+        authedFetch(`/v1/tdah/routines/${id}`, { method: 'DELETE', token })
+    );
+
+    const previewRoutineApi = (id: number, month: string, token?: string): Promise<Response> => (
+        authedFetch(`/v1/tdah/routines/${id}/preview?month=${month}`, { method: 'GET', token })
+    );
+
+    const readRoutine = async (response: Response): Promise<TdahTestRoutine> => (
+        (await response.json() as { routine: TdahTestRoutine }).routine
+    );
+
+    const readRoutines = async (response: Response): Promise<TdahTestRoutine[]> => (
+        (await response.json() as { routines: TdahTestRoutine[] }).routines
+    );
+
+    const readDates = async (response: Response): Promise<string[]> => (
+        (await response.json() as { dates: string[] }).dates
+    );
+
+    // Story 1.4 widened `TdahRoutineInput.pattern` from an implicit
+    // Mon-Fri-only default to a real calendar pattern, so a fixture with no
+    // `pattern` at all now defaults to weekdays [1,2,3,4,5] — day-dependent
+    // whenever "tomorrow" (in `computeTomorrowDate`'s real, unmocked system
+    // clock) falls on a weekend. This fixture is used by tests that only care
+    // about basic activation write-through, not the precedence engine, so it
+    // gets an explicit every-day pattern to stay day-independent.
     const WORKDAY_ROUTINE = {
         title: 'Día laboral',
+        pattern: { kind: 'weekday' as const, weekdays: [0, 1, 2, 3, 4, 5, 6] },
         blocks: [
             { title: 'Mañana', startTime: '08:00', durationMinutes: 120 },
             { title: 'Tarde', startTime: '14:00', durationMinutes: 180 },
@@ -419,12 +486,23 @@ describe('tdah module', () => {
             expect(await readErrorCode(response)).toBe('TDAH_ROUTINE_INVALID');
         });
 
-        test('routine block with duration_minutes<=0 returns 400 TDAH_ROUTINE_INVALID', async () => {
+        test('a zero-duration routine block is valid (end === start, 03-modo-tdah-rutinas.md edge case)', async () => {
             const response = await activate({
                 timeZone: 'UTC',
                 routine: {
                     title: 'Día laboral',
                     blocks: [{ title: 'Mañana', startTime: '08:00', durationMinutes: 0 }],
+                },
+            });
+            expect(response.status).toBe(200);
+        });
+
+        test('routine block with a negative duration_minutes returns 400 TDAH_ROUTINE_INVALID', async () => {
+            const response = await activate({
+                timeZone: 'UTC',
+                routine: {
+                    title: 'Día laboral',
+                    blocks: [{ title: 'Mañana', startTime: '08:00', durationMinutes: -1 }],
                 },
             });
             expect(response.status).toBe(400);
@@ -506,7 +584,11 @@ describe('tdah module', () => {
             expect(await readErrorCode(response)).toBe('TDAH_ROUTINE_INVALID');
         });
 
-        test('overlapping blocks in a routine return 400 TDAH_ROUTINE_INVALID', async () => {
+        test('overlapping blocks in a routine no longer reject — story 1.4 relaxes this to a non-blocking overlapWarnings save', async () => {
+            // Story 1.3 hard-rejected this with 400 TDAH_ROUTINE_INVALID; the
+            // UX spec deliberately relaxes it ("aviso no bloqueante — el
+            // usuario puede querer solapes deliberados") — see routes.ts's
+            // parseRoutineInput and storage.ts's computeOverlapWarnings.
             const response = await activate({
                 timeZone: 'UTC',
                 routine: {
@@ -517,8 +599,14 @@ describe('tdah module', () => {
                     ],
                 },
             });
-            expect(response.status).toBe(400);
-            expect(await readErrorCode(response)).toBe('TDAH_ROUTINE_INVALID');
+            expect(response.status).toBe(200);
+            const body = await readActivateResponse(response);
+            expect(body.routineCreated).toBe(true);
+
+            const listResponse = await authedFetch('/v1/tdah/routines');
+            const listBody = await listResponse.json() as { routines: TdahTestRoutine[] };
+            expect(listBody.routines).toHaveLength(1);
+            expect(listBody.routines[0]?.overlapWarnings).toEqual([{ blockIndexA: 0, blockIndexB: 1 }]);
         });
 
         test('a non-overlapping routine (existing coverage) still activates successfully', async () => {
@@ -581,6 +669,739 @@ describe('tdah module', () => {
         });
     });
 
+    describe('/v1/tdah/routines CRUD & precedence engine (story 1.4)', () => {
+        const NEW_WORKDAY_ROUTINE = {
+            title: 'Día laboral',
+            pattern: { kind: 'weekday', weekdays: [1, 2, 3, 4, 5] },
+            blocks: [
+                { title: 'Mañana', startTime: '08:00', durationMinutes: 120 },
+                { title: 'Tarde', startTime: '14:00', durationMinutes: 180 },
+            ],
+        };
+
+        /** Tomorrow's calendar date in UTC, decomposed for building test Rutina patterns that are guaranteed to match it. */
+        const tomorrowInfoUtc = (): { date: string; year: number; month: number; day: number; weekday: number; ordinal: number } => {
+            const now = new Date();
+            const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+            const tomorrowUtc = new Date(todayUtc.getTime() + 24 * 60 * 60 * 1000);
+            const year = tomorrowUtc.getUTCFullYear();
+            const month = tomorrowUtc.getUTCMonth() + 1;
+            const day = tomorrowUtc.getUTCDate();
+            const weekday = tomorrowUtc.getUTCDay();
+            const occurrence = Math.ceil(day / 7);
+            const ordinal = occurrence <= 4 ? occurrence : -1;
+            const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            return { date, year, month, day, weekday, ordinal };
+        };
+
+        test('create weekday Rutina returns 201 with full Rutina, blocks, empty overlapWarnings', async () => {
+            const response = await createRoutineApi(NEW_WORKDAY_ROUTINE);
+            expect(response.status).toBe(201);
+            const routine = await readRoutine(response);
+            expect(typeof routine.id).toBe('number');
+            expect(routine.title).toBe('Día laboral');
+            expect(routine.pattern).toEqual({ kind: 'weekday', weekdays: [1, 2, 3, 4, 5] });
+            expect(routine.blocks).toHaveLength(2);
+            expect(routine.overlapWarnings).toEqual([]);
+            expect(routine.crossesMidnightWarnings).toEqual([]);
+        });
+
+        test('create nthWeekdayOfMonth Rutina ("último sábado") persists ordinal/weekday', async () => {
+            const response = await createRoutineApi({
+                title: 'Último sábado',
+                pattern: { kind: 'nthWeekdayOfMonth', ordinal: -1, weekday: 6 },
+                blocks: [{ title: 'Limpieza', startTime: '10:00', durationMinutes: 60 }],
+            });
+            expect(response.status).toBe(201);
+            const routine = await readRoutine(response);
+            expect(routine.pattern).toEqual({ kind: 'nthWeekdayOfMonth', ordinal: -1, weekday: 6 });
+        });
+
+        test('empty weekdays array returns 400 TDAH_ROUTINE_INVALID', async () => {
+            const response = await createRoutineApi({
+                title: 'Vacío',
+                pattern: { kind: 'weekday', weekdays: [] },
+                blocks: [{ title: 'Bloque', startTime: '08:00', durationMinutes: 60 }],
+            });
+            expect(response.status).toBe(400);
+            expect(await readErrorCode(response)).toBe('TDAH_ROUTINE_INVALID');
+        });
+
+        test('ordinal out of range (5) returns 400 TDAH_ROUTINE_INVALID', async () => {
+            const response = await createRoutineApi({
+                title: 'Ordinal inválido',
+                pattern: { kind: 'nthWeekdayOfMonth', ordinal: 5, weekday: 6 },
+                blocks: [{ title: 'Bloque', startTime: '08:00', durationMinutes: 60 }],
+            });
+            expect(response.status).toBe(400);
+            expect(await readErrorCode(response)).toBe('TDAH_ROUTINE_INVALID');
+        });
+
+        test('overlapping Bloques save successfully with overlapWarnings populated instead of rejecting', async () => {
+            const response = await createRoutineApi({
+                title: 'Con solape',
+                blocks: [
+                    { title: 'Mañana', startTime: '08:00', durationMinutes: 120 },
+                    { title: 'Solapado', startTime: '09:00', durationMinutes: 30 },
+                ],
+            });
+            expect(response.status).toBe(201);
+            const routine = await readRoutine(response);
+            expect(routine.overlapWarnings).toEqual([{ blockIndexA: 0, blockIndexB: 1 }]);
+        });
+
+        test('a Bloque crossing midnight saves successfully with a crossesMidnightWarnings entry', async () => {
+            const response = await createRoutineApi({
+                title: 'Nocturno',
+                blocks: [{ title: 'Noche', startTime: '23:30', durationMinutes: 90 }],
+            });
+            expect(response.status).toBe(201);
+            const routine = await readRoutine(response);
+            expect(routine.crossesMidnightWarnings).toEqual([{ blockIndex: 0 }]);
+        });
+
+        test('a title over 80 characters returns 400 TDAH_ROUTINE_INVALID (DW-2)', async () => {
+            const response = await createRoutineApi({
+                title: 'x'.repeat(201),
+                blocks: [{ title: 'Bloque', startTime: '08:00', durationMinutes: 60 }],
+            });
+            expect(response.status).toBe(400);
+            expect(await readErrorCode(response)).toBe('TDAH_ROUTINE_INVALID');
+        });
+
+        test('a duration over 1440 minutes returns 400 TDAH_ROUTINE_INVALID (DW-2)', async () => {
+            const response = await createRoutineApi({
+                title: 'Duración inválida',
+                blocks: [{ title: 'Bloque', startTime: '08:00', durationMinutes: 100000 }],
+            });
+            expect(response.status).toBe(400);
+            expect(await readErrorCode(response)).toBe('TDAH_ROUTINE_INVALID');
+        });
+
+        // --- P7: exact-boundary coverage on the CRUD routes (title, duration, blocks caps) ---
+
+        test('a title of exactly TDAH_ROUTINE_TITLE_MAX_LENGTH (80) chars succeeds via POST', async () => {
+            const response = await createRoutineApi({
+                title: 'x'.repeat(80),
+                blocks: [{ title: 'Bloque', startTime: '08:00', durationMinutes: 60 }],
+            });
+            expect(response.status).toBe(201);
+            const routine = await readRoutine(response);
+            expect(routine.title).toHaveLength(80);
+        });
+
+        test('a title of TDAH_ROUTINE_TITLE_MAX_LENGTH + 1 (81) chars fails with TDAH_ROUTINE_INVALID via POST', async () => {
+            const response = await createRoutineApi({
+                title: 'x'.repeat(81),
+                blocks: [{ title: 'Bloque', startTime: '08:00', durationMinutes: 60 }],
+            });
+            expect(response.status).toBe(400);
+            expect(await readErrorCode(response)).toBe('TDAH_ROUTINE_INVALID');
+        });
+
+        test('the same title boundary (80 ok, 81 rejected) holds via PUT', async () => {
+            const created = await readRoutine(await createRoutineApi(NEW_WORKDAY_ROUTINE));
+            const atLimit = await updateRoutineApi(created.id, {
+                title: 'y'.repeat(80),
+                pattern: NEW_WORKDAY_ROUTINE.pattern,
+                blocks: NEW_WORKDAY_ROUTINE.blocks,
+            });
+            expect(atLimit.status).toBe(200);
+
+            const overLimit = await updateRoutineApi(created.id, {
+                title: 'y'.repeat(81),
+                pattern: NEW_WORKDAY_ROUTINE.pattern,
+                blocks: NEW_WORKDAY_ROUTINE.blocks,
+            });
+            expect(overLimit.status).toBe(400);
+            expect(await readErrorCode(overLimit)).toBe('TDAH_ROUTINE_INVALID');
+        });
+
+        test('a durationMinutes of exactly TDAH_BLOCK_DURATION_MAX_MINUTES (1440) succeeds via POST', async () => {
+            const response = await createRoutineApi({
+                title: 'Duración límite',
+                blocks: [{ title: 'Bloque', startTime: '08:00', durationMinutes: 1440 }],
+            });
+            expect(response.status).toBe(201);
+        });
+
+        test('a durationMinutes of TDAH_BLOCK_DURATION_MAX_MINUTES + 1 (1441) fails with TDAH_ROUTINE_INVALID via POST', async () => {
+            const response = await createRoutineApi({
+                title: 'Duración excedida',
+                blocks: [{ title: 'Bloque', startTime: '08:00', durationMinutes: 1441 }],
+            });
+            expect(response.status).toBe(400);
+            expect(await readErrorCode(response)).toBe('TDAH_ROUTINE_INVALID');
+        });
+
+        test('the same duration boundary (1440 ok, 1441 rejected) holds via PUT', async () => {
+            const created = await readRoutine(await createRoutineApi(NEW_WORKDAY_ROUTINE));
+            const atLimit = await updateRoutineApi(created.id, {
+                title: created.title,
+                pattern: NEW_WORKDAY_ROUTINE.pattern,
+                blocks: [{ title: 'Bloque', startTime: '08:00', durationMinutes: 1440 }],
+            });
+            expect(atLimit.status).toBe(200);
+
+            const overLimit = await updateRoutineApi(created.id, {
+                title: created.title,
+                pattern: NEW_WORKDAY_ROUTINE.pattern,
+                blocks: [{ title: 'Bloque', startTime: '08:00', durationMinutes: 1441 }],
+            });
+            expect(overLimit.status).toBe(400);
+            expect(await readErrorCode(overLimit)).toBe('TDAH_ROUTINE_INVALID');
+        });
+
+        test('a blocks array of TDAH_ROUTINE_MAX_BLOCKS (24) is accepted, and 25 is rejected with TDAH_ROUTINE_INVALID, via POST', async () => {
+            const buildBlocks = (count: number) => Array.from({ length: count }, (_, index) => ({
+                title: `Bloque ${index}`,
+                startTime: `00:${String(index % 60).padStart(2, '0')}`,
+                durationMinutes: 1,
+            }));
+
+            const atLimit = await createRoutineApi({ title: 'Bloques al límite', blocks: buildBlocks(24) });
+            expect(atLimit.status).toBe(201);
+
+            const overLimit = await createRoutineApi({ title: 'Demasiados bloques', blocks: buildBlocks(25) });
+            expect(overLimit.status).toBe(400);
+            expect(await readErrorCode(overLimit)).toBe('TDAH_ROUTINE_INVALID');
+        });
+
+        test('a blocks array of 25 is rejected with TDAH_ROUTINE_INVALID via PUT (not just the /activate path)', async () => {
+            const created = await readRoutine(await createRoutineApi(NEW_WORKDAY_ROUTINE));
+            const blocks = Array.from({ length: 25 }, (_, index) => ({
+                title: `Bloque ${index}`,
+                startTime: `00:${String(index % 60).padStart(2, '0')}`,
+                durationMinutes: 1,
+            }));
+            const response = await updateRoutineApi(created.id, { title: created.title, pattern: NEW_WORKDAY_ROUTINE.pattern, blocks });
+            expect(response.status).toBe(400);
+            expect(await readErrorCode(response)).toBe('TDAH_ROUTINE_INVALID');
+        });
+
+        // --- TDAH_ROUTINE_MAX_COUNT: unbounded Rutina creation per namespace is a real resource-cost concern this story introduces ---
+
+        test('a namespace can create up to TDAH_ROUTINE_MAX_COUNT (50) Rutinas, and the 51st is rejected with TDAH_ROUTINE_INVALID', async () => {
+            for (let i = 0; i < 50; i += 1) {
+                const response = await createRoutineApi({
+                    title: `Rutina ${i}`,
+                    blocks: [{ title: 'Bloque', startTime: '08:00', durationMinutes: 30 }],
+                });
+                expect(response.status).toBe(201);
+            }
+
+            const overCap = await createRoutineApi({
+                title: 'Rutina 51',
+                blocks: [{ title: 'Bloque', startTime: '08:00', durationMinutes: 30 }],
+            });
+            expect(overCap.status).toBe(400);
+            expect(await readErrorCode(overCap)).toBe('TDAH_ROUTINE_INVALID');
+
+            const listResponse = await listRoutinesApi();
+            const routines = await readRoutines(listResponse);
+            expect(routines).toHaveLength(50);
+        });
+
+        // --- P4: duplicate weekday numbers are deduped before persisting ---
+
+        test('duplicate weekday values in the pattern are deduped before persisting', async () => {
+            const response = await createRoutineApi({
+                title: 'Duplicados',
+                pattern: { kind: 'weekday', weekdays: [1, 1, 2, 2, 2, 3] },
+                blocks: [{ title: 'Bloque', startTime: '08:00', durationMinutes: 60 }],
+            });
+            expect(response.status).toBe(201);
+            const routine = await readRoutine(response);
+            expect(routine.pattern).toEqual({ kind: 'weekday', weekdays: [1, 2, 3] });
+        });
+
+        // --- P7: PUT changing pattern.kind clears the now-irrelevant columns ---
+
+        test('PUT changing pattern.kind from nthWeekdayOfMonth to weekday clears stale ordinal/weekday fields', async () => {
+            const created = await readRoutine(await createRoutineApi({
+                title: 'Último sábado',
+                pattern: { kind: 'nthWeekdayOfMonth', ordinal: -1, weekday: 6 },
+                blocks: [{ title: 'Limpieza', startTime: '10:00', durationMinutes: 60 }],
+            }));
+            expect(created.pattern).toEqual({ kind: 'nthWeekdayOfMonth', ordinal: -1, weekday: 6 });
+
+            const updateResponse = await updateRoutineApi(created.id, {
+                title: created.title,
+                pattern: { kind: 'weekday', weekdays: [1, 2, 3] },
+                blocks: [{ title: 'Bloque', startTime: '09:00', durationMinutes: 30 }],
+            });
+            expect(updateResponse.status).toBe(200);
+            const updated = await readRoutine(updateResponse);
+            expect(updated.pattern).toEqual({ kind: 'weekday', weekdays: [1, 2, 3] });
+            expect((updated.pattern as { ordinal?: number }).ordinal).toBeUndefined();
+            expect((updated.pattern as { weekday?: number }).weekday).toBeUndefined();
+
+            // Read back independently via GET — confirms the persisted row, not
+            // just the write response, carries no stale nth-columns.
+            const fetched = await readRoutine(await getRoutineApi(created.id));
+            expect(fetched.pattern).toEqual({ kind: 'weekday', weekdays: [1, 2, 3] });
+        });
+
+        test('PUT changing pattern.kind from weekday to nthWeekdayOfMonth clears the stale weekdays field', async () => {
+            const created = await readRoutine(await createRoutineApi(NEW_WORKDAY_ROUTINE));
+            expect(created.pattern).toEqual({ kind: 'weekday', weekdays: [1, 2, 3, 4, 5] });
+
+            const updateResponse = await updateRoutineApi(created.id, {
+                title: created.title,
+                pattern: { kind: 'nthWeekdayOfMonth', ordinal: 2, weekday: 3 },
+                blocks: [{ title: 'Bloque', startTime: '09:00', durationMinutes: 30 }],
+            });
+            expect(updateResponse.status).toBe(200);
+            const updated = await readRoutine(updateResponse);
+            expect(updated.pattern).toEqual({ kind: 'nthWeekdayOfMonth', ordinal: 2, weekday: 3 });
+            expect((updated.pattern as { weekdays?: number[] }).weekdays).toBeUndefined();
+
+            const fetched = await readRoutine(await getRoutineApi(created.id));
+            expect(fetched.pattern).toEqual({ kind: 'nthWeekdayOfMonth', ordinal: 2, weekday: 3 });
+        });
+
+        // --- P6/P8: bogus-year months are rejected instead of silently wrapping century ---
+
+        test('a preview month with a bogus year like 0099-01 is rejected as 400 instead of silently producing a wrong-century date', async () => {
+            const created = await readRoutine(await createRoutineApi(NEW_WORKDAY_ROUTINE));
+            const response = await previewRoutineApi(created.id, '0099-01');
+            expect(response.status).toBe(400);
+        });
+
+        test('a preview month with year 0000 is rejected as 400', async () => {
+            const created = await readRoutine(await createRoutineApi(NEW_WORKDAY_ROUTINE));
+            const response = await previewRoutineApi(created.id, '0000-05');
+            expect(response.status).toBe(400);
+        });
+
+        // --- P1: GET /v1/tdah/routines/conflicts (server-computed precedence) ---
+
+        test('GET /v1/tdah/routines/conflicts returns an empty object when no Rutinas conflict, and is not swallowed by the /:id route', async () => {
+            await createRoutineApi(NEW_WORKDAY_ROUTINE);
+            const response = await authedFetch('/v1/tdah/routines/conflicts');
+            expect(response.status).toBe(200);
+            const body = await response.json() as { conflicts: Record<string, unknown> };
+            expect(body.conflicts).toEqual({});
+        });
+
+        test('GET /v1/tdah/routines/conflicts reports every conflicting weekday pair with the server-computed winner (same tie-break as day-plan generation)', async () => {
+            const older = await readRoutine(await createRoutineApi({
+                title: 'Genérica martes',
+                pattern: { kind: 'weekday', weekdays: [2] },
+                blocks: [{ title: 'Bloque', startTime: '08:00', durationMinutes: 30 }],
+            }));
+            const newer = await readRoutine(await createRoutineApi({
+                title: 'Nueva martes',
+                pattern: { kind: 'weekday', weekdays: [2, 3] },
+                blocks: [{ title: 'Bloque', startTime: '09:00', durationMinutes: 30 }],
+            }));
+
+            const response = await authedFetch('/v1/tdah/routines/conflicts');
+            expect(response.status).toBe(200);
+            const body = await response.json() as { conflicts: Record<string, { withId: number; withTitle: string; wins: boolean }[]> };
+            expect(body.conflicts[String(older.id)]).toEqual([{ withId: newer.id, withTitle: 'Nueva martes', wins: false }]);
+            expect(body.conflicts[String(newer.id)]).toEqual([{ withId: older.id, withTitle: 'Genérica martes', wins: true }]);
+        });
+
+        test('GET /v1/tdah/routines/conflicts: a nthWeekdayOfMonth Rutina always outranks a conflicting weekday Rutina, regardless of createdAt', async () => {
+            const weekly = await readRoutine(await createRoutineApi({
+                title: 'Todos los sábados',
+                pattern: { kind: 'weekday', weekdays: [6] },
+                blocks: [{ title: 'Bloque', startTime: '08:00', durationMinutes: 30 }],
+            }));
+            const specific = await readRoutine(await createRoutineApi({
+                title: 'Último sábado',
+                pattern: { kind: 'nthWeekdayOfMonth', ordinal: -1, weekday: 6 },
+                blocks: [{ title: 'Bloque', startTime: '09:00', durationMinutes: 30 }],
+            }));
+
+            const response = await authedFetch('/v1/tdah/routines/conflicts');
+            const body = await response.json() as { conflicts: Record<string, { withId: number; wins: boolean }[]> };
+            expect(body.conflicts[String(weekly.id)]?.find((c) => c.withId === specific.id)?.wins).toBe(false);
+            expect(body.conflicts[String(specific.id)]?.find((c) => c.withId === weekly.id)?.wins).toBe(true);
+        });
+
+        test('GET /v1/tdah/routines/conflicts: two nthWeekdayOfMonth Rutinas on the same weekday conflict regardless of ordinal (false positives acceptable, false negatives are not)', async () => {
+            const first = await readRoutine(await createRoutineApi({
+                title: 'Primer sábado',
+                pattern: { kind: 'nthWeekdayOfMonth', ordinal: 1, weekday: 6 },
+                blocks: [{ title: 'Bloque', startTime: '08:00', durationMinutes: 30 }],
+            }));
+            const last = await readRoutine(await createRoutineApi({
+                title: 'Último sábado',
+                pattern: { kind: 'nthWeekdayOfMonth', ordinal: -1, weekday: 6 },
+                blocks: [{ title: 'Bloque', startTime: '09:00', durationMinutes: 30 }],
+            }));
+
+            const response = await authedFetch('/v1/tdah/routines/conflicts');
+            const body = await response.json() as { conflicts: Record<string, { withId: number }[]> };
+            expect(body.conflicts[String(first.id)]?.some((c) => c.withId === last.id)).toBe(true);
+            expect(body.conflicts[String(last.id)]?.some((c) => c.withId === first.id)).toBe(true);
+        });
+
+        test('POST /v1/tdah/routines/conflicts returns 405 TDAH_METHOD_NOT_ALLOWED', async () => {
+            const response = await authedFetch('/v1/tdah/routines/conflicts', { method: 'POST' });
+            expect(response.status).toBe(405);
+            expect(await readErrorCode(response)).toBe('TDAH_METHOD_NOT_ALLOWED');
+        });
+
+        test('GET /v1/tdah/routines/:id returns the Rutina; an unknown id returns 404', async () => {
+            const created = await readRoutine(await createRoutineApi(NEW_WORKDAY_ROUTINE));
+            const found = await getRoutineApi(created.id);
+            expect(found.status).toBe(200);
+            expect((await readRoutine(found)).id).toBe(created.id);
+
+            const missing = await getRoutineApi(999999);
+            expect(missing.status).toBe(404);
+            expect(await readErrorCode(missing)).toBe('TDAH_NOT_FOUND');
+        });
+
+        test('PUT /v1/tdah/routines/:id fully replaces pattern and Bloques', async () => {
+            const created = await readRoutine(await createRoutineApi(NEW_WORKDAY_ROUTINE));
+            const updateResponse = await updateRoutineApi(created.id, {
+                title: 'Fin de semana',
+                pattern: { kind: 'weekday', weekdays: [0, 6] },
+                blocks: [{ title: 'Descanso', startTime: '10:00', durationMinutes: 30 }],
+            });
+            expect(updateResponse.status).toBe(200);
+            const updated = await readRoutine(updateResponse);
+            expect(updated.title).toBe('Fin de semana');
+            expect(updated.pattern).toEqual({ kind: 'weekday', weekdays: [0, 6] });
+            expect(updated.blocks).toHaveLength(1);
+            expect(updated.blocks[0]?.title).toBe('Descanso');
+        });
+
+        test('PUT on an unknown Rutina id returns 404 TDAH_NOT_FOUND', async () => {
+            const response = await updateRoutineApi(999999, NEW_WORKDAY_ROUTINE);
+            expect(response.status).toBe(404);
+            expect(await readErrorCode(response)).toBe('TDAH_NOT_FOUND');
+        });
+
+        test('PUT with no pattern in the body returns 400 TDAH_ROUTINE_INVALID instead of silently resetting it to the Mon-Fri default', async () => {
+            const created = await readRoutine(await createRoutineApi({
+                title: 'Último sábado',
+                pattern: { kind: 'nthWeekdayOfMonth', ordinal: -1, weekday: 6 },
+                blocks: [{ title: 'Limpieza', startTime: '10:00', durationMinutes: 60 }],
+            }));
+            const response = await updateRoutineApi(created.id, {
+                title: created.title,
+                blocks: created.blocks.map((b) => ({ title: b.title, startTime: b.startTime, durationMinutes: b.durationMinutes })),
+            });
+            expect(response.status).toBe(400);
+            expect(await readErrorCode(response)).toBe('TDAH_ROUTINE_INVALID');
+
+            // The custom pattern must still be intact — the rejected PUT never reached storage.
+            const fetched = await readRoutine(await getRoutineApi(created.id));
+            expect(fetched.pattern).toEqual({ kind: 'nthWeekdayOfMonth', ordinal: -1, weekday: 6 });
+        });
+
+        test('DELETE /v1/tdah/routines/:id removes the row; a second GET then 404s', async () => {
+            const created = await readRoutine(await createRoutineApi(NEW_WORKDAY_ROUTINE));
+            const deleteResponse = await deleteRoutineApi(created.id);
+            expect(deleteResponse.status).toBe(200);
+            expect(await deleteResponse.json()).toEqual({ deleted: true });
+
+            const found = await getRoutineApi(created.id);
+            expect(found.status).toBe(404);
+        });
+
+        test('DELETE on an unknown Rutina id returns 404 TDAH_NOT_FOUND', async () => {
+            const response = await deleteRoutineApi(999999);
+            expect(response.status).toBe(404);
+            expect(await readErrorCode(response)).toBe('TDAH_NOT_FOUND');
+        });
+
+        test('editing/deleting a Rutina never touches already-generated day plans or activities', async () => {
+            const created = await readRoutine(await createRoutineApi(NEW_WORKDAY_ROUTINE));
+            const activation = await activate({ timeZone: 'UTC' });
+            const activationBody = await readActivateResponse(activation);
+            const generatedActivityCount = activationBody.dayPlan.activityCount;
+
+            await updateRoutineApi(created.id, {
+                title: 'Otro nombre',
+                pattern: NEW_WORKDAY_ROUTINE.pattern,
+                blocks: [{ title: 'Solo uno', startTime: '09:00', durationMinutes: 30 }],
+            });
+            await deleteRoutineApi(created.id);
+
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(databasePath, { readonly: true });
+            try {
+                const activityCount = database
+                    .prepare('SELECT COUNT(*) AS count FROM tdah_activity WHERE day_plan_date = ?;')
+                    .get(activationBody.dayPlan.date) as { count: number };
+                expect(activityCount.count).toBe(generatedActivityCount);
+            } finally {
+                database.close();
+            }
+        });
+
+        test('list Rutinas orders most-specific-first (nthWeekdayOfMonth before weekday)', async () => {
+            await createRoutineApi(NEW_WORKDAY_ROUTINE);
+            const specific = await readRoutine(await createRoutineApi({
+                title: 'Último viernes',
+                pattern: { kind: 'nthWeekdayOfMonth', ordinal: -1, weekday: 5 },
+                blocks: [{ title: 'Cierre', startTime: '17:00', durationMinutes: 30 }],
+            }));
+
+            const listResponse = await listRoutinesApi();
+            expect(listResponse.status).toBe(200);
+            const routines = await readRoutines(listResponse);
+            expect(routines).toHaveLength(2);
+            expect(routines[0]?.id).toBe(specific.id);
+            expect(routines[0]?.pattern.kind).toBe('nthWeekdayOfMonth');
+        });
+
+        test('applicability preview: nthWeekdayOfMonth outranks a same-day generic weekday Rutina (AD-5)', async () => {
+            const tomorrow = tomorrowInfoUtc();
+            const month = `${tomorrow.year}-${String(tomorrow.month).padStart(2, '0')}`;
+
+            const generic = await readRoutine(await createRoutineApi({
+                title: 'Genérica',
+                pattern: { kind: 'weekday', weekdays: [tomorrow.weekday] },
+                blocks: [{ title: 'Bloque genérico', startTime: '08:00', durationMinutes: 30 }],
+            }));
+            const specific = await readRoutine(await createRoutineApi({
+                title: 'Específica',
+                pattern: { kind: 'nthWeekdayOfMonth', ordinal: tomorrow.ordinal, weekday: tomorrow.weekday },
+                blocks: [{ title: 'Bloque específico', startTime: '08:00', durationMinutes: 30 }],
+            }));
+
+            const genericPreview = await readDates(await previewRoutineApi(generic.id, month));
+            const specificPreview = await readDates(await previewRoutineApi(specific.id, month));
+            expect(specificPreview).toContain(tomorrow.date);
+            expect(genericPreview).not.toContain(tomorrow.date);
+        });
+
+        test('applicability preview: a same-specificity tie goes to the most-recently-created Rutina', async () => {
+            const tomorrow = tomorrowInfoUtc();
+            const month = `${tomorrow.year}-${String(tomorrow.month).padStart(2, '0')}`;
+            const allWeekdays = [0, 1, 2, 3, 4, 5, 6];
+
+            const older = await readRoutine(await createRoutineApi({
+                title: 'Más antigua',
+                pattern: { kind: 'weekday', weekdays: allWeekdays },
+                blocks: [{ title: 'Bloque', startTime: '08:00', durationMinutes: 30 }],
+            }));
+            const newer = await readRoutine(await createRoutineApi({
+                title: 'Más reciente',
+                pattern: { kind: 'weekday', weekdays: allWeekdays },
+                blocks: [{ title: 'Bloque', startTime: '09:00', durationMinutes: 30 }],
+            }));
+
+            const olderPreview = await readDates(await previewRoutineApi(older.id, month));
+            const newerPreview = await readDates(await previewRoutineApi(newer.id, month));
+            expect(olderPreview).toEqual([]);
+            expect(newerPreview.length).toBeGreaterThan(0);
+        });
+
+        test('day-plan generation itself picks the precedence winner, not just the preview (nthWeekdayOfMonth beats weekday)', async () => {
+            const tomorrow = tomorrowInfoUtc();
+            await createRoutineApi({
+                title: 'Genérica',
+                pattern: { kind: 'weekday', weekdays: [tomorrow.weekday] },
+                blocks: [{ title: 'Solo uno', startTime: '08:00', durationMinutes: 30 }],
+            });
+            await createRoutineApi({
+                title: 'Específica',
+                pattern: { kind: 'nthWeekdayOfMonth', ordinal: tomorrow.ordinal, weekday: tomorrow.weekday },
+                blocks: [
+                    { title: 'Primero', startTime: '08:00', durationMinutes: 30 },
+                    { title: 'Segundo', startTime: '09:00', durationMinutes: 30 },
+                ],
+            });
+
+            const response = await activate({ timeZone: 'UTC' });
+            expect(response.status).toBe(200);
+            const body = await readActivateResponse(response);
+            expect(body.dayPlan.date).toBe(tomorrow.date);
+            expect(body.dayPlan.activityCount).toBe(2);
+        });
+
+        test('GET .../preview with an unknown Rutina id returns 404', async () => {
+            const response = await previewRoutineApi(999999, '2026-09');
+            expect(response.status).toBe(404);
+            expect(await readErrorCode(response)).toBe('TDAH_NOT_FOUND');
+        });
+
+        test('GET .../preview with a missing or malformed month query param returns 400', async () => {
+            const created = await readRoutine(await createRoutineApi(NEW_WORKDAY_ROUTINE));
+            const missingMonth = await authedFetch(`/v1/tdah/routines/${created.id}/preview`);
+            expect(missingMonth.status).toBe(400);
+            const malformedMonth = await previewRoutineApi(created.id, 'not-a-month');
+            expect(malformedMonth.status).toBe(400);
+        });
+
+        test("DW-5: reactivating with a different Rutina than the one CRUD already created stays a no-op", async () => {
+            const created = await readRoutine(await createRoutineApi(NEW_WORKDAY_ROUTINE));
+
+            const response = await activate({
+                timeZone: 'UTC',
+                routine: {
+                    title: 'Otra rutina completamente distinta',
+                    blocks: [{ title: 'Diferente', startTime: '06:00', durationMinutes: 45 }],
+                },
+            });
+            expect(response.status).toBe(200);
+            const body = await readActivateResponse(response);
+            expect(body.routineCreated).toBe(false);
+
+            const routines = await readRoutines(await listRoutinesApi());
+            expect(routines).toHaveLength(1);
+            expect(routines[0]?.id).toBe(created.id);
+            expect(routines[0]?.title).toBe('Día laboral');
+        });
+
+        test('a fresh database starts directly at schema v1 (no migration needed)', async () => {
+            await activate({ timeZone: 'UTC' });
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(databasePath, { readonly: true });
+            try {
+                const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: number };
+                expect(versionRow.user_version).toBe(1);
+                const columns = (database.prepare("PRAGMA table_info('tdah_routine');") as unknown as {
+                    all(): { name: string }[];
+                }).all();
+                expect(columns.some((column) => column.name === 'pattern_weekdays')).toBe(true);
+            } finally {
+                database.close();
+            }
+        });
+
+        test('a pre-1.4 (schema v0) database on disk migrates transparently and its Rutina backfills to weekdays [1,2,3,4,5]', async () => {
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            mkdirSync(join(dataDir, key, 'tdah'), { recursive: true });
+
+            const { Database } = await import('bun:sqlite');
+            const seedDatabase = new Database(databasePath);
+            try {
+                seedDatabase.exec(`
+                    CREATE TABLE tdah_routine (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        title TEXT NOT NULL,
+                        pattern_kind TEXT NOT NULL CHECK (pattern_kind IN ('weekday')),
+                        created_at TEXT NOT NULL
+                    );
+                `);
+                seedDatabase.exec(`
+                    CREATE TABLE tdah_routine_block (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        routine_id INTEGER NOT NULL REFERENCES tdah_routine(id),
+                        title TEXT NOT NULL,
+                        start_time TEXT NOT NULL,
+                        duration_minutes INTEGER NOT NULL,
+                        sort_order INTEGER NOT NULL
+                    );
+                `);
+                seedDatabase
+                    .prepare("INSERT INTO tdah_routine (id, title, pattern_kind, created_at) VALUES (1, 'Día laboral', 'weekday', '2026-01-01T00:00:00.000Z');")
+                    .run();
+                seedDatabase
+                    .prepare("INSERT INTO tdah_routine_block (routine_id, title, start_time, duration_minutes, sort_order) VALUES (1, 'Mañana', '08:00', 120, 0);")
+                    .run();
+                // PRAGMA user_version defaults to 0 — left unset on purpose, matching a real pre-1.4 file on disk.
+            } finally {
+                seedDatabase.close();
+            }
+
+            // A pure read (GET, no prior write in this process) is the
+            // riskier path — withReadDatabase must migrate a stale v0
+            // database itself, not only withWriteTransaction.
+            const listResponse = await listRoutinesApi();
+            expect(listResponse.status).toBe(200);
+            const routines = await readRoutines(listResponse);
+            expect(routines).toHaveLength(1);
+            expect(routines[0]?.title).toBe('Día laboral');
+            expect(routines[0]?.pattern).toEqual({ kind: 'weekday', weekdays: [1, 2, 3, 4, 5] });
+            expect(routines[0]?.blocks).toHaveLength(1);
+
+            const verifyDatabase = new Database(databasePath, { readonly: true });
+            try {
+                const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
+                expect(versionRow.user_version).toBe(1);
+            } finally {
+                verifyDatabase.close();
+            }
+        });
+
+        test('a stray leftover tdah_routine_v2 table from an interrupted migration self-heals instead of throwing "table already exists" (P2)', async () => {
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            mkdirSync(join(dataDir, key, 'tdah'), { recursive: true });
+
+            const { Database } = await import('bun:sqlite');
+            const seedDatabase = new Database(databasePath);
+            try {
+                seedDatabase.exec(`
+                    CREATE TABLE tdah_routine (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        title TEXT NOT NULL,
+                        pattern_kind TEXT NOT NULL CHECK (pattern_kind IN ('weekday')),
+                        created_at TEXT NOT NULL
+                    );
+                `);
+                seedDatabase.exec(`
+                    CREATE TABLE tdah_routine_block (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        routine_id INTEGER NOT NULL REFERENCES tdah_routine(id),
+                        title TEXT NOT NULL,
+                        start_time TEXT NOT NULL,
+                        duration_minutes INTEGER NOT NULL,
+                        sort_order INTEGER NOT NULL
+                    );
+                `);
+                seedDatabase
+                    .prepare("INSERT INTO tdah_routine (id, title, pattern_kind, created_at) VALUES (1, 'Día laboral', 'weekday', '2026-01-01T00:00:00.000Z');")
+                    .run();
+                seedDatabase
+                    .prepare("INSERT INTO tdah_routine_block (routine_id, title, start_time, duration_minutes, sort_order) VALUES (1, 'Mañana', '08:00', 120, 0);")
+                    .run();
+                // Simulate a migration interrupted right after CREATE TABLE
+                // tdah_routine_v2 but before it could DROP/RENAME — the exact
+                // stray state the `DROP TABLE IF EXISTS` defense-in-depth
+                // targets. PRAGMA user_version is left at 0, matching a real
+                // interrupted-migration file on disk.
+                seedDatabase.exec(`
+                    CREATE TABLE tdah_routine_v2 (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        title TEXT NOT NULL,
+                        pattern_kind TEXT NOT NULL CHECK (pattern_kind IN ('weekday', 'nthWeekdayOfMonth')),
+                        pattern_weekdays TEXT,
+                        pattern_nth_ordinal INTEGER,
+                        pattern_nth_weekday INTEGER,
+                        created_at TEXT NOT NULL
+                    );
+                `);
+            } finally {
+                seedDatabase.close();
+            }
+
+            const listResponse = await listRoutinesApi();
+            expect(listResponse.status).toBe(200);
+            const routines = await readRoutines(listResponse);
+            expect(routines).toHaveLength(1);
+            expect(routines[0]?.title).toBe('Día laboral');
+            expect(routines[0]?.pattern).toEqual({ kind: 'weekday', weekdays: [1, 2, 3, 4, 5] });
+
+            const verifyDatabase = new Database(databasePath, { readonly: true });
+            try {
+                const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
+                expect(versionRow.user_version).toBe(1);
+                const tableNames = (verifyDatabase.prepare("SELECT name FROM sqlite_master WHERE type = 'table';") as unknown as {
+                    all(): { name: string }[];
+                }).all().map((row) => row.name);
+                expect(tableNames).not.toContain('tdah_routine_v2');
+            } finally {
+                verifyDatabase.close();
+            }
+        });
+    });
+
     describe('formatDateInTimeZone', () => {
         test('throws a controlled error instead of letting a raw Intl exception escape for a bogus IANA zone', () => {
             // Every production caller validates the time zone first (or falls
@@ -588,6 +1409,22 @@ describe('tdah module', () => {
             // of the defensive try/catch boundary itself, not a reachable
             // production path.
             expect(() => formatDateInTimeZone(new Date(), 'Bogus/Zone')).toThrow();
+        });
+    });
+
+    describe('isValidMonthString (P6/P8: single canonical validator, tightened year range)', () => {
+        test('rejects a bogus year like 0099 or 0000 while accepting a sane 4-digit year', () => {
+            expect(isValidMonthString('0099-01')).toBe(false);
+            expect(isValidMonthString('0000-05')).toBe(false);
+            expect(isValidMonthString('2026-08')).toBe(true);
+            expect(isValidMonthString('1970-01')).toBe(true);
+            expect(isValidMonthString('2999-12')).toBe(true);
+        });
+
+        test('still rejects a malformed month regardless of year', () => {
+            expect(isValidMonthString('2026-13')).toBe(false);
+            expect(isValidMonthString('2026-00')).toBe(false);
+            expect(isValidMonthString('not-a-month')).toBe(false);
         });
     });
 });

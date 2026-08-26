@@ -154,6 +154,8 @@ const STATIC_CLOUD_ROUTES = new Set([
     '/v1/sections',
     '/v1/tasks',
     '/v1/tdah/profile',
+    '/v1/tdah/routines',
+    '/v1/tdah/routines/conflicts',
 ]);
 
 export function canonicalCloudRoute(pathname: string): string {
@@ -166,6 +168,8 @@ export function canonicalCloudRoute(pathname: string): string {
     if (/^\/v1\/areas\/[^/]+$/.test(pathname)) return '/v1/areas/:id';
     if (/^\/v1\/calendar\/[^/]+\.ics$/.test(pathname)) return '/v1/calendar/:token';
     if (pathname.startsWith('/v1/attachments/')) return '/v1/attachments/:path';
+    if (/^\/v1\/tdah\/routines\/[^/]+\/preview$/.test(pathname)) return '/v1/tdah/routines/:id/preview';
+    if (/^\/v1\/tdah\/routines\/[^/]+$/.test(pathname)) return '/v1/tdah/routines/:id';
     return 'unmatched';
 }
 

@@ -180,7 +180,7 @@ export async function cloudGetJson<T>(
 }
 
 export async function cloudRequestJson<T>(
-    method: 'POST' | 'PATCH' | 'DELETE',
+    method: 'POST' | 'PATCH' | 'PUT' | 'DELETE',
     url: string,
     body?: unknown,
     options: CloudOptions = {},

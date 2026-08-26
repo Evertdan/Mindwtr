@@ -37,17 +37,43 @@ export type TdahProfileResponse = {
 
 /**
  * Story 1.3 — minimal Rutina/DayPlan/Actividad schema. Additive to the
- * profile table above; reused as-is by story 1.4 (CRUD/precedence) and 1.5
- * (recurring scheduler) rather than being reimplemented there.
+ * profile table above; widened by story 1.4's `pattern_kind`
+ * `PRAGMA user_version`-gated migration (v0→v1) to support a real
+ * calendar-pattern precedence engine, reused as-is by story 1.5 (recurring
+ * scheduler) rather than being reimplemented there.
  */
-export const TDAH_ROUTINE_PATTERN_KINDS = ['weekday'] as const;
+export const TDAH_ROUTINE_PATTERN_KINDS = ['weekday', 'nthWeekdayOfMonth'] as const;
 export type TdahRoutinePatternKind = (typeof TDAH_ROUTINE_PATTERN_KINDS)[number];
 
-export type TdahRoutine = {
-    id: number;
-    title: string;
-    patternKind: TdahRoutinePatternKind;
-    createdAt: string;
+/** Matches on a fixed set of weekdays (Sunday=0 … Saturday=6), any week of the month. */
+export type TdahRoutineWeekdayPattern = {
+    kind: 'weekday';
+    weekdays: number[];
+};
+
+/**
+ * Matches on the `ordinal`-th occurrence of `weekday` in the month —
+ * `ordinal` is `1`-`4`, or `-1` for "last" ("último sábado" beats a generic
+ * Saturday Rutina when both match a date; see `routineMatchesDate` in
+ * storage.ts). Always outranks `weekday` in precedence (AD-5).
+ */
+export type TdahRoutineNthWeekdayPattern = {
+    kind: 'nthWeekdayOfMonth';
+    ordinal: number;
+    weekday: number;
+};
+
+export type TdahRoutinePattern = TdahRoutineWeekdayPattern | TdahRoutineNthWeekdayPattern;
+
+/** A Bloque-time-range overlap warning — non-blocking (UX spec: "aviso no bloqueante"). */
+export type TdahRoutineOverlapWarning = {
+    blockIndexA: number;
+    blockIndexB: number;
+};
+
+/** A single Bloque whose `startTime + durationMinutes` crosses midnight — non-blocking, same shape as overlap. */
+export type TdahRoutineMidnightWarning = {
+    blockIndex: number;
 };
 
 export type TdahRoutineBlock = {
@@ -59,15 +85,40 @@ export type TdahRoutineBlock = {
     sortOrder: number;
 };
 
+/**
+ * The full persisted Rutina, as returned by every routine response (list,
+ * get, create, update): its calendar pattern, its ordered Bloques, and the
+ * non-blocking warnings computed fresh from those Bloques on every read —
+ * never persisted, always recomputed (AD-5: the server computes, the UI only
+ * renders).
+ */
+export type TdahRoutine = {
+    id: number;
+    title: string;
+    pattern: TdahRoutinePattern;
+    createdAt: string;
+    blocks: TdahRoutineBlock[];
+    overlapWarnings: TdahRoutineOverlapWarning[];
+    crossesMidnightWarnings: TdahRoutineMidnightWarning[];
+};
+
 export type TdahRoutineBlockInput = {
     title: string;
     startTime: string;
     durationMinutes: number;
 };
 
-/** Only the single "Día laboral" pattern is supported in this story. */
+/**
+ * `pattern` is optional on input and defaults to the fixed Mon–Fri weekday
+ * pattern (`{kind:'weekday', weekdays:[1,2,3,4,5]}`) when omitted — the same
+ * default the v0→v1 migration backfills onto pre-1.4 rows. This keeps
+ * `POST /activate`'s inline Rutina creation (story 1.3's mobile onboarding
+ * shortcut, which never sends a `pattern`) working unchanged alongside the
+ * new `/v1/tdah/routines` CRUD surface, which always sends one explicitly.
+ */
 export type TdahRoutineInput = {
     title: string;
+    pattern?: TdahRoutinePattern;
     blocks: TdahRoutineBlockInput[];
 };
 

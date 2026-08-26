@@ -81,7 +81,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Tiếng Việt',
         nonLatin: false,
-        translatedKeyFloor: 2213,
+        translatedKeyFloor: 2285,  // +72: story 1.4's tdahRoutines.* keys (2026-08-26)
     },
     zh: {
         loadSync: () => require('./locales/zh-Hans') as typeof import('./locales/zh-Hans'),
@@ -111,7 +111,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Español',
         nonLatin: false,
-        translatedKeyFloor: 1374,
+        translatedKeyFloor: 1446,  // +72: story 1.4's tdahRoutines.* keys (2026-08-26)
     },
     hi: {
         loadSync: () => require('./locales/hi') as typeof import('./locales/hi'),
@@ -121,7 +121,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'हिन्दी',
         nonLatin: true,
-        translatedKeyFloor: 1430,
+        translatedKeyFloor: 1502,  // +72: story 1.4's tdahRoutines.* keys (2026-08-26)
     },
     ar: {
         loadSync: () => require('./locales/ar') as typeof import('./locales/ar'),
@@ -131,7 +131,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'العربية',
         nonLatin: true,
-        translatedKeyFloor: 1457,
+        translatedKeyFloor: 1529,  // +72: story 1.4's tdahRoutines.* keys (2026-08-26)
     },
     de: {
         loadSync: () => require('./locales/de') as typeof import('./locales/de'),
@@ -141,7 +141,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Deutsch',
         nonLatin: false,
-        translatedKeyFloor: 1468,
+        translatedKeyFloor: 1540,  // +72: story 1.4's tdahRoutines.* keys (2026-08-26)
     },
     ru: {
         loadSync: () => require('./locales/ru') as typeof import('./locales/ru'),
@@ -151,7 +151,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Русский',
         nonLatin: true,
-        translatedKeyFloor: 1430,
+        translatedKeyFloor: 1502,  // +72: story 1.4's tdahRoutines.* keys (2026-08-26)
     },
     ja: {
         loadSync: () => require('./locales/ja') as typeof import('./locales/ja'),
@@ -173,7 +173,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Français',
         nonLatin: false,
-        translatedKeyFloor: 1961,
+        translatedKeyFloor: 2033,  // +72: story 1.4's tdahRoutines.* keys (2026-08-26)
     },
     pt: {
         loadSync: () => require('./locales/pt') as typeof import('./locales/pt'),
@@ -186,7 +186,7 @@ export const LOCALES = {
         // which variant they are choosing. Same reason zh/zh-Hant carry a script tag.
         native: 'Português (Brasil)',
         nonLatin: false,
-        translatedKeyFloor: 1474,
+        translatedKeyFloor: 1546,  // +72: story 1.4's tdahRoutines.* keys (2026-08-26)
     },
     pl: {
         loadSync: () => require('./locales/pl') as typeof import('./locales/pl'),
@@ -196,7 +196,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Polski',
         nonLatin: false,
-        translatedKeyFloor: 1453,
+        translatedKeyFloor: 1525,  // +72: story 1.4's tdahRoutines.* keys (2026-08-26)
     },
     cs: {
         loadSync: () => require('./locales/cs') as typeof import('./locales/cs'),
@@ -206,7 +206,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Čeština',
         nonLatin: false,
-        translatedKeyFloor: 2233,
+        translatedKeyFloor: 2305,  // +72: story 1.4's tdahRoutines.* keys (2026-08-26)
     },
     ko: {
         loadSync: () => require('./locales/ko') as typeof import('./locales/ko'),
@@ -218,7 +218,7 @@ export const LOCALES = {
         nonLatin: true,
         // Rewritten end to end by a native speaker in #934 (64 -> ~100%), replacing a machine
         // translation that rendered brand names as common nouns ('Gemini' as the constellation).
-        translatedKeyFloor: 2235,
+        translatedKeyFloor: 2307,  // +72: story 1.4's tdahRoutines.* keys (2026-08-26)
     },
     it: {
         loadSync: () => require('./locales/it') as typeof import('./locales/it'),
@@ -228,7 +228,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Italiano',
         nonLatin: false,
-        translatedKeyFloor: 1570,
+        translatedKeyFloor: 1642,  // +72: story 1.4's tdahRoutines.* keys (2026-08-26)
     },
     tr: {
         loadSync: () => require('./locales/tr') as typeof import('./locales/tr'),
@@ -238,7 +238,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Türkçe',
         nonLatin: false,
-        translatedKeyFloor: 1476,
+        translatedKeyFloor: 1548,  // +72: story 1.4's tdahRoutines.* keys (2026-08-26)
     },
     nl: {
         loadSync: () => require('./locales/nl') as typeof import('./locales/nl'),
@@ -248,7 +248,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Nederlands',
         nonLatin: false,
-        translatedKeyFloor: 569,
+        translatedKeyFloor: 641,  // +72: story 1.4's tdahRoutines.* keys (2026-08-26)
     },
     fa: {
         loadSync: () => require('./locales/fa') as typeof import('./locales/fa'),
