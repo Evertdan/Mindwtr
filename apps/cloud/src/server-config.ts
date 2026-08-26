@@ -31,7 +31,9 @@ export type CloudFailureContext = {
         | 'request_failed'
         | 'server_start_failed'
         | 'stored_data_invalid'
-        | 'stored_data_invalid_json';
+        | 'stored_data_invalid_json'
+        | 'tdah_nightly_tick_crashed'
+        | 'tdah_nightly_tick_failed';
     // S10: ONLY ever assign a bare fs/sqlite error code here (e.g. 'ENOENT', 'EACCES',
     // 'SQLITE_BUSY') — never error.message or a path. Privacy ratchet 9e1cd93b7 covers
     // this field too: logError does not sanitize it, the caller must.
@@ -55,6 +57,9 @@ export const CLOUD_LOG_MESSAGES = [
     'request completed',
     'request failed',
     'shutdown signal received',
+    'tdah nightly trigger crashed',
+    'tdah nightly trigger fired',
+    'tdah nightly trigger namespace failed',
     'token auth allowlist enabled',
     'token namespace mode enabled by explicit opt-in',
     'trusting proxy IP headers for auth failure rate limiting',
@@ -64,14 +69,27 @@ type CloudLogMessage = typeof CLOUD_LOG_MESSAGES[number];
 type CloudOperationalLogContext = Partial<Record<
     | 'allowedTokens'
     | 'count'
+    // Story 1.5 (tdah nightly scheduler): 'date', 'failedCount', 'firedCount',
+    // 'generatedCount', 'limboCount', 'namespaceCount' and 'skippedCount' back
+    // the 'tdah nightly trigger fired' audit line's context
+    // (TdahNightlyTickSummary) — counts and the tick's own reference date
+    // only, deliberately never a namespace key (AGENTS.md's `.code`-only
+    // rule).
+    | 'date'
     | 'elapsedMs'
+    | 'failedCount'
+    | 'firedCount'
+    | 'generatedCount'
     | 'hint'
+    | 'limboCount'
     | 'maxNamespaces'
     | 'method'
+    | 'namespaceCount'
     | 'port'
     | 'requestId'
     | 'route'
     | 'signal'
+    | 'skippedCount'
     | 'status'
     | 'trustedProxyIps',
     string | number

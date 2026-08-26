@@ -165,6 +165,32 @@ export type TdahActivateResponse = {
     };
 };
 
+/**
+ * Story 1.5 — per-tick aggregate stats across every namespace scanned by
+ * `runNightlyTdahTick` (scheduler.ts). Doubles as the scheduler's own audit
+ * log context (`server-config.ts`'s `CLOUD_LOG_MESSAGES`) and as a typed
+ * return value tests can assert against. Deliberately counts only — never a
+ * namespace key or Activity title (AGENTS.md's existing `.code`-only rule
+ * applies here too, since a namespace key is exactly the kind of identifying
+ * detail that rule exists to keep out of logs).
+ */
+export type TdahNightlyTickSummary = {
+    /** The tick's own reference date (UTC calendar day of `now`) — not any single namespace's local date, since namespaces can span time zones. */
+    date: string;
+    /** Namespaces with an existing TDAH database, scanned this tick. */
+    namespaceCount: number;
+    /** Namespaces that closed today and generated tomorrow this tick. */
+    firedCount: number;
+    /** Namespaces skipped this tick (mode off, ritual hour not yet reached, or tomorrow already generated). */
+    skippedCount: number;
+    /** Namespaces whose write transaction failed this tick — retried automatically next tick. */
+    failedCount: number;
+    /** Total Actividades created across every namespace that fired this tick. */
+    generatedCount: number;
+    /** Total Actividades moved to `limbo` across every namespace that fired this tick. */
+    limboCount: number;
+};
+
 const TDAH_ERROR_CODES = {
     invalidBody: 'TDAH_INVALID_BODY',
     invalidTimeZone: 'TDAH_INVALID_TIME_ZONE',

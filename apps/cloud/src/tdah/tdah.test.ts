@@ -1,11 +1,20 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { tokenToKey } from '../server-auth';
 import { startCloudServer } from '../server';
-import { activateTdahProfile, formatDateInTimeZone, isValidMonthString, readTdahProfile, tdahDatabasePath } from './storage';
+import {
+    activateTdahProfile,
+    computeTomorrowDate,
+    formatDateInTimeZone,
+    isValidMonthString,
+    listActiveTdahNamespaces,
+    readTdahProfile,
+    tdahDatabasePath,
+} from './storage';
 import { handleTdahRequest } from './routes';
+import { runNightlyTdahTick } from './scheduler';
 
 const TOKEN_ALPHA = 'tdah-token-alpha-1234567890';
 const TOKEN_BETA = 'tdah-token-beta-1234567890';
@@ -1399,6 +1408,407 @@ describe('tdah module', () => {
             } finally {
                 verifyDatabase.close();
             }
+        });
+    });
+
+    describe('runNightlyTdahTick (story 1.5: nightly scheduler)', () => {
+        // Mexico abolished DST in 2022 (fixed UTC-6 year-round), so tests can
+        // build exact instants for this zone without any DST ambiguity.
+        const MEXICO_CITY_OFFSET = '-06:00';
+        const localInstant = (date: string, time: string): Date => new Date(`${date}T${time}:00${MEXICO_CITY_OFFSET}`);
+
+        type ActivityRow = { day_plan_date: string; title: string; origin: string; state: string };
+        type DayPlanCountRow = { count: number };
+
+        const readActivityRows = async (databasePath: string, date: string): Promise<ActivityRow[]> => {
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(databasePath, { readonly: true });
+            try {
+                return (database.prepare(
+                    'SELECT day_plan_date, title, origin, state FROM tdah_activity WHERE day_plan_date = ? ORDER BY id;',
+                ) as unknown as { all(...params: unknown[]): ActivityRow[] }).all(date);
+            } finally {
+                database.close();
+            }
+        };
+
+        const countDayPlans = async (databasePath: string, date: string): Promise<number> => {
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(databasePath, { readonly: true });
+            try {
+                const row = database.prepare('SELECT COUNT(*) AS count FROM tdah_day_plan WHERE date = ?;').get(date) as DayPlanCountRow;
+                return row.count;
+            } finally {
+                database.close();
+            }
+        };
+
+        test('at ritual hour: closes today (pending/started -> limbo) and generates tomorrow with one Actividad per Bloque', async () => {
+            const activation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            });
+            const activationBody = await readActivateResponse(activation);
+            const outgoingDate = activationBody.dayPlan.date;
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+
+            // Simulate real usage: one Actividad got started but never finished before the ritual.
+            const { Database } = await import('bun:sqlite');
+            const seedDatabase = new Database(databasePath);
+            try {
+                seedDatabase.prepare("UPDATE tdah_activity SET state = 'started' WHERE day_plan_date = ? AND title = ?;")
+                    .run(outgoingDate, 'Mañana');
+            } finally {
+                seedDatabase.close();
+            }
+
+            const now = localInstant(outgoingDate, '23:30');
+            const nextDate = computeTomorrowDate('America/Mexico_City', now);
+
+            const summary = await runNightlyTdahTick(dataDir, now);
+
+            // TdahNightlyTickSummary.date is the tick's own UTC-calendar-day
+            // reference (formatDateInTimeZone(now, 'UTC') in scheduler.ts) — not
+            // any single namespace's local date.
+            expect(summary.date).toBe(formatDateInTimeZone(now, 'UTC'));
+            expect(summary.namespaceCount).toBe(1);
+            expect(summary.firedCount).toBe(1);
+            expect(summary.skippedCount).toBe(0);
+            expect(summary.failedCount).toBe(0);
+            expect(summary.generatedCount).toBe(WORKDAY_ROUTINE.blocks.length);
+            expect(summary.limboCount).toBe(WORKDAY_ROUTINE.blocks.length);
+
+            const outgoingRows = await readActivityRows(databasePath, outgoingDate);
+            expect(outgoingRows).toHaveLength(2);
+            for (const row of outgoingRows) {
+                expect(row.state).toBe('limbo');
+            }
+
+            expect(await countDayPlans(databasePath, nextDate)).toBe(1);
+            const nextRows = await readActivityRows(databasePath, nextDate);
+            expect(nextRows).toHaveLength(2);
+            for (const row of nextRows) {
+                expect(row.origin).toBe('routine');
+                expect(row.state).toBe('pending');
+            }
+        });
+
+        test('re-firing for the same boundary is a no-op: no duplicate rows, no re-touched Actividad', async () => {
+            const activation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            });
+            const activationBody = await readActivateResponse(activation);
+            const outgoingDate = activationBody.dayPlan.date;
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const now = localInstant(outgoingDate, '23:30');
+            const nextDate = computeTomorrowDate('America/Mexico_City', now);
+
+            const first = await runNightlyTdahTick(dataDir, now);
+            expect(first.firedCount).toBe(1);
+
+            const second = await runNightlyTdahTick(dataDir, now);
+            expect(second.namespaceCount).toBe(1);
+            expect(second.firedCount).toBe(0);
+            expect(second.skippedCount).toBe(1);
+            expect(second.failedCount).toBe(0);
+
+            expect(await countDayPlans(databasePath, nextDate)).toBe(1);
+            const nextRows = await readActivityRows(databasePath, nextDate);
+            expect(nextRows).toHaveLength(WORKDAY_ROUTINE.blocks.length);
+            // The already-limbo'd outgoing Actividades were not re-touched by the second, skipped firing.
+            const outgoingRows = await readActivityRows(databasePath, outgoingDate);
+            for (const row of outgoingRows) {
+                expect(row.state).toBe('limbo');
+            }
+        });
+
+        test('no Rutina applies: still generates a valid empty DayPlan', async () => {
+            const activation = await activate({ timeZone: 'America/Mexico_City', ritualHour: '22:00' });
+            const activationBody = await readActivateResponse(activation);
+            expect(activationBody.dayPlan.activityCount).toBe(0);
+            const outgoingDate = activationBody.dayPlan.date;
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const now = localInstant(outgoingDate, '23:30');
+            const nextDate = computeTomorrowDate('America/Mexico_City', now);
+
+            const summary = await runNightlyTdahTick(dataDir, now);
+            expect(summary.firedCount).toBe(1);
+            expect(summary.generatedCount).toBe(0);
+            expect(summary.limboCount).toBe(0);
+            expect(await countDayPlans(databasePath, nextDate)).toBe(1);
+            expect(await readActivityRows(databasePath, nextDate)).toHaveLength(0);
+        });
+
+        test("mode:'off' skips the namespace entirely, touching nothing", async () => {
+            const activation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            });
+            const activationBody = await readActivateResponse(activation);
+            const outgoingDate = activationBody.dayPlan.date;
+            await putProfile({ mode: 'off' });
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const now = localInstant(outgoingDate, '23:30');
+            const nextDate = computeTomorrowDate('America/Mexico_City', now);
+
+            const summary = await runNightlyTdahTick(dataDir, now);
+            expect(summary.namespaceCount).toBe(1);
+            expect(summary.firedCount).toBe(0);
+            expect(summary.skippedCount).toBe(1);
+            expect(await countDayPlans(databasePath, nextDate)).toBe(0);
+            const outgoingRows = await readActivityRows(databasePath, outgoingDate);
+            for (const row of outgoingRows) {
+                expect(row.state).toBe('pending');
+            }
+        });
+
+        test('before the ritual hour: skips, leaving today untouched and tomorrow ungenerated', async () => {
+            const activation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            });
+            const activationBody = await readActivateResponse(activation);
+            const outgoingDate = activationBody.dayPlan.date;
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const now = localInstant(outgoingDate, '21:00');
+            const nextDate = computeTomorrowDate('America/Mexico_City', now);
+
+            const summary = await runNightlyTdahTick(dataDir, now);
+            expect(summary.firedCount).toBe(0);
+            expect(summary.skippedCount).toBe(1);
+            expect(await countDayPlans(databasePath, nextDate)).toBe(0);
+            const outgoingRows = await readActivityRows(databasePath, outgoingDate);
+            for (const row of outgoingRows) {
+                expect(row.state).toBe('pending');
+            }
+        });
+
+        test('a ritualHour/timeZone change via PUT /profile takes effect on the next tick, reading the live profile fresh', async () => {
+            const activation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            });
+            const activationBody = await readActivateResponse(activation);
+            const outgoingDate = activationBody.dayPlan.date;
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const beforeChangeRows = await readActivityRows(databasePath, outgoingDate);
+
+            // Push the ritual hour later, same timezone: a tick that already passed the OLD
+            // hour but not the new one must still skip -- the tick has to re-read the live
+            // profile every time, never a cached "next fire" instant from activation.
+            await putProfile({ ritualHour: '23:30' });
+            const stillEarlyForNewHour = localInstant(outgoingDate, '22:30');
+            const skippedSummary = await runNightlyTdahTick(dataDir, stillEarlyForNewHour);
+            expect(skippedSummary.firedCount).toBe(0);
+            expect(skippedSummary.skippedCount).toBe(1);
+
+            // Changing the profile did not touch any already-persisted Actividad row.
+            const unchangedRows = await readActivityRows(databasePath, outgoingDate);
+            expect(unchangedRows).toEqual(beforeChangeRows);
+
+            // Once local time reaches the NEW ritual hour, the tick fires using it.
+            const atNewHour = localInstant(outgoingDate, '23:30');
+            const nextDate = computeTomorrowDate('America/Mexico_City', atNewHour);
+            const firedSummary = await runNightlyTdahTick(dataDir, atNewHour);
+            expect(firedSummary.firedCount).toBe(1);
+            expect(await countDayPlans(databasePath, nextDate)).toBe(1);
+        });
+
+        test('a timeZone change via PUT /profile takes effect on the next tick, computing tomorrow against the new zone', async () => {
+            const activation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            });
+            const activationBody = await readActivateResponse(activation);
+            const outgoingDate = activationBody.dayPlan.date;
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const beforeChangeRows = await readActivityRows(databasePath, outgoingDate);
+
+            // Asia/Tokyo has no DST (fixed UTC+9 year-round) -- the same
+            // determinism reasoning MEXICO_CITY_OFFSET above exists for -- so
+            // this test can build exact instants for the NEW zone without any
+            // DST ambiguity, the same way `localInstant` already does for the
+            // old one.
+            await putProfile({ timeZone: 'Asia/Tokyo' });
+
+            // At this instant Mexico City's clock already reads 23:30 -- past
+            // the OLD zone's 22:00 ritual hour -- but Tokyo's clock (Mexico +
+            // 15h) only reads 14:30 the same wall-clock day, well before the
+            // SAME '22:00' ritual hour string in the NEW zone. A tick that
+            // fires here would prove it's still using a cached America/Mexico_City
+            // zone instead of re-reading the live (now Asia/Tokyo) profile.
+            const pastOldZoneRitualNotYetNewZone = localInstant(outgoingDate, '23:30');
+            const skippedSummary = await runNightlyTdahTick(dataDir, pastOldZoneRitualNotYetNewZone);
+            expect(skippedSummary.firedCount).toBe(0);
+            expect(skippedSummary.skippedCount).toBe(1);
+
+            // Changing the profile did not touch any already-persisted Actividad row.
+            const unchangedRows = await readActivityRows(databasePath, outgoingDate);
+            expect(unchangedRows).toEqual(beforeChangeRows);
+
+            // Once Tokyo's own local clock reaches 22:00 on `outgoingDate`, the tick
+            // fires using the NEW zone end to end: closing `outgoingDate` and
+            // generating tomorrow computed against Asia/Tokyo, not America/Mexico_City.
+            const atNewZoneRitualHour = new Date(`${outgoingDate}T22:00:00+09:00`);
+            const nextDate = computeTomorrowDate('Asia/Tokyo', atNewZoneRitualHour);
+            const firedSummary = await runNightlyTdahTick(dataDir, atNewZoneRitualHour);
+            expect(firedSummary.firedCount).toBe(1);
+            expect(firedSummary.skippedCount).toBe(0);
+
+            const outgoingRows = await readActivityRows(databasePath, outgoingDate);
+            expect(outgoingRows).toHaveLength(WORKDAY_ROUTINE.blocks.length);
+            for (const row of outgoingRows) {
+                expect(row.state).toBe('limbo');
+            }
+            expect(await countDayPlans(databasePath, nextDate)).toBe(1);
+            const nextRows = await readActivityRows(databasePath, nextDate);
+            expect(nextRows).toHaveLength(WORKDAY_ROUTINE.blocks.length);
+        });
+
+        test('the recurring scheduler itself also picks the precedence winner (nthWeekdayOfMonth beats an existing weekday Rutina)', async () => {
+            const activation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            });
+            const activationBody = await readActivateResponse(activation);
+            const outgoingDate = activationBody.dayPlan.date;
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+
+            const now = localInstant(outgoingDate, '23:30');
+            const nextDate = computeTomorrowDate('America/Mexico_City', now);
+
+            // Same date-decomposition approach as story 1.4's own "day-plan
+            // generation itself picks the precedence winner" test
+            // (`tomorrowInfoUtc` above), just applied to the SCHEDULER's own
+            // generated target date (`nextDate`) instead of the real calendar
+            // "tomorrow".
+            const [year, month, day] = nextDate.split('-').map(Number) as [number, number, number];
+            const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+            const occurrence = Math.ceil(day / 7);
+            const ordinal = occurrence <= 4 ? occurrence : -1;
+
+            // More specific than WORKDAY_ROUTINE's every-day `weekday` pattern
+            // (created inline at activation above) and matching the exact same
+            // `nextDate` the scheduler is about to generate.
+            await createRoutineApi({
+                title: 'Específica',
+                pattern: { kind: 'nthWeekdayOfMonth', ordinal, weekday },
+                blocks: [
+                    { title: 'Primero', startTime: '08:00', durationMinutes: 30 },
+                    { title: 'Segundo', startTime: '09:00', durationMinutes: 30 },
+                ],
+            });
+
+            const summary = await runNightlyTdahTick(dataDir, now);
+            expect(summary.firedCount).toBe(1);
+
+            const nextRows = await readActivityRows(databasePath, nextDate);
+            expect(nextRows.map((row) => row.title)).toEqual(['Primero', 'Segundo']);
+        });
+
+        test('a namespace directory with no tdah database at all is skipped, not counted', async () => {
+            mkdirSync(join(dataDir, 'no-tdah-namespace', 'attachments'), { recursive: true });
+            const summary = await runNightlyTdahTick(dataDir, new Date());
+            expect(summary.namespaceCount).toBe(0);
+            expect(summary.firedCount).toBe(0);
+        });
+
+        test('listActiveTdahNamespaces only returns entries with an existing tdah.sqlite file', () => {
+            const customDir = mkdtempSync(join(tmpdir(), 'mindwtr-cloud-tdah-list-'));
+            try {
+                // A namespace with other data (e.g. attachments/sync doc) but no tdah/ subfolder.
+                mkdirSync(join(customDir, 'namespace-without-tdah', 'attachments'), { recursive: true });
+                // A flat per-namespace sidecar file (calendar feed / sync doc shape), not a directory at all.
+                writeFileSync(join(customDir, 'namespace-with-sidecar-only.json'), '{}');
+                // A real TDAH namespace.
+                mkdirSync(join(customDir, 'namespace-with-tdah', 'tdah'), { recursive: true });
+                writeFileSync(join(customDir, 'namespace-with-tdah', 'tdah', 'tdah.sqlite'), '');
+                expect(listActiveTdahNamespaces(customDir)).toEqual(['namespace-with-tdah']);
+            } finally {
+                rmSync(customDir, { recursive: true, force: true });
+            }
+        });
+
+        test('a write failure for one namespace is logged and retried, without aborting other namespaces in the same tick', async () => {
+            const alphaActivation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            }, TOKEN_ALPHA);
+            const alphaBody = await readActivateResponse(alphaActivation);
+            const betaActivation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            }, TOKEN_BETA);
+            const betaBody = await readActivateResponse(betaActivation);
+            // Both activated moments apart in the same test run — same local calendar date in practice.
+            const outgoingDate = alphaBody.dayPlan.date;
+            expect(betaBody.dayPlan.date).toBe(outgoingDate);
+
+            const alphaPath = tdahDatabasePath(dataDir, tokenToKey(TOKEN_ALPHA));
+            const betaPath = tdahDatabasePath(dataDir, tokenToKey(TOKEN_BETA));
+            // Corrupt beta's database file so any open against it throws — simulating a
+            // per-namespace storage failure. The WAL/SHM sidecars have to be removed
+            // too: SQLite's WAL recovery can silently reconstruct a valid database
+            // from those even when the main file's header is garbage, which would
+            // mask the failure this test needs to exercise.
+            for (const suffix of ['', '-wal', '-shm']) {
+                const sidecarPath = `${betaPath}${suffix}`;
+                if (existsSync(sidecarPath)) rmSync(sidecarPath);
+            }
+            writeFileSync(betaPath, 'this is not a valid sqlite database file, corrupted intentionally for this test');
+
+            const now = localInstant(outgoingDate, '23:30');
+            const nextDate = computeTomorrowDate('America/Mexico_City', now);
+
+            const summary = await runNightlyTdahTick(dataDir, now);
+            expect(summary.namespaceCount).toBe(2);
+            expect(summary.firedCount).toBe(1);
+            expect(summary.failedCount).toBe(1);
+
+            // Alpha fired normally despite beta's failure in the same tick.
+            expect(await countDayPlans(alphaPath, nextDate)).toBe(1);
+
+            // Retrying the same tick still attempts (and fails) beta again, while alpha is now a no-op skip.
+            const retry = await runNightlyTdahTick(dataDir, now);
+            expect(retry.firedCount).toBe(0);
+            expect(retry.skippedCount).toBe(1);
+            expect(retry.failedCount).toBe(1);
+        });
+    });
+
+    describe('computeTomorrowDate (story 1.5: DST-safe date arithmetic)', () => {
+        test('rolls over correctly across a spring-forward DST transition (a 23-hour local day)', () => {
+            // 2026-03-08 is when America/New_York springs forward (02:00 -> 03:00 local).
+            expect(computeTomorrowDate('America/New_York', new Date('2026-03-08T20:00:00Z'))).toBe('2026-03-09');
+        });
+
+        test('rolls over correctly across a fall-back DST transition (a 25-hour local day)', () => {
+            // 2026-11-01 is when America/New_York falls back (02:00 -> 01:00 local).
+            expect(computeTomorrowDate('America/New_York', new Date('2026-11-01T20:00:00Z'))).toBe('2026-11-02');
+        });
+
+        test('rolls over a year boundary correctly regardless of a large positive UTC offset', () => {
+            // Pacific/Kiritimati is UTC+14 year-round: 2026-12-30T20:00:00Z is
+            // already 2026-12-31T10:00 local, so tomorrow is the new year.
+            expect(computeTomorrowDate('Pacific/Kiritimati', new Date('2026-12-30T20:00:00Z'))).toBe('2027-01-01');
         });
     });
 

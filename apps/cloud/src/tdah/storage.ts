@@ -17,7 +17,7 @@
  * zero busy timeout and yield between attempts, exactly as `withCloudFileLock`
  * does.
  */
-import { existsSync } from 'fs';
+import { existsSync, readdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { ensureDurableDirectory } from '../server-storage';
 import type {
@@ -291,8 +291,12 @@ const ensureSchema = (database: TdahDatabase): void => {
  * "any request touching the module migrates the schema transparently before
  * being served" holds for read-only routes too (list/preview), not just
  * writes.
+ *
+ * Exported (story 1.5) so `scheduler.ts` can run its own cheap pre-transaction
+ * skip check (`hasDayPlan`) without duplicating this open/migrate/close
+ * dance.
  */
-const withReadDatabase = async <T>(
+export const withReadDatabase = async <T>(
     databasePath: string,
     run: (database: TdahDatabase) => T,
 ): Promise<T> => {
@@ -331,8 +335,12 @@ const waitForWriteLockRetry = (delayMs: number): Promise<void> => (
  * another writer holds the file, and blocking on any of them would stall Bun's
  * only JS thread. A contended attempt closes its handle, awaits a backoff that
  * yields to the event loop, and retries until the wait budget is spent.
+ *
+ * Exported (story 1.5) so `scheduler.ts` can hold one transaction per
+ * namespace across `mutateCloseOutgoingDay` + `mutateGenerateTomorrowIfMissing`
+ * together, the same way every mutation in this file already reuses it.
  */
-const withWriteTransaction = async <T>(
+export const withWriteTransaction = async <T>(
     databasePath: string,
     mutate: (database: TdahDatabase) => T,
 ): Promise<T> => {
@@ -985,11 +993,22 @@ export const formatDateInTimeZone = (date: Date, timeZone: string): string => {
 };
 
 /**
- * Tomorrow's calendar date in the profile's time zone, as a `YYYY-MM-DD`
- * string. Deliberately simple calendar-day arithmetic — DST-aware
- * recalculation and the recurring midnight rollover are story 1.5's job.
+ * Tomorrow's calendar date in `timeZone`, as a `YYYY-MM-DD` string. Genuinely
+ * DST-safe (story 1.5): today's local Y-M-D components are resolved once via
+ * `formatDateInTimeZone`'s `Intl.DateTimeFormat` call, which already accounts
+ * for the zone's DST state at `now`; the day component is then incremented
+ * through `Date.UTC`, which normalizes month/year rollover (e.g. day 32 of
+ * January becomes February 1) correctly regardless of month length or leap
+ * years. No further time-zone offset is applied after that initial Intl
+ * resolution, so this never repeats the naive-arithmetic bug a fixed
+ * `now.getTime() + 24*60*60*1000` offset would have on a DST-transition day
+ * (when the local calendar day is 23 or 25 hours long, not 24).
+ *
+ * Exported (story 1.5) since the nightly scheduler needs both this and "local
+ * today" (plain `formatDateInTimeZone(now, timeZone)` — no new helper needed
+ * for that half).
  */
-const computeTomorrowDate = (timeZone: string, now: Date = new Date()): string => {
+export const computeTomorrowDate = (timeZone: string, now: Date = new Date()): string => {
     const todayParts = formatDateInTimeZone(now, timeZone).split('-').map(Number);
     const [year, month, day] = todayParts as [number, number, number];
     const tomorrowUtc = new Date(Date.UTC(year, month - 1, day + 1));
@@ -1010,8 +1029,12 @@ export type GenerateTomorrowResult = {
  * upserted inside the same transaction. `timeZone` is threaded through
  * separately (rather than re-reading the profile) because it's also needed
  * by `selectApplicableRoutine`'s weekday resolution (AD-6).
+ *
+ * Exported (story 1.5) so `scheduler.ts` can run it inside the same
+ * `withWriteTransaction` as `mutateCloseOutgoingDay`, exactly as this file's
+ * own `activateTdahProfile` already does.
  */
-const mutateGenerateTomorrowIfMissing = (database: TdahDatabase, date: string, timeZone: string): GenerateTomorrowResult => {
+export const mutateGenerateTomorrowIfMissing = (database: TdahDatabase, date: string, timeZone: string): GenerateTomorrowResult => {
     const existing = database.prepare(SELECT_DAY_PLAN_SQL).get(date) as { date: unknown } | undefined | null;
     if (existing) {
         const countRow = database.prepare(COUNT_ACTIVITIES_FOR_DAY_PLAN_SQL).get(date) as { count: unknown };
@@ -1027,6 +1050,64 @@ const mutateGenerateTomorrowIfMissing = (database: TdahDatabase, date: string, t
             .run(date, block.id, block.title, block.startTime, block.durationMinutes);
     }
     return { date, activityCount: blocks.length, created: true };
+};
+
+// --- Nightly scheduler primitives (story 1.5) -------------------------------
+
+const SELECT_DAY_PLAN_EXISTS_SQL = 'SELECT 1 FROM tdah_day_plan WHERE date = ? LIMIT 1;';
+const CLOSE_OUTGOING_DAY_SQL = `
+    UPDATE tdah_activity SET state = 'limbo'
+    WHERE day_plan_date = ? AND state IN ('pending', 'started');
+`;
+
+/**
+ * Cheap existence check against `tdah_day_plan`'s own PRIMARY KEY — the
+ * scheduler's pre-transaction skip check (`scheduler.ts`): a namespace whose
+ * tomorrow-DayPlan already exists is skipped without ever opening a write
+ * transaction, since `mutateGenerateTomorrowIfMissing` would itself be a
+ * no-op. Takes an already-open `database` handle (typically opened via
+ * `withReadDatabase`) rather than a path, so the caller controls whether this
+ * check runs standalone or alongside other reads in the same handle.
+ */
+export const hasDayPlan = (database: TdahDatabase, date: string): boolean => (
+    Boolean(database.prepare(SELECT_DAY_PLAN_EXISTS_SQL).get(date))
+);
+
+export type CloseOutgoingDayResult = { limboCount: number };
+
+/**
+ * The limbo transition (AD-5/AD-11): every Actividad still `pending`/`started`
+ * for the outgoing local day becomes `limbo`. Only `scheduler.ts` calls this
+ * — no route may bulk-set `limbo` (ADR 0026 addendum, story 1.5). Separately
+ * idempotent from `mutateGenerateTomorrowIfMissing`: re-running it against a
+ * date whose Actividades are already `limbo` (or `completed`/`missed`/
+ * `discarded`) matches zero rows and changes nothing.
+ */
+export const mutateCloseOutgoingDay = (database: TdahDatabase, date: string): CloseOutgoingDayResult => {
+    const result = database.prepare(CLOSE_OUTGOING_DAY_SQL).run(date);
+    return { limboCount: Number(result.changes) };
+};
+
+/**
+ * Every namespace under `dataDir` with an existing TDAH database, for
+ * `scheduler.ts` to walk each tick. Reuses `pruneOrphanedCalendarFeeds`'s
+ * (`server-calendar-feed.ts`) `readdirSync(dataDir)` pattern rather than
+ * inventing a second directory-walk convention: `dataDir` mixes namespace
+ * directories (`<key>/`, holding `attachments/` and now `tdah/`) with flat
+ * per-namespace sidecar files (`<key>.json`, `<key>.ics.json`), so every entry
+ * is filtered through `tdahDatabasePath` + `existsSync` rather than assumed to
+ * be a namespace directory. A missing or unreadable `dataDir` yields an empty
+ * list rather than throwing — mirrors `pruneOrphanedCalendarFeeds`'s own
+ * best-effort `readdirSync` handling.
+ */
+export const listActiveTdahNamespaces = (dataDir: string): string[] => {
+    let entries: string[];
+    try {
+        entries = readdirSync(dataDir);
+    } catch {
+        return [];
+    }
+    return entries.filter((entry) => existsSync(tdahDatabasePath(dataDir, entry)));
 };
 
 /**

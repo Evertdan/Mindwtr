@@ -63,6 +63,7 @@ import {
     createRequestAbortError,
     createWriteLockRunner,
     ensureWritableDir,
+    getFsErrorCode,
     isBodyReadError,
     isRequestAbortError,
     readData,
@@ -104,7 +105,7 @@ import {
     rotateCalendarFeed,
     type CalendarFeedRecord,
 } from './server-calendar-feed';
-import { TDAH_PATH_PREFIX, handleTdahRequest } from './tdah';
+import { TDAH_PATH_PREFIX, handleTdahRequest, runNightlyTdahTick } from './tdah';
 
 const ANY_TOKEN_NAMESPACE_LIMIT_DEFAULT = 32;
 const NAMESPACE_ADMISSION_LOCK_KEY = '__namespace_admission__';
@@ -1094,6 +1095,56 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
         cleanupTimer.unref();
     }
 
+    // The app's first background scheduler (ADR 0026 addendum, story 1.5):
+    // once a minute, walk every namespace with an active TDAH profile and
+    // fire its nightly ritual (close today, generate tomorrow) once its local
+    // ritual hour arrives. `runNightlyTdahTick` never throws — every
+    // per-namespace failure is caught and logged internally — but the
+    // `.catch` here is a defensive backstop against an unhandled rejection
+    // ever reaching this fire-and-forget interval callback: it logs the
+    // caught error (`.code` only, mirroring `getFsErrorCode`'s use elsewhere
+    // in this file — never the raw `.message` or stack) instead of silently
+    // swallowing what would otherwise be a completely invisible contract
+    // violation. The one audit line for the tick is logged here rather than
+    // inside the scheduler itself, mirroring `pruneOrphanedCalendarFeeds`
+    // below: a pure function returns counts, its caller owns the logging.
+    //
+    // `tdahTickInFlight` guards against a slow tick (many namespaces, retried
+    // write locks) still running when the next 60s interval fires — harmless
+    // for correctness (every operation here is idempotent) but wasted work
+    // and redundant DB contention, so a tick already in flight is skipped
+    // rather than overlapped.
+    let tdahTickInFlight = false;
+    const tdahNightlyTickTimer = setInterval(() => {
+        if (tdahTickInFlight) return;
+        tdahTickInFlight = true;
+        void runNightlyTdahTick(dataDir, new Date())
+            .then((summary) => {
+                logInfo('tdah nightly trigger fired', {
+                    date: summary.date,
+                    failedCount: summary.failedCount,
+                    firedCount: summary.firedCount,
+                    generatedCount: summary.generatedCount,
+                    limboCount: summary.limboCount,
+                    namespaceCount: summary.namespaceCount,
+                    skippedCount: summary.skippedCount,
+                });
+            })
+            .catch((error) => {
+                logError('tdah nightly trigger crashed', {
+                    failureClass: 'runtime',
+                    failureCode: 'tdah_nightly_tick_crashed',
+                    failureErrno: getFsErrorCode(error),
+                });
+            })
+            .finally(() => {
+                tdahTickInFlight = false;
+            });
+    }, 60_000);
+    if (typeof tdahNightlyTickTimer.unref === 'function') {
+        tdahNightlyTickTimer.unref();
+    }
+
     const usingLegacyTokenVar = options.allowedAuthTokens === undefined
         && !String(process.env.MINDWTR_CLOUD_AUTH_TOKENS || '').trim()
         && !String(process.env.MINDWTR_CLOUD_AUTH_TOKENS_FILE || '').trim()
@@ -1574,6 +1625,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
         if (stopped) return;
         stopped = true;
         clearInterval(cleanupTimer);
+        clearInterval(tdahNightlyTickTimer);
         try {
             await Promise.resolve((server as { stop?: (closeIdleConnections?: boolean) => void | Promise<void> }).stop?.(true));
         } catch {

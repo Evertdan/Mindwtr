@@ -158,3 +158,67 @@ producto/diseño que valen la pena dejar registradas aquí junto al mecanismo:
   AD-1), no si el usuario puede administrar sus datos. Es consistente con el
   resto del módulo: el perfil y las Rutinas son almacenamiento de servidor
   independiente de si la generación automática está activa.
+
+## Adenda (historia 1.5): el primer scheduler en segundo plano de la aplicación
+
+La historia 1.5 (generación nocturna) introdujo el primer disparador
+server-side que corre sin que ninguna petición HTTP lo invoque: hasta ahora,
+`mutateGenerateTomorrowIfMissing` solo se ejecutaba de forma síncrona dentro de
+`POST /v1/tdah/activate`, así que el plan del día se generaba exactamente una
+vez, en la activación, y nunca más — el andamio dependía de que el usuario
+reactivara el modo cada noche, justo lo que la espina del épico prohíbe
+(`epic-1-context.md`: "el andamio nunca depende de la disciplina nocturna del
+usuario").
+
+**Mecanismo elegido: un `setInterval` de 60s en proceso, no un framework de
+colas de trabajos.** `apps/cloud/src/server.ts`'s `startCloudServer` registra
+un segundo temporizador (`.unref()`'d, igual que el `cleanupTimer` del rate
+limiter ya existente) que cada 60 segundos invoca
+`runNightlyTdahTick(dataDir, new Date())` (`apps/cloud/src/tdah/scheduler.ts`).
+A la escala esperada de este módulo (un VPS por usuario o un puñado de
+usuarios por instancia auto-alojada), un job-queue genérico sería
+infraestructura que esta historia no necesita — mismo criterio "aditivo,
+mínimo" del resto de este ADR. El propio `setInterval` del rate limiter ya era
+precedente directo de esta forma de cableado.
+
+**Recomputa zona horaria/hora del ritual desde el perfil vivo en cada tick, sin
+caché de "próxima disparada".** Cada tick vuelve a leer `readTdahProfile` por
+namespace y recalcula "hoy"/"mañana" y si la hora local ya alcanzó
+`ritualHour` — nunca guarda un timestamp "próximo disparo" derivado. Esto
+satisface con cero lógica de invalidación el requisito de que un `PUT
+/v1/tdah/profile` que cambie `timeZone`/`ritualHour` surta efecto en el
+siguiente tick, sin tocar ninguna Actividad ya registrada.
+
+**Una transacción por namespace, nunca una transacción cruzada.** Cada
+namespace tiene su propio archivo SQLite (ADR 0026 original); no existe
+atomicidad cruzada que ganar, y el aislamiento de fallos por namespace (un
+caso de borde que la historia exige explícitamente) necesita transacciones
+separadas de todos modos. `mutateCloseOutgoingDay` (la transición a `limbo` de
+Actividades `pending`/`started`) y la ya existente `mutateGenerateTomorrowIfMissing`
+corren dentro de un único `withWriteTransaction` sostenido por namespace —
+`scheduler.ts` es el único código autorizado a invocar `mutateCloseOutgoingDay`;
+ninguna ruta puede poner `limbo` en bloque (coincide con AD-5/AD-11 del spec de
+UX).
+
+**Sin columna ni bandera nueva de "última vez disparado": la fila
+`tdah_day_plan` de mañana sigue siendo la única señal de completitud**, vía su
+PRIMARY KEY ya existente desde la historia 1.3 — un namespace cuyo
+DayPlan-de-mañana ya existe se salta con una lectura barata (`hasDayPlan`), sin
+abrir siquiera una transacción de escritura. Añadir una segunda marca de
+completitud habría exigido su propia migración para un hecho que el esquema ya
+codifica — mismo precedente de minimalismo que la migración única de la
+historia 1.4.
+
+**Auditoría de logs sin identidad de namespace, siguiendo el mismo patrón que
+`pruneOrphanedCalendarFeeds`.** `runNightlyTdahTick` es una función pura que
+solo devuelve conteos (`TdahNightlyTickSummary`); es su llamador en
+`server.ts` quien emite la única línea de auditoría por tick
+(`'tdah nightly trigger fired'`, contexto `{date, generatedCount, limboCount,
+namespaceCount}`) — el mismo reparto de responsabilidades que
+`server-calendar-feed.ts`'s `pruneOrphanedCalendarFeeds` ya establecía (una
+función de storage que nunca loggea, un caller en `server.ts` que sí). Un
+fallo de escritura en un namespace individual se loggea con el mensaje
+genérico ya existente `'request failed'` y su `.code` de fs/sqlite —
+nunca la clave del namespace ni el título de una Actividad — y ese namespace
+simplemente se reintenta en el siguiente tick sin abortar ni demorar a los
+demás namespaces del mismo tick.

@@ -128,8 +128,11 @@ describe('cloud server utils', () => {
         const allowlistedMessages = new Set<string>(CLOUD_LOG_MESSAGES);
         const observedMessages = new Set<string>();
         const violations: string[] = [];
-        const productionSources = readdirSync(testDirectory)
-            .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'));
+        // Recursive: the ratchet must also see submodules like tdah/ (story 1.5's
+        // scheduler.ts logs its own per-namespace failure message from there),
+        // not just this top-level directory's own files.
+        const productionSources = readdirSync(testDirectory, { recursive: true })
+            .filter((name): name is string => typeof name === 'string' && name.endsWith('.ts') && !name.endsWith('.test.ts'));
 
         for (const name of productionSources) {
             const source = readFileSync(join(testDirectory, name), 'utf8');
