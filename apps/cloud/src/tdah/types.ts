@@ -122,6 +122,7 @@ const TDAH_ERROR_CODES = {
     methodNotAllowed: 'TDAH_METHOD_NOT_ALLOWED',
     notFound: 'TDAH_NOT_FOUND',
     storageFailed: 'TDAH_STORAGE_FAILED',
+    activateRequired: 'TDAH_ACTIVATE_REQUIRED',
 } as const;
 
 export type TdahErrorCode = (typeof TDAH_ERROR_CODES)[keyof typeof TDAH_ERROR_CODES];

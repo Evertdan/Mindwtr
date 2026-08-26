@@ -1,6 +1,9 @@
 /**
  * HTTP surface of the TDAH module: GET/PUT `/v1/tdah/profile` and
- * POST `/v1/tdah/activate` (story 1.3 — the only way to turn the mode on).
+ * POST `/v1/tdah/activate`. PUT only ever sets `mode:'off'` or updates
+ * timeZone/ritualHour on an existing profile — POST /activate is the only
+ * way to set `mode:'on'`, and PUT rejects a `mode:'on'` body outright with
+ * `TDAH_ACTIVATE_REQUIRED`.
  *
  * Mounted additively by server.ts under its own prefix (ADR 0026) — every
  * request arrives already authenticated, rate-limited and namespace-admitted
@@ -84,6 +87,9 @@ const parseProfilePutBody = (body: unknown): { ok: true; body: TdahParsedProfile
     }
     if (raw.ritualHour !== undefined && !RITUAL_HOUR_PATTERN.test(raw.ritualHour)) {
         return { ok: false, code: TDAH_ERRORS.invalidRitualHour };
+    }
+    if (raw.mode === 'on') {
+        return { ok: false, code: TDAH_ERRORS.activateRequired };
     }
     const parsed: TdahParsedProfilePut = {};
     if (raw.mode !== undefined) parsed.mode = raw.mode;
@@ -172,9 +178,12 @@ const parseActivateBody = (body: unknown): { ok: true; body: TdahParsedActivate 
 
 /**
  * POST /v1/tdah/activate — the only way to turn the mode on, first time or
- * on reactivation. Idempotent: a Rutina is created only if the body includes
- * one and none exists yet; `generateTomorrowIfMissing` never duplicates
- * tomorrow's DayPlan (see storage.ts).
+ * on reactivation. `PUT /tdah/profile` rejects a `mode:'on'` body with
+ * `TDAH_ACTIVATE_REQUIRED`; it only sets `mode:'off'` or updates
+ * timeZone/ritualHour on an existing profile. Idempotent: a Rutina is
+ * created only if the body includes one and none exists yet;
+ * `generateTomorrowIfMissing` never duplicates tomorrow's DayPlan (see
+ * storage.ts).
  */
 const handleActivate = async (
     req: Request,

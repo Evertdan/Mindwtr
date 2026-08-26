@@ -116,7 +116,7 @@ describe('tdah module', () => {
     });
 
     test('first activation persists mode, detected time zone and the 23:00 ritual default in the namespace sqlite', async () => {
-        const response = await putProfile({ mode: 'on', timeZone: 'America/Mexico_City' });
+        const response = await activate({ timeZone: 'America/Mexico_City' });
         expect(response.status).toBe(200);
         const profile = await readProfile(response);
         expect(profile?.mode).toBe('on');
@@ -148,7 +148,7 @@ describe('tdah module', () => {
     });
 
     test('activation without a time zone falls back to UTC', async () => {
-        const response = await putProfile({ mode: 'on' });
+        const response = await activate({});
         expect(response.status).toBe(200);
         const profile = await readProfile(response);
         expect(profile?.mode).toBe('on');
@@ -201,8 +201,14 @@ describe('tdah module', () => {
         await expectInvalidBody('{}');
     });
 
+    test("PUT mode:'on' is rejected — POST /activate is the only way to turn the mode on", async () => {
+        const response = await putProfile({ mode: 'on' });
+        expect(response.status).toBe(400);
+        expect(await readErrorCode(response)).toBe('TDAH_ACTIVATE_REQUIRED');
+    });
+
     test('deactivating keeps the profile row intact (time zone and ritual hour preserved)', async () => {
-        await putProfile({ mode: 'on', timeZone: 'Europe/Madrid', ritualHour: '22:30' });
+        await activate({ timeZone: 'Europe/Madrid', ritualHour: '22:30' });
         const response = await putProfile({ mode: 'off' });
         expect(response.status).toBe(200);
         const profile = await readProfile(response);
@@ -213,9 +219,9 @@ describe('tdah module', () => {
     });
 
     test('reactivating after off does not reset time zone or ritual hour (FR-1)', async () => {
-        await putProfile({ mode: 'on', timeZone: 'Europe/Madrid', ritualHour: '22:30' });
+        await activate({ timeZone: 'Europe/Madrid', ritualHour: '22:30' });
         await putProfile({ mode: 'off' });
-        const response = await putProfile({ mode: 'on' });
+        const response = await activate({});
         expect(response.status).toBe(200);
         const profile = await readProfile(response);
         expect(profile?.mode).toBe('on');
@@ -245,9 +251,9 @@ describe('tdah module', () => {
     });
 
     test('two tokens get isolated sqlite databases under their own namespace', async () => {
-        const alphaActivation = await putProfile({ mode: 'on', timeZone: 'America/Mexico_City' }, TOKEN_ALPHA);
+        const alphaActivation = await activate({ timeZone: 'America/Mexico_City' }, TOKEN_ALPHA);
         expect(alphaActivation.status).toBe(200);
-        const betaActivation = await putProfile({ mode: 'on', timeZone: 'Asia/Tokyo', ritualHour: '21:00' }, TOKEN_BETA);
+        const betaActivation = await activate({ timeZone: 'Asia/Tokyo', ritualHour: '21:00' }, TOKEN_BETA);
         expect(betaActivation.status).toBe(200);
 
         const alphaKey = tokenToKey(TOKEN_ALPHA);
@@ -264,15 +270,15 @@ describe('tdah module', () => {
         expect(betaProfile?.ritualHour).toBe('21:00');
     });
 
-    test('concurrent PUTs for the same token all succeed and leave a coherent, non-mixed row', async () => {
+    test('concurrent activations for the same token all succeed and leave a coherent, non-mixed row', async () => {
         const writes = [
-            { mode: 'on', timeZone: 'America/Mexico_City', ritualHour: '20:00' },
-            { mode: 'on', timeZone: 'Europe/Madrid', ritualHour: '21:15' },
-            { mode: 'on', timeZone: 'Asia/Tokyo', ritualHour: '22:30' },
-            { mode: 'on', timeZone: 'America/New_York', ritualHour: '23:45' },
+            { timeZone: 'America/Mexico_City', ritualHour: '20:00' },
+            { timeZone: 'Europe/Madrid', ritualHour: '21:15' },
+            { timeZone: 'Asia/Tokyo', ritualHour: '22:30' },
+            { timeZone: 'America/New_York', ritualHour: '23:45' },
         ];
 
-        const responses = await Promise.all(writes.map((body) => putProfile(body)));
+        const responses = await Promise.all(writes.map((body) => activate(body)));
         for (const response of responses) {
             expect(response.status).toBe(200);
         }
