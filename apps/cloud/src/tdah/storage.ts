@@ -245,6 +245,34 @@ export async function readTdahProfile(dataDir: string, key: string): Promise<Tda
     ));
 }
 
+/**
+ * Upsert mutation body, factored out so `activateTdahProfile` can run it in
+ * the same held transaction as the routine/day-plan mutations below instead
+ * of opening its own `BEGIN IMMEDIATE`/`COMMIT`.
+ */
+const mutateUpsertProfile = (database: TdahDatabase, request: TdahProfileUpsertRequest): TdahProfile => {
+    const nowIso = new Date().toISOString();
+    const existing = rowToProfile(
+        database.prepare(SELECT_PROFILE_SQL).get() as TdahProfileRow | undefined | null,
+    );
+    const nextMode: TdahMode = request.mode ?? existing?.mode ?? 'off';
+    const nextTimeZone = request.timeZone ?? existing?.timeZone ?? TDAH_DEFAULT_TIME_ZONE;
+    const nextRitualHour = request.ritualHour ?? existing?.ritualHour ?? TDAH_DEFAULT_RITUAL_HOUR;
+    const createdAt = existing?.createdAt ?? nowIso;
+    database
+        .prepare(UPSERT_PROFILE_SQL)
+        .run(nextMode, nextTimeZone, nextRitualHour, createdAt, nowIso);
+    // Read back inside the transaction: it observes its own write, and the
+    // COMMIT the helper issues on return makes it durable.
+    const saved = rowToProfile(
+        database.prepare(SELECT_PROFILE_SQL).get() as TdahProfileRow | undefined | null,
+    );
+    if (!saved) {
+        throw new Error('TDAH profile readback failed after upsert');
+    }
+    return saved;
+};
+
 export async function upsertTdahProfile(
     dataDir: string,
     key: string,
@@ -255,28 +283,7 @@ export async function upsertTdahProfile(
     if (!durableDir) {
         throw new Error('TDAH database directory is unsafe');
     }
-    return await withWriteTransaction(databasePath, (database) => {
-        const nowIso = new Date().toISOString();
-        const existing = rowToProfile(
-            database.prepare(SELECT_PROFILE_SQL).get() as TdahProfileRow | undefined | null,
-        );
-        const nextMode: TdahMode = request.mode ?? existing?.mode ?? 'off';
-        const nextTimeZone = request.timeZone ?? existing?.timeZone ?? TDAH_DEFAULT_TIME_ZONE;
-        const nextRitualHour = request.ritualHour ?? existing?.ritualHour ?? TDAH_DEFAULT_RITUAL_HOUR;
-        const createdAt = existing?.createdAt ?? nowIso;
-        database
-            .prepare(UPSERT_PROFILE_SQL)
-            .run(nextMode, nextTimeZone, nextRitualHour, createdAt, nowIso);
-        // Read back inside the transaction: it observes its own write, and the
-        // COMMIT the helper issues on return makes it durable.
-        const saved = rowToProfile(
-            database.prepare(SELECT_PROFILE_SQL).get() as TdahProfileRow | undefined | null,
-        );
-        if (!saved) {
-            throw new Error('TDAH profile readback failed after upsert');
-        }
-        return saved;
-    });
+    return await withWriteTransaction(databasePath, (database) => mutateUpsertProfile(database, request));
 }
 
 // --- Rutina / DayPlan / Actividad (story 1.3) ------------------------------
@@ -348,6 +355,31 @@ export type CreateRoutineResult = {
 };
 
 /**
+ * Routine-creation mutation body, factored out for the same reason as
+ * `mutateUpsertProfile` above — reused inside `activateTdahProfile`'s single
+ * shared transaction.
+ */
+const mutateCreateRoutineWithBlocks = (database: TdahDatabase, input: TdahRoutineInput): CreateRoutineResult => {
+    const existing = selectLatestRoutineWithBlocks(database);
+    if (existing) {
+        return { routine: existing, created: false };
+    }
+    const nowIso = new Date().toISOString();
+    const insertedRoutine = database.prepare(INSERT_ROUTINE_SQL).run(input.title, 'weekday', nowIso);
+    const routineId = Number(insertedRoutine.lastInsertRowid);
+    input.blocks.forEach((block, index) => {
+        database
+            .prepare(INSERT_ROUTINE_BLOCK_SQL)
+            .run(routineId, block.title, block.startTime, block.durationMinutes, index);
+    });
+    const created = selectLatestRoutineWithBlocks(database);
+    if (!created) {
+        throw new Error('TDAH routine readback failed after insert');
+    }
+    return { routine: created, created: true };
+};
+
+/**
  * Creates the single Rutina this story supports, with its Bloques, unless
  * one already exists — retries of `POST /activate` with a `routine` in the
  * body must never produce a second Rutina (only one is ever allowed until
@@ -363,25 +395,7 @@ export async function createRoutineWithBlocks(
     if (!durableDir) {
         throw new Error('TDAH database directory is unsafe');
     }
-    return await withWriteTransaction(databasePath, (database) => {
-        const existing = selectLatestRoutineWithBlocks(database);
-        if (existing) {
-            return { routine: existing, created: false };
-        }
-        const nowIso = new Date().toISOString();
-        const insertedRoutine = database.prepare(INSERT_ROUTINE_SQL).run(input.title, 'weekday', nowIso);
-        const routineId = Number(insertedRoutine.lastInsertRowid);
-        input.blocks.forEach((block, index) => {
-            database
-                .prepare(INSERT_ROUTINE_BLOCK_SQL)
-                .run(routineId, block.title, block.startTime, block.durationMinutes, index);
-        });
-        const created = selectLatestRoutineWithBlocks(database);
-        if (!created) {
-            throw new Error('TDAH routine readback failed after insert');
-        }
-        return { routine: created, created: true };
-    });
+    return await withWriteTransaction(databasePath, (database) => mutateCreateRoutineWithBlocks(database, input));
 }
 
 const formatDateInTimeZone = (date: Date, timeZone: string): string => (
@@ -409,6 +423,30 @@ export type GenerateTomorrowResult = {
 };
 
 /**
+ * Day-plan-generation mutation body, factored out for the same reason as the
+ * two mutate helpers above. Takes the already-computed `date` rather than a
+ * profile, since `activateTdahProfile` computes it from the profile it just
+ * upserted inside the same transaction.
+ */
+const mutateGenerateTomorrowIfMissing = (database: TdahDatabase, date: string): GenerateTomorrowResult => {
+    const existing = database.prepare(SELECT_DAY_PLAN_SQL).get(date) as { date: unknown } | undefined | null;
+    if (existing) {
+        const countRow = database.prepare(COUNT_ACTIVITIES_FOR_DAY_PLAN_SQL).get(date) as { count: unknown };
+        return { date, activityCount: Number(countRow.count), created: false };
+    }
+    const nowIso = new Date().toISOString();
+    database.prepare(INSERT_DAY_PLAN_SQL).run(date, nowIso);
+    const routine = selectLatestRoutineWithBlocks(database);
+    const blocks = routine?.blocks ?? [];
+    for (const block of blocks) {
+        database
+            .prepare(INSERT_ACTIVITY_FROM_BLOCK_SQL)
+            .run(date, block.id, block.title, block.startTime, block.durationMinutes);
+    }
+    return { date, activityCount: blocks.length, created: true };
+};
+
+/**
  * The only function that generates a DayPlan. Inserts `tdah_day_plan` for
  * tomorrow (in the profile's time zone) plus one Actividad per Bloque of the
  * most recent Rutina, or an empty DayPlan when no Rutina exists yet (FR-3).
@@ -427,21 +465,39 @@ export async function generateTomorrowIfMissing(
         throw new Error('TDAH database directory is unsafe');
     }
     const date = computeTomorrowDate(profile.timeZone);
+    return await withWriteTransaction(databasePath, (database) => mutateGenerateTomorrowIfMissing(database, date));
+}
+
+/**
+ * POST /v1/tdah/activate's single write path (story 1.3's atomicity fix):
+ * runs the profile upsert, the optional routine creation, and tomorrow's
+ * day-plan generation inside ONE held `BEGIN IMMEDIATE`/`COMMIT` transaction,
+ * instead of three independently-committing calls. If any step throws — most
+ * notably a `tdah_routine_block` constraint violation from a malformed
+ * routine — `withWriteTransaction`'s existing rollback undoes the profile
+ * upsert too, so the mode is never left flipped on without its routine/plan.
+ */
+export async function activateTdahProfile(
+    dataDir: string,
+    key: string,
+    request: { timeZone?: string; ritualHour?: string; routine?: TdahRoutineInput },
+): Promise<{ profile: TdahProfile; routineCreated: boolean; dayPlan: GenerateTomorrowResult }> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    const durableDir = ensureDurableDirectory(dirname(databasePath));
+    if (!durableDir) {
+        throw new Error('TDAH database directory is unsafe');
+    }
     return await withWriteTransaction(databasePath, (database) => {
-        const existing = database.prepare(SELECT_DAY_PLAN_SQL).get(date) as { date: unknown } | undefined | null;
-        if (existing) {
-            const countRow = database.prepare(COUNT_ACTIVITIES_FOR_DAY_PLAN_SQL).get(date) as { count: unknown };
-            return { date, activityCount: Number(countRow.count), created: false };
-        }
-        const nowIso = new Date().toISOString();
-        database.prepare(INSERT_DAY_PLAN_SQL).run(date, nowIso);
-        const routine = selectLatestRoutineWithBlocks(database);
-        const blocks = routine?.blocks ?? [];
-        for (const block of blocks) {
-            database
-                .prepare(INSERT_ACTIVITY_FROM_BLOCK_SQL)
-                .run(date, block.id, block.title, block.startTime, block.durationMinutes);
-        }
-        return { date, activityCount: blocks.length, created: true };
+        const profile = mutateUpsertProfile(database, {
+            mode: 'on',
+            timeZone: request.timeZone,
+            ritualHour: request.ritualHour,
+        });
+        const routineResult = request.routine
+            ? mutateCreateRoutineWithBlocks(database, request.routine)
+            : undefined;
+        const date = computeTomorrowDate(profile.timeZone);
+        const dayPlan = mutateGenerateTomorrowIfMissing(database, date);
+        return { profile, routineCreated: routineResult?.created ?? false, dayPlan };
     });
 }

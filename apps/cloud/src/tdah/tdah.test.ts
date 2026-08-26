@@ -4,7 +4,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { tokenToKey } from '../server-auth';
 import { startCloudServer } from '../server';
-import { tdahDatabasePath } from './storage';
+import { activateTdahProfile, readTdahProfile, tdahDatabasePath } from './storage';
 
 const TOKEN_ALPHA = 'tdah-token-alpha-1234567890';
 const TOKEN_BETA = 'tdah-token-beta-1234567890';
@@ -440,6 +440,34 @@ describe('tdah module', () => {
             const response = await authedFetch('/v1/tdah/activate', { method: 'GET' });
             expect(response.status).toBe(405);
             expect(await readErrorCode(response)).toBe('TDAH_METHOD_NOT_ALLOWED');
+        });
+
+        test('a storage-level failure mid-activation rolls back the profile upsert too (atomic activate)', async () => {
+            // Storage-unit test, bypassing HTTP/route validation on purpose:
+            // `parseRoutineInput` rejects a non-string `startTime` long before it
+            // reaches storage.ts, so the only way to exercise the transaction's
+            // rollback is to call `activateTdahProfile` directly with a `null`
+            // `startTime` smuggled past TypeScript via `as any`. That value hits
+            // `tdah_routine_block.start_time TEXT NOT NULL` (storage.ts's
+            // CREATE_ROUTINE_BLOCK_TABLE_SQL) on the second block's INSERT — after
+            // the profile upsert and the first block insert have already run
+            // inside the same held transaction — so a real SQLITE_CONSTRAINT
+            // error is what triggers the rollback, not a hand-rolled throw.
+            const key = tokenToKey(TOKEN_ALPHA);
+
+            await expect(activateTdahProfile(dataDir, key, {
+                timeZone: 'UTC',
+                routine: {
+                    title: 'Día laboral',
+                    blocks: [
+                        { title: 'Mañana', startTime: '08:00', durationMinutes: 60 },
+                        { title: 'Tarde', startTime: null as any, durationMinutes: 60 },
+                    ],
+                },
+            })).rejects.toBeTruthy();
+
+            const profile = await readTdahProfile(dataDir, key);
+            expect(profile).toBeNull();
         });
     });
 });

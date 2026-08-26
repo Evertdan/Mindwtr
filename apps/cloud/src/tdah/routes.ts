@@ -10,7 +10,7 @@
  */
 import { getFsErrorCode, isBodyReadError, readJsonBody } from '../server-storage';
 import { jsonResponse, logError } from '../server-config';
-import { createRoutineWithBlocks, generateTomorrowIfMissing, readTdahProfile, upsertTdahProfile } from './storage';
+import { activateTdahProfile, readTdahProfile, upsertTdahProfile } from './storage';
 import {
     isTdahMode,
     TDAH_ERRORS,
@@ -190,17 +190,11 @@ const handleActivate = async (
         return tdahErrorResponse(parsed.code, 400);
     }
     try {
-        const profile = await upsertTdahProfile(options.dataDir, ctx.key, {
-            mode: 'on',
+        const { profile, routineCreated, dayPlan } = await activateTdahProfile(options.dataDir, ctx.key, {
             timeZone: parsed.body.timeZone,
             ritualHour: parsed.body.ritualHour,
+            routine: parsed.body.routine,
         });
-        let routineCreated = false;
-        if (parsed.body.routine) {
-            const routineResult = await createRoutineWithBlocks(options.dataDir, ctx.key, parsed.body.routine);
-            routineCreated = routineResult.created;
-        }
-        const dayPlan = await generateTomorrowIfMissing(options.dataDir, ctx.key, profile);
         const responseBody: TdahActivateResponse = {
             profile,
             routineCreated,
