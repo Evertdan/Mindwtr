@@ -143,8 +143,10 @@ import {
   scheduleLocalPomodoroCompletionNotification,
   sendLocalMobileNotification,
   setLocalNotificationOpenHandler,
+  showTdahActivityNotification,
   startLocalMobileNotifications,
   stopLocalMobileNotifications,
+  TDAH_ACTIVITY_NOTIFICATION_CHANNEL,
 } from './notification-service-local';
 
 describe('notification-service-local', () => {
@@ -293,6 +295,140 @@ describe('notification-service-local', () => {
           taskId: 'task-1',
         }),
       })
+    );
+  });
+
+  // Story 2.2 ("La vibra en la muñeca"): the only other coverage of this
+  // function (use-root-layout-tdah-connection.test.tsx) fully mocks
+  // '@/lib/notification-service-local', so it never exercises the real
+  // scheduleAlarmForKey/buildAlarmConfigSignature wiring below — a
+  // regression there (wrong channel, `vibrate` flipped back to `false`, a
+  // missing `notificationActionStart`/`vibrationPattern` data field, or the
+  // wrong snooze_interval) would ship with every other test still green.
+  // This calls the real, unmocked function end to end.
+  it('schedules the real TDAH Activity notification on its own high-importance, vibrating channel with all 3 actions and the localized channel name', async () => {
+    await showTdahActivityNotification({
+      key: 'tdah-activity:42:start',
+      title: 'Ordenar el escritorio — 25 min',
+      message: "It's time to start.",
+      vibrationPattern: [0, 120, 120, 120],
+      actionLabels: { start: 'Iniciar', complete: 'Completada', snooze: 'Posponer +10 min' },
+      channelName: 'Recordatorios de Actividades',
+      data: { kind: 'tdah-activity', context: '42', edge: 'start' },
+    });
+
+    expect(mockAlarmScheduleAlarm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Ordenar el escritorio — 25 min',
+        message: "It's time to start.",
+        channel: TDAH_ACTIVITY_NOTIFICATION_CHANNEL,
+        has_button: true,
+        has_complete_action: true,
+        vibrate: true,
+        snooze_interval: 10,
+        data: expect.objectContaining({
+          kind: 'tdah-activity',
+          context: '42',
+          edge: 'start',
+          notificationActionStart: 'true',
+          notificationActionComplete: 'true',
+          vibrationPattern: '0,120,120,120',
+          tdahStartActionLabel: 'Iniciar',
+          tdahCompleteActionLabel: 'Completada',
+          tdahSnoozeActionLabel: 'Posponer +10 min',
+          tdahActivityNotificationChannelName: 'Recordatorios de Actividades',
+        }),
+      })
+    );
+
+    // Never the GTD reminder channel/snooze constant — this is TDAH's own,
+    // independent pipeline (ADR-0013).
+    expect(mockAlarmScheduleAlarm).not.toHaveBeenCalledWith(
+      expect.objectContaining({ channel: 'mindwtr_reminders_v2' })
+    );
+  });
+
+  // Review fix (MEDIUM): the three early-return paths below used to return
+  // silently — a skipped Activity notification was indistinguishable from a
+  // lost WS event. Each must now say why it skipped (and never schedule).
+  it('skips the TDAH Activity notification (and says why) when the title is blank', async () => {
+    await showTdahActivityNotification({
+      key: 'tdah-activity:42:start',
+      title: '   ',
+      message: "It's time to start.",
+      vibrationPattern: [0, 120, 120, 120],
+      actionLabels: { start: 'Iniciar', complete: 'Completada', snooze: 'Posponer +10 min' },
+      channelName: 'Recordatorios de Actividades',
+      data: { kind: 'tdah-activity', context: '42', edge: 'start' },
+    });
+
+    expect(mockAlarmScheduleAlarm).not.toHaveBeenCalled();
+    expect(mockLogInfo).toHaveBeenCalledWith(
+      '[Local Notifications] TDAH Activity notification skipped: blank title',
+      expect.anything()
+    );
+  });
+
+  it('skips the TDAH Activity notification (and says why) when the alarm API is unavailable', async () => {
+    // loadAlarmApi() only returns null when the native module is missing its
+    // scheduleAlarm bridge; the static module mock always provides it, so
+    // re-import the service against a stub without it (same vi.resetModules +
+    // vi.doMock idiom speech-to-text.test.ts uses for its missing-RNFS cases).
+    vi.resetModules();
+    vi.doMock('react-native-alarm-notification', () => ({ default: {} }));
+    try {
+      const freshService = await import('./notification-service-local');
+      await freshService.showTdahActivityNotification({
+        key: 'tdah-activity:42:start',
+        title: 'Ordenar el escritorio — 25 min',
+        message: "It's time to start.",
+        vibrationPattern: [0, 120, 120, 120],
+        actionLabels: { start: 'Iniciar', complete: 'Completada', snooze: 'Posponer +10 min' },
+        channelName: 'Recordatorios de Actividades',
+        data: { kind: 'tdah-activity', context: '42', edge: 'start' },
+      });
+
+      expect(mockAlarmScheduleAlarm).not.toHaveBeenCalled();
+      expect(mockLogInfo).toHaveBeenCalledWith(
+        '[Local Notifications] TDAH Activity notification skipped: alarm API unavailable',
+        expect.anything()
+      );
+    } finally {
+      vi.doMock('react-native-alarm-notification', () => ({
+        default: {
+          parseDate: (date: Date) => date.toISOString(),
+          scheduleAlarm: mockAlarmScheduleAlarm,
+          sendNotification: mockAlarmSendNotification,
+          deleteAlarm: mockAlarmDeleteAlarm,
+          deleteRepeatingAlarm: mockAlarmDeleteRepeatingAlarm,
+          removeFiredNotification: mockAlarmRemoveFiredNotification,
+          removeAllFiredNotifications: mockAlarmRemoveAllFiredNotifications,
+          getScheduledAlarms: mockAlarmGetScheduledAlarms,
+          requestPermissions: mockAlarmRequestPermissions,
+        },
+      }));
+      vi.resetModules();
+    }
+  });
+
+  it('skips the TDAH Activity notification (and says why) when notification permission is denied', async () => {
+    mockPermissionsAndroidCheck.mockResolvedValue(false);
+    mockPermissionsAndroidRequest.mockResolvedValue('never_ask_again');
+
+    await showTdahActivityNotification({
+      key: 'tdah-activity:42:start',
+      title: 'Ordenar el escritorio — 25 min',
+      message: "It's time to start.",
+      vibrationPattern: [0, 120, 120, 120],
+      actionLabels: { start: 'Iniciar', complete: 'Completada', snooze: 'Posponer +10 min' },
+      channelName: 'Recordatorios de Actividades',
+      data: { kind: 'tdah-activity', context: '42', edge: 'start' },
+    });
+
+    expect(mockAlarmScheduleAlarm).not.toHaveBeenCalled();
+    expect(mockLogInfo).toHaveBeenCalledWith(
+      '[Local Notifications] TDAH Activity notification skipped: notification permission denied',
+      expect.anything()
     );
   });
 

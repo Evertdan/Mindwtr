@@ -27,6 +27,8 @@ type NotificationOpenPayload = {
   projectId?: string;
   context?: string;
   kind?: string;
+  /** Story 2.2: 'start' | 'end' on a `kind: 'tdah-activity'` payload — see use-root-layout-tdah-connection.ts's handleTdahActivityTriggerEvent. */
+  edge?: string;
 };
 
 type NotificationOpenHandler = (payload: NotificationOpenPayload) => void;
@@ -74,6 +76,27 @@ type LocalAlarmConfig = {
   hasSnoozeAction?: boolean;
   hasCompleteAction?: boolean;
   data?: Record<string, string>;
+  /**
+   * Story 2.2 additions — all optional and unused by the GTD/pomodoro call
+   * sites above, so their behavior (channel `LOCAL_NOTIFICATION_CHANNEL`,
+   * `vibrate: false`, `TASK_REMINDER_SNOOZE_MINUTES`, hardcoded native
+   * action labels) stays byte-identical when omitted.
+   */
+  channel?: string;
+  vibrate?: boolean;
+  /** `[delay, on, off, on, ...]` ms, forwarded to the native layer verbatim — see tdah-activity-notification.ts. */
+  vibrationPattern?: number[];
+  /** Adds a third real "Iniciar" action button (patch-alarm-notification-gradle.js's `notificationActionStart`) and, per spec, suppresses the native DISMISS button so the TDAH Activity notification shows exactly 3 actions. */
+  hasStartAction?: boolean;
+  /** Own module constant (spec Never: "no reutilizar TASK_REMINDER_SNOOZE_MINUTES del pipeline GTD... declarar una constante propia"); defaults to the GTD constant when omitted. */
+  snoozeMinutes?: number;
+  actionLabels?: {
+    start?: string;
+    complete?: string;
+    snooze?: string;
+  };
+  /** Localized Android notification-channel display name — same pass-through-via-bundle pattern as `actionLabels` (patch-alarm-notification-gradle.js reads `tdahActivityNotificationChannelName` off the data bundle, falling back to its own hardcoded string when absent). */
+  channelDisplayName?: string;
 };
 
 type NativeEmitterSubscription = {
@@ -99,6 +122,18 @@ const NOTIFICATION_EVENT_RESCHEDULE_DEBOUNCE_MS = 250;
 // out, so a short scheduling delay is imperceptible.
 const STORE_RESCHEDULE_DEBOUNCE_MS = 2_500;
 const TASK_REMINDER_SNOOZE_MINUTES = 10;
+
+// Story 2.2 ("La vibra en la muñeca"). Own constant per spec's Never bullet:
+// never reuse TASK_REMINDER_SNOOZE_MINUTES above, even though the value
+// happens to match today (ADR-0013: no shared scheduling constants with the
+// GTD pipeline).
+export const TDAH_ACTIVITY_SNOOZE_MINUTES = 10;
+// Must match TDAH_ACTIVITY_NOTIFICATION_CHANNEL_ID in
+// apps/mobile/plugins/patch-alarm-notification-gradle.js — the native patch
+// special-cases this exact channel id for IMPORTANCE_HIGH + vibration
+// (distinct from LOCAL_NOTIFICATION_CHANNEL above, which N-... GTD reminders
+// use at IMPORTANCE_DEFAULT with no vibration). Keep both literals in sync.
+export const TDAH_ACTIVITY_NOTIFICATION_CHANNEL = 'mindwtr_tdah_activity_v1';
 
 let started = false;
 let alarmApi: AlarmNotificationsApi | null = null;
@@ -425,6 +460,7 @@ function attachNativeEventListeners(): void {
         projectId: data.projectId,
         context: data.context,
         kind: data.kind,
+        edge: data.edge,
       });
     } catch (error) {
       logNotificationError('Failed to handle notification open event', error);
@@ -464,6 +500,13 @@ function buildAlarmConfigSignature(config: LocalAlarmConfig): string {
     repeatInterval: config.repeatInterval ?? 'once',
     hasSnoozeAction: config.hasSnoozeAction === true,
     ...(config.hasCompleteAction === true ? { hasCompleteAction: true } : {}),
+    ...(config.hasStartAction === true ? { hasStartAction: true } : {}),
+    ...(config.channel ? { channel: config.channel } : {}),
+    ...(config.vibrate === true ? { vibrate: true } : {}),
+    ...(config.vibrationPattern?.length ? { vibrationPattern: config.vibrationPattern } : {}),
+    ...(config.snoozeMinutes !== undefined ? { snoozeMinutes: config.snoozeMinutes } : {}),
+    ...(config.actionLabels ? { actionLabels: config.actionLabels } : {}),
+    ...(config.channelDisplayName ? { channelDisplayName: config.channelDisplayName } : {}),
     data: config.data ?? {},
   });
 }
@@ -516,11 +559,11 @@ async function scheduleAlarmForKey(api: AlarmNotificationsApi, key: string, conf
   const detailsBase: Record<string, unknown> = {
     title: config.title,
     message: normalizeNotificationMessage(config.title, config.message),
-    channel: LOCAL_NOTIFICATION_CHANNEL,
+    channel: config.channel ?? LOCAL_NOTIFICATION_CHANNEL,
     auto_cancel: true,
     small_icon: LOCAL_SMALL_ICON,
     color: LOCAL_NOTIFICATION_COLOR,
-    has_button: config.hasSnoozeAction === true || config.hasCompleteAction === true,
+    has_button: config.hasSnoozeAction === true || config.hasCompleteAction === true || config.hasStartAction === true,
     has_complete_action: config.hasCompleteAction === true,
     loop_sound: false,
     play_sound: true,
@@ -528,13 +571,19 @@ async function scheduleAlarmForKey(api: AlarmNotificationsApi, key: string, conf
     repeat_interval: config.repeatInterval ?? 'hourly',
     interval_value: 1,
     use_big_text: true,
-    vibrate: false,
+    vibrate: config.vibrate === true,
     data: {
       ...(config.data ?? {}),
       alarmKey: key,
       ...(config.hasCompleteAction === true ? { notificationActionComplete: 'true' } : {}),
+      ...(config.hasStartAction === true ? { notificationActionStart: 'true' } : {}),
+      ...(config.vibrationPattern?.length ? { vibrationPattern: config.vibrationPattern.join(',') } : {}),
+      ...(config.actionLabels?.start ? { tdahStartActionLabel: config.actionLabels.start } : {}),
+      ...(config.actionLabels?.complete ? { tdahCompleteActionLabel: config.actionLabels.complete } : {}),
+      ...(config.actionLabels?.snooze ? { tdahSnoozeActionLabel: config.actionLabels.snooze } : {}),
+      ...(config.channelDisplayName ? { tdahActivityNotificationChannelName: config.channelDisplayName } : {}),
     },
-    ...(config.hasSnoozeAction === true ? { snooze_interval: TASK_REMINDER_SNOOZE_MINUTES } : {}),
+    ...(config.hasSnoozeAction === true ? { snooze_interval: config.snoozeMinutes ?? TASK_REMINDER_SNOOZE_MINUTES } : {}),
   };
 
   let scheduledId: number | null = null;
@@ -853,6 +902,79 @@ export async function sendLocalMobileNotification(
     });
   } catch (error) {
     logNotificationError('Failed to send local mobile notification', error);
+  }
+}
+
+export type TdahActivityNotificationRequest = {
+  /** Stable per Activity+edge, e.g. `tdah-activity:{activityId}:{edge}` — reused as the alarm-map key so a duplicate WS delivery replaces rather than stacks. */
+  key: string;
+  title: string;
+  message?: string;
+  /** `[delay, on, off, on, ...]` ms — see getTdahActivityVibrationPattern in components/tdah/today/tdah-activity-notification.ts. */
+  vibrationPattern: number[];
+  actionLabels: { start: string; complete: string; snooze: string };
+  /** Localized Android notification-channel display name (`tdahToday.activityNotificationChannelName`) — channel names are immutable after first creation, so this only actually takes effect the very first time the TDAH Activity channel gets created on a given device, same as any other Android notification channel. */
+  channelName: string;
+  /** Caller-built payload — always includes `kind: 'tdah-activity'` and the Activity id (carried in `context`, the one generic field the existing native→JS open-payload path already forwards end-to-end; see use-root-layout-notification-open-handler.ts). */
+  data: Record<string, string>;
+};
+
+/**
+ * Story 2.2 ("La vibra en la muñeca") — shows the Activity-trigger
+ * notification pushed by the VPS tick over the WS channel (story 2.1): a
+ * self-sufficient title, 3 real action buttons (Iniciar/Posponer/Completada,
+ * via patch-alarm-notification-gradle.js's `notificationActionStart` +
+ * already-existing `notificationActionComplete`/snooze), and an edge-specific
+ * vibration pattern on a dedicated high-importance, vibrating channel.
+ *
+ * Deliberately goes through `scheduleAlarm` (a ~2s-out fire time, same
+ * convention `sendLocalMobileNotification`'s own fallback already uses)
+ * rather than the library's immediate `sendNotification` bridge method: that
+ * method's Android side reads the vibrate flag off the wrong bundle key
+ * (`loop_sound` instead of `vibrate` — an upstream copy-paste bug), while
+ * `scheduleAlarm` reads it correctly and still creates a real, DB-backed
+ * alarm row so Posponer's native local reschedule (no network call) works.
+ */
+export async function showTdahActivityNotification(request: TdahActivityNotificationRequest): Promise<void> {
+  const trimmedTitle = String(request.title || '').trim();
+  if (!trimmedTitle) {
+    // Review fix (MEDIUM): every skip path must say why (#1028) — a silently
+    // skipped Activity notification is indistinguishable from a lost WS event.
+    logNotificationInfo('TDAH Activity notification skipped: blank title');
+    return;
+  }
+
+  const api = await loadAlarmApi();
+  if (!api) {
+    logNotificationInfo('TDAH Activity notification skipped: alarm API unavailable');
+    return;
+  }
+
+  const permission = await requestLocalNotificationPermission();
+  if (!permission.granted) {
+    logNotificationInfo('TDAH Activity notification skipped: notification permission denied');
+    return;
+  }
+
+  await loadAlarmMapIfNeeded();
+  try {
+    await scheduleAlarmForKey(api, request.key, {
+      title: trimmedTitle,
+      message: request.message ?? trimmedTitle,
+      fireAt: new Date(Date.now() + 2000),
+      hasSnoozeAction: true,
+      hasCompleteAction: true,
+      hasStartAction: true,
+      channel: TDAH_ACTIVITY_NOTIFICATION_CHANNEL,
+      vibrate: true,
+      vibrationPattern: request.vibrationPattern,
+      snoozeMinutes: TDAH_ACTIVITY_SNOOZE_MINUTES,
+      actionLabels: request.actionLabels,
+      channelDisplayName: request.channelName,
+      data: request.data,
+    });
+  } finally {
+    await saveAlarmMap();
   }
 }
 

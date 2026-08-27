@@ -275,8 +275,100 @@ const TDAH_ERROR_CODES = {
     notFound: 'TDAH_NOT_FOUND',
     storageFailed: 'TDAH_STORAGE_FAILED',
     activateRequired: 'TDAH_ACTIVATE_REQUIRED',
+    // Story 2.1: the WS channel upgrade's own bearer-token check (query
+    // param, not the `Authorization` header — see ws-channel.ts) rejects a
+    // missing/invalid/unauthorized token with this single code, before the
+    // handshake ever completes. The client treats any WS close/reject as
+    // "sin servidor" and never inspects a raw message (AGENTS.md's
+    // `.code`-only rule applies to the channel exactly like every HTTP
+    // TDAH route).
+    wsUnauthorized: 'TDAH_WS_UNAUTHORIZED',
 } as const;
 
 export type TdahErrorCode = (typeof TDAH_ERROR_CODES)[keyof typeof TDAH_ERROR_CODES];
 
 export const TDAH_ERRORS = TDAH_ERROR_CODES;
+
+/**
+ * Story 2.1 — the persistent WS channel's shared shapes. Same server-only
+ * rule as the rest of this file (ADR 0026): the channel lives entirely in
+ * server.ts + ws-channel.ts, and story 2.2 (activity-trigger notifications)
+ * will add its own event `kind`s onto this same envelope rather than
+ * inventing a second one.
+ */
+
+/**
+ * Sent once, immediately after a successful upgrade (server.ts's
+ * `websocket.open` handler) — the minimal "the channel is live" payload.
+ * `kind` is a discriminant so `TdahWsServerEvent` can grow into a real union
+ * once story 2.2 adds its own event kinds on top, without this story having
+ * to anticipate their fields.
+ */
+export type TdahWsConnectedEvent = {
+    kind: 'connected';
+    at: string;
+};
+
+/**
+ * Story 2.2 — the activity-trigger tick's own WS event kind, added onto the
+ * same envelope story 2.1's `TdahWsConnectedEvent` doc-comment anticipated.
+ * `cloud/src/tdah/activity-trigger.ts`'s `runActivityTriggerTick` pushes one
+ * of these per Actividad milestone that just crossed and hadn't been
+ * notified yet — `edge: 'start'` when `startTime` arrives, `edge: 'end'`
+ * when `startTime + durationMinutes` arrives. Never a third, generic kind.
+ *
+ * Field names/`kind` value (`'activity-trigger'`, `edge` rather than
+ * `event`) match
+ * `apps/mobile/components/tdah/today/tdah-activity-notification.ts`'s own
+ * mirror of this shape (ADR 0026: the client can't import this file across
+ * the wire boundary, so it keeps an independent copy) — that file's own doc
+ * comment says only its parser needs to change if the server lands on
+ * different names, so this is the actual wire contract to reconcile it
+ * against, not a guess.
+ *
+ * `durationMinutes` travels raw (not a pre-formatted string) so the client
+ * builds the `"{Actividad} — {duración}"` title itself, following the same
+ * `{durationMinutes} min` formatting convention `TdahActivityRow.tsx`
+ * already uses. It is never `null` for an `edge: 'end'` trigger (an
+ * Actividad without a duration can never reach an end milestone, since
+ * `startTime + durationMinutes` is undefined without both), but genuinely
+ * optional for `edge: 'start'` (a manual Actividad can have a `startTime`
+ * without a `durationMinutes`) — the mobile mirror type above types its own
+ * `durationMinutes` the same nullable way.
+ */
+export type TdahWsActivityTriggerEvent = {
+    kind: 'activity-trigger';
+    edge: 'start' | 'end';
+    activityId: number;
+    title: string;
+    durationMinutes: number | null;
+    startTime: string;
+    at: string;
+};
+
+export type TdahWsServerEvent = TdahWsConnectedEvent | TdahWsActivityTriggerEvent;
+
+/**
+ * Story 2.2 — per-tick aggregate stats across every namespace scanned by
+ * `runActivityTriggerTick` (activity-trigger.ts). Same shape/spirit as
+ * `TdahNightlyTickSummary` above: counts only, never a namespace key or
+ * Activity title (AGENTS.md's `.code`-only logging rule applies here too).
+ */
+export type TdahActivityTriggerTickSummary = {
+    /** The tick's own reference date (UTC calendar day of `now`) — not any single namespace's local date, since namespaces can span time zones. */
+    date: string;
+    /** Namespaces with an existing TDAH database, scanned this tick. */
+    namespaceCount: number;
+    /** Namespaces that fired at least one activity-trigger event this tick. */
+    firedNamespaceCount: number;
+    /** Total individual start/end trigger events fired across every namespace this tick. */
+    firedEventCount: number;
+    /**
+     * Namespaces skipped this tick — mode off, no open WS connection to push
+     * to (never marks anything notified in that case — see
+     * activity-trigger.ts), or no Actividad milestone due yet.
+     */
+    skippedCount: number;
+    /** Namespaces whose write transaction failed this tick — retried automatically next tick. */
+    failedCount: number;
+};

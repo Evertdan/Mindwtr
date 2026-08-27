@@ -8,6 +8,8 @@ type NotificationOpenPayload = {
   projectId?: string;
   context?: string;
   kind?: string;
+  /** Story 2.2: 'start' | 'end' on a `kind: 'tdah-activity'` payload — see use-root-layout-tdah-connection.ts's handleTdahActivityTriggerEvent. */
+  edge?: string;
 };
 
 type NotificationOpenIntentsModule = {
@@ -70,6 +72,7 @@ function normalizePayload(payload: Record<string, unknown>): NotificationOpenPay
     projectId: stringifyPayloadValue(payload.projectId) || nestedData.projectId,
     context: stringifyPayloadValue(payload.context) || nestedData.context,
     kind: stringifyPayloadValue(payload.kind) || nestedData.kind,
+    edge: stringifyPayloadValue(payload.edge) || nestedData.edge,
   };
 }
 

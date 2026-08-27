@@ -59,8 +59,12 @@ import type { TdahNightlyTickSummary } from './types';
  * `weekdayOfDate`/`formatDateInTimeZone` already establish. Zero-padded
  * (`hourCycle: 'h23'`), so it's directly comparable, lexically, against the
  * profile's own zero-padded `ritualHour` string.
+ *
+ * Exported (story 2.2) so `activity-trigger.ts`'s tick can resolve the same
+ * namespace-local "now" wall clock this file already uses, instead of a
+ * second copy of this `Intl.DateTimeFormat` call.
  */
-const computeLocalTimeOfDay = (timeZone: string, now: Date): string => (
+export const computeLocalTimeOfDay = (timeZone: string, now: Date): string => (
     new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(now)
 );
 

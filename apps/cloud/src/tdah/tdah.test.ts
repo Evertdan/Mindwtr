@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync 
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { tokenToKey } from '../server-auth';
-import { startCloudServer } from '../server';
+import { startCloudServer, runTdahActivityTriggerIntervalTick, buildTdahActivityTriggerPush } from '../server';
 import {
     activateTdahProfile,
     computeTomorrowDate,
@@ -17,6 +17,10 @@ import {
 } from './storage';
 import { handleTdahRequest } from './routes';
 import { runNightlyTdahTick } from './scheduler';
+import { runActivityTriggerTick } from './activity-trigger';
+import { createTdahWsConnectionRegistry, resolveTdahWsAuth, TDAH_WS_PATH } from './ws-channel';
+import { createAllowedAuthTokens } from '../server-auth';
+import type { TdahWsActivityTriggerEvent } from './types';
 
 const TOKEN_ALPHA = 'tdah-token-alpha-1234567890';
 const TOKEN_BETA = 'tdah-token-beta-1234567890';
@@ -1402,10 +1406,12 @@ describe('tdah module', () => {
         });
 
         // Story 1.6 added a second version bump (tdah_activity's
-        // started_at/completed_at, SCHEMA_VERSION_ACTIVITY_TIMESTAMPS = 2), so
-        // a fresh database — which gets both widened shapes directly from
-        // their CREATE TABLE statements — now lands at v2, not v1.
-        test('a fresh database starts directly at schema v2 (no migration needed)', async () => {
+        // started_at/completed_at, SCHEMA_VERSION_ACTIVITY_TIMESTAMPS = 2),
+        // and story 2.2 added a third (start_notified_at/end_notified_at,
+        // SCHEMA_VERSION_ACTIVITY_NOTIFICATIONS = 3), so a fresh database —
+        // which gets all three widened/added shapes directly from their
+        // CREATE TABLE statements — now lands at v3, not v1.
+        test('a fresh database starts directly at schema v3 (no migration needed)', async () => {
             await activate({ timeZone: 'UTC' });
             const key = tokenToKey(TOKEN_ALPHA);
             const databasePath = tdahDatabasePath(dataDir, key);
@@ -1413,7 +1419,7 @@ describe('tdah module', () => {
             const database = new Database(databasePath, { readonly: true });
             try {
                 const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: number };
-                expect(versionRow.user_version).toBe(2);
+                expect(versionRow.user_version).toBe(3);
                 const columns = (database.prepare("PRAGMA table_info('tdah_routine');") as unknown as {
                     all(): { name: string }[];
                 }).all();
@@ -1471,16 +1477,17 @@ describe('tdah module', () => {
             expect(routines[0]?.pattern).toEqual({ kind: 'weekday', weekdays: [1, 2, 3, 4, 5] });
             expect(routines[0]?.blocks).toHaveLength(1);
 
-            // Story 1.6's v1->v2 step also runs here: this seed never creates
-            // `tdah_activity` at all, so `ensureSchema`'s
-            // `CREATE TABLE IF NOT EXISTS` plants it already widened
-            // (started_at/completed_at included), and the migration step sees
-            // those columns present and stamps v2 directly — same as the
-            // "fresh database" case above.
+            // Story 1.6's v1->v2 step and story 2.2's v2->v3 step also run
+            // here: this seed never creates `tdah_activity` at all, so
+            // `ensureSchema`'s `CREATE TABLE IF NOT EXISTS` plants it already
+            // widened (started_at/completed_at and start_notified_at/
+            // end_notified_at included), and both migration steps see those
+            // columns present and stamp v3 directly — same as the "fresh
+            // database" case above.
             const verifyDatabase = new Database(databasePath, { readonly: true });
             try {
                 const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
-                expect(versionRow.user_version).toBe(2);
+                expect(versionRow.user_version).toBe(3);
             } finally {
                 verifyDatabase.close();
             }
@@ -1545,12 +1552,13 @@ describe('tdah module', () => {
             expect(routines[0]?.title).toBe('Día laboral');
             expect(routines[0]?.pattern).toEqual({ kind: 'weekday', weekdays: [1, 2, 3, 4, 5] });
 
-            // Same story 1.6 v1->v2 cascade as the test above: this seed
-            // never creates `tdah_activity` either, so it lands on v2 too.
+            // Same story 1.6 v1->v2 and story 2.2 v2->v3 cascade as the test
+            // above: this seed never creates `tdah_activity` either, so it
+            // lands on v3 too.
             const verifyDatabase = new Database(databasePath, { readonly: true });
             try {
                 const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
-                expect(versionRow.user_version).toBe(2);
+                expect(versionRow.user_version).toBe(3);
                 const tableNames = (verifyDatabase.prepare("SELECT name FROM sqlite_master WHERE type = 'table';") as unknown as {
                     all(): { name: string }[];
                 }).all().map((row) => row.name);
@@ -1963,7 +1971,7 @@ describe('tdah module', () => {
         });
 
         describe('schema migration v1 -> v2 (started_at/completed_at)', () => {
-            test('a fresh database starts directly at schema v2 with started_at/completed_at present and start_time/duration_minutes nullable', async () => {
+            test('a fresh database starts directly at schema v3 (story 2.2 bump) with started_at/completed_at present and start_time/duration_minutes nullable', async () => {
                 await activate({ timeZone: 'UTC' });
                 const key = tokenToKey(TOKEN_ALPHA);
                 const databasePath = tdahDatabasePath(dataDir, key);
@@ -1971,7 +1979,7 @@ describe('tdah module', () => {
                 const database = new Database(databasePath, { readonly: true });
                 try {
                     const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: number };
-                    expect(versionRow.user_version).toBe(2);
+                    expect(versionRow.user_version).toBe(3);
                     const columns = (database.prepare("PRAGMA table_info('tdah_activity');") as unknown as {
                         all(): { name: string; notnull: number }[];
                     }).all();
@@ -2079,7 +2087,9 @@ describe('tdah module', () => {
                 const verifyDatabase = new Database(databasePath, { readonly: true });
                 try {
                     const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
-                    expect(versionRow.user_version).toBe(2);
+                    // v1 -> v2 (this describe's own migration) then v2 -> v3
+                    // (story 2.2's) both run in sequence on this seeded v1 file.
+                    expect(versionRow.user_version).toBe(3);
                     const columns = (verifyDatabase.prepare("PRAGMA table_info('tdah_activity');") as unknown as {
                         all(): { name: string; notnull: number }[];
                     }).all();
@@ -2198,11 +2208,146 @@ describe('tdah module', () => {
                 const verifyDatabase = new Database(databasePath, { readonly: true });
                 try {
                     const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
-                    expect(versionRow.user_version).toBe(2);
+                    // All three migration steps (v0->v1, v1->v2, v2->v3) run in
+                    // sequence on this seeded v0 file.
+                    expect(versionRow.user_version).toBe(3);
                 } finally {
                     verifyDatabase.close();
                 }
             });
+        });
+    });
+
+    describe('WS channel (story 2.1: persistent connection)', () => {
+        type TdahWsServerEventLike = { kind: string; at: string };
+
+        const wsUrl = (token: string = TOKEN_ALPHA): string => (
+            `ws://127.0.0.1:${server!.port}${TDAH_WS_PATH}?token=${encodeURIComponent(token)}`
+        );
+
+        // Resolves once the server's own "connected" event (types.ts's
+        // `TdahWsConnectedEvent`) arrives — proof the upgrade actually
+        // completed and the channel is live, not just that the client-side
+        // `open` event fired.
+        const openTdahWs = (token?: string): Promise<{ ws: WebSocket; connectedEvent: TdahWsServerEventLike }> => (
+            new Promise((resolve, reject) => {
+                const ws = new WebSocket(wsUrl(token));
+                const timeout = setTimeout(() => {
+                    reject(new Error('WS did not receive the connected event in time'));
+                }, 2000);
+                ws.onmessage = (event) => {
+                    clearTimeout(timeout);
+                    resolve({ ws, connectedEvent: JSON.parse(String(event.data)) as TdahWsServerEventLike });
+                };
+                ws.onerror = () => {
+                    clearTimeout(timeout);
+                    reject(new Error('WS errored before the connected event arrived'));
+                };
+            })
+        );
+
+        const waitForClose = (ws: WebSocket): Promise<void> => (
+            new Promise((resolve) => {
+                if (ws.readyState === ws.CLOSED) {
+                    resolve();
+                    return;
+                }
+                ws.onclose = () => resolve();
+            })
+        );
+
+        test('a valid token upgrades the connection and receives a "connected" event', async () => {
+            const { ws, connectedEvent } = await openTdahWs();
+            expect(connectedEvent.kind).toBe('connected');
+            expect(typeof connectedEvent.at).toBe('string');
+            expect(Number.isNaN(Date.parse(connectedEvent.at))).toBe(false);
+            ws.close();
+            await waitForClose(ws);
+        });
+
+        test('a missing token is rejected before the handshake, with 401 and a .code body', async () => {
+            const response = await fetch(`${baseUrl}${TDAH_WS_PATH}`);
+            expect(response.status).toBe(401);
+            expect(await readErrorCode(response)).toBe('TDAH_WS_UNAUTHORIZED');
+        });
+
+        test('a malformed token is rejected before the handshake, with 401 and a .code body', async () => {
+            const response = await fetch(`${baseUrl}${TDAH_WS_PATH}?token=short`);
+            expect(response.status).toBe(401);
+            expect(await readErrorCode(response)).toBe('TDAH_WS_UNAUTHORIZED');
+        });
+
+        test('a well-formed but unrecognized token is rejected the same way as a missing one', async () => {
+            // Same length/charset as TOKEN_ALPHA (passes the bearer-token
+            // format check) but never added to this server's
+            // allowedAuthTokens allowlist — proves the allowlist check runs,
+            // not just the format check.
+            const response = await fetch(`${baseUrl}${TDAH_WS_PATH}?token=tdah-token-unknown-0000000`);
+            expect(response.status).toBe(401);
+            expect(await readErrorCode(response)).toBe('TDAH_WS_UNAUTHORIZED');
+        });
+
+        test('non-GET requests to the WS path are rejected with 405, before auth is even checked', async () => {
+            const response = await fetch(`${baseUrl}${TDAH_WS_PATH}`, { method: 'POST' });
+            expect(response.status).toBe(405);
+            expect(await readErrorCode(response)).toBe('TDAH_METHOD_NOT_ALLOWED');
+        });
+
+        test('a valid token without a real WS handshake gets a plain 400, not the channel\'s .code', async () => {
+            // A plain fetch() GET never sends the Upgrade/Connection headers a
+            // real WS client sends, so `bunServer.upgrade()` returns false
+            // even though the token itself is valid and allowlisted — this is
+            // the "not a real handshake" branch, distinct from an auth
+            // rejection (server.ts's own comment on that branch).
+            const response = await fetch(`${baseUrl}${TDAH_WS_PATH}?token=${encodeURIComponent(TOKEN_ALPHA)}`);
+            expect(response.status).toBe(400);
+            const body = await response.json() as { error?: string };
+            expect(body.error).toBe('WebSocket upgrade required');
+        });
+
+        test('repeated invalid-token attempts trip the same auth-failure rate limit as HTTP routes, returning 429', async () => {
+            // Mirrors server.test.ts's "auth failure throttling never bypasses
+            // token checks" pattern: AUTH_FAILURE_RATE_MAX defaults to 30, so
+            // the 31st request in the same window trips it. All requests
+            // share the 'auth-failure:ip:unknown' bucket here (no
+            // trustProxyHeaders configured), same as that existing test.
+            let firstStatus = 0;
+            let lastStatus = 0;
+            for (let attempt = 0; attempt < 31; attempt += 1) {
+                const response = await fetch(`${baseUrl}${TDAH_WS_PATH}?token=not-a-real-token-at-all-000`);
+                if (attempt === 0) firstStatus = response.status;
+                lastStatus = response.status;
+            }
+            expect(firstStatus).toBe(401);
+            expect(lastStatus).toBe(429);
+        });
+
+        test('a client-initiated close is clean: the server keeps serving, and the same namespace can reconnect right away', async () => {
+            const { ws } = await openTdahWs();
+            ws.close(1000, 'done');
+            await waitForClose(ws);
+            expect(ws.readyState).toBe(ws.CLOSED);
+
+            // The disconnect must not affect the rest of the server.
+            const health = await fetch(`${baseUrl}/health`);
+            expect(health.status).toBe(200);
+
+            // And the closed connection's registry entry didn't leak or block
+            // a fresh upgrade for the very same namespace.
+            const reconnect = await openTdahWs();
+            expect(reconnect.connectedEvent.kind).toBe('connected');
+            reconnect.ws.close();
+            await waitForClose(reconnect.ws);
+        });
+
+        test('two different tokens each get their own independent, simultaneous connection', async () => {
+            const alpha = await openTdahWs(TOKEN_ALPHA);
+            const beta = await openTdahWs(TOKEN_BETA);
+            expect(alpha.ws.readyState).toBe(alpha.ws.OPEN);
+            expect(beta.ws.readyState).toBe(beta.ws.OPEN);
+            alpha.ws.close();
+            beta.ws.close();
+            await Promise.all([waitForClose(alpha.ws), waitForClose(beta.ws)]);
         });
     });
 
@@ -2741,6 +2886,676 @@ describe('tdah module', () => {
         });
     });
 
+    describe('schema migration v2 -> v3 (start_notified_at/end_notified_at, story 2.2)', () => {
+        test('a fresh database starts directly at schema v3 with start_notified_at/end_notified_at present', async () => {
+            await activate({ timeZone: 'UTC' });
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(databasePath, { readonly: true });
+            try {
+                const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: number };
+                expect(versionRow.user_version).toBe(3);
+                const columns = (database.prepare("PRAGMA table_info('tdah_activity');") as unknown as {
+                    all(): { name: string }[];
+                }).all();
+                expect(columns.some((column) => column.name === 'start_notified_at')).toBe(true);
+                expect(columns.some((column) => column.name === 'end_notified_at')).toBe(true);
+            } finally {
+                database.close();
+            }
+        });
+
+        test('a pre-2.2 (schema v2) database on disk migrates transparently via ALTER TABLE, backfilling both new columns as NULL', async () => {
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            mkdirSync(join(dataDir, key, 'tdah'), { recursive: true });
+
+            const today = formatDateInTimeZone(new Date(), 'UTC');
+            const { Database } = await import('bun:sqlite');
+            const seedDatabase = new Database(databasePath);
+            try {
+                // Deliberately the pre-2.2 shape (story 1.6's schema v2):
+                // started_at/completed_at present, but no start_notified_at/
+                // end_notified_at yet.
+                seedDatabase.exec(`
+                    CREATE TABLE tdah_day_plan (
+                        date TEXT PRIMARY KEY,
+                        generated_at TEXT NOT NULL
+                    );
+                `);
+                seedDatabase.exec(`
+                    CREATE TABLE tdah_activity (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        day_plan_date TEXT NOT NULL REFERENCES tdah_day_plan(date),
+                        block_id INTEGER,
+                        title TEXT NOT NULL,
+                        start_time TEXT,
+                        duration_minutes INTEGER,
+                        origin TEXT NOT NULL CHECK (origin IN ('routine', 'manual')),
+                        state TEXT NOT NULL CHECK (state IN ('pending', 'started', 'completed', 'missed', 'limbo', 'discarded')) DEFAULT 'pending',
+                        started_at TEXT,
+                        completed_at TEXT
+                    );
+                `);
+                seedDatabase.prepare('INSERT INTO tdah_day_plan (date, generated_at) VALUES (?, ?);').run(today, '2026-01-01T00:00:00.000Z');
+                seedDatabase
+                    .prepare("INSERT INTO tdah_activity (day_plan_date, block_id, title, start_time, duration_minutes, origin, state) VALUES (?, NULL, 'Vieja', '08:00', 30, 'manual', 'pending');")
+                    .run(today);
+                // PRAGMA user_version = 2 — matches a real post-1.6/pre-2.2 file on disk.
+                seedDatabase.exec('PRAGMA user_version = 2;');
+            } finally {
+                seedDatabase.close();
+            }
+
+            // FR-1 mode gate: GET /day needs an active profile — activation's
+            // withWriteTransaction is the write that opens the seeded v2 file
+            // and runs ensureSchema, migrating it in place.
+            await activate({ timeZone: 'UTC' });
+
+            const day = await readDay(await getDay());
+            expect(day.activities).toHaveLength(1);
+            expect(day.activities[0]?.title).toBe('Vieja');
+            // The pre-2.2 row's real values survive the ALTER TABLE untouched.
+            expect(day.activities[0]?.startTime).toBe('08:00');
+            expect(day.activities[0]?.durationMinutes).toBe(30);
+
+            const verifyDatabase = new Database(databasePath, { readonly: true });
+            try {
+                const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
+                expect(versionRow.user_version).toBe(3);
+                const row = verifyDatabase.prepare(
+                    'SELECT start_notified_at, end_notified_at FROM tdah_activity WHERE day_plan_date = ?;',
+                ).get(today) as { start_notified_at: string | null; end_notified_at: string | null };
+                expect(row.start_notified_at).toBeNull();
+                expect(row.end_notified_at).toBeNull();
+            } finally {
+                verifyDatabase.close();
+            }
+        });
+    });
+
+    describe('runActivityTriggerTick (story 2.2: activity-trigger tick)', () => {
+        // Builds an exact UTC instant for the REAL current calendar day (so it
+        // lands on the same `tdah_day_plan.date` row `createManualActivityApi`
+        // plants via its own unmocked `new Date()`), with full control over
+        // the HH:mm portion for start/end-crossing comparisons.
+        const buildTodayInstant = (hhmm: string): Date => (
+            new Date(`${formatDateInTimeZone(new Date(), 'UTC')}T${hhmm}:00.000Z`)
+        );
+
+        const alwaysConnected = (): boolean => true;
+        const neverConnected = (): boolean => false;
+
+        type CollectedFire = { key: string; event: TdahWsActivityTriggerEvent };
+        const collectFires = (): {
+            fires: CollectedFire[];
+            onFire: (key: string, event: TdahWsActivityTriggerEvent) => void;
+        } => {
+            const fires: CollectedFire[] = [];
+            return { fires, onFire: (key, event) => fires.push({ key, event }) };
+        };
+
+        type NotifiedRow = {
+            id: number;
+            title: string;
+            start_notified_at: string | null;
+            end_notified_at: string | null;
+        };
+
+        const readNotifiedRows = async (databasePath: string, date: string): Promise<NotifiedRow[]> => {
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(databasePath, { readonly: true });
+            try {
+                return (database.prepare(
+                    'SELECT id, title, start_notified_at, end_notified_at FROM tdah_activity WHERE day_plan_date = ? ORDER BY id;',
+                ) as unknown as { all(...params: unknown[]): NotifiedRow[] }).all(date);
+            } finally {
+                database.close();
+            }
+        };
+
+        test('an Actividad whose startTime already arrived fires exactly one "start" event with a self-sufficient payload, and persists the mark', async () => {
+            await activate({ timeZone: 'UTC' });
+            const created = await readActivity(
+                await createManualActivityApi({ title: 'Foco', startTime: '11:55', durationMinutes: 25 }),
+            );
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const now = buildTodayInstant('12:00');
+
+            const { fires, onFire } = collectFires();
+            const summary = await runActivityTriggerTick(dataDir, now, alwaysConnected, onFire);
+
+            expect(summary.namespaceCount).toBe(1);
+            expect(summary.firedNamespaceCount).toBe(1);
+            expect(summary.firedEventCount).toBe(1);
+            expect(summary.skippedCount).toBe(0);
+            expect(summary.failedCount).toBe(0);
+            expect(fires).toHaveLength(1);
+            expect(fires[0]?.key).toBe(key);
+            expect(fires[0]?.event.kind).toBe('activity-trigger');
+            expect(fires[0]?.event.edge).toBe('start');
+            expect(fires[0]?.event.activityId).toBe(created.id);
+            expect(fires[0]?.event.title).toBe('Foco');
+            expect(fires[0]?.event.durationMinutes).toBe(25);
+            expect(fires[0]?.event.startTime).toBe('11:55');
+            expect(typeof fires[0]?.event.at).toBe('string');
+            expect(Number.isNaN(Date.parse(fires[0]?.event.at ?? ''))).toBe(false);
+
+            const rows = await readNotifiedRows(databasePath, created.dayPlanDate);
+            expect(rows).toHaveLength(1);
+            expect(rows[0]?.start_notified_at).not.toBeNull();
+            expect(rows[0]?.end_notified_at).toBeNull();
+        });
+
+        test('an Actividad whose startTime + durationMinutes already arrived fires an "end" event once its start mark is already set', async () => {
+            await activate({ timeZone: 'UTC' });
+            const created = await readActivity(
+                await createManualActivityApi({ title: 'Reunión', startTime: '09:00', durationMinutes: 30 }),
+            );
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+
+            // First tick: only the start milestone (09:00) has crossed —
+            // 09:15 is still before the 09:30 end.
+            const startOnly = collectFires();
+            const firstSummary = await runActivityTriggerTick(dataDir, buildTodayInstant('09:15'), alwaysConnected, startOnly.onFire);
+            expect(firstSummary.firedEventCount).toBe(1);
+            expect(startOnly.fires[0]?.event.edge).toBe('start');
+
+            // Second tick, later: the end milestone (09:30) has now also
+            // crossed — only "end" fires, since "start" is already marked.
+            const endOnly = collectFires();
+            const secondSummary = await runActivityTriggerTick(dataDir, buildTodayInstant('09:31'), alwaysConnected, endOnly.onFire);
+            expect(secondSummary.firedEventCount).toBe(1);
+            expect(endOnly.fires).toHaveLength(1);
+            expect(endOnly.fires[0]?.event.edge).toBe('end');
+            expect(endOnly.fires[0]?.event.activityId).toBe(created.id);
+            expect(endOnly.fires[0]?.event.durationMinutes).toBe(30);
+
+            const rows = await readNotifiedRows(databasePath, created.dayPlanDate);
+            expect(rows[0]?.start_notified_at).not.toBeNull();
+            expect(rows[0]?.end_notified_at).not.toBeNull();
+        });
+
+        // Matrix: "Reinicio del servidor entre el startTime y el disparo" — a
+        // milestone that arrives while no tick ever ran (simulating downtime)
+        // is still detected and fires exactly once on the next tick, since
+        // the mark lives entirely in the persisted database, never in any
+        // process-local memory.
+        test('a milestone that arrived while the tick never ran (simulated server downtime) still fires exactly once on the next tick', async () => {
+            await activate({ timeZone: 'UTC' });
+            const created = await readActivity(
+                await createManualActivityApi({ title: 'Ducha', startTime: '07:00', durationMinutes: 15 }),
+            );
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+
+            // No tick ran anywhere near 07:00 or 07:15 — the very first tick
+            // to ever run against this namespace happens well after both
+            // milestones already crossed.
+            const { fires, onFire } = collectFires();
+            const summary = await runActivityTriggerTick(dataDir, buildTodayInstant('08:00'), alwaysConnected, onFire);
+            expect(summary.firedEventCount).toBe(2);
+            expect(fires.map((fire) => fire.event.edge)).toEqual(['start', 'end']);
+            expect(fires.every((fire) => fire.event.activityId === created.id)).toBe(true);
+
+            // A fresh call to the pure tick function — exactly what a
+            // restarted process's very first tick looks like, since it
+            // carries zero in-memory state from before — never re-fires.
+            const retry = collectFires();
+            const retrySummary = await runActivityTriggerTick(dataDir, buildTodayInstant('08:05'), alwaysConnected, retry.onFire);
+            expect(retrySummary.firedEventCount).toBe(0);
+            expect(retry.fires).toHaveLength(0);
+
+            const rows = await readNotifiedRows(databasePath, created.dayPlanDate);
+            expect(rows[0]?.start_notified_at).not.toBeNull();
+            expect(rows[0]?.end_notified_at).not.toBeNull();
+        });
+
+        test('re-running the tick for the same crossed milestone is a no-op (idempotent, no duplicate event)', async () => {
+            await activate({ timeZone: 'UTC' });
+            await createManualActivityApi({ title: 'Lectura', startTime: '10:00', durationMinutes: 20 });
+            const now = buildTodayInstant('10:05');
+
+            const first = collectFires();
+            const firstSummary = await runActivityTriggerTick(dataDir, now, alwaysConnected, first.onFire);
+            expect(firstSummary.firedEventCount).toBe(1);
+
+            const second = collectFires();
+            const secondSummary = await runActivityTriggerTick(dataDir, now, alwaysConnected, second.onFire);
+            expect(secondSummary.firedEventCount).toBe(0);
+            expect(secondSummary.skippedCount).toBe(1);
+            expect(second.fires).toHaveLength(0);
+        });
+
+        test('an Actividad with a null startTime (manual, "sin hora") never fires any event', async () => {
+            await activate({ timeZone: 'UTC' });
+            await createManualActivityApi({ title: 'Algún día' });
+
+            const { fires, onFire } = collectFires();
+            const summary = await runActivityTriggerTick(dataDir, buildTodayInstant('23:59'), alwaysConnected, onFire);
+            expect(summary.firedEventCount).toBe(0);
+            expect(summary.skippedCount).toBe(1);
+            expect(fires).toHaveLength(0);
+        });
+
+        // Matrix: "Sin conexión WS al momento del disparo" — no live socket
+        // to push to means nothing is marked notified either, so the very
+        // next tick (once a connection exists) still detects and fires it.
+        test('with no open WS connection, the tick fires nothing and marks nothing notified; once reconnected, the next tick fires normally', async () => {
+            await activate({ timeZone: 'UTC' });
+            const created = await readActivity(
+                await createManualActivityApi({ title: 'Estiramientos', startTime: '06:00', durationMinutes: 10 }),
+            );
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const now = buildTodayInstant('06:30');
+
+            const disconnected = collectFires();
+            const disconnectedSummary = await runActivityTriggerTick(dataDir, now, neverConnected, disconnected.onFire);
+            expect(disconnectedSummary.firedEventCount).toBe(0);
+            expect(disconnectedSummary.skippedCount).toBe(1);
+            expect(disconnected.fires).toHaveLength(0);
+
+            const rowsWhileDisconnected = await readNotifiedRows(databasePath, created.dayPlanDate);
+            expect(rowsWhileDisconnected[0]?.start_notified_at).toBeNull();
+            expect(rowsWhileDisconnected[0]?.end_notified_at).toBeNull();
+
+            const reconnected = collectFires();
+            const reconnectedSummary = await runActivityTriggerTick(dataDir, now, alwaysConnected, reconnected.onFire);
+            expect(reconnectedSummary.firedEventCount).toBe(2);
+            expect(reconnected.fires.map((fire) => fire.event.edge)).toEqual(['start', 'end']);
+        });
+
+        test('a deactivated (mode: off) profile is skipped without ever reading its Actividades', async () => {
+            await activate({ timeZone: 'UTC' });
+            await createManualActivityApi({ title: 'Fantasma', startTime: '05:00', durationMinutes: 5 });
+            await putProfile({ mode: 'off' });
+
+            const { fires, onFire } = collectFires();
+            const summary = await runActivityTriggerTick(dataDir, buildTodayInstant('23:00'), alwaysConnected, onFire);
+            expect(summary.namespaceCount).toBe(1);
+            expect(summary.skippedCount).toBe(1);
+            expect(summary.firedEventCount).toBe(0);
+            expect(fires).toHaveLength(0);
+        });
+
+        test('an Actividad with a startTime but no durationMinutes can fire "start" but never "end"', async () => {
+            await activate({ timeZone: 'UTC' });
+            const created = await readActivity(
+                await createManualActivityApi({ title: 'Sin duración', startTime: '13:00' }),
+            );
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+
+            const { fires, onFire } = collectFires();
+            const summary = await runActivityTriggerTick(dataDir, buildTodayInstant('23:00'), alwaysConnected, onFire);
+            expect(summary.firedEventCount).toBe(1);
+            expect(fires[0]?.event.edge).toBe('start');
+            expect(fires[0]?.event.durationMinutes).toBeNull();
+
+            const rows = await readNotifiedRows(databasePath, created.dayPlanDate);
+            expect(rows[0]?.start_notified_at).not.toBeNull();
+            expect(rows[0]?.end_notified_at).toBeNull();
+        });
+
+        // Review fix (HIGH): plain minutes-of-day arithmetic (0-1439) can
+        // never represent "tomorrow", so an end milestone landing after
+        // midnight could never satisfy a same-day comparison at all.
+        test('an Actividad whose end milestone crosses midnight (23:50 + 30min) fires correctly once the next day arrives', async () => {
+            await activate({ timeZone: 'UTC' });
+            const created = await readActivity(
+                await createManualActivityApi({ title: 'Trasnochada', startTime: '23:50', durationMinutes: 30 }),
+            );
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+
+            // First tick, same day at 23:55: the start milestone (23:50) has
+            // crossed; the end milestone (00:20 the NEXT day) has not.
+            const startOnly = collectFires();
+            const firstSummary = await runActivityTriggerTick(dataDir, buildTodayInstant('23:55'), alwaysConnected, startOnly.onFire);
+            expect(firstSummary.firedEventCount).toBe(1);
+            expect(startOnly.fires).toHaveLength(1);
+            expect(startOnly.fires[0]?.event.edge).toBe('start');
+
+            // Second tick, the NEXT calendar day at 00:25: the end milestone
+            // (00:20) has now crossed too, even though this Actividad's own
+            // `day_plan_date` is "yesterday" relative to this tick's "today".
+            const nextDayAt0025 = new Date(buildTodayInstant('00:25').getTime() + 24 * 60 * 60 * 1000);
+            const endOnly = collectFires();
+            const secondSummary = await runActivityTriggerTick(dataDir, nextDayAt0025, alwaysConnected, endOnly.onFire);
+            expect(secondSummary.firedEventCount).toBe(1);
+            expect(endOnly.fires).toHaveLength(1);
+            expect(endOnly.fires[0]?.event.edge).toBe('end');
+            expect(endOnly.fires[0]?.event.activityId).toBe(created.id);
+
+            const rows = await readNotifiedRows(databasePath, created.dayPlanDate);
+            expect(rows[0]?.start_notified_at).not.toBeNull();
+            expect(rows[0]?.end_notified_at).not.toBeNull();
+        });
+
+        // Review fix (HIGH): the candidate query used to be bound to
+        // `day_plan_date = today` exactly, so a milestone still pending when
+        // the calendar day rolled over (the tick never got a chance to run
+        // on the Actividad's own day at all — simulated server downtime
+        // spanning midnight) silently dropped out of every future query.
+        test('a milestone still pending when the calendar day rolls over (server down across midnight) still fires after the rollover', async () => {
+            await activate({ timeZone: 'UTC' });
+            const created = await readActivity(
+                await createManualActivityApi({ title: 'Madrugada', startTime: '01:00', durationMinutes: 10 }),
+            );
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+
+            // No tick ever ran on this Actividad's own day — the very first
+            // tick against this namespace happens the NEXT calendar day.
+            const nextDayAt1000 = new Date(buildTodayInstant('10:00').getTime() + 24 * 60 * 60 * 1000);
+            const { fires, onFire } = collectFires();
+            const summary = await runActivityTriggerTick(dataDir, nextDayAt1000, alwaysConnected, onFire);
+            expect(summary.firedEventCount).toBe(2);
+            expect(fires.map((fire) => fire.event.edge)).toEqual(['start', 'end']);
+            expect(fires.every((fire) => fire.event.activityId === created.id)).toBe(true);
+
+            const rows = await readNotifiedRows(databasePath, created.dayPlanDate);
+            expect(rows[0]?.start_notified_at).not.toBeNull();
+            expect(rows[0]?.end_notified_at).not.toBeNull();
+        });
+
+        // Review fix (HIGH): the candidate query's backward sweep was
+        // unbounded (`day_plan_date <= ?` with no lower bound), so the first
+        // tick after a reconnect — or after the v2->v3 migration added the
+        // notified columns — re-evaluated every stale never-notified
+        // Actividad from the namespace's ENTIRE history at once: a
+        // notification storm. The sweep is now bounded to the tick's own day
+        // plus exactly one earlier day, which still covers the
+        // midnight-rollover catch-up case pinned by the test above (and the
+        // server-down-across-midnight matrix in scheduler-era tests).
+        test('an Actividad from 3 days ago (outside the one-day sweep window) never fires — no stale-notification storm', async () => {
+            await activate({ timeZone: 'UTC' });
+            const created = await readActivity(
+                await createManualActivityApi({ title: 'Añeja', startTime: '00:00', durationMinutes: 1 }),
+            );
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const threeDaysAgo = formatDateInTimeZone(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), 'UTC');
+
+            // Push the due Actividad's day 3 days back with a raw write —
+            // exactly the stale row a bounded sweep must stop finding. (The
+            // tdah schema's FK on day_plan_date is not enforced: SQLite
+            // defaults PRAGMA foreign_keys to off and this module never
+            // turns it on.)
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(databasePath);
+            try {
+                database
+                    .prepare('UPDATE tdah_activity SET day_plan_date = ? WHERE id = ?;')
+                    .run(threeDaysAgo, created.id);
+            } finally {
+                database.close();
+            }
+
+            // The real clock, exactly like the interval's own wiring — the
+            // row sits 3 days back, outside the [today-1, today] window.
+            const { fires, onFire } = collectFires();
+            const summary = await runActivityTriggerTick(dataDir, new Date(), alwaysConnected, onFire);
+            expect(summary.firedEventCount).toBe(0);
+            expect(fires).toHaveLength(0);
+
+            const rows = await readNotifiedRows(databasePath, threeDaysAgo);
+            expect(rows).toHaveLength(1);
+            expect(rows[0]?.start_notified_at).toBeNull();
+            expect(rows[0]?.end_notified_at).toBeNull();
+        });
+        // wiring synchronously ws.send()s inside it) — one namespace's push
+        // failing (e.g. an already-closing socket) must never abort the
+        // remaining namespaces still left in the same tick's loop.
+        test('one namespace\'s onFire throwing does not abort the remaining namespaces in the same tick call', async () => {
+            const keyAlpha = tokenToKey(TOKEN_ALPHA);
+            const keyBeta = tokenToKey(TOKEN_BETA);
+
+            await activate({ timeZone: 'UTC' }, TOKEN_ALPHA);
+            await activate({ timeZone: 'UTC' }, TOKEN_BETA);
+            await createManualActivityApi({ title: 'Alpha', startTime: '09:00', durationMinutes: 5 }, TOKEN_ALPHA);
+            await createManualActivityApi({ title: 'Beta', startTime: '09:00', durationMinutes: 5 }, TOKEN_BETA);
+
+            const now = buildTodayInstant('09:10');
+            const betaFires: { key: string; event: TdahWsActivityTriggerEvent }[] = [];
+            let onFireCalls = 0;
+            const summary = await runActivityTriggerTick(dataDir, now, alwaysConnected, (key, event) => {
+                onFireCalls += 1;
+                if (key === keyAlpha) {
+                    throw new Error('boom - simulated closing socket');
+                }
+                betaFires.push({ key, event });
+            });
+
+            // Both namespaces had real work (start + end, since duration 5
+            // means 09:05 has also already crossed by 09:10) and both are
+            // counted as fired regardless of alpha's onFire throwing — the
+            // notified mark is already durably committed before onFire runs.
+            expect(summary.firedNamespaceCount).toBe(2);
+            expect(summary.firedEventCount).toBe(4);
+            expect(onFireCalls).toBe(4);
+            expect(betaFires).toHaveLength(2);
+            expect(betaFires.every((fire) => fire.key === keyBeta)).toBe(true);
+            expect(betaFires.map((fire) => fire.event.edge).sort()).toEqual(['end', 'start']);
+        });
+
+        // Review fix (LOW): per-namespace storage-failure isolation for the
+        // tick itself — a namespace whose tdah database can't even be opened
+        // (here: garbage bytes planted on disk, never activated) must fail
+        // alone: every healthy namespace in the same tick still fires, the
+        // failure is counted (never thrown — runActivityTriggerTick's own
+        // never-throws contract), and the call resolves.
+        test('a corrupt namespace database fails alone: healthy namespaces still fire, failedCount counts it, and the tick resolves', async () => {
+            const keyAlpha = tokenToKey(TOKEN_ALPHA);
+            const keyBeta = tokenToKey(TOKEN_BETA);
+
+            await activate({ timeZone: 'UTC' }, TOKEN_ALPHA);
+            await createManualActivityApi({ title: 'Sana', startTime: '07:00', durationMinutes: 10 }, TOKEN_ALPHA);
+
+            // listActiveTdahNamespaces discovers beta purely by the tdah
+            // database file EXISTING on disk — no activation ever ran for
+            // it, so the garbage bytes below are the first thing any opener
+            // sees and the tick's profile read throws.
+            mkdirSync(join(dataDir, keyBeta, 'tdah'), { recursive: true });
+            writeFileSync(tdahDatabasePath(dataDir, keyBeta), 'not a sqlite database');
+
+            const { fires, onFire } = collectFires();
+            const summary = await runActivityTriggerTick(dataDir, buildTodayInstant('07:30'), alwaysConnected, onFire);
+            expect(summary.namespaceCount).toBe(2);
+            expect(summary.firedNamespaceCount).toBe(1);
+            expect(summary.firedEventCount).toBe(2);
+            expect(summary.failedCount).toBe(1);
+            expect(fires).toHaveLength(2);
+            expect(fires.every((fire) => fire.key === keyAlpha)).toBe(true);
+        });
+
+        // Review fix (MEDIUM): the candidate query had no `state` filter, so
+        // a manually completed/discarded/missed Actividad still fired its
+        // originally-planned notification even though the user already
+        // resolved it.
+        test('a manually completed Actividad never fires its start/end notification', async () => {
+            await activate({ timeZone: 'UTC' });
+            const created = await readActivity(
+                await createManualActivityApi({ title: 'Ya resuelta', startTime: '08:00', durationMinutes: 10 }),
+            );
+            const completeResponse = await transitionActivityApi(created.id, 'complete');
+            expect(completeResponse.status).toBe(200);
+
+            const { fires, onFire } = collectFires();
+            const summary = await runActivityTriggerTick(dataDir, buildTodayInstant('23:00'), alwaysConnected, onFire);
+            expect(summary.firedEventCount).toBe(0);
+            expect(summary.skippedCount).toBe(1);
+            expect(fires).toHaveLength(0);
+        });
+
+        // Review fix (LOW): `started` is not a terminal state — an Actividad
+        // the user explicitly began still deserves its remaining milestone
+        // notifications; only completed/discarded/missed are excluded by the
+        // candidate query's state filter.
+        test('a started Actividad still fires its start/end events once both milestones cross', async () => {
+            await activate({ timeZone: 'UTC' });
+            const created = await readActivity(
+                await createManualActivityApi({ title: 'En curso', startTime: '07:00', durationMinutes: 10 }),
+            );
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+
+            const startResponse = await transitionActivityApi(created.id, 'start');
+            expect(startResponse.status).toBe(200);
+
+            const { fires, onFire } = collectFires();
+            const summary = await runActivityTriggerTick(dataDir, buildTodayInstant('07:30'), alwaysConnected, onFire);
+            expect(summary.firedEventCount).toBe(2);
+            expect(fires.map((fire) => fire.event.edge)).toEqual(['start', 'end']);
+            expect(fires.every((fire) => fire.event.activityId === created.id)).toBe(true);
+
+            const rows = await readNotifiedRows(databasePath, created.dayPlanDate);
+            expect(rows[0]?.start_notified_at).not.toBeNull();
+            expect(rows[0]?.end_notified_at).not.toBeNull();
+        });
+
+        // Review fix (LOW): durationMinutes 0 is valid input (the routes
+        // validate `>= 0`) but has no end milestone distinct from its start
+        // — it used to fire a simultaneous duplicate 'end' event alongside
+        // the 'start' one in the same tick.
+        test('a zero-durationMinutes Actividad fires exactly one "start" event and never an "end"', async () => {
+            await activate({ timeZone: 'UTC' });
+            const created = await readActivity(
+                await createManualActivityApi({ title: 'Instantáneo', startTime: '09:00', durationMinutes: 0 }),
+            );
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+
+            const { fires, onFire } = collectFires();
+            const summary = await runActivityTriggerTick(dataDir, buildTodayInstant('23:00'), alwaysConnected, onFire);
+            expect(summary.firedEventCount).toBe(1);
+            expect(fires).toHaveLength(1);
+            expect(fires[0]?.event.edge).toBe('start');
+            expect(fires[0]?.event.durationMinutes).toBe(0);
+
+            const rows = await readNotifiedRows(databasePath, created.dayPlanDate);
+            expect(rows[0]?.start_notified_at).not.toBeNull();
+            expect(rows[0]?.end_notified_at).toBeNull();
+        });
+    });
+
+    describe('runTdahActivityTriggerIntervalTick (story 2.2: server.ts interval wiring)', () => {
+        test('runs one tick and invokes onFire for a crossed milestone, never throwing even if onFire itself throws', async () => {
+            await activate({ timeZone: 'UTC' });
+            await createManualActivityApi({ title: 'Bloque', startTime: '00:00', durationMinutes: 1 });
+
+            // The real interval always calls this with `new Date()` — with
+            // startTime '00:00' the milestone has necessarily already
+            // crossed by the time this test runs "today", regardless of the
+            // real wall-clock instant, so this exercises the exact function
+            // server.ts wires into its own setInterval without needing to
+            // fake the clock.
+            let onFireCalls = 0;
+            await expect(
+                runTdahActivityTriggerIntervalTick(
+                    dataDir,
+                    () => true,
+                    () => {
+                        onFireCalls += 1;
+                        throw new Error('boom - a send failure must never crash the tick');
+                    },
+                ),
+            ).resolves.toBeUndefined();
+            expect(onFireCalls).toBeGreaterThan(0);
+        });
+
+        test('resolves cleanly with zero namespaces when dataDir has no TDAH database at all (steady-state no-op)', async () => {
+            // A dataDir that has never had a TDAH database resolves to an
+            // empty namespace list (listActiveTdahNamespaces' own
+            // missing-directory handling) rather than throwing — the
+            // wrapper's never-throws contract holds trivially here, and no
+            // onFire call happens.
+            let onFireCalls = 0;
+            await expect(
+                runTdahActivityTriggerIntervalTick(
+                    join(dataDir, 'does-not-exist'),
+                    () => true,
+                    () => { onFireCalls += 1; },
+                ),
+            ).resolves.toBeUndefined();
+            expect(onFireCalls).toBe(0);
+        });
+    });
+
+    // Review fix (MEDIUM): the interval's two push closures (hasOpenConnection
+    // + onFire) used to live inline in startCloudServer's setInterval, so the
+    // real wiring — JSON.stringify, fan-out over connectionsFor, and the
+    // readyState guard — was never directly tested. They are extracted as
+    // buildTdahActivityTriggerPush; these tests exercise the actual function
+    // the interval uses, with fake sockets instead of a real port.
+    describe('buildTdahActivityTriggerPush (story 2.2: the interval\'s real WS push wiring)', () => {
+        type FakePushSocket = {
+            readyState: number;
+            sent: string[];
+            send: (payload: string) => void;
+        };
+
+        const buildFakeSocket = (readyState: number): FakePushSocket => {
+            const sent: string[] = [];
+            return {
+                readyState,
+                sent,
+                send: (payload: string): void => {
+                    sent.push(payload);
+                },
+            };
+        };
+
+        test('onFire JSON.stringifies the event and fans out only to OPEN sockets; hasOpenConnection mirrors the registry count', () => {
+            const registry = createTdahWsConnectionRegistry<FakePushSocket>();
+            const push = buildTdahActivityTriggerPush(registry);
+            expect(push.hasOpenConnection('key-a')).toBe(false);
+
+            const openSocket = buildFakeSocket(1);
+            const closingSocket = buildFakeSocket(3);
+            registry.register('key-a', openSocket);
+            registry.register('key-a', closingSocket);
+            expect(push.hasOpenConnection('key-a')).toBe(true);
+
+            const event: TdahWsActivityTriggerEvent = {
+                kind: 'activity-trigger',
+                edge: 'start',
+                activityId: 7,
+                title: 'Foco',
+                durationMinutes: 25,
+                startTime: '11:55',
+                at: new Date('2026-08-27T12:00:00.000Z').toISOString(),
+            };
+            push.onFire('key-a', event);
+
+            // Only the OPEN socket received the payload, exactly once; the
+            // CLOSING socket (readyState 3) was skipped explicitly.
+            expect(openSocket.sent).toHaveLength(1);
+            expect(closingSocket.sent).toHaveLength(0);
+
+            // The payload parses back into the exact wire shape
+            // (types.ts's TdahWsActivityTriggerEvent).
+            const received = JSON.parse(openSocket.sent[0] ?? '{}') as TdahWsActivityTriggerEvent;
+            expect(received).toEqual(event);
+            expect(received.kind).toBe('activity-trigger');
+            expect(received.edge).toBe('start');
+            expect(received.activityId).toBe(7);
+            expect(received.title).toBe('Foco');
+            expect(received.durationMinutes).toBe(25);
+            expect(received.startTime).toBe('11:55');
+            expect(received.at).toBe(event.at);
+
+            registry.unregister('key-a', openSocket);
+            expect(push.hasOpenConnection('key-a')).toBe(true);
+            registry.unregister('key-a', closingSocket);
+            expect(push.hasOpenConnection('key-a')).toBe(false);
+        });
+    });
+
     describe('weekdayOfDate (timezone-independent)', () => {
         // 2026-01-15 is a Thursday. The old noon-UTC-then-format-in-zone
         // implementation returned Friday for Pacific/Kiritimati (+14) and
@@ -2809,5 +3624,98 @@ describe('tdah module', () => {
             expect(isValidMonthString('2026-00')).toBe(false);
             expect(isValidMonthString('not-a-month')).toBe(false);
         });
+    });
+});
+
+describe('resolveTdahWsAuth (story 2.1: WS channel token resolution, no server/socket needed)', () => {
+    const ALLOWED = createAllowedAuthTokens(['tdah-token-alpha-1234567890']);
+    const wsUrlWithToken = (token: string | null): URL => {
+        const url = new URL('ws://127.0.0.1/v1/tdah/ws');
+        if (token !== null) url.searchParams.set('token', token);
+        return url;
+    };
+
+    test('accepts a valid, allowlisted token and returns its namespace key', () => {
+        const result = resolveTdahWsAuth(wsUrlWithToken('tdah-token-alpha-1234567890'), ALLOWED);
+        expect(result.ok).toBe(true);
+        expect(result.ok && typeof result.key).toBe('string');
+        expect(result.ok && result.key.length).toBe(64); // sha256 hex digest, same shape as tokenToKey elsewhere
+    });
+
+    test('rejects a missing token with TDAH_WS_UNAUTHORIZED', () => {
+        const result = resolveTdahWsAuth(wsUrlWithToken(null), ALLOWED);
+        expect(result).toEqual({ ok: false, code: 'TDAH_WS_UNAUTHORIZED' });
+    });
+
+    test('rejects a malformed token (fails BEARER_TOKEN_PATTERN) with the same code', () => {
+        const result = resolveTdahWsAuth(wsUrlWithToken('short'), ALLOWED);
+        expect(result).toEqual({ ok: false, code: 'TDAH_WS_UNAUTHORIZED' });
+    });
+
+    test('rejects a well-formed but non-allowlisted token with the same code', () => {
+        const result = resolveTdahWsAuth(wsUrlWithToken('tdah-token-unknown-0000000'), ALLOWED);
+        expect(result).toEqual({ ok: false, code: 'TDAH_WS_UNAUTHORIZED' });
+    });
+
+    test('a null allowlist (any-token mode) accepts any well-formed token', () => {
+        const result = resolveTdahWsAuth(wsUrlWithToken('tdah-token-anything-000000'), null);
+        expect(result.ok).toBe(true);
+    });
+});
+
+describe('createTdahWsConnectionRegistry (story 2.1: pure per-namespace connection bookkeeping)', () => {
+    test('starts empty', () => {
+        const registry = createTdahWsConnectionRegistry<string>();
+        expect(registry.namespaceCount()).toBe(0);
+        expect(registry.connectionCount('key-a')).toBe(0);
+        expect(registry.connectionsFor('key-a').size).toBe(0);
+    });
+
+    test('register adds a connection under its namespace key, visible via connectionsFor/connectionCount', () => {
+        const registry = createTdahWsConnectionRegistry<string>();
+        registry.register('key-a', 'conn-1');
+        expect(registry.connectionCount('key-a')).toBe(1);
+        expect(registry.connectionsFor('key-a')).toEqual(new Set(['conn-1']));
+        expect(registry.namespaceCount()).toBe(1);
+    });
+
+    test('a namespace can hold more than one simultaneous connection', () => {
+        const registry = createTdahWsConnectionRegistry<string>();
+        registry.register('key-a', 'conn-1');
+        registry.register('key-a', 'conn-2');
+        expect(registry.connectionCount('key-a')).toBe(2);
+        expect(registry.namespaceCount()).toBe(1);
+    });
+
+    test('different namespaces stay isolated from each other', () => {
+        const registry = createTdahWsConnectionRegistry<string>();
+        registry.register('key-a', 'conn-1');
+        registry.register('key-b', 'conn-2');
+        expect(registry.connectionCount('key-a')).toBe(1);
+        expect(registry.connectionCount('key-b')).toBe(1);
+        expect(registry.namespaceCount()).toBe(2);
+    });
+
+    test('unregister removes only the given connection and prunes an emptied namespace entirely', () => {
+        const registry = createTdahWsConnectionRegistry<string>();
+        registry.register('key-a', 'conn-1');
+        registry.register('key-a', 'conn-2');
+        registry.unregister('key-a', 'conn-1');
+        expect(registry.connectionCount('key-a')).toBe(1);
+        expect(registry.connectionsFor('key-a')).toEqual(new Set(['conn-2']));
+
+        registry.unregister('key-a', 'conn-2');
+        expect(registry.connectionCount('key-a')).toBe(0);
+        // The empty Set must not linger as a dangling namespace entry.
+        expect(registry.namespaceCount()).toBe(0);
+    });
+
+    test('unregistering an unknown connection or namespace is a harmless no-op', () => {
+        const registry = createTdahWsConnectionRegistry<string>();
+        registry.register('key-a', 'conn-1');
+        registry.unregister('key-a', 'conn-does-not-exist');
+        registry.unregister('key-does-not-exist', 'conn-1');
+        expect(registry.connectionCount('key-a')).toBe(1);
+        expect(registry.namespaceCount()).toBe(1);
     });
 });

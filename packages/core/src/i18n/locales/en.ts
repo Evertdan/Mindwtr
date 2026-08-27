@@ -1107,6 +1107,31 @@ export const en: Record<string, string> = {
         'tdahToday.retry': 'Retry',
         'tdahToday.noTime': 'No time',
         'tdahToday.nowLabel': 'Now',
+        // Story 2.1 — the persistent connection channel (N-05) and its
+        // `connection-dot` (DESIGN.md §Components). connectionBanner is a
+        // distinct key from the pre-existing offlineBanner above even though
+        // the copy matches: offlineBanner covers the day-fetch API failing,
+        // connectionBanner covers the WebSocket channel going down while the
+        // already-loaded day still renders (AD-11 keeps those two states
+        // independent).
+        'tdahToday.connectionBanner': 'No connection to the server — retrying',
+        'tdahToday.connectionDotConnected': 'Connected',
+        'tdahToday.connectionDotReconnecting': 'Reconnecting…',
+        'tdahToday.connectionDotOffline': 'No server connection',
+        'tdahToday.connectionExplanationTitle': 'Connection status',
+        'tdahToday.connectionExplanationBody': "Mindwtr keeps a live connection to your server while ADHD Mode is on, so today's reminders arrive on time.",
+        'tdahToday.connectionBatteryChip': 'Connection limited by battery',
+        'tdahToday.connectionBatteryRequestButton': 'Allow unrestricted battery use',
+        'tdahToday.connectionNotificationTitle': 'Mindwtr connected',
+        'tdahToday.connectionNotificationText': "Your day's reminders are active",
+        'tdahToday.connectionNotificationReconnectingText': 'Reconnecting…',
+        'tdahToday.connectionNotificationChannelName': 'Connection',
+        'tdahToday.activityStartNotificationBody': 'It\'s time to start.',
+        'tdahToday.activityEndNotificationBody': 'Time\'s up — see what\'s next.',
+        'tdahToday.activityStartActionLabel': 'Start',
+        'tdahToday.activityPostponeActionLabel': 'Postpone +10 min',
+        'tdahToday.activityCompleteActionLabel': 'Complete',
+        'tdahToday.activityNotificationChannelName': 'Activity reminders',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Routine',
@@ -1129,6 +1154,7 @@ export const en: Record<string, string> = {
         'tdahActivity.actionMiss': 'Not completed',
         'tdahActivity.alreadyRegistered': 'Already registered',
         'tdahActivity.errorGeneric': 'Could not complete the action. Try again.',
+        'tdahActivity.actionOfflineMessage': 'No internet connection. The action was not registered.',
         'tdahActivity.routineContext': 'Part of Routine {name}',
         'settings.dataSync': "Data & Sync",
         'settings.dataDesc': "Import or export your data to sync with other devices.",

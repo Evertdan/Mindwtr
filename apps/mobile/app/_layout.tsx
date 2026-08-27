@@ -58,6 +58,7 @@ import { useRootLayoutExternalCapture } from '@/hooks/root-layout/use-root-layou
 import { useRootLayoutPendingCaptures } from '@/hooks/root-layout/use-root-layout-pending-captures';
 import { useRootLayoutNotificationOpenHandler } from '@/hooks/root-layout/use-root-layout-notification-open-handler';
 import { useRootLayoutStartup } from '@/hooks/root-layout/use-root-layout-startup';
+import { useRootLayoutTdahConnection } from '@/hooks/root-layout/use-root-layout-tdah-connection';
 import { resolveMobileAnalyticsVersion } from '@/lib/analytics-heartbeat';
 import { useRootLayoutSyncEffects } from '@/hooks/root-layout/use-root-layout-sync-effects';
 import { ProjectNextActionPromptProvider } from '@/components/project-next-action-prompt';
@@ -492,6 +493,11 @@ function RootLayoutContentInner() {
     showToast,
   });
   useRootLayoutPendingCaptures({ dataReady });
+  // Story 2.1: Modo TDAH's persistent WS channel lifecycle lives here, not in
+  // T-01, so it survives navigating away from the Hoy screen while the mode
+  // stays on (spec Always: "se abre al activar el modo y se cierra
+  // intencionalmente al desactivarlo").
+  useRootLayoutTdahConnection({ resolveText });
 
   if (!firstRenderLogged.current) {
     firstRenderLogged.current = true;

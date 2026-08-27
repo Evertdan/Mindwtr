@@ -41,6 +41,9 @@ const applyAlarmActionDeadRowPatchToSource = transformFor('alarm-dead-row-action
 const applyAlarmIosCompleteActionPatchToSource = transformFor('alarm-ios-complete-action');
 const applyAlarmIosUniqueIdentifierPatchToSource = transformFor('alarm-ios-unique-identifier');
 const applyAlarmIosDeletePendingPatchToSource = transformFor('alarm-ios-delete-pending-arg');
+const applyAlarmTdahActivityUtilPatchToSource = transformFor('alarm-tdah-activity-util');
+const applyAlarmTdahActivityReceiverPatchToSource = transformFor('alarm-tdah-activity-receiver');
+const applyAlarmTdahActivityConstantsPatchToSource = transformFor('alarm-tdah-activity-constants');
 
 describe('patch-alarm-notification-gradle', () => {
   it('patches AlarmUtil pending intent flags for Android 12+', () => {
@@ -919,6 +922,255 @@ afterEvaluate { project ->
   });
 });
 
+describe('story 2.2 — TDAH Activity notification patches', () => {
+  it('adds the NOTIFICATION_ACTION_START constant after NOTIFICATION_ACTION_COMPLETE, idempotently', () => {
+    const input = `class Constants {
+    static final String NOTIFICATION_ACTION_SNOOZE = "ACTION_SNOOZE";
+    static final String NOTIFICATION_ACTION_COMPLETE = "ACTION_COMPLETE";
+}`;
+    const output = applyAlarmTdahActivityConstantsPatchToSource(input);
+    expect(output).toContain('static final String NOTIFICATION_ACTION_START = "ACTION_START";');
+    expect(output.match(/NOTIFICATION_ACTION_START/g)).toHaveLength(1);
+
+    // Idempotent: a second pass over the already-patched file changes nothing.
+    expect(applyAlarmTdahActivityConstantsPatchToSource(output)).toBe(output);
+  });
+
+  it('adds a 3rd real "Iniciar" action, a custom vibration pattern, a high-importance channel, and localized labels — all gated on data the GTD reminder path never sets', () => {
+    // Fixture shaped like AlarmUtil.java after alarm-complete-action-util +
+    // alarm-dead-row-util + alarm-reminder-behavior have already run (this
+    // patch's registry position) — see those patches' own tests for the
+    // un-collapsed intermediate shapes.
+    const input = `import static com.emekalites.react.alarm.notification.Constants.NOTIFICATION_ACTION_DISMISS;
+import static com.emekalites.react.alarm.notification.Constants.NOTIFICATION_ACTION_SNOOZE;
+import static com.emekalites.react.alarm.notification.Constants.NOTIFICATION_ACTION_COMPLETE;
+class AlarmUtil {
+    static final long[] DEFAULT_VIBRATE_PATTERN = {0, 250, 250, 250};
+
+    void send(Alarm alarm, Bundle bundle, NotificationCompat.Builder mBuilder, Context mContext, int notificationID, String channelID) {
+            long vibration = (long) alarm.getVibration();
+
+            long[] vibrationPattern = vibration == 0 ? DEFAULT_VIBRATE_PATTERN : new long[]{0, vibration, 1000, vibration};
+
+            NotificationChannel mChannel = new NotificationChannel(channelID, "Mindwtr reminders", NotificationManager.IMPORTANCE_DEFAULT);
+
+            NotificationCompat.Builder builder = mBuilder
+                    .setPriority(NotificationCompat.PRIORITY_DEFAULT);
+
+            if (alarm.isHasButton()) {
+                boolean hasCompleteAction = "true".equals(bundle.getString("notificationActionComplete"));
+                if (hasCompleteAction) {
+                    Intent completeIntent = new Intent(mContext, AlarmReceiver.class);
+                    completeIntent.setAction(NOTIFICATION_ACTION_COMPLETE);
+                    completeIntent.putExtra("AlarmId", alarm.getId());
+                    completeIntent.putExtra("NotificationId", notificationID);
+                    completeIntent.putExtras(bundle);
+                    PendingIntent pendingComplete = PendingIntent.getBroadcast(mContext, notificationID + 2, completeIntent, getUpdateCurrentImmutableFlags());
+                    NotificationCompat.Action completeAction = new NotificationCompat.Action(android.R.drawable.checkbox_on_background, "COMPLETE", pendingComplete);
+                    mBuilder.addAction(completeAction);
+                }
+
+                Intent snoozeIntent = new Intent(mContext, AlarmReceiver.class);
+                snoozeIntent.setAction(NOTIFICATION_ACTION_SNOOZE);
+                snoozeIntent.putExtra("SnoozeAlarmId", alarm.getId());
+                snoozeIntent.putExtra("NotificationId", notificationID);
+                PendingIntent pendingSnooze = PendingIntent.getBroadcast(mContext, notificationID + 1, snoozeIntent, getUpdateCurrentImmutableFlags());
+                NotificationCompat.Action snoozeAction = new NotificationCompat.Action(R.drawable.ic_snooze, "SNOOZE", pendingSnooze);
+                mBuilder.addAction(snoozeAction);
+
+                Intent dismissIntent = new Intent(mContext, AlarmReceiver.class);
+                dismissIntent.setAction(NOTIFICATION_ACTION_DISMISS);
+                dismissIntent.putExtra("AlarmId", alarm.getId());
+                dismissIntent.putExtra("NotificationId", notificationID);
+                PendingIntent pendingDismiss = PendingIntent.getBroadcast(mContext, notificationID, dismissIntent, getUpdateCurrentImmutableFlags());
+                NotificationCompat.Action dismissAction = new NotificationCompat.Action(android.R.drawable.ic_lock_idle_alarm, "DISMISS", pendingDismiss);
+                mBuilder.addAction(dismissAction);
+            }
+    }
+}`;
+
+    const output = applyAlarmTdahActivityUtilPatchToSource(input);
+
+    // Static import + own channel-id constant.
+    expect(output).toContain('import static com.emekalites.react.alarm.notification.Constants.NOTIFICATION_ACTION_START;');
+    expect(output).toContain('static final String TDAH_ACTIVITY_NOTIFICATION_CHANNEL_ID = "mindwtr_tdah_activity_v1";');
+
+    // Vibration pattern override — a genuine single-pulse pattern is possible now.
+    expect(output).toContain('bundle.getString("vibrationPattern")');
+    expect(output).toContain('Long.parseLong(vibrationPatternParts[i].trim())');
+    // Review fix (LOW): parseLong accepts negatives that would crash
+    // VibrationEffect.createWaveform at runtime — the parse loop must
+    // reject them up front.
+    expect(output).toContain('if (parsedVibrationPattern[i] < 0) {');
+
+    // Channel importance / priority are TDAH-channel-aware, never touching GTD's own IMPORTANCE_DEFAULT/PRIORITY_DEFAULT path.
+    expect(output).toContain('isTdahActivityNotification ? NotificationManager.IMPORTANCE_HIGH : NotificationManager.IMPORTANCE_DEFAULT');
+    expect(output).toContain('TDAH_ACTIVITY_NOTIFICATION_CHANNEL_ID.equals(channelID) ? NotificationCompat.PRIORITY_HIGH : NotificationCompat.PRIORITY_DEFAULT');
+
+    // Channel display name is read dynamically off the bundle (localized,
+    // like the 3 action labels below), never a bare hardcoded literal — a
+    // fallback string is fine, but it must only be used when the bundle key
+    // is absent/empty.
+    expect(output).toContain('bundle.getString("tdahActivityNotificationChannelName")');
+    expect(output).toContain('isTdahActivityNotification ? tdahActivityNotificationChannelName : "Mindwtr reminders"');
+    expect(output).not.toContain('isTdahActivityNotification ? "Mindwtr TDAH activities" : "Mindwtr reminders"');
+
+    // A 3rd real "Iniciar" action, gated on notificationActionStart, ordered ahead of COMPLETE.
+    expect(output).toContain('notificationActionStart');
+    expect(output).toContain('NOTIFICATION_ACTION_START');
+    expect(output.indexOf('Intent startIntent')).toBeLessThan(output.indexOf('Intent completeIntent'));
+    expect(output).toContain('PendingIntent.getBroadcast(mContext, notificationID + 3, startIntent, getUpdateCurrentImmutableFlags())');
+
+    // Exactly 3 actions when Start is present — DISMISS is suppressed, never a 4th button.
+    expect(output).toContain('if (!hasStartAction) {');
+    expect(output.indexOf('if (!hasStartAction) {')).toBeLessThan(output.indexOf('Intent dismissIntent'));
+
+    // Localized action labels replace the hardcoded English literals.
+    expect(output).toContain('bundle.getString("tdahStartActionLabel")');
+    expect(output).toContain('bundle.getString("tdahCompleteActionLabel")');
+    expect(output).toContain('bundle.getString("tdahSnoozeActionLabel")');
+    expect(output).not.toContain('"COMPLETE", pendingComplete');
+    expect(output).not.toContain('"SNOOZE", pendingSnooze');
+
+    // Idempotent: a second pass changes nothing further.
+    expect(applyAlarmTdahActivityUtilPatchToSource(output)).toBe(output);
+  });
+
+  // Review fix (MEDIUM): the sub-replacements used to be unguarded
+  // `next.replace(...)` calls — on anchor drift they silently no-op'd while
+  // the registry's `appliedMarker` (satisfied by the independently guarded
+  // TDAH_ACTIVITY_NOTIFICATION_CHANNEL_ID block) still reported the patch as
+  // applied, shipping a partial patch green.
+  it('throws naming the drifted anchor instead of silently shipping a partial tdah-activity-util patch', () => {
+    // Same fixture as the happy path above, except the channel-creation
+    // anchor drifted (as if a library upgrade renamed the local variable) —
+    // the import/constant/vibration blocks still apply, so only the throw
+    // distinguishes "partially patched" from "fully patched".
+    const input = `import static com.emekalites.react.alarm.notification.Constants.NOTIFICATION_ACTION_DISMISS;
+import static com.emekalites.react.alarm.notification.Constants.NOTIFICATION_ACTION_SNOOZE;
+import static com.emekalites.react.alarm.notification.Constants.NOTIFICATION_ACTION_COMPLETE;
+class AlarmUtil {
+    static final long[] DEFAULT_VIBRATE_PATTERN = {0, 250, 250, 250};
+
+    void send(Alarm alarm, Bundle bundle, NotificationCompat.Builder mBuilder, Context mContext, int notificationID, String channelID) {
+            long vibration = (long) alarm.getVibration();
+
+            long[] vibrationPattern = vibration == 0 ? DEFAULT_VIBRATE_PATTERN : new long[]{0, vibration, 1000, vibration};
+
+            NotificationChannel driftedChannel = new NotificationChannel(channelID, "Mindwtr reminders", NotificationManager.IMPORTANCE_DEFAULT);
+
+            NotificationCompat.Builder builder = mBuilder
+                    .setPriority(NotificationCompat.PRIORITY_DEFAULT);
+
+            if (alarm.isHasButton()) {
+                boolean hasCompleteAction = "true".equals(bundle.getString("notificationActionComplete"));
+                if (hasCompleteAction) {
+                    Intent completeIntent = new Intent(mContext, AlarmReceiver.class);
+                    completeIntent.setAction(NOTIFICATION_ACTION_COMPLETE);
+                    completeIntent.putExtra("AlarmId", alarm.getId());
+                    completeIntent.putExtra("NotificationId", notificationID);
+                    completeIntent.putExtras(bundle);
+                    PendingIntent pendingComplete = PendingIntent.getBroadcast(mContext, notificationID + 2, completeIntent, getUpdateCurrentImmutableFlags());
+                    NotificationCompat.Action completeAction = new NotificationCompat.Action(android.R.drawable.checkbox_on_background, "COMPLETE", pendingComplete);
+                    mBuilder.addAction(completeAction);
+                }
+
+                Intent snoozeIntent = new Intent(mContext, AlarmReceiver.class);
+                snoozeIntent.setAction(NOTIFICATION_ACTION_SNOOZE);
+                snoozeIntent.putExtra("SnoozeAlarmId", alarm.getId());
+                snoozeIntent.putExtra("NotificationId", notificationID);
+                PendingIntent pendingSnooze = PendingIntent.getBroadcast(mContext, notificationID + 1, snoozeIntent, getUpdateCurrentImmutableFlags());
+                NotificationCompat.Action snoozeAction = new NotificationCompat.Action(R.drawable.ic_snooze, "SNOOZE", pendingSnooze);
+                mBuilder.addAction(snoozeAction);
+
+                Intent dismissIntent = new Intent(mContext, AlarmReceiver.class);
+                dismissIntent.setAction(NOTIFICATION_ACTION_DISMISS);
+                dismissIntent.putExtra("AlarmId", alarm.getId());
+                dismissIntent.putExtra("NotificationId", notificationID);
+                PendingIntent pendingDismiss = PendingIntent.getBroadcast(mContext, notificationID, dismissIntent, getUpdateCurrentImmutableFlags());
+                NotificationCompat.Action dismissAction = new NotificationCompat.Action(android.R.drawable.ic_lock_idle_alarm, "DISMISS", pendingDismiss);
+                mBuilder.addAction(dismissAction);
+            }
+    }
+}`;
+
+    expect(() => applyAlarmTdahActivityUtilPatchToSource(input)).toThrow(
+      'tdah-activity-util patch anchor not found: channel creation'
+    );
+  });
+
+  it('adds a "start" receiver case ahead of "complete", identical in shape but for the action/log-tag/actionIdentifier — a tap-through only, no mutation', () => {
+    const input = `class AlarmReceiver {
+    void onReceive(Context context, Intent intent) {
+                switch (action) {
+                    case Constants.NOTIFICATION_ACTION_COMPLETE:
+                        id = intent.getExtras().getInt("AlarmId");
+
+                        try {
+                            alarm = alarmDB.getAlarm(id);
+                            Log.d(TAG, "ACTION_COMPLETE id=" + id + " alarmFound=" + (alarm != null));
+                            Bundle payload = new Bundle();
+                            if (intent.getExtras() != null) {
+                                payload.putAll(intent.getExtras());
+                            }
+                            payload.putString("id", String.valueOf(alarm != null ? alarm.getId() : id));
+                            if (payload.getString("alarmKey") == null && payload.getString("taskId") != null) {
+                                payload.putString("alarmKey", "task:" + payload.getString("taskId"));
+                            }
+                            payload.putString("actionIdentifier", "complete");
+                            LinkedHashMap<String, String> pendingPayload = new LinkedHashMap<>();
+                            for (String key : payload.keySet()) {
+                                Object value = payload.get(key);
+                                if (value != null) {
+                                    pendingPayload.put(key, String.valueOf(value));
+                                }
+                            }
+                            NotificationOpenPayloadStore.cache(pendingPayload);
+
+                            if (alarm != null) {
+                                alarmUtil.removeFiredNotification(alarm.getId());
+                                alarmUtil.cancelAlarm(alarm, false);
+                            } else if (intent.getExtras().containsKey("NotificationId")) {
+                                alarmUtil.clearNotification(intent.getExtras().getInt("NotificationId"));
+                            } else {
+                                alarmUtil.removeFiredNotification(id);
+                            }
+                            alarmUtil.stopAlarmSound();
+
+                            if (ANModule.getReactAppContext() != null) {
+                                ANModule.getReactAppContext().getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class).emit("OnNotificationOpened", BundleJSONConverter.convertToJSON(payload).toString());
+                            } else {
+                                Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+                                if (launchIntent != null) {
+                                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                                    launchIntent.putExtras(payload);
+                                    context.startActivity(launchIntent);
+                                }
+                            }
+                        } catch (Exception e) {
+                            alarmUtil.stopAlarmSound();
+                            e.printStackTrace();
+                        }
+                        break;
+                }
+    }
+}`;
+
+    const output = applyAlarmTdahActivityReceiverPatchToSource(input);
+
+    expect(output).toContain('case Constants.NOTIFICATION_ACTION_START:');
+    expect(output).toContain('Log.d(TAG, "ACTION_START id="');
+    expect(output).toContain('payload.putString("actionIdentifier", "start");');
+    // No mutation call anywhere in the derived case — same tap-through-only shape as COMPLETE.
+    expect(output.indexOf('case Constants.NOTIFICATION_ACTION_START:')).toBeLessThan(output.indexOf('case Constants.NOTIFICATION_ACTION_COMPLETE:'));
+    expect(output.match(/case Constants\.NOTIFICATION_ACTION_START:/g)).toHaveLength(1);
+
+    // Idempotent: a second pass over the already-patched file adds no duplicate.
+    const secondPass = applyAlarmTdahActivityReceiverPatchToSource(output);
+    expect(secondPass).toBe(output);
+  });
+});
+
 describe('PATCHES registry completeness', () => {
   // Pinned verbatim from the original per-candidate loops this task replaced
   // (17 (file, transform) call sites from 16 distinct transforms —
@@ -953,6 +1205,13 @@ describe('PATCHES registry completeness', () => {
     // no-op on a notification action tap.
     ['AlarmUtil.java', 'applyAlarmDeadRowUtilPatchToSource'],
     ['AlarmReceiver.java', 'applyAlarmActionDeadRowPatchToSource'],
+    // Added for story 2.2 ("La vibra en la muñeca"): dropping any of these
+    // three silently loses the TDAH Activity notification's 3rd "Iniciar"
+    // action button, its custom vibration pattern / high-importance channel,
+    // or its localized action labels.
+    ['AlarmUtil.java', 'applyAlarmTdahActivityUtilPatchToSource'],
+    ['AlarmReceiver.java', 'applyAlarmTdahActivityReceiverPatchToSource'],
+    ['Constants.java', 'applyAlarmTdahActivityConstantsPatchToSource'],
   ];
 
   it('has exactly one registry entry per original call site — none dropped in the collapse', () => {
@@ -966,7 +1225,7 @@ describe('PATCHES registry completeness', () => {
   });
 
   it('every entry declares required/firstMatchOnly explicitly', () => {
-    expect(PATCHES).toHaveLength(20);
+    expect(PATCHES).toHaveLength(23);
     for (const patch of PATCHES) {
       expect(typeof patch.id).toBe('string');
       expect(typeof patch.required).toBe('boolean');
@@ -1149,7 +1408,7 @@ describe('alarm manifest entries', () => {
 
     const actions = receiverNamed(manifest, ALARM_RECEIVER)['intent-filter'][0].action
       .map((action) => action.$['android:name']);
-    expect(actions).toEqual(['ACTION_DISMISS', 'ACTION_SNOOZE', 'ACTION_COMPLETE']);
+    expect(actions).toEqual(['ACTION_DISMISS', 'ACTION_SNOOZE', 'ACTION_COMPLETE', 'ACTION_START']);
   });
 });
 

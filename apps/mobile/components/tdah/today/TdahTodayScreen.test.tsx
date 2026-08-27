@@ -43,6 +43,41 @@ vi.mock('expo-network', () => ({
     },
 }));
 
+type FakeConnectionState = { status: 'connected' | 'reconnecting' | 'offline'; consecutiveFailures: number };
+
+// Wiring the screen actually reads (spec 2.1 I/O matrix: connection-dot +
+// offline banner + reconnect reload) — TdahTodayScreen imports the
+// subscribe/get functions from the root-layout hook module, not from
+// `@/lib/persistent-connection` directly; that module only supplies
+// isPersistentConnectionSupported/isIgnoringBatteryOptimizations/
+// requestIgnoreBatteryOptimizations plus types.
+const connection = vi.hoisted(() => ({
+    supported: false,
+    state: { status: 'connected', consecutiveFailures: 0 } as FakeConnectionState,
+    stateListeners: new Set<(state: FakeConnectionState) => void>(),
+    reconnectedListeners: new Set<() => void>(),
+    batteryLimited: false,
+    requestBatteryExemption: vi.fn(),
+}));
+
+vi.mock('@/lib/persistent-connection', () => ({
+    isPersistentConnectionSupported: () => connection.supported,
+    isIgnoringBatteryOptimizations: () => !connection.batteryLimited,
+    requestIgnoreBatteryOptimizations: () => connection.requestBatteryExemption(),
+}));
+
+vi.mock('@/hooks/root-layout/use-root-layout-tdah-connection', () => ({
+    getTdahConnectionState: () => connection.state,
+    subscribeTdahConnectionState: (listener: (state: FakeConnectionState) => void) => {
+        connection.stateListeners.add(listener);
+        return () => connection.stateListeners.delete(listener);
+    },
+    subscribeTdahConnectionReconnected: (listener: () => void) => {
+        connection.reconnectedListeners.add(listener);
+        return () => connection.reconnectedListeners.delete(listener);
+    },
+}));
+
 vi.mock('react-native-safe-area-context', () => ({
     SafeAreaView: (props: any) => React.createElement('SafeAreaView', props, props.children),
 }));
@@ -103,6 +138,12 @@ describe('TdahTodayScreen', () => {
         hookState.reload.mockReset();
         router.push.mockReset();
         networkListeners.length = 0;
+        connection.supported = false;
+        connection.state = { status: 'connected', consecutiveFailures: 0 };
+        connection.stateListeners.clear();
+        connection.reconnectedListeners.clear();
+        connection.batteryLimited = false;
+        connection.requestBatteryExemption.mockReset();
     });
 
     it('reloads on focus (AD-1: every screen load is a fresh fetch)', async () => {
@@ -349,6 +390,90 @@ describe('TdahTodayScreen', () => {
             }
 
             await act(async () => { tree!.unmount(); });
+        });
+    });
+
+    describe('connection state (spec 2.1 I/O matrix: connection-dot + offline banner + reconnect reload)', () => {
+        beforeEach(() => {
+            connection.supported = true;
+        });
+
+        it('shows the connection banner once the connection state pushes offline (row: "VPS caído o inalcanzable tras reintentos sostenidos")', async () => {
+            hookState.phase = 'ready';
+            connection.state = { status: 'connected', consecutiveFailures: 0 };
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+            expect(tree!.root.findAllByProps({ testID: 'tdah-today-connection-banner' })).toHaveLength(0);
+
+            await act(async () => {
+                connection.stateListeners.forEach((listener) => listener({ status: 'offline', consecutiveFailures: 4 }));
+            });
+            expect(tree!.root.findByProps({ testID: 'tdah-today-connection-banner' })).toBeTruthy();
+        });
+
+        it('does not show the banner while reconnecting (row: "Pérdida de red momentánea" — sin banner todavía)', async () => {
+            hookState.phase = 'ready';
+            connection.state = { status: 'connected', consecutiveFailures: 0 };
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+
+            await act(async () => {
+                connection.stateListeners.forEach((listener) => listener({ status: 'reconnecting', consecutiveFailures: 1 }));
+            });
+            expect(tree!.root.findAllByProps({ testID: 'tdah-today-connection-banner' })).toHaveLength(0);
+            expect(tree!.root.findByProps({ testID: 'tdah-connection-dot-reconnecting' })).toBeTruthy();
+        });
+
+        it('shows no banner and a connected dot when the connection state is connected', async () => {
+            hookState.phase = 'ready';
+            connection.state = { status: 'connected', consecutiveFailures: 0 };
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+
+            expect(tree!.root.findAllByProps({ testID: 'tdah-today-connection-banner' })).toHaveLength(0);
+            expect(tree!.root.findByProps({ testID: 'tdah-connection-dot-connected' })).toBeTruthy();
+        });
+
+        it("reloads the day's plan when the reconnected callback fires (row: \"Reconexión exitosa tras caída\" — sin acción del usuario)", async () => {
+            hookState.phase = 'ready';
+            connection.state = { status: 'connected', consecutiveFailures: 0 };
+            await act(async () => { create(<TdahTodayScreen />); });
+            expect(hookState.reload).toHaveBeenCalledTimes(1); // focus only
+
+            await act(async () => {
+                connection.reconnectedListeners.forEach((listener) => listener());
+            });
+            expect(hookState.reload).toHaveBeenCalledTimes(2);
+        });
+
+        it('suppresses the connection banner when the day-fetch phase is already offline (no double banner over the dedicated offline screen)', async () => {
+            hookState.phase = 'offline';
+            connection.state = { status: 'offline', consecutiveFailures: 4 };
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+
+            expect(tree!.root.findByProps({ testID: 'tdah-today-offline' })).toBeTruthy();
+            expect(tree!.root.findAllByProps({ testID: 'tdah-today-connection-banner' })).toHaveLength(0);
+        });
+
+        it('suppresses the connection banner when the day-fetch phase is unconfigured (no double banner over the unconfigured screen)', async () => {
+            hookState.phase = 'unconfigured';
+            connection.state = { status: 'offline', consecutiveFailures: 4 };
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+
+            expect(tree!.root.findByProps({ testID: 'tdah-today-unconfigured' })).toBeTruthy();
+            expect(tree!.root.findAllByProps({ testID: 'tdah-today-connection-banner' })).toHaveLength(0);
+        });
+
+        it('passes batteryLimited through to the connection dot when the battery-exemption permission is missing', async () => {
+            hookState.phase = 'ready';
+            connection.state = { status: 'connected', consecutiveFailures: 0 };
+            connection.batteryLimited = true;
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+
+            expect(tree!.root.findByProps({ testID: 'tdah-connection-battery-chip' })).toBeTruthy();
         });
     });
 });

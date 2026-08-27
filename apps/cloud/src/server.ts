@@ -106,6 +106,15 @@ import {
     type CalendarFeedRecord,
 } from './server-calendar-feed';
 import { TDAH_PATH_PREFIX, handleTdahRequest, runNightlyTdahTick } from './tdah';
+import { runActivityTriggerTick } from './tdah/activity-trigger';
+import { TDAH_ERRORS, type TdahWsActivityTriggerEvent } from './tdah/types';
+import {
+    buildTdahWsConnectedEvent,
+    createTdahWsConnectionRegistry,
+    resolveTdahWsAuth,
+    TDAH_WS_PATH,
+    type TdahWsConnectionRegistry,
+} from './tdah/ws-channel';
 
 const ANY_TOKEN_NAMESPACE_LIMIT_DEFAULT = 32;
 const NAMESPACE_ADMISSION_LOCK_KEY = '__namespace_admission__';
@@ -159,6 +168,7 @@ const STATIC_CLOUD_ROUTES = new Set([
     '/v1/tdah/routines/conflicts',
     '/v1/tdah/day',
     '/v1/tdah/day/activities',
+    '/v1/tdah/ws',
 ]);
 
 export function canonicalCloudRoute(pathname: string): string {
@@ -241,16 +251,51 @@ const loadExistingDataForMerge = (filePath: string): AppData | { error: Response
     return validateStoredAppData(filePath, rawData);
 };
 
+/** `.data` attached to a WS connection at upgrade time (server.ts's `bunServer.upgrade(req, { data })`) — carries only the namespace key, mirroring every HTTP route's `ctx.key`. */
+type TdahWsConnectionData = { key: string };
+
+/** Bun's `ServerWebSocket`, narrowed to the surface this module actually uses. */
+type BunServerWebSocket = {
+    readonly data: TdahWsConnectionData;
+    /** W3C readyState (0 CONNECTING, 1 OPEN, 2 CLOSING, 3 CLOSED) — Bun tracks it live. */
+    readonly readyState: number;
+    send: (data: string) => number;
+    close: (code?: number, reason?: string) => void;
+};
+
+/**
+ * The connection surface `buildTdahActivityTriggerPush`'s fan-out needs —
+ * `BunServerWebSocket` above satisfies it, and unit tests satisfy it with
+ * plain fake sockets, the same generic-over-connection trick
+ * `TdahWsConnectionRegistry` itself uses.
+ */
+type TdahActivityTriggerSocket = {
+    readonly readyState: number;
+    send: (data: string) => unknown;
+};
+
 type BunServer = {
     port: number;
     stop?: (closeIdleConnections?: boolean) => void | Promise<void>;
+    /** Native `Bun.serve` WS upgrade — returns `false` when the request isn't a valid upgrade (e.g. missing `Upgrade` header). */
+    upgrade: (req: Request, options?: { data?: TdahWsConnectionData }) => boolean;
 };
 
 type BunRuntime = {
     serve: (options: {
         hostname: string;
         port: number;
-        fetch: (req: Request) => Response | Promise<Response>;
+        // Bun passes the `Server` instance itself as the second argument —
+        // needed here because `server.upgrade()` must be called from inside
+        // `fetch`, before the `const server = bunRuntime.serve(...)` binding
+        // below even exists. Returning `undefined` (instead of a `Response`)
+        // is how a successful upgrade is signalled back to Bun: it has
+        // already sent the 101 Switching Protocols response itself.
+        fetch: (req: Request, server: BunServer) => Response | undefined | Promise<Response | undefined>;
+        websocket?: {
+            open?: (ws: BunServerWebSocket) => void;
+            close?: (ws: BunServerWebSocket, code: number, reason: string) => void;
+        };
     }) => BunServer;
 };
 
@@ -963,6 +1008,76 @@ export async function runTdahNightlyIntervalTick(dataDir: string): Promise<void>
     }
 }
 
+/**
+ * Story 2.2 — the activity-trigger interval's callback body, extracted for
+ * the same directly-testable reason as `runTdahNightlyIntervalTick` above:
+ * run one tick against `dataDir` with the real clock, then log a single
+ * `'tdah activity trigger fired'` audit line only when the tick actually did
+ * something (fired or failed) — unlike the once-a-minute nightly tick, this
+ * one runs every `TDAH_ACTIVITY_TRIGGER_TICK_INTERVAL_MS`, so logging every
+ * steady-state no-op tick would flood the audit log for no reason. The
+ * `'tdah activity trigger crashed'` backstop covers `runActivityTriggerTick`
+ * ever throwing despite its own never-throws contract.
+ */
+export async function runTdahActivityTriggerIntervalTick(
+    dataDir: string,
+    hasOpenConnection: (key: string) => boolean,
+    onFire: (key: string, event: TdahWsActivityTriggerEvent) => void,
+): Promise<void> {
+    try {
+        const summary = await runActivityTriggerTick(dataDir, new Date(), hasOpenConnection, onFire);
+        if (summary.firedEventCount > 0 || summary.failedCount > 0) {
+            logInfo('tdah activity trigger fired', {
+                date: summary.date,
+                failedCount: summary.failedCount,
+                firedEventCount: summary.firedEventCount,
+                firedNamespaceCount: summary.firedNamespaceCount,
+                namespaceCount: summary.namespaceCount,
+                skippedCount: summary.skippedCount,
+            });
+        }
+    } catch (error) {
+        logError('tdah activity trigger crashed', {
+            failureClass: 'runtime',
+            failureCode: 'tdah_activity_trigger_tick_crashed',
+            failureErrno: getFsErrorCode(error),
+        });
+    }
+}
+
+/** W3C `readyState` value for an OPEN socket — the only state `send()` can still reach. */
+const TDAH_WS_READY_STATE_OPEN = 1;
+
+/**
+ * The real WS push wiring behind the activity-trigger interval's two
+ * closures (review fix: previously inlined in `startCloudServer`'s
+ * `setInterval`, hence untestable without a real socket and port).
+ * Extracted as an exported factory over any registry whose connections
+ * expose `readyState`/`send` — the same "pure logic separate from the real
+ * `Bun.serve` wiring" split ws-channel.ts keeps — so the JSON.stringify +
+ * fan-out + readyState guard below is directly testable with fake sockets.
+ * `startCloudServer` is the only production caller, passing the live
+ * per-server `tdahWsRegistry`.
+ */
+export const buildTdahActivityTriggerPush = <TConnection extends TdahActivityTriggerSocket>(
+    tdahWsRegistry: TdahWsConnectionRegistry<TConnection>,
+): {
+    hasOpenConnection: (key: string) => boolean;
+    onFire: (key: string, event: TdahWsActivityTriggerEvent) => void;
+} => ({
+    hasOpenConnection: (key) => tdahWsRegistry.connectionCount(key) > 0,
+    onFire: (key, event) => {
+        const payload = JSON.stringify(event);
+        for (const ws of tdahWsRegistry.connectionsFor(key)) {
+            // Bun sockets in CLOSING/CLOSED state fail silently on send —
+            // skip anything not OPEN so the miss is explicit, never a
+            // half-delivered fan-out.
+            if (ws.readyState !== TDAH_WS_READY_STATE_OPEN) continue;
+            ws.send(payload);
+        }
+    },
+});
+
 function isProjectPurgePatch(bodyRecord: Record<string, unknown>): boolean {
     return typeof bodyRecord.purgedAt === 'string' && bodyRecord.purgedAt.trim().length > 0;
 }
@@ -1041,6 +1156,11 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
         }
     });
     const rateLimiter = createRateLimiter({ windowMs, maxKeys: RATE_LIMIT_MAX_KEYS });
+    // Story 2.1 — one registry per running server instance (never
+    // module-scoped): tests spawn several `startCloudServer()` instances in
+    // the same process, and each must track only its own live WS
+    // connections.
+    const tdahWsRegistry = createTdahWsConnectionRegistry<BunServerWebSocket>();
 
     const getRequestIpAddress = (req: Request): string | null => {
         const bunServer = server as { requestIP?: (request: Request) => { address?: string | null } | null };
@@ -1068,6 +1188,30 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
             }
         }
         return errorResponse('Unauthorized', 401);
+    };
+
+    // Story 2.1 — same auth-failure rate limiting as `unauthorizedResponse`
+    // above (IP + token buckets, `AUTH_FAILURE_RATE_MAX`), but the channel's
+    // own `.code`-shaped body instead of a raw message: the WS upgrade
+    // rejects before any handshake completes, so the client only ever gets
+    // to inspect a JSON body, never a raw fs/sqlite `.message` (AGENTS.md).
+    const tdahWsUnauthorizedResponse = (req: Request, token?: string | null): Response => {
+        const authRateKey = getAuthFailureRateKey(req, {
+            trustProxyHeaders,
+            trustedProxyIps,
+            requestIpAddress: getRequestIpAddress(req),
+        });
+        const authRateLimitKeys = [
+            authRateKey,
+            getAuthFailureTokenRateKey({ token, authHeader: null }),
+        ].filter((key): key is string => Boolean(key));
+        for (const key of authRateLimitKeys) {
+            const authRateLimitResponse = rateLimiter.check(key, AUTH_FAILURE_RATE_MAX);
+            if (authRateLimitResponse) {
+                return authRateLimitResponse;
+            }
+        }
+        return jsonResponse({ error: { code: TDAH_ERRORS.wsUnauthorized } }, { status: 401 });
     };
 
     const baseServerConfig: ServerConfig = {
@@ -1153,6 +1297,34 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
         tdahNightlyTickTimer.unref();
     }
 
+    // Story 2.2 — the activity-trigger tick's own sibling `setInterval`:
+    // every `TDAH_ACTIVITY_TRIGGER_TICK_INTERVAL_MS`, walk every namespace
+    // with a live WS connection and push a start/end notification event for
+    // any Actividad milestone that just crossed. 15s comfortably clears the
+    // epic's ±30s window (Design Notes: "cualquier intervalo razonable ...
+    // no está prescrito un valor exacto, pero debe documentarse en el
+    // código") while staying cheap — every tick is read-only unless there is
+    // real work (`runActivityTriggerTick`'s own per-namespace guard).
+    // `tdahActivityTriggerTickInFlight` guards against overlap the same way
+    // `tdahTickInFlight` does for the nightly tick above.
+    const TDAH_ACTIVITY_TRIGGER_TICK_INTERVAL_MS = 15_000;
+    const tdahActivityTriggerPush = buildTdahActivityTriggerPush(tdahWsRegistry);
+    let tdahActivityTriggerTickInFlight = false;
+    const tdahActivityTriggerTickTimer = setInterval(() => {
+        if (tdahActivityTriggerTickInFlight) return;
+        tdahActivityTriggerTickInFlight = true;
+        void runTdahActivityTriggerIntervalTick(
+            dataDir,
+            tdahActivityTriggerPush.hasOpenConnection,
+            tdahActivityTriggerPush.onFire,
+        ).finally(() => {
+            tdahActivityTriggerTickInFlight = false;
+        });
+    }, TDAH_ACTIVITY_TRIGGER_TICK_INTERVAL_MS);
+    if (typeof tdahActivityTriggerTickTimer.unref === 'function') {
+        tdahActivityTriggerTickTimer.unref();
+    }
+
     const usingLegacyTokenVar = options.allowedAuthTokens === undefined
         && !String(process.env.MINDWTR_CLOUD_AUTH_TOKENS || '').trim()
         && !String(process.env.MINDWTR_CLOUD_AUTH_TOKENS_FILE || '').trim()
@@ -1211,7 +1383,19 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
     const server = bunRuntime.serve({
         hostname: host,
         port,
-        async fetch(req: Request) {
+        // Story 2.1 — the WS channel's real socket wiring: `open`/`close`
+        // only ever touch `tdahWsRegistry` (register/unregister), never
+        // decide anything themselves (that split lives in ws-channel.ts).
+        websocket: {
+            open(ws) {
+                tdahWsRegistry.register(ws.data.key, ws);
+                ws.send(JSON.stringify(buildTdahWsConnectedEvent(new Date())));
+            },
+            close(ws) {
+                tdahWsRegistry.unregister(ws.data.key, ws);
+            },
+        },
+        async fetch(req: Request, bunServer: BunServer) {
             const requestId = generateRequestId();
             const requestStartedAt = performance.now();
             let requestRoute = 'unmatched';
@@ -1226,7 +1410,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                 requestAbortController.abort(createRequestAbortError('Request timed out', 408));
             }, requestTimeoutMs);
             try {
-                const response = await (async (): Promise<Response> => {
+                const response = await (async (): Promise<Response | undefined> => {
                     try {
                         throwIfRequestAborted(requestAbortController.signal);
 
@@ -1238,6 +1422,37 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
 
                 if (req.method === 'GET' && pathname === '/health') {
                     return jsonResponse({ ok: true });
+                }
+
+                // Story 2.1 — the persistent WS channel. Dispatched by exact
+                // path match here, ahead of the TDAH HTTP block below (which
+                // matches any `${TDAH_PATH_PREFIX}/...` pathname and would
+                // otherwise swallow this one into a 404). Auth is the same
+                // bearer-token allowlist as every other TDAH route, just read
+                // from the `token` query param instead of `Authorization`
+                // (Design Notes: RN's WebSocket client can't set custom
+                // upgrade headers) — see ws-channel.ts's `resolveTdahWsAuth`.
+                if (pathname === TDAH_WS_PATH) {
+                    if (req.method !== 'GET') {
+                        return jsonResponse({ error: { code: TDAH_ERRORS.methodNotAllowed } }, { status: 405 });
+                    }
+                    const wsAuth = resolveTdahWsAuth(url, allowedAuthTokens);
+                    if (!wsAuth.ok) {
+                        return tdahWsUnauthorizedResponse(req, url.searchParams.get('token'));
+                    }
+                    const upgraded = bunServer.upgrade(req, { data: { key: wsAuth.key } });
+                    if (!upgraded) {
+                        // Not a real WS handshake (e.g. missing `Upgrade`
+                        // header) despite a valid token — a plain GET to this
+                        // path, not an auth failure, so the generic 400
+                        // rather than the channel's `.code`.
+                        return errorResponse('WebSocket upgrade required', 400);
+                    }
+                    // Bun has already sent the 101 Switching Protocols
+                    // response itself; returning undefined here is how that
+                    // is signalled back to it (see the BunRuntime type's own
+                    // comment above).
+                    return undefined;
                 }
 
                 if (
@@ -1610,6 +1825,26 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                         return createInternalServerErrorResponse('Internal server error', requestId);
                     }
                 })();
+                // Story 2.1 — `undefined` means the WS upgrade succeeded and
+                // Bun already sent the 101 response itself; there is no real
+                // Response object here to attach a request id to, but the
+                // completion record still gets built and sent through the
+                // exact same sink as every other request — status 101
+                // (Switching Protocols) stands in for `response.status`,
+                // which doesn't exist on this path.
+                if (response === undefined) {
+                    const wsCompletion: CloudRequestCompletion = {
+                        requestId,
+                        method: req.method,
+                        route: requestRoute,
+                        status: 101,
+                        elapsedMs: Math.max(0, Math.round(performance.now() - requestStartedAt)),
+                    };
+                    if (shouldLogCloudRequest(wsCompletion, logAllRequests, slowRequestMs)) {
+                        requestCompletionSink(wsCompletion);
+                    }
+                    return undefined;
+                }
                 attachRequestId(response, requestId);
                 const completion: CloudRequestCompletion = {
                     requestId,
@@ -1634,6 +1869,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
         stopped = true;
         clearInterval(cleanupTimer);
         clearInterval(tdahNightlyTickTimer);
+        clearInterval(tdahActivityTriggerTickTimer);
         try {
             await Promise.resolve((server as { stop?: (closeIdleConnections?: boolean) => void | Promise<void> }).stop?.(true));
         } catch {
