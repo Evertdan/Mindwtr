@@ -381,6 +381,18 @@ const migrateActivityTimestampColumnsIfNeeded = (database: TdahDatabase): void =
     database.exec(`PRAGMA user_version = ${SCHEMA_VERSION_ACTIVITY_TIMESTAMPS};`);
 };
 
+const execAlterTableAddColumnToleratingDuplicate = (database: TdahDatabase, sql: string): void => {
+    try {
+        database.exec(sql);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/duplicate column name/i.test(message)) throw error;
+        // Another opener committed the same ALTER between this migration's
+        // pre-transaction PRAGMA table_info read and its BEGIN IMMEDIATE —
+        // the column now exists, which is the outcome this ALTER wanted.
+    }
+};
+
 /**
  * v2 -> v3 (story 2.2): a pre-2.2 database's `tdah_activity` has neither
  * `start_notified_at` nor `end_notified_at` — the persisted "already
@@ -391,30 +403,52 @@ const migrateActivityTimestampColumnsIfNeeded = (database: TdahDatabase): void =
  * no existing `NOT NULL`/CHECK constraint to relax, so this is a plain
  * `ALTER TABLE ... ADD COLUMN` pair rather than a create-copy-drop-rename
  * rebuild.
+ *
+ * Each column's presence is tracked INDEPENDENTLY and only the missing
+ * one(s) are ALTERed, so a database left half-migrated by an interrupted
+ * earlier attempt (or by another process's concurrent run, below) converges
+ * instead of failing forever on the column it already has. A "duplicate
+ * column name" SQLite error from either ALTER is tolerated as success: the
+ * `PRAGMA table_info` read above ran outside this transaction, so another
+ * opener (multi-process opens are a supported pattern) can have committed
+ * the same ALTER between that read and this `BEGIN IMMEDIATE` — at that
+ * point the column exists, which is all this migration wanted, so it still
+ * stamps `PRAGMA user_version` and COMMITs. No other error is swallowed.
  */
 const migrateActivityNotificationColumnsIfNeeded = (database: TdahDatabase): void => {
     const columns = prepareAll<{ name: unknown }>(database, "PRAGMA table_info('tdah_activity');").all();
-    const hasNotificationColumns = columns.some((column) => String(column.name) === 'start_notified_at');
+    const hasStartNotifiedAt = columns.some((column) => String(column.name) === 'start_notified_at');
+    const hasEndNotifiedAt = columns.some((column) => String(column.name) === 'end_notified_at');
 
-    if (!hasNotificationColumns) {
-        database.exec('BEGIN IMMEDIATE;');
-        try {
-            database.exec('ALTER TABLE tdah_activity ADD COLUMN start_notified_at TEXT;');
-            database.exec('ALTER TABLE tdah_activity ADD COLUMN end_notified_at TEXT;');
-            database.exec(`PRAGMA user_version = ${SCHEMA_VERSION_ACTIVITY_NOTIFICATIONS};`);
-            database.exec('COMMIT;');
-        } catch (error) {
-            try {
-                database.exec('ROLLBACK;');
-            } catch {
-                // Closing the handle in the caller releases the lock either way.
-            }
-            throw error;
-        }
+    if (hasStartNotifiedAt && hasEndNotifiedAt) {
+        database.exec(`PRAGMA user_version = ${SCHEMA_VERSION_ACTIVITY_NOTIFICATIONS};`);
         return;
     }
 
-    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION_ACTIVITY_NOTIFICATIONS};`);
+    database.exec('BEGIN IMMEDIATE;');
+    try {
+        if (!hasStartNotifiedAt) {
+            execAlterTableAddColumnToleratingDuplicate(
+                database,
+                'ALTER TABLE tdah_activity ADD COLUMN start_notified_at TEXT;',
+            );
+        }
+        if (!hasEndNotifiedAt) {
+            execAlterTableAddColumnToleratingDuplicate(
+                database,
+                'ALTER TABLE tdah_activity ADD COLUMN end_notified_at TEXT;',
+            );
+        }
+        database.exec(`PRAGMA user_version = ${SCHEMA_VERSION_ACTIVITY_NOTIFICATIONS};`);
+        database.exec('COMMIT;');
+    } catch (error) {
+        try {
+            database.exec('ROLLBACK;');
+        } catch {
+            // Closing the handle in the caller releases the lock either way.
+        }
+        throw error;
+    }
 };
 
 const migrateSchemaIfNeeded = (database: TdahDatabase): void => {
@@ -1278,24 +1312,30 @@ export const mutateCloseOutgoingDay = (database: TdahDatabase, date: string): Cl
 
 // Candidate rows for either milestone: an Actividad with a real `start_time`
 // that still needs its `start` mark OR (has a real `duration_minutes` and
-// still needs its `end` mark). `day_plan_date <= ?` (not `= ?`) is the same
-// unbounded backward SWEEP `CLOSE_OUTGOING_DAY_SQL`/
-// `SELECT_PENDING_OR_STARTED_UP_TO_SQL` above already use: a milestone whose
-// day rolled over before the tick ever caught it (server down across
-// midnight, or longer) must still be found on every later tick, not just the
-// one day it was originally planned for. `state NOT IN (...)` excludes the
-// three terminal states — a manually completed/discarded/missed Actividad
-// must never fire a notification for a milestone the user already resolved;
-// `pending`/`started`/`limbo` remain eligible (the nightly sweep's own
-// `limbo` transition is a day-close bookkeeping concern, independent of
-// whether this Actividad's start/end notification already fired). Narrowed
-// once in SQL; the actual crossing comparison happens in JS below via
-// `localInstantMs`, never raw minutes-of-day (see that helper's own comment
-// for why).
+// still needs its `end` mark). The sweep window is BOUNDED to the tick's own
+// "today" plus exactly one earlier day (`day_plan_date >= date(?, '-1 day')`)
+// rather than the unbounded `day_plan_date <= ?` it originally used: an
+// unbounded backward sweep floods the first post-reconnect tick (or the first
+// tick after the v2->v3 migration adds the notified columns) with every
+// stale, never-notified Actividad from the namespace's ENTIRE history — a
+// notification storm. The '-1 day' lower bound is what the midnight-rollover
+// catch-up case actually needs (and what existing tests pin): a milestone
+// whose day rolled over before the tick ever caught it (server down across
+// midnight) still lands inside the window on the next day's tick, exactly as
+// `CLOSE_OUTGOING_DAY_SQL` above deliberately keeps its own unbounded sweep
+// for the day-close bookkeeping this tick must NOT duplicate. `state NOT IN
+// (...)` excludes the three terminal states — a manually
+// completed/discarded/missed Actividad must never fire a notification for a
+// milestone the user already resolved; `pending`/`started`/`limbo` remain
+// eligible (the nightly sweep's own `limbo` transition is a day-close
+// bookkeeping concern, independent of whether this Actividad's start/end
+// notification already fired). Narrowed once in SQL; the actual crossing
+// comparison happens in JS below via `localInstantMs`, never raw
+// minutes-of-day (see that helper's own comment for why).
 const SELECT_ACTIVITY_TRIGGER_CANDIDATES_SQL = `
     SELECT id, day_plan_date, title, start_time, duration_minutes, start_notified_at, end_notified_at
     FROM tdah_activity
-    WHERE day_plan_date <= ? AND start_time IS NOT NULL
+    WHERE day_plan_date <= ? AND day_plan_date >= date(?, '-1 day') AND start_time IS NOT NULL
       AND state NOT IN ('completed', 'discarded', 'missed')
       AND (start_notified_at IS NULL OR (duration_minutes IS NOT NULL AND end_notified_at IS NULL));
 `;
@@ -1351,7 +1391,7 @@ export type TdahActivityTriggerFire = {
  */
 const selectDueActivityTriggers = (database: TdahDatabase, date: string, nowTimeOfDay: string): TdahActivityTriggerFire[] => {
     const nowInstantMs = localInstantMs(date, nowTimeOfDay);
-    const rows = prepareAll<TdahActivityTriggerCandidateRow>(database, SELECT_ACTIVITY_TRIGGER_CANDIDATES_SQL).all(date);
+    const rows = prepareAll<TdahActivityTriggerCandidateRow>(database, SELECT_ACTIVITY_TRIGGER_CANDIDATES_SQL).all(date, date);
     const fires: TdahActivityTriggerFire[] = [];
     for (const row of rows) {
         // The milestone's OWN day (`row.day_plan_date`), never the tick's
@@ -1369,7 +1409,11 @@ const selectDueActivityTriggers = (database: TdahDatabase, date: string, nowTime
         if (!startAlreadyNotified && startInstantMs <= nowInstantMs) {
             fires.push({ id, title, startTime, durationMinutes, edge: 'start' });
         }
-        if (!endAlreadyNotified && durationMinutes !== null) {
+        if (!endAlreadyNotified && durationMinutes !== null && durationMinutes > 0) {
+            // `> 0`, not `!== null` alone: a zero duration (allowed by the
+            // routes' `durationMinutes >= 0` validation) has no end milestone
+            // distinct from its start — it must fire only the 'start' event,
+            // never a simultaneous duplicate 'end'.
             const endInstantMs = startInstantMs + durationMinutes * 60_000;
             if (endInstantMs <= nowInstantMs) {
                 fires.push({ id, title, startTime, durationMinutes, edge: 'end' });

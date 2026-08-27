@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync 
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { tokenToKey } from '../server-auth';
-import { startCloudServer, runTdahActivityTriggerIntervalTick } from '../server';
+import { startCloudServer, runTdahActivityTriggerIntervalTick, buildTdahActivityTriggerPush } from '../server';
 import {
     activateTdahProfile,
     computeTomorrowDate,
@@ -3263,7 +3263,51 @@ describe('tdah module', () => {
             expect(rows[0]?.end_notified_at).not.toBeNull();
         });
 
-        // Review fix (MEDIUM): onFire is caller code (server.ts's real
+        // Review fix (HIGH): the candidate query's backward sweep was
+        // unbounded (`day_plan_date <= ?` with no lower bound), so the first
+        // tick after a reconnect — or after the v2->v3 migration added the
+        // notified columns — re-evaluated every stale never-notified
+        // Actividad from the namespace's ENTIRE history at once: a
+        // notification storm. The sweep is now bounded to the tick's own day
+        // plus exactly one earlier day, which still covers the
+        // midnight-rollover catch-up case pinned by the test above (and the
+        // server-down-across-midnight matrix in scheduler-era tests).
+        test('an Actividad from 3 days ago (outside the one-day sweep window) never fires — no stale-notification storm', async () => {
+            await activate({ timeZone: 'UTC' });
+            const created = await readActivity(
+                await createManualActivityApi({ title: 'Añeja', startTime: '00:00', durationMinutes: 1 }),
+            );
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const threeDaysAgo = formatDateInTimeZone(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), 'UTC');
+
+            // Push the due Actividad's day 3 days back with a raw write —
+            // exactly the stale row a bounded sweep must stop finding. (The
+            // tdah schema's FK on day_plan_date is not enforced: SQLite
+            // defaults PRAGMA foreign_keys to off and this module never
+            // turns it on.)
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(databasePath);
+            try {
+                database
+                    .prepare('UPDATE tdah_activity SET day_plan_date = ? WHERE id = ?;')
+                    .run(threeDaysAgo, created.id);
+            } finally {
+                database.close();
+            }
+
+            // The real clock, exactly like the interval's own wiring — the
+            // row sits 3 days back, outside the [today-1, today] window.
+            const { fires, onFire } = collectFires();
+            const summary = await runActivityTriggerTick(dataDir, new Date(), alwaysConnected, onFire);
+            expect(summary.firedEventCount).toBe(0);
+            expect(fires).toHaveLength(0);
+
+            const rows = await readNotifiedRows(databasePath, threeDaysAgo);
+            expect(rows).toHaveLength(1);
+            expect(rows[0]?.start_notified_at).toBeNull();
+            expect(rows[0]?.end_notified_at).toBeNull();
+        });
         // wiring synchronously ws.send()s inside it) — one namespace's push
         // failing (e.g. an already-closing socket) must never abort the
         // remaining namespaces still left in the same tick's loop.
@@ -3299,6 +3343,36 @@ describe('tdah module', () => {
             expect(betaFires.map((fire) => fire.event.edge).sort()).toEqual(['end', 'start']);
         });
 
+        // Review fix (LOW): per-namespace storage-failure isolation for the
+        // tick itself — a namespace whose tdah database can't even be opened
+        // (here: garbage bytes planted on disk, never activated) must fail
+        // alone: every healthy namespace in the same tick still fires, the
+        // failure is counted (never thrown — runActivityTriggerTick's own
+        // never-throws contract), and the call resolves.
+        test('a corrupt namespace database fails alone: healthy namespaces still fire, failedCount counts it, and the tick resolves', async () => {
+            const keyAlpha = tokenToKey(TOKEN_ALPHA);
+            const keyBeta = tokenToKey(TOKEN_BETA);
+
+            await activate({ timeZone: 'UTC' }, TOKEN_ALPHA);
+            await createManualActivityApi({ title: 'Sana', startTime: '07:00', durationMinutes: 10 }, TOKEN_ALPHA);
+
+            // listActiveTdahNamespaces discovers beta purely by the tdah
+            // database file EXISTING on disk — no activation ever ran for
+            // it, so the garbage bytes below are the first thing any opener
+            // sees and the tick's profile read throws.
+            mkdirSync(join(dataDir, keyBeta, 'tdah'), { recursive: true });
+            writeFileSync(tdahDatabasePath(dataDir, keyBeta), 'not a sqlite database');
+
+            const { fires, onFire } = collectFires();
+            const summary = await runActivityTriggerTick(dataDir, buildTodayInstant('07:30'), alwaysConnected, onFire);
+            expect(summary.namespaceCount).toBe(2);
+            expect(summary.firedNamespaceCount).toBe(1);
+            expect(summary.firedEventCount).toBe(2);
+            expect(summary.failedCount).toBe(1);
+            expect(fires).toHaveLength(2);
+            expect(fires.every((fire) => fire.key === keyAlpha)).toBe(true);
+        });
+
         // Review fix (MEDIUM): the candidate query had no `state` filter, so
         // a manually completed/discarded/missed Actividad still fired its
         // originally-planned notification even though the user already
@@ -3316,6 +3390,56 @@ describe('tdah module', () => {
             expect(summary.firedEventCount).toBe(0);
             expect(summary.skippedCount).toBe(1);
             expect(fires).toHaveLength(0);
+        });
+
+        // Review fix (LOW): `started` is not a terminal state — an Actividad
+        // the user explicitly began still deserves its remaining milestone
+        // notifications; only completed/discarded/missed are excluded by the
+        // candidate query's state filter.
+        test('a started Actividad still fires its start/end events once both milestones cross', async () => {
+            await activate({ timeZone: 'UTC' });
+            const created = await readActivity(
+                await createManualActivityApi({ title: 'En curso', startTime: '07:00', durationMinutes: 10 }),
+            );
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+
+            const startResponse = await transitionActivityApi(created.id, 'start');
+            expect(startResponse.status).toBe(200);
+
+            const { fires, onFire } = collectFires();
+            const summary = await runActivityTriggerTick(dataDir, buildTodayInstant('07:30'), alwaysConnected, onFire);
+            expect(summary.firedEventCount).toBe(2);
+            expect(fires.map((fire) => fire.event.edge)).toEqual(['start', 'end']);
+            expect(fires.every((fire) => fire.event.activityId === created.id)).toBe(true);
+
+            const rows = await readNotifiedRows(databasePath, created.dayPlanDate);
+            expect(rows[0]?.start_notified_at).not.toBeNull();
+            expect(rows[0]?.end_notified_at).not.toBeNull();
+        });
+
+        // Review fix (LOW): durationMinutes 0 is valid input (the routes
+        // validate `>= 0`) but has no end milestone distinct from its start
+        // — it used to fire a simultaneous duplicate 'end' event alongside
+        // the 'start' one in the same tick.
+        test('a zero-durationMinutes Actividad fires exactly one "start" event and never an "end"', async () => {
+            await activate({ timeZone: 'UTC' });
+            const created = await readActivity(
+                await createManualActivityApi({ title: 'Instantáneo', startTime: '09:00', durationMinutes: 0 }),
+            );
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+
+            const { fires, onFire } = collectFires();
+            const summary = await runActivityTriggerTick(dataDir, buildTodayInstant('23:00'), alwaysConnected, onFire);
+            expect(summary.firedEventCount).toBe(1);
+            expect(fires).toHaveLength(1);
+            expect(fires[0]?.event.edge).toBe('start');
+            expect(fires[0]?.event.durationMinutes).toBe(0);
+
+            const rows = await readNotifiedRows(databasePath, created.dayPlanDate);
+            expect(rows[0]?.start_notified_at).not.toBeNull();
+            expect(rows[0]?.end_notified_at).toBeNull();
         });
     });
 
@@ -3359,6 +3483,76 @@ describe('tdah module', () => {
                 ),
             ).resolves.toBeUndefined();
             expect(onFireCalls).toBe(0);
+        });
+    });
+
+    // Review fix (MEDIUM): the interval's two push closures (hasOpenConnection
+    // + onFire) used to live inline in startCloudServer's setInterval, so the
+    // real wiring — JSON.stringify, fan-out over connectionsFor, and the
+    // readyState guard — was never directly tested. They are extracted as
+    // buildTdahActivityTriggerPush; these tests exercise the actual function
+    // the interval uses, with fake sockets instead of a real port.
+    describe('buildTdahActivityTriggerPush (story 2.2: the interval\'s real WS push wiring)', () => {
+        type FakePushSocket = {
+            readyState: number;
+            sent: string[];
+            send: (payload: string) => void;
+        };
+
+        const buildFakeSocket = (readyState: number): FakePushSocket => {
+            const sent: string[] = [];
+            return {
+                readyState,
+                sent,
+                send: (payload: string): void => {
+                    sent.push(payload);
+                },
+            };
+        };
+
+        test('onFire JSON.stringifies the event and fans out only to OPEN sockets; hasOpenConnection mirrors the registry count', () => {
+            const registry = createTdahWsConnectionRegistry<FakePushSocket>();
+            const push = buildTdahActivityTriggerPush(registry);
+            expect(push.hasOpenConnection('key-a')).toBe(false);
+
+            const openSocket = buildFakeSocket(1);
+            const closingSocket = buildFakeSocket(3);
+            registry.register('key-a', openSocket);
+            registry.register('key-a', closingSocket);
+            expect(push.hasOpenConnection('key-a')).toBe(true);
+
+            const event: TdahWsActivityTriggerEvent = {
+                kind: 'activity-trigger',
+                edge: 'start',
+                activityId: 7,
+                title: 'Foco',
+                durationMinutes: 25,
+                startTime: '11:55',
+                at: new Date('2026-08-27T12:00:00.000Z').toISOString(),
+            };
+            push.onFire('key-a', event);
+
+            // Only the OPEN socket received the payload, exactly once; the
+            // CLOSING socket (readyState 3) was skipped explicitly.
+            expect(openSocket.sent).toHaveLength(1);
+            expect(closingSocket.sent).toHaveLength(0);
+
+            // The payload parses back into the exact wire shape
+            // (types.ts's TdahWsActivityTriggerEvent).
+            const received = JSON.parse(openSocket.sent[0] ?? '{}') as TdahWsActivityTriggerEvent;
+            expect(received).toEqual(event);
+            expect(received.kind).toBe('activity-trigger');
+            expect(received.edge).toBe('start');
+            expect(received.activityId).toBe(7);
+            expect(received.title).toBe('Foco');
+            expect(received.durationMinutes).toBe(25);
+            expect(received.startTime).toBe('11:55');
+            expect(received.at).toBe(event.at);
+
+            registry.unregister('key-a', openSocket);
+            expect(push.hasOpenConnection('key-a')).toBe(true);
+            registry.unregister('key-a', closingSocket);
+            expect(push.hasOpenConnection('key-a')).toBe(false);
         });
     });
 

@@ -77,14 +77,15 @@ const runNamespaceActivityTriggerTick = async (
     hasOpenConnection: (key: string) => boolean,
 ): Promise<NamespaceActivityTriggerOutcome> => {
     try {
-        const profile = await readTdahProfile(dataDir, key);
-        if (!profile || profile.mode !== 'on') {
-            return { kind: 'skipped' };
-        }
         // No live socket to push to right now — never mark anything
         // notified (see this file's own doc comment on the reconnect edge
-        // case).
+        // case), and checked BEFORE the profile read so a disconnected
+        // namespace never pays that disk I/O on every 15s tick.
         if (!hasOpenConnection(key)) {
+            return { kind: 'skipped' };
+        }
+        const profile = await readTdahProfile(dataDir, key);
+        if (!profile || profile.mode !== 'on') {
             return { kind: 'skipped' };
         }
 

@@ -113,6 +113,7 @@ import {
     createTdahWsConnectionRegistry,
     resolveTdahWsAuth,
     TDAH_WS_PATH,
+    type TdahWsConnectionRegistry,
 } from './tdah/ws-channel';
 
 const ANY_TOKEN_NAMESPACE_LIMIT_DEFAULT = 32;
@@ -256,8 +257,21 @@ type TdahWsConnectionData = { key: string };
 /** Bun's `ServerWebSocket`, narrowed to the surface this module actually uses. */
 type BunServerWebSocket = {
     readonly data: TdahWsConnectionData;
+    /** W3C readyState (0 CONNECTING, 1 OPEN, 2 CLOSING, 3 CLOSED) — Bun tracks it live. */
+    readonly readyState: number;
     send: (data: string) => number;
     close: (code?: number, reason?: string) => void;
+};
+
+/**
+ * The connection surface `buildTdahActivityTriggerPush`'s fan-out needs —
+ * `BunServerWebSocket` above satisfies it, and unit tests satisfy it with
+ * plain fake sockets, the same generic-over-connection trick
+ * `TdahWsConnectionRegistry` itself uses.
+ */
+type TdahActivityTriggerSocket = {
+    readonly readyState: number;
+    send: (data: string) => unknown;
 };
 
 type BunServer = {
@@ -1031,6 +1045,39 @@ export async function runTdahActivityTriggerIntervalTick(
     }
 }
 
+/** W3C `readyState` value for an OPEN socket — the only state `send()` can still reach. */
+const TDAH_WS_READY_STATE_OPEN = 1;
+
+/**
+ * The real WS push wiring behind the activity-trigger interval's two
+ * closures (review fix: previously inlined in `startCloudServer`'s
+ * `setInterval`, hence untestable without a real socket and port).
+ * Extracted as an exported factory over any registry whose connections
+ * expose `readyState`/`send` — the same "pure logic separate from the real
+ * `Bun.serve` wiring" split ws-channel.ts keeps — so the JSON.stringify +
+ * fan-out + readyState guard below is directly testable with fake sockets.
+ * `startCloudServer` is the only production caller, passing the live
+ * per-server `tdahWsRegistry`.
+ */
+export const buildTdahActivityTriggerPush = <TConnection extends TdahActivityTriggerSocket>(
+    tdahWsRegistry: TdahWsConnectionRegistry<TConnection>,
+): {
+    hasOpenConnection: (key: string) => boolean;
+    onFire: (key: string, event: TdahWsActivityTriggerEvent) => void;
+} => ({
+    hasOpenConnection: (key) => tdahWsRegistry.connectionCount(key) > 0,
+    onFire: (key, event) => {
+        const payload = JSON.stringify(event);
+        for (const ws of tdahWsRegistry.connectionsFor(key)) {
+            // Bun sockets in CLOSING/CLOSED state fail silently on send —
+            // skip anything not OPEN so the miss is explicit, never a
+            // half-delivered fan-out.
+            if (ws.readyState !== TDAH_WS_READY_STATE_OPEN) continue;
+            ws.send(payload);
+        }
+    },
+});
+
 function isProjectPurgePatch(bodyRecord: Record<string, unknown>): boolean {
     return typeof bodyRecord.purgedAt === 'string' && bodyRecord.purgedAt.trim().length > 0;
 }
@@ -1261,19 +1308,15 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
     // `tdahActivityTriggerTickInFlight` guards against overlap the same way
     // `tdahTickInFlight` does for the nightly tick above.
     const TDAH_ACTIVITY_TRIGGER_TICK_INTERVAL_MS = 15_000;
+    const tdahActivityTriggerPush = buildTdahActivityTriggerPush(tdahWsRegistry);
     let tdahActivityTriggerTickInFlight = false;
     const tdahActivityTriggerTickTimer = setInterval(() => {
         if (tdahActivityTriggerTickInFlight) return;
         tdahActivityTriggerTickInFlight = true;
         void runTdahActivityTriggerIntervalTick(
             dataDir,
-            (key) => tdahWsRegistry.connectionCount(key) > 0,
-            (key, event) => {
-                const payload = JSON.stringify(event);
-                for (const ws of tdahWsRegistry.connectionsFor(key)) {
-                    ws.send(payload);
-                }
-            },
+            tdahActivityTriggerPush.hasOpenConnection,
+            tdahActivityTriggerPush.onFire,
         ).finally(() => {
             tdahActivityTriggerTickInFlight = false;
         });

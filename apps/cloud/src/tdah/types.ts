@@ -318,12 +318,13 @@ export type TdahWsConnectedEvent = {
  * when `startTime + durationMinutes` arrives. Never a third, generic kind.
  *
  * Field names/`kind` value (`'activity-trigger'`, `edge` rather than
- * `event`) match `apps/mobile/components/tdah/today/tdah-activity-
- * notification.ts`'s own mirror of this shape (ADR 0026: the client can't
- * import this file across the wire boundary, so it keeps an independent
- * copy) — that file's own doc comment says only its parser needs to change
- * if the server lands on different names, so this is the actual wire
- * contract to reconcile it against, not a guess.
+ * `event`) match
+ * `apps/mobile/components/tdah/today/tdah-activity-notification.ts`'s own
+ * mirror of this shape (ADR 0026: the client can't import this file across
+ * the wire boundary, so it keeps an independent copy) — that file's own doc
+ * comment says only its parser needs to change if the server lands on
+ * different names, so this is the actual wire contract to reconcile it
+ * against, not a guess.
  *
  * `durationMinutes` travels raw (not a pre-formatted string) so the client
  * builds the `"{Actividad} — {duración}"` title itself, following the same
