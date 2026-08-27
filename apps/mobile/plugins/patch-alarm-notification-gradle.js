@@ -600,6 +600,22 @@ const applyAlarmCompleteUtilPatchToSource = (original) => {
 //    `tdahCompleteActionLabel` / `tdahSnoozeActionLabel`) instead of the
 //    hardcoded "START"/"COMPLETE"/"SNOOZE" — spec Always: "toda copy nueva
 //    ... se localiza por clave".
+//
+// Review fix (MEDIUM): every sub-replacement this transform makes used to be
+// an unguarded `next.replace(...)`, which silently no-ops on anchor drift —
+// while the registry's `appliedMarker: 'TDAH_ACTIVITY_NOTIFICATION_CHANNEL_ID'`
+// (inserted by an independently includes-guarded block above) still satisfied
+// `required: true`, so a partial patch shipped green. Sub-changes below now
+// go through `replaceRequired`: skip when the sub-change's own output marker
+// is already present (idempotent second pass), throw when neither the output
+// marker nor the anchor is present (real anchor drift).
+const replaceRequired = (source, anchor, replacement, name) => {
+  if (!source.includes(anchor)) {
+    throw new Error(`tdah-activity-util patch anchor not found: ${name}`);
+  }
+  return source.replace(anchor, replacement);
+};
+
 const applyAlarmTdahActivityUtilPatchToSource = (original) => {
   let next = original;
 
@@ -630,6 +646,13 @@ const applyAlarmTdahActivityUtilPatchToSource = (original) => {
                 for (int i = 0; i < vibrationPatternParts.length; i++) {
                     try {
                         parsedVibrationPattern[i] = Long.parseLong(vibrationPatternParts[i].trim());
+                        // Review fix (LOW): parseLong("-100") succeeds, but
+                        // VibrationEffect.createWaveform would throw at runtime
+                        // on any negative entry — reject the whole pattern here.
+                        if (parsedVibrationPattern[i] < 0) {
+                            vibrationPatternParsedOk = false;
+                            break;
+                        }
                     } catch (NumberFormatException e) {
                         vibrationPatternParsedOk = false;
                         break;
@@ -642,22 +665,30 @@ const applyAlarmTdahActivityUtilPatchToSource = (original) => {
     );
   }
 
-  next = next.replace(
-    'NotificationChannel mChannel = new NotificationChannel(channelID, "Mindwtr reminders", NotificationManager.IMPORTANCE_DEFAULT);',
-    `boolean isTdahActivityNotification = TDAH_ACTIVITY_NOTIFICATION_CHANNEL_ID.equals(channelID);
+  if (!next.includes('isTdahActivityNotification')) {
+    next = replaceRequired(
+      next,
+      'NotificationChannel mChannel = new NotificationChannel(channelID, "Mindwtr reminders", NotificationManager.IMPORTANCE_DEFAULT);',
+      `boolean isTdahActivityNotification = TDAH_ACTIVITY_NOTIFICATION_CHANNEL_ID.equals(channelID);
                 String tdahActivityNotificationChannelName = bundle.getString("tdahActivityNotificationChannelName");
                 if (tdahActivityNotificationChannelName == null || tdahActivityNotificationChannelName.equals("")) tdahActivityNotificationChannelName = "Mindwtr TDAH activities";
                 NotificationChannel mChannel = new NotificationChannel(
                         channelID,
                         isTdahActivityNotification ? tdahActivityNotificationChannelName : "Mindwtr reminders",
                         isTdahActivityNotification ? NotificationManager.IMPORTANCE_HIGH : NotificationManager.IMPORTANCE_DEFAULT
-                );`
-  );
+                );`,
+      'channel creation'
+    );
+  }
 
-  next = next.replace(
-    '.setPriority(NotificationCompat.PRIORITY_DEFAULT)',
-    '.setPriority(TDAH_ACTIVITY_NOTIFICATION_CHANNEL_ID.equals(channelID) ? NotificationCompat.PRIORITY_HIGH : NotificationCompat.PRIORITY_DEFAULT)'
-  );
+  if (!next.includes('.setPriority(TDAH_ACTIVITY_NOTIFICATION_CHANNEL_ID.equals(channelID)')) {
+    next = replaceRequired(
+      next,
+      '.setPriority(NotificationCompat.PRIORITY_DEFAULT)',
+      '.setPriority(TDAH_ACTIVITY_NOTIFICATION_CHANNEL_ID.equals(channelID) ? NotificationCompat.PRIORITY_HIGH : NotificationCompat.PRIORITY_DEFAULT)',
+      'notification priority'
+    );
+  }
 
   if (!next.includes('hasStartAction')) {
     next = next.replace(
@@ -680,22 +711,31 @@ const applyAlarmTdahActivityUtilPatchToSource = (original) => {
     );
   }
 
-  next = next.replace(
-    'NotificationCompat.Action completeAction = new NotificationCompat.Action(android.R.drawable.checkbox_on_background, "COMPLETE", pendingComplete);',
-    `String tdahCompleteActionLabel = bundle.getString("tdahCompleteActionLabel");
+  if (!next.includes('bundle.getString("tdahCompleteActionLabel")')) {
+    next = replaceRequired(
+      next,
+      'NotificationCompat.Action completeAction = new NotificationCompat.Action(android.R.drawable.checkbox_on_background, "COMPLETE", pendingComplete);',
+      `String tdahCompleteActionLabel = bundle.getString("tdahCompleteActionLabel");
                     if (tdahCompleteActionLabel == null || tdahCompleteActionLabel.equals("")) tdahCompleteActionLabel = "COMPLETE";
-                    NotificationCompat.Action completeAction = new NotificationCompat.Action(android.R.drawable.checkbox_on_background, tdahCompleteActionLabel, pendingComplete);`
-  );
+                    NotificationCompat.Action completeAction = new NotificationCompat.Action(android.R.drawable.checkbox_on_background, tdahCompleteActionLabel, pendingComplete);`,
+      'complete action label'
+    );
+  }
 
-  next = next.replace(
-    'NotificationCompat.Action snoozeAction = new NotificationCompat.Action(R.drawable.ic_snooze, "SNOOZE", pendingSnooze);',
-    `String tdahSnoozeActionLabel = bundle.getString("tdahSnoozeActionLabel");
+  if (!next.includes('bundle.getString("tdahSnoozeActionLabel")')) {
+    next = replaceRequired(
+      next,
+      'NotificationCompat.Action snoozeAction = new NotificationCompat.Action(R.drawable.ic_snooze, "SNOOZE", pendingSnooze);',
+      `String tdahSnoozeActionLabel = bundle.getString("tdahSnoozeActionLabel");
                 if (tdahSnoozeActionLabel == null || tdahSnoozeActionLabel.equals("")) tdahSnoozeActionLabel = "SNOOZE";
-                NotificationCompat.Action snoozeAction = new NotificationCompat.Action(R.drawable.ic_snooze, tdahSnoozeActionLabel, pendingSnooze);`
-  );
+                NotificationCompat.Action snoozeAction = new NotificationCompat.Action(R.drawable.ic_snooze, tdahSnoozeActionLabel, pendingSnooze);`,
+      'snooze action label'
+    );
+  }
 
   if (!next.includes('if (!hasStartAction) {')) {
-    next = next.replace(
+    next = replaceRequired(
+      next,
       `                Intent dismissIntent = new Intent(mContext, AlarmReceiver.class);
                 dismissIntent.setAction(NOTIFICATION_ACTION_DISMISS);
                 dismissIntent.putExtra("AlarmId", alarm.getId());
@@ -713,7 +753,8 @@ const applyAlarmTdahActivityUtilPatchToSource = (original) => {
                     NotificationCompat.Action dismissAction = new NotificationCompat.Action(android.R.drawable.ic_lock_idle_alarm, "DISMISS", pendingDismiss);
                     mBuilder.addAction(dismissAction);
                 }
-            }`
+            }`,
+      'dismiss suppression'
     );
   }
 
@@ -1167,9 +1208,11 @@ const applyAlarmTdahActivityReceiverPatchToSource = (original) => {
 `;
 
   if (!original.includes(completeCaseHardened)) {
-    // Loud, not silent: `alarm-tdah-activity-receiver`'s `required: true` +
-    // `appliedMarker` below already catches a missing marker, but this gives
-    // the actual reason (anchor drift) instead of a generic "did not apply".
+    // Review fix (LOW): this returns the original untouched — it does NOT
+    // throw and does not name the reason. The failure is surfaced only
+    // generically, by this patch's registry entry (`required: true` +
+    // `appliedMarker` failing its post-transform check); the anchor-drift
+    // cause itself stays unreported on this path.
     return original;
   }
 
