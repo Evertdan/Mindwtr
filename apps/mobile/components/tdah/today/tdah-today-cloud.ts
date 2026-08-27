@@ -17,6 +17,12 @@ const TDAH_REQUEST_TIMEOUT_MS = 10_000;
 const TDAH_PROFILE_PATH = '/tdah/profile';
 const TDAH_DAY_PATH = '/tdah/day';
 const TDAH_DAY_ACTIVITIES_PATH = '/tdah/day/activities';
+// Story 3.3 (T-06/T-07): "mañana"'s own read/write surface, entirely
+// separate from TDAH_DAY_PATH's "hoy" endpoints above — T-06 never reuses
+// the "hoy" GET (spec Always: computeTomorrowDate, AD-6).
+const TDAH_DAY_TOMORROW_PATH = `${TDAH_DAY_PATH}/tomorrow`;
+const TDAH_DAY_TOMORROW_ACTIVITIES_PATH = `${TDAH_DAY_TOMORROW_PATH}/activities`;
+const TDAH_DAY_TOMORROW_CONFIRM_PATH = `${TDAH_DAY_TOMORROW_PATH}/confirm`;
 
 /**
  * Same cloud-sync-config load shape as tdah-settings-screen.tsx's `reload()`
@@ -66,4 +72,19 @@ export function buildTdahActivityActionUrl(
 /** T-05's decide endpoint (spec Code Map): `POST /v1/tdah/activities/:id/decide`. */
 export function buildTdahActivityDecideUrl(cloudUrl: string, activityId: number): string {
     return `${getCloudBaseUrl(cloudUrl)}/tdah/activities/${activityId}/decide`;
+}
+
+/** T-06's read endpoint (spec Code Map): `GET /v1/tdah/day/tomorrow`. */
+export function buildTdahTomorrowDayUrl(cloudUrl: string): string {
+    return `${getCloudBaseUrl(cloudUrl)}${TDAH_DAY_TOMORROW_PATH}`;
+}
+
+/** T-06's "Agregar manual" endpoint (spec Code Map): `POST /v1/tdah/day/tomorrow/activities`, independent of the confirm draft. */
+export function buildTdahTomorrowActivitiesUrl(cloudUrl: string): string {
+    return `${getCloudBaseUrl(cloudUrl)}${TDAH_DAY_TOMORROW_ACTIVITIES_PATH}`;
+}
+
+/** T-06's grouped confirm endpoint (spec Code Map): `POST /v1/tdah/day/tomorrow/confirm`. */
+export function buildTdahTomorrowConfirmUrl(cloudUrl: string): string {
+    return `${getCloudBaseUrl(cloudUrl)}${TDAH_DAY_TOMORROW_CONFIRM_PATH}`;
 }

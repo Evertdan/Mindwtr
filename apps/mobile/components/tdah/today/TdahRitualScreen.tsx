@@ -16,7 +16,7 @@ import { TdahStatusGlyph } from './TdahStatusGlyph';
 import { tdahActivityStateLabel } from './tdah-activity-labels';
 import { formatIsoWallClockInTimeZone } from './tdah-time';
 import { styles as todayStyles } from './tdah-today.styles';
-import type { TdahActivity, TdahActivityDecideRequest } from './tdah-today-types';
+import type { TdahActivity, TdahActivityDecideRequest, TdahActivityDecision } from './tdah-today-types';
 import { useTdahRitual } from './use-tdah-ritual';
 
 /**
@@ -36,14 +36,16 @@ export function TdahRitualScreen() {
     const router = useRouter();
     const { phase, timeZone, activities, reload, decideActivity } = useTdahRitual();
 
-    // Session-only "this row was decided" set (Design Notes: even "sin
-    // fecha", which changes nothing server-side, only collapses the row for
-    // this session) — deliberately never mirrored into the fetched
-    // `activities` themselves, so a decided row keeps showing the real
-    // missed/limbo outcome and hours of the day that just closed, rather
-    // than flipping to the mutation's new (and, for this recap, irrelevant)
-    // `pending`/cleared-hours shape.
-    const [decidedIds, setDecidedIds] = useState<ReadonlySet<number>>(new Set());
+    // Session-only "this row was decided, with what" map (Design Notes:
+    // even "sin fecha", which changes nothing server-side, only collapses
+    // the row for this session) — deliberately never mirrored into the
+    // fetched `activities` themselves, so a decided row keeps showing the
+    // real missed/limbo outcome and hours of the day that just closed,
+    // rather than flipping to the mutation's new (and, for this recap,
+    // irrelevant) `pending`/cleared-hours shape. Story 3.3: keyed by
+    // decision (not just membership) so T-06's own CTA can forward per-type
+    // counts to it (spec Code Map).
+    const [decidedByType, setDecidedByType] = useState<ReadonlyMap<number, TdahActivityDecision>>(new Map());
 
     useFocusEffect(useCallback(() => {
         void reload();
@@ -55,10 +57,10 @@ export function TdahRitualScreen() {
     ): Promise<boolean> => {
         try {
             await decideActivity(activityId, request);
-            setDecidedIds((current) => {
+            setDecidedByType((current) => {
                 if (current.has(activityId)) return current;
-                const next = new Set(current);
-                next.add(activityId);
+                const next = new Map(current);
+                next.set(activityId, request.decision);
                 return next;
             });
             return true;
@@ -87,9 +89,35 @@ export function TdahRitualScreen() {
         }
     }, [decideActivity, showToast, t]);
 
+    // Story 3.3 (spec Code Map): T-06 receives T-05's own 4 figures as route
+    // params rather than re-deriving them from a fresh fetch — "al Limbo"
+    // combines rows never decided this session with the ones explicitly
+    // sent "sin fecha" (`'undated'`, a deliberate no-op that still lands in
+    // Limbo server-side).
     const continueToMorning = useCallback(() => {
-        router.push('/tdah-morning');
-    }, [router]);
+        let movedTomorrow = 0;
+        let movedDate = 0;
+        let discarded = 0;
+        let undatedCount = 0;
+        for (const decision of decidedByType.values()) {
+            if (decision === 'move-tomorrow') movedTomorrow += 1;
+            else if (decision === 'move-date') movedDate += 1;
+            else if (decision === 'discard') discarded += 1;
+            else if (decision === 'undated') undatedCount += 1;
+        }
+        const stillUndecidedCount = activities.filter((activity) => (
+            DECIDABLE_STATES.has(activity.state) && !decidedByType.has(activity.id)
+        )).length;
+        router.push({
+            pathname: '/tdah-morning',
+            params: {
+                movedTomorrow: String(movedTomorrow),
+                movedDate: String(movedDate),
+                discarded: String(discarded),
+                limbo: String(stillUndecidedCount + undatedCount),
+            },
+        });
+    }, [activities, decidedByType, router]);
 
     const completedCount = useMemo(
         () => activities.filter((activity) => activity.state === 'completed').length,
@@ -105,9 +133,9 @@ export function TdahRitualScreen() {
     );
     const undecidedCount = useMemo(
         () => activities.filter((activity) => (
-            DECIDABLE_STATES.has(activity.state) && !decidedIds.has(activity.id)
+            DECIDABLE_STATES.has(activity.state) && !decidedByType.has(activity.id)
         )).length,
-        [activities, decidedIds],
+        [activities, decidedByType],
     );
 
     if (phase === 'loading') {
@@ -212,7 +240,7 @@ export function TdahRitualScreen() {
 
                 <View style={ritualStyles.list} testID="tdah-ritual-activity-list">
                     {activities.map((activity) => {
-                        const decided = decidedIds.has(activity.id);
+                        const decided = decidedByType.has(activity.id);
                         const needsDecision = DECIDABLE_STATES.has(activity.state) && !decided;
                         const stateLabel = tdahActivityStateLabel(t, activity.state);
                         const startedAtLabel = activity.startedAt

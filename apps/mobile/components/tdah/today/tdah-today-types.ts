@@ -24,6 +24,19 @@ export type TdahActivityState = (typeof TDAH_ACTIVITY_STATES)[number];
  * straight from its Bloque. `durationMinutes === 0` (as opposed to `null`)
  * reads as "zero minutes given", not "instant" — the UI hides the duration
  * label rather than showing "0 min" for either case.
+ *
+ * `movedAt` (story 3.3): the instant a `move-tomorrow`/`move-date` T-05
+ * decision last touched this Activity — `null`/absent for one that never
+ * moved through the Cierre. Drives T-06's "Movido desde el Cierre" badge,
+ * distinct from the `origin:'routine'` "De Rutina X" badge (an Activity can
+ * carry both: a Rutina-born row moved by a decision keeps its `origin` and
+ * also gains `movedAt`). Typed optional (`?`) rather than required so the
+ * many pre-3.3 fixtures across other stories' own test files — outside this
+ * story's owned files, so never touched here — that build a `TdahActivity`
+ * literal without it keep typechecking; every real server response still
+ * always includes it. Read it as `activity.movedAt ?? null`, never a bare
+ * `!== null`, so an omitted field in an older fixture reads the same as an
+ * explicit `null` (never mistaken for "moved").
  */
 export type TdahActivity = {
     id: number;
@@ -36,6 +49,7 @@ export type TdahActivity = {
     state: TdahActivityState;
     startedAt: string | null;
     completedAt: string | null;
+    movedAt?: string | null;
 };
 
 /**
@@ -51,6 +65,15 @@ export type TdahDayResponse = {
     timeZone: string;
     routineTitle: string | null;
     activities: TdahActivity[];
+    /**
+     * `null` until "Confirmar mañana" (T-06) persists the day's draft —
+     * story 3.3. Present on every `GET .../day{,/tomorrow}` and the confirm
+     * response alike (same `TdahDayPlanView` shape server-side); "hoy"'s own
+     * response also carries it (always `null` there in practice, since T-05
+     * closes "hoy" via `/decide`, never `/confirm`) rather than typing two
+     * near-identical response shapes for one field.
+     */
+    confirmedAt: string | null;
 };
 
 /** POST /v1/tdah/day/activities body. `startTime`/`durationMinutes` are genuinely optional — omit either to leave it unset ("sin hora"). */
@@ -87,3 +110,18 @@ export type TdahActivityDecideRequest =
     | { decision: 'move-date'; date: string }
     | { decision: 'discard' }
     | { decision: 'undated' };
+
+/**
+ * `POST /v1/tdah/day/tomorrow/confirm` body (story 3.3, T-06). A full
+ * overwrite, never a diff (Design Notes): `activities` carries every
+ * surviving Activity of the day, in its final order (`sortOrder` = array
+ * index, assigned server-side), and `deletedActivityIds` carries every id
+ * removed from the draft. The server rejects the request whole (400
+ * `TDAH_ACTIVITY_INVALID`) unless `activities.length + deletedActivityIds.length`
+ * equals its own current count for the day — exact accounting, so a
+ * desynced client can never silently drop rows it doesn't know about.
+ */
+export type TdahConfirmMorningRequest = {
+    activities: { id: number; startTime: string | null; durationMinutes: number | null }[];
+    deletedActivityIds: number[];
+};

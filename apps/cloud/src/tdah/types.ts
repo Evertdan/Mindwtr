@@ -157,6 +157,13 @@ export type TdahActivity = {
     state: TdahActivityState;
     startedAt: string | null;
     completedAt: string | null;
+    /**
+     * Story 3.3 — `null` unless a T-05 `move-tomorrow`/`move-date` decision
+     * (story 3.2) relocated this Activity here. T-06's morning editor renders
+     * that as a distinct "Movido desde el Cierre" badge, separate from
+     * `origin:'routine'`'s own "De Rutina X" badge.
+     */
+    movedAt: string | null;
 };
 
 /**
@@ -177,6 +184,13 @@ export type TdahDayResponse = {
     date: string;
     timeZone: string;
     routineTitle: string | null;
+    /**
+     * Story 3.3 — `null` until `POST /v1/tdah/day/tomorrow/confirm` sets it;
+     * re-confirming overwrites it with a fresher timestamp. T-06 renders a
+     * soft-lock banner when this is non-null on re-entry, but still allows
+     * editing and reconfirming (no hard block).
+     */
+    confirmedAt: string | null;
     activities: TdahActivity[];
 };
 
@@ -257,6 +271,27 @@ export type TdahActivityDecideRequest =
     | { decision: 'move-date'; date: string }
     | { decision: 'discard' }
     | { decision: 'undated' };
+
+/**
+ * POST /v1/tdah/day/tomorrow/confirm body — story 3.3, T-06's single
+ * grouped-persist for the morning editor's borrador local (Design Notes: "el
+ * confirm es una sobrescritura completa, nunca un diff implícito").
+ *
+ * `activities` carries every surviving Actividad in its final order —
+ * `sortOrder` is implicit, the array index — with its (possibly edited)
+ * `startTime`/`durationMinutes`; `deletedActivityIds` carries every id the
+ * draft removed. The server requires
+ * `activities.length + deletedActivityIds.length` to equal the day's current
+ * `pending` Actividad count exactly (contabilidad exacta) — any mismatch, or
+ * any id outside tomorrow's own `pending` set, rejects the WHOLE request with
+ * `TDAH_ACTIVITY_INVALID` and writes nothing (see `mutateConfirmMorning` in
+ * storage.ts). Retrying the identical payload is naturally idempotent —
+ * there is no separate idempotency-key mechanism.
+ */
+export type TdahConfirmMorningRequest = {
+    activities: Array<{ id: number; startTime: string | null; durationMinutes: number | null }>;
+    deletedActivityIds: number[];
+};
 
 /**
  * POST /v1/tdah/activate body. Always turns the mode on (first activation or

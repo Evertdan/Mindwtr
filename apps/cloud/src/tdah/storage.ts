@@ -26,6 +26,7 @@ import type {
     TdahActivityOrigin,
     TdahActivityState,
     TdahActivityTransitionAction,
+    TdahConfirmMorningRequest,
     TdahMode,
     TdahProfile,
     TdahProfileUpsertRequest,
@@ -139,10 +140,20 @@ const CREATE_ROUTINE_BLOCK_TABLE_SQL = `
     );
 `;
 
+// `confirmed_at` (story 3.3) marks the local calendar date `tdah_day_plan`'s
+// row was last confirmed via `POST /v1/tdah/day/tomorrow/confirm` — a fresh
+// database gets it directly from this CREATE TABLE (so a new user starts at
+// schema v5 with no migration to run), while a pre-3.3 database needs
+// `migrateMorningEditColumnsIfNeeded` below (a plain `ALTER TABLE ... ADD
+// COLUMN`, same shape as the notification-column pairs above, since it's a
+// genuinely new nullable column with no existing constraint to relax). `null`
+// until the first confirm; re-confirming after that (T-06's soft-lock
+// re-entry) simply overwrites it with a fresher timestamp.
 const CREATE_DAY_PLAN_TABLE_SQL = `
     CREATE TABLE IF NOT EXISTS tdah_day_plan (
         date TEXT PRIMARY KEY,
-        generated_at TEXT NOT NULL
+        generated_at TEXT NOT NULL,
+        confirmed_at TEXT
     );
 `;
 
@@ -170,6 +181,18 @@ const CREATE_DAY_PLAN_TABLE_SQL = `
 // database needs `migrateActivityNotificationColumnsIfNeeded` below (a plain
 // `ALTER TABLE ... ADD COLUMN` pair, since both are genuinely new nullable
 // columns with no existing constraint to relax).
+// `sort_order`/`moved_at` (story 3.3) back T-06's morning editor: `sort_order`
+// is the draft's confirmed drag order (`0` default for every unedited row, so
+// existing rows keep their prior relative order via the secondary sort keys
+// in `SELECT_ACTIVITIES_FOR_DAY_SQL` below); `moved_at` marks an Actividad
+// that a T-05 `move-tomorrow`/`move-date` decision (story 3.2) relocated here
+// — distinct from `origin:'routine'`'s "De Rutina X" badge. A fresh database
+// gets both directly from this CREATE TABLE (so a new user starts at schema
+// v5 with no migration to run), while a pre-3.3 database needs
+// `migrateMorningEditColumnsIfNeeded` below (a plain `ALTER TABLE ... ADD
+// COLUMN` pair, since both are genuinely new columns with no existing
+// constraint to relax — `sort_order` gets a `DEFAULT 0` so the `ALTER TABLE`
+// itself backfills every pre-existing row instead of leaving them NULL).
 const CREATE_ACTIVITY_TABLE_SQL = `
     CREATE TABLE IF NOT EXISTS tdah_activity (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -183,7 +206,9 @@ const CREATE_ACTIVITY_TABLE_SQL = `
         started_at TEXT,
         completed_at TEXT,
         start_notified_at TEXT,
-        end_notified_at TEXT
+        end_notified_at TEXT,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        moved_at TEXT
     );
 `;
 
@@ -253,7 +278,10 @@ const SCHEMA_VERSION_ACTIVITY_TIMESTAMPS = 2;
 const SCHEMA_VERSION_ACTIVITY_NOTIFICATIONS = 3;
 // Story 3.1 — adds `tdah_profile.ritual_notified_date`.
 const SCHEMA_VERSION_RITUAL_NOTIFICATION = 4;
-const SCHEMA_TARGET_VERSION = SCHEMA_VERSION_RITUAL_NOTIFICATION;
+// Story 3.3 — adds `tdah_activity.sort_order`/`moved_at` and
+// `tdah_day_plan.confirmed_at` (T-06's morning editor + T-07's confirm).
+const SCHEMA_VERSION_MORNING_EDIT = 5;
+const SCHEMA_TARGET_VERSION = SCHEMA_VERSION_MORNING_EDIT;
 
 /**
  * v0 -> v1: a pre-1.4 database's `tdah_routine` still has the old
@@ -468,6 +496,43 @@ const migrateRitualNotificationColumnIfNeeded = (database: TdahDatabase): void =
     database.exec(`PRAGMA user_version = ${SCHEMA_VERSION_RITUAL_NOTIFICATION};`);
 };
 
+/**
+ * v4 -> v5 (story 3.3): a pre-3.3 database's `tdah_activity` has neither
+ * `sort_order` nor `moved_at`, and its `tdah_day_plan` has no `confirmed_at`
+ * — the persisted shape T-06's morning editor and T-07's confirm need (see
+ * this file's own CREATE_ACTIVITY_TABLE_SQL/CREATE_DAY_PLAN_TABLE_SQL doc
+ * comments above). Every one of the three is a genuinely new column with no
+ * existing `NOT NULL`/CHECK constraint to relax, so this is a plain
+ * `ALTER TABLE ... ADD COLUMN` trio rather than a create-copy-drop-rename
+ * rebuild — `sort_order`'s own `DEFAULT 0` backfills every pre-existing row
+ * automatically.
+ */
+const migrateMorningEditColumnsIfNeeded = (database: TdahDatabase): void => {
+    const activityColumns = prepareAll<{ name: unknown }>(database, "PRAGMA table_info('tdah_activity');").all();
+    const hasMorningEditColumns = activityColumns.some((column) => String(column.name) === 'sort_order');
+
+    if (!hasMorningEditColumns) {
+        database.exec('BEGIN IMMEDIATE;');
+        try {
+            database.exec('ALTER TABLE tdah_activity ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;');
+            database.exec('ALTER TABLE tdah_activity ADD COLUMN moved_at TEXT;');
+            database.exec('ALTER TABLE tdah_day_plan ADD COLUMN confirmed_at TEXT;');
+            database.exec(`PRAGMA user_version = ${SCHEMA_VERSION_MORNING_EDIT};`);
+            database.exec('COMMIT;');
+        } catch (error) {
+            try {
+                database.exec('ROLLBACK;');
+            } catch {
+                // Closing the handle in the caller releases the lock either way.
+            }
+            throw error;
+        }
+        return;
+    }
+
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION_MORNING_EDIT};`);
+};
+
 const migrateSchemaIfNeeded = (database: TdahDatabase): void => {
     const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: unknown };
     let currentVersion = Number(versionRow.user_version ?? 0);
@@ -491,6 +556,11 @@ const migrateSchemaIfNeeded = (database: TdahDatabase): void => {
     if (currentVersion < SCHEMA_VERSION_RITUAL_NOTIFICATION) {
         migrateRitualNotificationColumnIfNeeded(database);
         currentVersion = SCHEMA_VERSION_RITUAL_NOTIFICATION;
+    }
+
+    if (currentVersion < SCHEMA_VERSION_MORNING_EDIT) {
+        migrateMorningEditColumnsIfNeeded(database);
+        currentVersion = SCHEMA_VERSION_MORNING_EDIT;
     }
 };
 
@@ -1621,11 +1691,18 @@ export async function activateTdahProfile(
 // the explicit `(start_time IS NULL) ASC` clause SQLite's default `ASC`
 // ordering treats `NULL` as smaller than any real value, which would sort
 // no-time Activities FIRST instead of last.
+// `sort_order ASC` leads (story 3.3): T-06's confirm persists the draft's
+// final drag order there (index in the confirmed array), so a confirmed day
+// renders in exactly that order. Every row `sort_order` has never touched
+// still shares the default `0`, so the original timed-then-untimed ordering
+// (`(start_time IS NULL) ASC, start_time ASC, id ASC`) remains the tie-break
+// among them — an un-confirmed day (or one confirmed with no reorder) renders
+// identically to before this story.
 const SELECT_ACTIVITIES_FOR_DAY_SQL = `
-    SELECT id, day_plan_date, block_id, title, start_time, duration_minutes, origin, state, started_at, completed_at
+    SELECT id, day_plan_date, block_id, title, start_time, duration_minutes, origin, state, started_at, completed_at, moved_at
     FROM tdah_activity
     WHERE day_plan_date = ?
-    ORDER BY (start_time IS NULL) ASC, start_time ASC, id ASC;
+    ORDER BY sort_order ASC, (start_time IS NULL) ASC, start_time ASC, id ASC;
 `;
 // `null` whenever today has no block-linked (origin:'routine') Activity —
 // either no Rutina applies (FR-3) or today is manual-only. A routine-edit
@@ -1647,7 +1724,7 @@ const SELECT_ROUTINE_TITLE_FOR_DAY_SQL = `
     ORDER BY tdah_activity.id ASC
     LIMIT 1;
 `;
-const SELECT_ACTIVITY_BY_ID_SQL = 'SELECT id, day_plan_date, block_id, title, start_time, duration_minutes, origin, state, started_at, completed_at FROM tdah_activity WHERE id = ?;';
+const SELECT_ACTIVITY_BY_ID_SQL = 'SELECT id, day_plan_date, block_id, title, start_time, duration_minutes, origin, state, started_at, completed_at, moved_at FROM tdah_activity WHERE id = ?;';
 const INSERT_MANUAL_ACTIVITY_SQL = `
     INSERT INTO tdah_activity (day_plan_date, block_id, title, start_time, duration_minutes, origin, state)
     VALUES (?, NULL, ?, ?, ?, 'manual', 'pending');
@@ -1658,7 +1735,10 @@ const UPDATE_ACTIVITY_MISS_SQL = "UPDATE tdah_activity SET state = 'missed' WHER
 // Story 3.2 — `move-tomorrow`/`move-date`: reprogramming is a fresh attempt
 // on a new day, so `startedAt`/`completedAt` are cleared back to NULL rather
 // than carried over from the missed/limbo attempt being replaced.
-const UPDATE_ACTIVITY_DECIDE_MOVE_SQL = "UPDATE tdah_activity SET state = 'pending', day_plan_date = ?, started_at = NULL, completed_at = NULL WHERE id = ?;";
+// `moved_at` (story 3.3) is stamped here too — the only place it's ever
+// written — so T-06 can render its "Movido desde el Cierre" badge, distinct
+// from `origin:'routine'`'s own badge; `discard`/`undated` never touch it.
+const UPDATE_ACTIVITY_DECIDE_MOVE_SQL = "UPDATE tdah_activity SET state = 'pending', day_plan_date = ?, started_at = NULL, completed_at = NULL, moved_at = ? WHERE id = ?;";
 const UPDATE_ACTIVITY_DECIDE_DISCARD_SQL = "UPDATE tdah_activity SET state = 'discarded' WHERE id = ?;";
 
 type TdahActivityRow = {
@@ -1672,6 +1752,7 @@ type TdahActivityRow = {
     state: unknown;
     started_at: unknown;
     completed_at: unknown;
+    moved_at: unknown;
 };
 
 const asNumberOrNull = (value: unknown): number | null => (
@@ -1692,6 +1773,10 @@ const rowToActivity = (row: TdahActivityRow): TdahActivity => ({
     state: row.state as TdahActivityState,
     startedAt: asString(row.started_at),
     completedAt: asString(row.completed_at),
+    // `null` unless a T-05 `move-tomorrow`/`move-date` decision (story 3.2)
+    // relocated this Actividad — the only write path for this column (see
+    // UPDATE_ACTIVITY_DECIDE_MOVE_SQL).
+    movedAt: asString(row.moved_at),
 });
 
 const selectActivityById = (database: TdahDatabase, activityId: number): TdahActivity | null => {
@@ -1703,8 +1788,12 @@ export type TdahDayPlanView = {
     date: string;
     timeZone: string;
     routineTitle: string | null;
+    /** `null` until `POST /v1/tdah/day/tomorrow/confirm` (story 3.3, T-06/T-07) sets it; re-confirming overwrites it with a fresher timestamp. */
+    confirmedAt: string | null;
     activities: TdahActivity[];
 };
+
+const SELECT_DAY_PLAN_CONFIRMED_AT_SQL = 'SELECT confirmed_at FROM tdah_day_plan WHERE date = ?;';
 
 /**
  * `getTodayDayPlan`'s raw-database read half — every Activity for `date`
@@ -1716,7 +1805,14 @@ export type TdahDayPlanView = {
 const selectDayPlanView = (database: TdahDatabase, date: string, timeZone: string): TdahDayPlanView => {
     const activities = prepareAll<TdahActivityRow>(database, SELECT_ACTIVITIES_FOR_DAY_SQL).all(date).map(rowToActivity);
     const routineTitleRow = database.prepare(SELECT_ROUTINE_TITLE_FOR_DAY_SQL).get(date) as { title: unknown } | undefined | null;
-    return { date, timeZone, routineTitle: routineTitleRow ? String(routineTitleRow.title) : null, activities };
+    const dayPlanRow = database.prepare(SELECT_DAY_PLAN_CONFIRMED_AT_SQL).get(date) as { confirmed_at: unknown } | undefined | null;
+    return {
+        date,
+        timeZone,
+        routineTitle: routineTitleRow ? String(routineTitleRow.title) : null,
+        confirmedAt: dayPlanRow ? asString(dayPlanRow.confirmed_at) : null,
+        activities,
+    };
 };
 
 /**
@@ -1744,6 +1840,37 @@ export async function getTodayDayPlan(
 ): Promise<TdahDayPlanView> {
     const databasePath = tdahDatabasePath(dataDir, key);
     const date = formatDateInTimeZone(new Date(), timeZone);
+    if (existsSync(databasePath)) {
+        const existing = await withReadDatabase(databasePath, (database) => (
+            hasDayPlan(database, date) ? selectDayPlanView(database, date, timeZone) : null
+        ));
+        if (existing) return existing;
+    }
+    const durableDir = ensureDurableDirectory(dirname(databasePath));
+    if (!durableDir) {
+        throw new Error('TDAH database directory is unsafe');
+    }
+    return await withWriteTransaction(databasePath, (database) => {
+        mutateGenerateTomorrowIfMissing(database, date);
+        return selectDayPlanView(database, date, timeZone);
+    });
+}
+
+/**
+ * GET /v1/tdah/day/tomorrow — story 3.3, T-06's morning editor. Same shape as
+ * `getTodayDayPlan` above, but reads/materializes tomorrow's DayPlan
+ * (`computeTomorrowDate`, AD-6) instead of today's — it never generates
+ * *today's* plan, and it never regenerates tomorrow's if it already exists
+ * (the same `tdah_day_plan.date` PRIMARY KEY makes `mutateGenerateTomorrowIfMissing`
+ * a no-op either way, exactly like the nightly scheduler's own generate step).
+ */
+export async function getTomorrowDayPlan(
+    dataDir: string,
+    key: string,
+    timeZone: string,
+): Promise<TdahDayPlanView> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    const date = computeTomorrowDate(timeZone);
     if (existsSync(databasePath)) {
         const existing = await withReadDatabase(databasePath, (database) => (
             hasDayPlan(database, date) ? selectDayPlanView(database, date, timeZone) : null
@@ -1833,6 +1960,30 @@ export async function createManualActivity(
         throw new Error('TDAH database directory is unsafe');
     }
     const date = formatDateInTimeZone(new Date(), timeZone);
+    return await withWriteTransaction(databasePath, (database) => mutateCreateManualActivity(database, date, input));
+}
+
+/**
+ * POST /v1/tdah/day/tomorrow/activities — story 3.3, T-06's "Agregar manual"
+ * CTA (reusing T-02's create flow). Unlike every other T-06 edit
+ * (reorder/hora/duración/eliminar, all borrador-local until confirm), this
+ * persists immediately — the same "always-immediate" contract
+ * `createManualActivity` already gives today, just targeting tomorrow's
+ * DayPlan (`computeTomorrowDate`) via the same date-generic
+ * `mutateCreateManualActivity` body.
+ */
+export async function createManualActivityForTomorrow(
+    dataDir: string,
+    key: string,
+    timeZone: string,
+    input: TdahCreateManualActivityInput,
+): Promise<TdahActivity | null> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    const durableDir = ensureDurableDirectory(dirname(databasePath));
+    if (!durableDir) {
+        throw new Error('TDAH database directory is unsafe');
+    }
+    const date = computeTomorrowDate(timeZone);
     return await withWriteTransaction(databasePath, (database) => mutateCreateManualActivity(database, date, input));
 }
 
@@ -2009,7 +2160,7 @@ const mutateDecideActivity = (
     if (Number(countRow.count) >= TDAH_DAY_MAX_ACTIVITIES) {
         return { kind: 'rejected' };
     }
-    database.prepare(UPDATE_ACTIVITY_DECIDE_MOVE_SQL).run(targetDate, activityId);
+    database.prepare(UPDATE_ACTIVITY_DECIDE_MOVE_SQL).run(targetDate, new Date().toISOString(), activityId);
     const updated = selectActivityById(database, activityId);
     if (!updated) throw new Error('TDAH activity readback failed after decide');
     return { kind: 'ok', activity: updated };
@@ -2030,4 +2181,110 @@ export async function decideActivity(
         throw new Error('TDAH database directory is unsafe');
     }
     return await withWriteTransaction(databasePath, (database) => mutateDecideActivity(database, activityId, request, timeZone));
+}
+
+// --- Morning editor / confirm (story 3.3, T-06/T-07) ------------------------
+
+// Eligibility (Design Notes: "el confirm es una sobrescritura completa"):
+// only an Actividad that is BOTH on tomorrow's own DayPlan AND still
+// `state:'pending'` may appear in a confirm payload, as a survivor
+// (`activities`) or a deletion (`deletedActivityIds`) — the same set backs
+// both the exact-accounting check and the per-id eligibility check below, so
+// an id from another day/namespace, or one that is no longer `pending`
+// (already started/completed/missed/limbo/discarded), can never sneak
+// through either list.
+const SELECT_ELIGIBLE_MORNING_ACTIVITY_IDS_SQL = "SELECT id FROM tdah_activity WHERE day_plan_date = ? AND state = 'pending';";
+const UPDATE_ACTIVITY_MORNING_EDIT_SQL = 'UPDATE tdah_activity SET start_time = ?, duration_minutes = ?, sort_order = ? WHERE id = ?;';
+const DELETE_ACTIVITY_BY_ID_SQL = 'DELETE FROM tdah_activity WHERE id = ?;';
+const UPDATE_DAY_PLAN_CONFIRMED_AT_SQL = 'UPDATE tdah_day_plan SET confirmed_at = ? WHERE date = ?;';
+
+export type TdahConfirmMorningResult =
+    | { kind: 'rejected' }
+    | { kind: 'ok'; day: TdahDayPlanView };
+
+/**
+ * `POST /v1/tdah/day/tomorrow/confirm`'s single grouped-persist (story 3.3,
+ * Design Notes: "el confirm es una sobrescritura completa, nunca un diff
+ * implícito"). Validates fully before writing anything, so a rejected
+ * payload never applies partially (I/O Matrix: "transacción completa
+ * rechazada"):
+ *
+ * 1. Exact accounting — `activities.length + deletedActivityIds.length` must
+ *    equal the day's current eligible (`pending`) Actividad count. A
+ *    desynced client (one that missed an Actividad another device already
+ *    added/removed) can never silently drop or duplicate rows this way.
+ * 2. Per-id eligibility — every id in either list must be one of those
+ *    eligible ids, and no id may repeat across (or within) the two lists.
+ *
+ * `startTime`/`durationMinutes` format (HH:mm / 0-`TDAH_BLOCK_DURATION_MAX_MINUTES`)
+ * is already validated by routes.ts's request parser before this ever runs —
+ * the same division of responsibility `mutateCreateManualActivity` already
+ * relies on for its own `input.startTime`/`input.durationMinutes`, so this
+ * function trusts its `request` shape the same way.
+ *
+ * Once validated, every survivor in `activities` is written with its array
+ * index as the confirmed `sort_order` (the draft's final drag order), every
+ * id in `deletedActivityIds` is deleted, and `tdah_day_plan.confirmed_at` is
+ * stamped — all inside the caller's held transaction, so a crash mid-write
+ * rolls back to the pre-confirm state. Re-running the exact same payload is
+ * naturally idempotent (Design Notes): the second run's eligible-id set still
+ * matches 1:1 (the survivors are still `pending`, still on this day), so it
+ * re-applies the identical writes rather than erroring.
+ */
+export const mutateConfirmMorning = (
+    database: TdahDatabase,
+    date: string,
+    request: TdahConfirmMorningRequest,
+    timeZone: string,
+): TdahConfirmMorningResult => {
+    const eligibleRows = prepareAll<{ id: unknown }>(database, SELECT_ELIGIBLE_MORNING_ACTIVITY_IDS_SQL).all(date);
+    const eligibleIds = new Set(eligibleRows.map((row) => Number(row.id)));
+
+    if (request.activities.length + request.deletedActivityIds.length !== eligibleIds.size) {
+        return { kind: 'rejected' };
+    }
+
+    const seenIds = new Set<number>();
+    for (const entry of request.activities) {
+        if (!eligibleIds.has(entry.id) || seenIds.has(entry.id)) return { kind: 'rejected' };
+        seenIds.add(entry.id);
+    }
+    for (const id of request.deletedActivityIds) {
+        if (!eligibleIds.has(id) || seenIds.has(id)) return { kind: 'rejected' };
+        seenIds.add(id);
+    }
+
+    request.activities.forEach((entry, index) => {
+        database.prepare(UPDATE_ACTIVITY_MORNING_EDIT_SQL).run(entry.startTime, entry.durationMinutes, index, entry.id);
+    });
+    for (const id of request.deletedActivityIds) {
+        database.prepare(DELETE_ACTIVITY_BY_ID_SQL).run(id);
+    }
+    database.prepare(UPDATE_DAY_PLAN_CONFIRMED_AT_SQL).run(new Date().toISOString(), date);
+
+    return { kind: 'ok', day: selectDayPlanView(database, date, timeZone) };
+};
+
+/**
+ * POST /v1/tdah/day/tomorrow/confirm — see `mutateConfirmMorning` for the
+ * exact accounting/eligibility/idempotency rules `result.kind` encodes. Only
+ * ever targets tomorrow's own DayPlan (`computeTomorrowDate`, AD-6), the same
+ * date T-06 read from `GET .../tomorrow` — a confirm payload built from a
+ * stale "tomorrow" (the caller waited past local midnight) simply fails the
+ * exact-accounting check above against the now-different day's Actividades,
+ * the same "no partial application" guarantee every other mismatch hits.
+ */
+export async function confirmMorning(
+    dataDir: string,
+    key: string,
+    request: TdahConfirmMorningRequest,
+    timeZone: string,
+): Promise<TdahConfirmMorningResult> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    const durableDir = ensureDurableDirectory(dirname(databasePath));
+    if (!durableDir) {
+        throw new Error('TDAH database directory is unsafe');
+    }
+    const date = computeTomorrowDate(timeZone);
+    return await withWriteTransaction(databasePath, (database) => mutateConfirmMorning(database, date, request, timeZone));
 }

@@ -310,7 +310,7 @@ describe('TdahRitualScreen — Continuar a Mañana', () => {
         router.push.mockReset();
     });
 
-    it('navigates to the T-06 stub even with undecided Activities remaining (deciding is never mandatory)', async () => {
+    it('navigates to T-06 with zero-count params even with undecided Activities remaining (deciding is never mandatory)', async () => {
         hookState.activities = [missedActivity, limboActivity];
         let tree: ReturnType<typeof create> | undefined;
         await act(async () => { tree = create(<TdahRitualScreen />); });
@@ -319,10 +319,14 @@ describe('TdahRitualScreen — Continuar a Mañana', () => {
             tree!.root.findByProps({ testID: 'tdah-ritual-continue' }).props.onPress();
         });
 
-        expect(router.push).toHaveBeenCalledWith('/tdah-morning');
+        // Both rows are undecided (spec: "al Limbo" = no decididas + 'undated').
+        expect(router.push).toHaveBeenCalledWith({
+            pathname: '/tdah-morning',
+            params: { movedTomorrow: '0', movedDate: '0', discarded: '0', limbo: '2' },
+        });
     });
 
-    it('navigates to the T-06 stub with zero Activities decided', async () => {
+    it('navigates to T-06 with zero-count params with zero Activities decided', async () => {
         hookState.activities = [];
         let tree: ReturnType<typeof create> | undefined;
         await act(async () => { tree = create(<TdahRitualScreen />); });
@@ -331,6 +335,41 @@ describe('TdahRitualScreen — Continuar a Mañana', () => {
             tree!.root.findByProps({ testID: 'tdah-ritual-continue' }).props.onPress();
         });
 
-        expect(router.push).toHaveBeenCalledWith('/tdah-morning');
+        expect(router.push).toHaveBeenCalledWith({
+            pathname: '/tdah-morning',
+            params: { movedTomorrow: '0', movedDate: '0', discarded: '0', limbo: '0' },
+        });
+    });
+
+    it('forwards per-decision counts (move-tomorrow/move-date/discard) plus Limbo (undecided + undated)', async () => {
+        const missed2: TdahActivity = { ...missedActivity, id: 4 };
+        const missed3: TdahActivity = { ...missedActivity, id: 5 };
+        const limbo2: TdahActivity = { ...limboActivity, id: 6 };
+        hookState.activities = [missedActivity, missed2, missed3, limboActivity, limbo2];
+        hookState.decideActivity.mockImplementation(async (activityId: number) => ({
+            ...missedActivity, id: activityId, state: 'pending', dayPlanDate: '2026-08-27',
+        }));
+        let tree: ReturnType<typeof create> | undefined;
+        await act(async () => { tree = create(<TdahRitualScreen />); });
+
+        await act(async () => {
+            await tree!.root.findByProps({ testID: 'tdah-decision-chip-1-move-tomorrow' }).props.onPress();
+        });
+        await act(async () => {
+            await tree!.root.findByProps({ testID: 'tdah-decision-chip-4-discard' }).props.onPress();
+        });
+        await act(async () => {
+            await tree!.root.findByProps({ testID: 'tdah-decision-chip-2-undated' }).props.onPress();
+        });
+        // 5 (missed3) and 6 (limbo2) are left fully undecided.
+
+        await act(async () => {
+            tree!.root.findByProps({ testID: 'tdah-ritual-continue' }).props.onPress();
+        });
+
+        expect(router.push).toHaveBeenCalledWith({
+            pathname: '/tdah-morning',
+            params: { movedTomorrow: '1', movedDate: '0', discarded: '1', limbo: '3' },
+        });
     });
 });

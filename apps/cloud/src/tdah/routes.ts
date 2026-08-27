@@ -23,12 +23,15 @@ import {
     activateTdahProfile,
     computeApplicabilityPreview,
     computeRoutineConflicts,
+    confirmMorning,
     createManualActivity,
+    createManualActivityForTomorrow,
     createRoutine,
     decideActivity,
     deleteRoutine,
     getRoutineWithBlocks,
     getTodayDayPlan,
+    getTomorrowDayPlan,
     isValidDateString,
     isValidMonthString,
     listRoutinesWithBlocks,
@@ -47,6 +50,7 @@ import {
     type TdahActivityDecideRequest,
     type TdahActivityResponse,
     type TdahActivityTransitionAction,
+    type TdahConfirmMorningRequest,
     type TdahDayResponse,
     type TdahErrorCode,
     type TdahMode,
@@ -73,6 +77,13 @@ const TDAH_ACTIVITY_ACTION_PATTERN = /^\/v1\/tdah\/activities\/([^/]+)\/(start|c
 // widening TDAH_ACTIVITY_ACTION_PATTERN's alternation) since `decide` takes a
 // body while start/complete/miss never do.
 const TDAH_ACTIVITY_DECIDE_PATTERN = /^\/v1\/tdah\/activities\/([^/]+)\/decide$/;
+// Story 3.3 — T-06's morning editor / T-07's confirm. `TDAH_DAY_TOMORROW_PATH`
+// never collides with `TDAH_DAY_PATH` (exact-string dispatch), but the three
+// are still matched ahead of it in handleTdahRequest for the same clarity
+// every other sub-path in this dispatcher already follows.
+const TDAH_DAY_TOMORROW_PATH = `${TDAH_DAY_PATH}/tomorrow`;
+const TDAH_DAY_TOMORROW_ACTIVITIES_PATH = `${TDAH_DAY_TOMORROW_PATH}/activities`;
+const TDAH_DAY_TOMORROW_CONFIRM_PATH = `${TDAH_DAY_TOMORROW_PATH}/confirm`;
 
 const IANA_TIME_ZONE_PATTERN = /^[A-Za-z0-9+_/-]{1,64}$/;
 const RITUAL_HOUR_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -355,6 +366,85 @@ const parseDecideRequestBody = (value: unknown): TdahActivityDecideRequest | nul
         return { decision: 'move-date', date: raw.date };
     }
     return null;
+};
+
+type TdahConfirmMorningActivityBody = {
+    id?: unknown;
+    startTime?: unknown;
+    durationMinutes?: unknown;
+};
+
+type TdahConfirmMorningBody = {
+    activities?: unknown;
+    deletedActivityIds?: unknown;
+};
+
+/**
+ * One entry of `POST /v1/tdah/day/tomorrow/confirm`'s `activities` array
+ * (story 3.3). `id` reuses the same positive-safe-integer rule
+ * `parsePositiveIntegerId` enforces on path segments, just against a JSON
+ * number instead of a string. `startTime`/`durationMinutes` are validated
+ * with the exact same rules `parseManualActivityInput` already applies
+ * (`RITUAL_HOUR_PATTERN` / `TDAH_BLOCK_DURATION_MAX_MINUTES`) — the field may
+ * be omitted (kept `null`, "sin hora"/"sin duración") or explicitly `null`,
+ * but a present non-null value must still be well-formed.
+ */
+const parseConfirmMorningActivityEntry = (
+    value: unknown,
+): { id: number; startTime: string | null; durationMinutes: number | null } | null => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+    const raw = value as TdahConfirmMorningActivityBody;
+    if (typeof raw.id !== 'number' || !Number.isSafeInteger(raw.id) || raw.id <= 0) return null;
+
+    let startTime: string | null = null;
+    if (raw.startTime !== undefined && raw.startTime !== null) {
+        if (typeof raw.startTime !== 'string' || !RITUAL_HOUR_PATTERN.test(raw.startTime)) return null;
+        startTime = raw.startTime;
+    }
+
+    let durationMinutes: number | null = null;
+    if (raw.durationMinutes !== undefined && raw.durationMinutes !== null) {
+        if (
+            typeof raw.durationMinutes !== 'number'
+            || !Number.isInteger(raw.durationMinutes)
+            || raw.durationMinutes < 0
+            || raw.durationMinutes > TDAH_BLOCK_DURATION_MAX_MINUTES
+        ) {
+            return null;
+        }
+        durationMinutes = raw.durationMinutes;
+    }
+
+    return { id: raw.id, startTime, durationMinutes };
+};
+
+/**
+ * POST /v1/tdah/day/tomorrow/confirm body (story 3.3). Same shape-invalid →
+ * `null` → `TDAH_ACTIVITY_INVALID` 400 convention as
+ * `parseManualActivityInput`/`parseDecideRequestBody` above — accounting
+ * (`activities.length + deletedActivityIds.length` against the day's real
+ * `pending` count) and per-id eligibility are semantic checks left to
+ * `confirmMorning`/`mutateConfirmMorning` (storage.ts), which need the
+ * caller's own namespace database to resolve them, not available at this
+ * parsing stage.
+ */
+const parseConfirmMorningRequestBody = (value: unknown): TdahConfirmMorningRequest | null => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+    const raw = value as TdahConfirmMorningBody;
+    if (!Array.isArray(raw.activities)) return null;
+    const activities: TdahConfirmMorningRequest['activities'] = [];
+    for (const rawEntry of raw.activities) {
+        const entry = parseConfirmMorningActivityEntry(rawEntry);
+        if (!entry) return null;
+        activities.push(entry);
+    }
+    if (!Array.isArray(raw.deletedActivityIds)) return null;
+    const deletedActivityIds: number[] = [];
+    for (const rawId of raw.deletedActivityIds) {
+        if (typeof rawId !== 'number' || !Number.isSafeInteger(rawId) || rawId <= 0) return null;
+        deletedActivityIds.push(rawId);
+    }
+    return { activities, deletedActivityIds };
 };
 
 const parseActivateBody = (body: unknown): { ok: true; body: TdahParsedActivate } | { ok: false; code: TdahErrorCode } => {
@@ -669,6 +759,70 @@ const handleCreateManualActivity = async (
 };
 
 /**
+ * GET /v1/tdah/day/tomorrow — story 3.3, T-06's morning editor. Mirrors
+ * `handleGetDay` above but reads/materializes tomorrow's DayPlan
+ * (`getTomorrowDayPlan`) instead of today's; never generates today's plan.
+ * Same FR-1 gate: 409 TDAH_ACTIVATE_REQUIRED unless the mode is on.
+ */
+const handleGetTomorrowDay = async (ctx: TdahRequestContext, options: TdahRequestOptions): Promise<Response> => {
+    try {
+        const profile = await readTdahProfile(options.dataDir, ctx.key);
+        if (!profile || profile.mode !== 'on') {
+            return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
+        }
+        const day = await getTomorrowDayPlan(options.dataDir, ctx.key, profile.timeZone);
+        const responseBody: TdahDayResponse = day;
+        return jsonResponse(responseBody);
+    } catch (error) {
+        logError('request failed', {
+            failureClass: 'filesystem',
+            failureCode: 'request_failed',
+            failureErrno: getFsErrorCode(error),
+        });
+        return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
+    }
+};
+
+/**
+ * POST /v1/tdah/day/tomorrow/activities — story 3.3, T-06's "Agregar manual"
+ * CTA. Unlike every other T-06 edit, this persists immediately, independent
+ * of the confirm draft (Design Notes) — mirrors `handleCreateManualActivity`
+ * above, targeting tomorrow's DayPlan instead of today's. Same FR-1 gate.
+ */
+const handleCreateManualActivityForTomorrow = async (
+    req: Request,
+    ctx: TdahRequestContext,
+    options: TdahRequestOptions,
+): Promise<Response> => {
+    const body = await readJsonBody(req, options.maxBodyBytes, options.signal);
+    if (isBodyReadError(body)) {
+        return tdahErrorResponse(TDAH_ERRORS.invalidBody, body.__mindwtrError.status);
+    }
+    const input = parseManualActivityInput(body);
+    if (!input) return tdahErrorResponse(TDAH_ERRORS.activityInvalid, 400);
+    try {
+        const profile = await readTdahProfile(options.dataDir, ctx.key);
+        if (!profile || profile.mode !== 'on') {
+            return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
+        }
+        const activity = await createManualActivityForTomorrow(options.dataDir, ctx.key, profile.timeZone, input);
+        // `null` means tomorrow's DayPlan was already at TDAH_DAY_MAX_ACTIVITIES —
+        // the insert never ran (checked and rejected atomically inside the same
+        // write transaction, see storage.ts).
+        if (!activity) return tdahErrorResponse(TDAH_ERRORS.activityInvalid, 400);
+        const responseBody: TdahActivityResponse = { activity };
+        return jsonResponse(responseBody, { status: 201 });
+    } catch (error) {
+        logError('request failed', {
+            failureClass: 'filesystem',
+            failureCode: 'request_failed',
+            failureErrno: getFsErrorCode(error),
+        });
+        return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
+    }
+};
+
+/**
  * POST /v1/tdah/activities/:id/{start|complete|miss} — story 1.6, T-02/AD-7.
  * See `mutateTransitionActivityState` (storage.ts) for the exact idempotency
  * and rejection rules this only translates into HTTP status/error codes.
@@ -739,6 +893,45 @@ const handleDecideActivity = async (
     }
 };
 
+/**
+ * POST /v1/tdah/day/tomorrow/confirm — story 3.3, T-06's single
+ * grouped-persist. Same FR-1 mode gate + rejected→400/500 shape as
+ * `handleDecideActivity` above; see `mutateConfirmMorning` (storage.ts) for
+ * the exact accounting/eligibility/idempotency rules `result.kind` encodes.
+ * There is no `notFound` branch here (unlike the other activity-id-keyed
+ * endpoints) — this always operates on the caller's own tomorrow DayPlan as
+ * a whole, never a single Activity id.
+ */
+const handleConfirmMorning = async (
+    req: Request,
+    ctx: TdahRequestContext,
+    options: TdahRequestOptions,
+): Promise<Response> => {
+    const body = await readJsonBody(req, options.maxBodyBytes, options.signal);
+    if (isBodyReadError(body)) {
+        return tdahErrorResponse(TDAH_ERRORS.invalidBody, body.__mindwtrError.status);
+    }
+    const confirmRequest = parseConfirmMorningRequestBody(body);
+    if (!confirmRequest) return tdahErrorResponse(TDAH_ERRORS.activityInvalid, 400);
+    try {
+        const profile = await readTdahProfile(options.dataDir, ctx.key);
+        if (!profile || profile.mode !== 'on') {
+            return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
+        }
+        const result = await confirmMorning(options.dataDir, ctx.key, confirmRequest, profile.timeZone);
+        if (result.kind === 'rejected') return tdahErrorResponse(TDAH_ERRORS.activityInvalid, 400);
+        const responseBody: TdahDayResponse = result.day;
+        return jsonResponse(responseBody);
+    } catch (error) {
+        logError('request failed', {
+            failureClass: 'filesystem',
+            failureCode: 'request_failed',
+            failureErrno: getFsErrorCode(error),
+        });
+        return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
+    }
+};
+
 export async function handleTdahRequest(
     req: Request,
     pathname: string,
@@ -782,6 +975,26 @@ export async function handleTdahRequest(
         if (req.method === 'PUT') return handleUpdateRoutine(req, routineId, ctx, options);
         if (req.method === 'DELETE') return handleDeleteRoutine(routineId, ctx, options);
         return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
+    }
+
+    // Story 3.3 — T-06's morning editor / T-07's confirm. Must be checked
+    // ahead of TDAH_DAY_PATH/TDAH_DAY_ACTIVITIES_PATH and
+    // TDAH_PROFILE_PATH's catch-all fallback below — no real string collision
+    // (exact-path dispatch), kept for the same clarity every other sub-path
+    // in this dispatcher already follows.
+    if (pathname === TDAH_DAY_TOMORROW_CONFIRM_PATH) {
+        if (req.method !== 'POST') return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
+        return handleConfirmMorning(req, ctx, options);
+    }
+
+    if (pathname === TDAH_DAY_TOMORROW_ACTIVITIES_PATH) {
+        if (req.method !== 'POST') return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
+        return handleCreateManualActivityForTomorrow(req, ctx, options);
+    }
+
+    if (pathname === TDAH_DAY_TOMORROW_PATH) {
+        if (req.method !== 'GET') return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
+        return handleGetTomorrowDay(ctx, options);
     }
 
     // Story 1.6 — "Hoy". Must be checked ahead of `TDAH_PROFILE_PATH`'s

@@ -149,6 +149,19 @@ describe('tdah module', () => {
         authedFetch(`/v1/tdah/activities/${id}/decide`, { method: 'POST', body: JSON.stringify(body), token })
     );
 
+    // Story 3.3 — T-06/T-07's morning-editor surface.
+    const getTomorrowDay = (token?: string): Promise<Response> => (
+        authedFetch('/v1/tdah/day/tomorrow', { method: 'GET', token })
+    );
+
+    const createManualActivityForTomorrowApi = (body: unknown, token?: string): Promise<Response> => (
+        authedFetch('/v1/tdah/day/tomorrow/activities', { method: 'POST', body: JSON.stringify(body), token })
+    );
+
+    const confirmMorningApi = (body: unknown, token?: string): Promise<Response> => (
+        authedFetch('/v1/tdah/day/tomorrow/confirm', { method: 'POST', body: JSON.stringify(body), token })
+    );
+
     // Story 3.2's decide endpoint only ever accepts a `missed`/`limbo`
     // Activity. There's no HTTP path to `limbo` a Activity outside the
     // nightly scheduler (story 1.5), so this reaches straight into the
@@ -176,12 +189,14 @@ describe('tdah module', () => {
         state: string;
         startedAt: string | null;
         completedAt: string | null;
+        movedAt: string | null;
     };
 
     type TdahTestDay = {
         date: string;
         timeZone: string;
         routineTitle: string | null;
+        confirmedAt: string | null;
         activities: TdahTestActivity[];
     };
 
@@ -1474,12 +1489,14 @@ describe('tdah module', () => {
         // Story 1.6 added a second version bump (tdah_activity's
         // started_at/completed_at, SCHEMA_VERSION_ACTIVITY_TIMESTAMPS = 2),
         // story 2.2 added a third (start_notified_at/end_notified_at,
-        // SCHEMA_VERSION_ACTIVITY_NOTIFICATIONS = 3), and story 3.1 added a
+        // SCHEMA_VERSION_ACTIVITY_NOTIFICATIONS = 3), story 3.1 added a
         // fourth (tdah_profile's ritual_notified_date,
-        // SCHEMA_VERSION_RITUAL_NOTIFICATION = 4), so a fresh database —
-        // which gets all four widened/added shapes directly from their
-        // CREATE TABLE statements — now lands at v4, not v1.
-        test('a fresh database starts directly at schema v4 (no migration needed)', async () => {
+        // SCHEMA_VERSION_RITUAL_NOTIFICATION = 4), and story 3.3 added a
+        // fifth (tdah_activity's sort_order/moved_at + tdah_day_plan's
+        // confirmed_at, SCHEMA_VERSION_MORNING_EDIT = 5), so a fresh
+        // database — which gets all five widened/added shapes directly from
+        // their CREATE TABLE statements — now lands at v5, not v1.
+        test('a fresh database starts directly at schema v5 (no migration needed)', async () => {
             await activate({ timeZone: 'UTC' });
             const key = tokenToKey(TOKEN_ALPHA);
             const databasePath = tdahDatabasePath(dataDir, key);
@@ -1487,7 +1504,7 @@ describe('tdah module', () => {
             const database = new Database(databasePath, { readonly: true });
             try {
                 const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: number };
-                expect(versionRow.user_version).toBe(4);
+                expect(versionRow.user_version).toBe(5);
                 const columns = (database.prepare("PRAGMA table_info('tdah_routine');") as unknown as {
                     all(): { name: string }[];
                 }).all();
@@ -1545,19 +1562,21 @@ describe('tdah module', () => {
             expect(routines[0]?.pattern).toEqual({ kind: 'weekday', weekdays: [1, 2, 3, 4, 5] });
             expect(routines[0]?.blocks).toHaveLength(1);
 
-            // Story 1.6's v1->v2 step, story 2.2's v2->v3 step, and story
-            // 3.1's v3->v4 step also run here: this seed never creates
-            // `tdah_activity` at all, so `ensureSchema`'s
+            // Story 1.6's v1->v2 step, story 2.2's v2->v3 step, story 3.1's
+            // v3->v4 step, and story 3.3's v4->v5 step also run here: this
+            // seed never creates `tdah_activity` at all, so `ensureSchema`'s
             // `CREATE TABLE IF NOT EXISTS` plants it already widened
-            // (started_at/completed_at and start_notified_at/end_notified_at
-            // included), the `tdah_profile` CREATE TABLE already includes
-            // `ritual_notified_date`, and every migration step sees its own
-            // columns already present and stamps v4 directly — same as the
-            // "fresh database" case above.
+            // (started_at/completed_at, start_notified_at/end_notified_at,
+            // and sort_order/moved_at included), the `tdah_profile` CREATE
+            // TABLE already includes `ritual_notified_date`, the
+            // `tdah_day_plan` CREATE TABLE already includes `confirmed_at`,
+            // and every migration step sees its own columns already present
+            // and stamps v5 directly — same as the "fresh database" case
+            // above.
             const verifyDatabase = new Database(databasePath, { readonly: true });
             try {
                 const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
-                expect(versionRow.user_version).toBe(4);
+                expect(versionRow.user_version).toBe(5);
             } finally {
                 verifyDatabase.close();
             }
@@ -1622,13 +1641,13 @@ describe('tdah module', () => {
             expect(routines[0]?.title).toBe('Día laboral');
             expect(routines[0]?.pattern).toEqual({ kind: 'weekday', weekdays: [1, 2, 3, 4, 5] });
 
-            // Same story 1.6 v1->v2, story 2.2 v2->v3, and story 3.1 v3->v4
-            // cascade as the test above: this seed never creates
-            // `tdah_activity` either, so it lands on v4 too.
+            // Same story 1.6 v1->v2, story 2.2 v2->v3, story 3.1 v3->v4, and
+            // story 3.3 v4->v5 cascade as the test above: this seed never
+            // creates `tdah_activity` either, so it lands on v5 too.
             const verifyDatabase = new Database(databasePath, { readonly: true });
             try {
                 const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
-                expect(versionRow.user_version).toBe(4);
+                expect(versionRow.user_version).toBe(5);
                 const tableNames = (verifyDatabase.prepare("SELECT name FROM sqlite_master WHERE type = 'table';") as unknown as {
                     all(): { name: string }[];
                 }).all().map((row) => row.name);
@@ -2061,10 +2080,11 @@ describe('tdah module', () => {
                 await activate({ timeZone: 'UTC' });
             });
 
-            test('move-tomorrow on a started-then-limbo Activity sets pending on tomorrow, clearing startedAt/completedAt', async () => {
+            test('move-tomorrow on a started-then-limbo Activity sets pending on tomorrow, clearing startedAt/completedAt, and stamps movedAt (story 3.3)', async () => {
                 const created = await createTodayActivity();
                 await transitionActivityApi(created.id, 'start');
                 await forceActivityLimbo(created.id);
+                expect(created.movedAt).toBeNull();
                 const response = await decideActivityApi(created.id, { decision: 'move-tomorrow' });
                 expect(response.status).toBe(200);
                 const activity = await readActivity(response);
@@ -2072,6 +2092,8 @@ describe('tdah module', () => {
                 expect(activity.dayPlanDate).toBe(computeTomorrowDate('UTC'));
                 expect(activity.startedAt).toBeNull();
                 expect(activity.completedAt).toBeNull();
+                expect(typeof activity.movedAt).toBe('string');
+                expect(activity.movedAt).not.toBeNull();
             });
 
             test('move-tomorrow on a missed Activity behaves the same as on limbo', async () => {
@@ -2084,7 +2106,7 @@ describe('tdah module', () => {
                 expect(activity.dayPlanDate).toBe(computeTomorrowDate('UTC'));
             });
 
-            test('move-date to a valid future date moves the Activity there, materializing its DayPlan', async () => {
+            test('move-date to a valid future date moves the Activity there, materializing its DayPlan, and stamps movedAt (story 3.3)', async () => {
                 const created = await createTodayActivity();
                 await transitionActivityApi(created.id, 'miss');
                 const futureDate = addDaysToDateString(computeTomorrowDate('UTC'), 5);
@@ -2095,6 +2117,7 @@ describe('tdah module', () => {
                 expect(activity.dayPlanDate).toBe(futureDate);
                 expect(activity.startedAt).toBeNull();
                 expect(activity.completedAt).toBeNull();
+                expect(activity.movedAt).not.toBeNull();
             });
 
             test('move-date to a date <= today is rejected with 400 TDAH_ACTIVITY_INVALID and leaves the row unchanged', async () => {
@@ -2226,7 +2249,7 @@ describe('tdah module', () => {
                 expect(activity.dayPlanDate).toBe(rolledOverDate);
             });
 
-            test('discard on a missed Activity sets state:discarded without touching dayPlanDate', async () => {
+            test('discard on a missed Activity sets state:discarded without touching dayPlanDate or movedAt (story 3.3: only move-tomorrow/move-date ever stamp movedAt)', async () => {
                 const created = await createTodayActivity();
                 await transitionActivityApi(created.id, 'miss');
                 const response = await decideActivityApi(created.id, { decision: 'discard' });
@@ -2234,6 +2257,7 @@ describe('tdah module', () => {
                 const activity = await readActivity(response);
                 expect(activity.state).toBe('discarded');
                 expect(activity.dayPlanDate).toBe(created.dayPlanDate);
+                expect(activity.movedAt).toBeNull();
             });
 
             test('a discarded Activity never reappears in a later DayPlan read', async () => {
@@ -2410,8 +2434,300 @@ describe('tdah module', () => {
             });
         });
 
+        describe('GET/POST /v1/tdah/day/tomorrow* (story 3.3, T-06/T-07: borrador local + confirm agrupado)', () => {
+            const ALL_DAYS_ROUTINE = {
+                title: 'Día laboral',
+                pattern: { kind: 'weekday' as const, weekdays: [0, 1, 2, 3, 4, 5, 6] },
+                blocks: [
+                    { title: 'Mañana', startTime: '08:00', durationMinutes: 120 },
+                    { title: 'Tarde', startTime: '14:00', durationMinutes: 180 },
+                ],
+            };
+
+            test('GET /day/tomorrow without any profile returns 409 TDAH_ACTIVATE_REQUIRED and plants nothing on disk', async () => {
+                const response = await getTomorrowDay();
+                expect(response.status).toBe(409);
+                expect(await readErrorCode(response)).toBe('TDAH_ACTIVATE_REQUIRED');
+                expect(existsSync(join(dataDir, tokenToKey(TOKEN_ALPHA)))).toBe(false);
+            });
+
+            test("GET /day/tomorrow reads tomorrow's own DayPlan (never today's), materializing it from the applicable Rutina, with confirmedAt:null before any confirm", async () => {
+                await activate({ timeZone: 'UTC', routine: ALL_DAYS_ROUTINE });
+                const day = await readDay(await getTomorrowDay());
+                expect(day.date).toBe(computeTomorrowDate('UTC'));
+                expect(day.activities.map((activity) => activity.title)).toEqual(['Mañana', 'Tarde']);
+                expect(day.confirmedAt).toBeNull();
+
+                const today = await readDay(await getDay());
+                expect(today.date).not.toBe(day.date);
+            });
+
+            test('GET /day/tomorrow rejects a non-GET method with 405 TDAH_METHOD_NOT_ALLOWED', async () => {
+                const response = await authedFetch('/v1/tdah/day/tomorrow', { method: 'PUT' });
+                expect(response.status).toBe(405);
+                expect(await readErrorCode(response)).toBe('TDAH_METHOD_NOT_ALLOWED');
+            });
+
+            describe('POST /v1/tdah/day/tomorrow/activities (alta manual inmediata, fuera del borrador de confirm)', () => {
+                beforeEach(async () => {
+                    await activate({ timeZone: 'UTC' });
+                });
+
+                test("creates a manual Activity on tomorrow's DayPlan immediately — never today's, and independent of any confirm draft", async () => {
+                    const activity = await readActivity(await createManualActivityForTomorrowApi({ title: 'Meditar' }));
+                    expect(activity.dayPlanDate).toBe(computeTomorrowDate('UTC'));
+                    expect(activity.origin).toBe('manual');
+                    expect(activity.state).toBe('pending');
+
+                    const today = await readDay(await getDay());
+                    expect(today.activities).toEqual([]);
+                    const tomorrow = await readDay(await getTomorrowDay());
+                    expect(tomorrow.activities.map((entry) => entry.id)).toContain(activity.id);
+                });
+
+                test('at the TDAH_DAY_MAX_ACTIVITIES (50) cap, returns 400 TDAH_ACTIVITY_INVALID (same pattern as the today endpoint)', async () => {
+                    const tomorrow = computeTomorrowDate('UTC');
+                    const databasePath = tdahDatabasePath(dataDir, tokenToKey(TOKEN_ALPHA));
+                    await withWriteTransaction(databasePath, (database) => {
+                        for (let i = 0; i < 50; i += 1) {
+                            database
+                                .prepare("INSERT INTO tdah_activity (day_plan_date, block_id, title, start_time, duration_minutes, origin, state) VALUES (?, NULL, ?, NULL, NULL, 'manual', 'pending');")
+                                .run(tomorrow, `Full ${i}`);
+                        }
+                    });
+                    const response = await createManualActivityForTomorrowApi({ title: 'Sin espacio' });
+                    expect(response.status).toBe(400);
+                    expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+                });
+
+                test('rejected with 409 TDAH_ACTIVATE_REQUIRED when the mode is off', async () => {
+                    await putProfile({ mode: 'off' });
+                    const response = await createManualActivityForTomorrowApi({ title: 'Con modo apagado' });
+                    expect(response.status).toBe(409);
+                    expect(await readErrorCode(response)).toBe('TDAH_ACTIVATE_REQUIRED');
+                });
+
+                test('GET on the tomorrow/activities path returns 405 TDAH_METHOD_NOT_ALLOWED', async () => {
+                    const response = await authedFetch('/v1/tdah/day/tomorrow/activities', { method: 'GET' });
+                    expect(response.status).toBe(405);
+                    expect(await readErrorCode(response)).toBe('TDAH_METHOD_NOT_ALLOWED');
+                });
+            });
+
+            describe('POST /v1/tdah/day/tomorrow/confirm (sobrescritura completa por API — I/O Matrix)', () => {
+                beforeEach(async () => {
+                    await activate({ timeZone: 'UTC', routine: ALL_DAYS_ROUTINE });
+                });
+
+                test('confirms reorder + edited hora/duración + deletion in one request: sort order/hora/duración se actualizan, la fila borrada desaparece, confirmed_at queda seteado, y la Rutina fuente no cambia', async () => {
+                    const tomorrow = await readDay(await getTomorrowDay());
+                    const [morning, afternoon] = tomorrow.activities;
+                    const routinesBefore = await readRoutines(await listRoutinesApi());
+
+                    const response = await confirmMorningApi({
+                        activities: [{ id: afternoon!.id, startTime: '15:30', durationMinutes: 90 }],
+                        deletedActivityIds: [morning!.id],
+                    });
+                    expect(response.status).toBe(200);
+                    const confirmed = await readDay(response);
+                    expect(confirmed.confirmedAt).not.toBeNull();
+                    expect(confirmed.activities).toHaveLength(1);
+                    expect(confirmed.activities[0]?.id).toBe(afternoon!.id);
+                    expect(confirmed.activities[0]?.startTime).toBe('15:30');
+                    expect(confirmed.activities[0]?.durationMinutes).toBe(90);
+
+                    const afterGet = await readDay(await getTomorrowDay());
+                    expect(afterGet).toEqual(confirmed);
+
+                    // The Rutina source stays untouched — the confirm only ever
+                    // writes to tdah_activity/tdah_day_plan, never tdah_routine/
+                    // tdah_routine_block (Boundaries: "editar una instancia nunca
+                    // toca tdah_routine/tdah_routine_block").
+                    const routinesAfter = await readRoutines(await listRoutinesApi());
+                    expect(routinesAfter).toEqual(routinesBefore);
+                });
+
+                test('reorder alone persists as the new sort order on the next read', async () => {
+                    const tomorrow = await readDay(await getTomorrowDay());
+                    const [morning, afternoon] = tomorrow.activities;
+                    const response = await confirmMorningApi({
+                        activities: [
+                            { id: afternoon!.id, startTime: afternoon!.startTime, durationMinutes: afternoon!.durationMinutes },
+                            { id: morning!.id, startTime: morning!.startTime, durationMinutes: morning!.durationMinutes },
+                        ],
+                        deletedActivityIds: [],
+                    });
+                    expect(response.status).toBe(200);
+                    const reordered = await readDay(await getTomorrowDay());
+                    expect(reordered.activities.map((entry) => entry.id)).toEqual([afternoon!.id, morning!.id]);
+                });
+
+                test('incomplete accounting (activities.length + deletedActivityIds.length != current pending count) is rejected with 400 TDAH_ACTIVITY_INVALID and writes nothing', async () => {
+                    const tomorrow = await readDay(await getTomorrowDay());
+                    const [morning] = tomorrow.activities;
+                    const response = await confirmMorningApi({
+                        activities: [{ id: morning!.id, startTime: morning!.startTime, durationMinutes: morning!.durationMinutes }],
+                        deletedActivityIds: [],
+                    });
+                    expect(response.status).toBe(400);
+                    expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+
+                    const unchanged = await readDay(await getTomorrowDay());
+                    expect(unchanged.activities).toHaveLength(2);
+                    expect(unchanged.confirmedAt).toBeNull();
+                });
+
+                test("an id from another day (e.g. today's own Activity) is rejected with 400 TDAH_ACTIVITY_INVALID — the whole transaction is rejected, no partial write", async () => {
+                    const tomorrow = await readDay(await getTomorrowDay());
+                    const [morning, afternoon] = tomorrow.activities;
+                    const foreignActivity = await readActivity(await createManualActivityApi({ title: 'De hoy' }));
+
+                    const response = await confirmMorningApi({
+                        activities: [
+                            { id: afternoon!.id, startTime: afternoon!.startTime, durationMinutes: afternoon!.durationMinutes },
+                            { id: foreignActivity.id, startTime: null, durationMinutes: null },
+                        ],
+                        deletedActivityIds: [morning!.id],
+                    });
+                    expect(response.status).toBe(400);
+                    expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+
+                    const unchanged = await readDay(await getTomorrowDay());
+                    expect(unchanged.activities).toHaveLength(2);
+                    expect(unchanged.confirmedAt).toBeNull();
+                    const foreignUnchanged = await readDay(await getDay());
+                    expect(foreignUnchanged.activities.find((entry) => entry.id === foreignActivity.id)?.state).toBe('pending');
+                });
+
+                test('a non-pending Activity (e.g. already started) on tomorrow is ineligible for confirm even when the accounting matches', async () => {
+                    const tomorrow = await readDay(await getTomorrowDay());
+                    const [morning] = tomorrow.activities;
+                    await transitionActivityApi(morning!.id, 'start');
+                    // Only the untouched (still-pending) Actividad remains
+                    // eligible; this payload's own length also totals 1, so the
+                    // rejection this exercises is purely the per-id eligibility
+                    // check, not the accounting guard the earlier test covers.
+                    const response = await confirmMorningApi({
+                        activities: [{ id: morning!.id, startTime: morning!.startTime, durationMinutes: morning!.durationMinutes }],
+                        deletedActivityIds: [],
+                    });
+                    expect(response.status).toBe(400);
+                    expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+                });
+
+                test('invalid startTime shape (out of HH:mm) is rejected with 400 TDAH_ACTIVITY_INVALID', async () => {
+                    const tomorrow = await readDay(await getTomorrowDay());
+                    const [morning, afternoon] = tomorrow.activities;
+                    const response = await confirmMorningApi({
+                        activities: [
+                            { id: morning!.id, startTime: '99:99', durationMinutes: morning!.durationMinutes },
+                            { id: afternoon!.id, startTime: afternoon!.startTime, durationMinutes: afternoon!.durationMinutes },
+                        ],
+                        deletedActivityIds: [],
+                    });
+                    expect(response.status).toBe(400);
+                    expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+
+                    const unchanged = await readDay(await getTomorrowDay());
+                    expect(unchanged.confirmedAt).toBeNull();
+                });
+
+                test('invalid durationMinutes (out of 0-1440) is rejected with 400 TDAH_ACTIVITY_INVALID', async () => {
+                    const tomorrow = await readDay(await getTomorrowDay());
+                    const [morning, afternoon] = tomorrow.activities;
+                    const response = await confirmMorningApi({
+                        activities: [
+                            { id: morning!.id, startTime: morning!.startTime, durationMinutes: 1441 },
+                            { id: afternoon!.id, startTime: afternoon!.startTime, durationMinutes: afternoon!.durationMinutes },
+                        ],
+                        deletedActivityIds: [],
+                    });
+                    expect(response.status).toBe(400);
+                    expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+
+                    const unchanged = await readDay(await getTomorrowDay());
+                    expect(unchanged.confirmedAt).toBeNull();
+                });
+
+                test('a retried identical confirm payload is idempotent — 200 both times, same final state', async () => {
+                    const tomorrow = await readDay(await getTomorrowDay());
+                    const [morning, afternoon] = tomorrow.activities;
+                    const payload = {
+                        activities: [
+                            { id: morning!.id, startTime: '09:00', durationMinutes: 45 },
+                            { id: afternoon!.id, startTime: afternoon!.startTime, durationMinutes: afternoon!.durationMinutes },
+                        ],
+                        deletedActivityIds: [],
+                    };
+                    const first = await confirmMorningApi(payload);
+                    expect(first.status).toBe(200);
+                    const firstBody = await readDay(first);
+                    const second = await confirmMorningApi(payload);
+                    expect(second.status).toBe(200);
+                    const secondBody = await readDay(second);
+                    expect(secondBody.activities).toEqual(firstBody.activities);
+                });
+
+                test('a day already confirmed before still accepts editing and reconfirmation — the soft lock never blocks the write', async () => {
+                    const tomorrow = await readDay(await getTomorrowDay());
+                    const [morning, afternoon] = tomorrow.activities;
+                    const first = await confirmMorningApi({
+                        activities: [
+                            { id: morning!.id, startTime: morning!.startTime, durationMinutes: morning!.durationMinutes },
+                            { id: afternoon!.id, startTime: afternoon!.startTime, durationMinutes: afternoon!.durationMinutes },
+                        ],
+                        deletedActivityIds: [],
+                    });
+                    expect(first.status).toBe(200);
+                    const firstConfirmedAt = (await readDay(first)).confirmedAt;
+                    expect(firstConfirmedAt).not.toBeNull();
+
+                    const reentry = await readDay(await getTomorrowDay());
+                    expect(reentry.confirmedAt).toBe(firstConfirmedAt);
+
+                    const second = await confirmMorningApi({
+                        activities: [{ id: afternoon!.id, startTime: '16:00', durationMinutes: 60 }],
+                        deletedActivityIds: [morning!.id],
+                    });
+                    expect(second.status).toBe(200);
+                    const secondBody = await readDay(second);
+                    expect(secondBody.activities).toHaveLength(1);
+                    expect(secondBody.activities[0]?.startTime).toBe('16:00');
+                    expect(secondBody.confirmedAt).not.toBeNull();
+                });
+
+                test("confirming one namespace's tomorrow day never touches another namespace's (isolation)", async () => {
+                    await activate({ timeZone: 'UTC', routine: ALL_DAYS_ROUTINE }, TOKEN_BETA);
+                    const betaTomorrowBefore = await readDay(await getTomorrowDay(TOKEN_BETA));
+
+                    const tomorrow = await readDay(await getTomorrowDay());
+                    const [morning, afternoon] = tomorrow.activities;
+                    await confirmMorningApi({
+                        activities: [{ id: afternoon!.id, startTime: afternoon!.startTime, durationMinutes: afternoon!.durationMinutes }],
+                        deletedActivityIds: [morning!.id],
+                    });
+
+                    const betaTomorrowAfter = await readDay(await getTomorrowDay(TOKEN_BETA));
+                    expect(betaTomorrowAfter).toEqual(betaTomorrowBefore);
+                });
+
+                test('GET on the confirm path returns 405 TDAH_METHOD_NOT_ALLOWED', async () => {
+                    const response = await authedFetch('/v1/tdah/day/tomorrow/confirm', { method: 'GET' });
+                    expect(response.status).toBe(405);
+                    expect(await readErrorCode(response)).toBe('TDAH_METHOD_NOT_ALLOWED');
+                });
+
+                test('rejected with 409 TDAH_ACTIVATE_REQUIRED when the mode is off', async () => {
+                    await putProfile({ mode: 'off' });
+                    const response = await confirmMorningApi({ activities: [], deletedActivityIds: [] });
+                    expect(response.status).toBe(409);
+                    expect(await readErrorCode(response)).toBe('TDAH_ACTIVATE_REQUIRED');
+                });
+            });
+        });
+
         describe('schema migration v1 -> v2 (started_at/completed_at)', () => {
-            test('a fresh database starts directly at schema v4 (story 3.1 bump) with started_at/completed_at present and start_time/duration_minutes nullable', async () => {
+            test('a fresh database starts directly at schema v5 (story 3.3 bump) with started_at/completed_at present and start_time/duration_minutes nullable', async () => {
                 await activate({ timeZone: 'UTC' });
                 const key = tokenToKey(TOKEN_ALPHA);
                 const databasePath = tdahDatabasePath(dataDir, key);
@@ -2419,7 +2735,7 @@ describe('tdah module', () => {
                 const database = new Database(databasePath, { readonly: true });
                 try {
                     const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: number };
-                    expect(versionRow.user_version).toBe(4);
+                    expect(versionRow.user_version).toBe(5);
                     const columns = (database.prepare("PRAGMA table_info('tdah_activity');") as unknown as {
                         all(): { name: string; notnull: number }[];
                     }).all();
@@ -2528,9 +2844,9 @@ describe('tdah module', () => {
                 try {
                     const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
                     // v1 -> v2 (this describe's own migration), v2 -> v3
-                    // (story 2.2's), and v3 -> v4 (story 3.1's) all run in
-                    // sequence on this seeded v1 file.
-                    expect(versionRow.user_version).toBe(4);
+                    // (story 2.2's), v3 -> v4 (story 3.1's), and v4 -> v5
+                    // (story 3.3's) all run in sequence on this seeded v1 file.
+                    expect(versionRow.user_version).toBe(5);
                     const columns = (verifyDatabase.prepare("PRAGMA table_info('tdah_activity');") as unknown as {
                         all(): { name: string; notnull: number }[];
                     }).all();
@@ -2649,9 +2965,9 @@ describe('tdah module', () => {
                 const verifyDatabase = new Database(databasePath, { readonly: true });
                 try {
                     const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
-                    // All four migration steps (v0->v1, v1->v2, v2->v3,
-                    // v3->v4) run in sequence on this seeded v0 file.
-                    expect(versionRow.user_version).toBe(4);
+                    // All five migration steps (v0->v1, v1->v2, v2->v3,
+                    // v3->v4, v4->v5) run in sequence on this seeded v0 file.
+                    expect(versionRow.user_version).toBe(5);
                 } finally {
                     verifyDatabase.close();
                 }
@@ -3663,11 +3979,12 @@ describe('tdah module', () => {
             const database = new Database(databasePath, { readonly: true });
             try {
                 const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: number };
-                // Story 3.1 bumped the shared schema target to v4
-                // (ritual_notified_date) — a fresh database now migrates
-                // straight through v3 to v4, so this is no longer the final
-                // version, just a column-presence check for the v2->v3 step.
-                expect(versionRow.user_version).toBe(4);
+                // Story 3.3 bumped the shared schema target to v5
+                // (sort_order/moved_at/confirmed_at) — a fresh database now
+                // migrates straight through v3 to v5, so this is no longer
+                // the final version, just a column-presence check for the
+                // v2->v3 step.
+                expect(versionRow.user_version).toBe(5);
                 const columns = (database.prepare("PRAGMA table_info('tdah_activity');") as unknown as {
                     all(): { name: string }[];
                 }).all();
@@ -3735,9 +4052,9 @@ describe('tdah module', () => {
             const verifyDatabase = new Database(databasePath, { readonly: true });
             try {
                 const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
-                // Migrates straight through to the current shared target (v4,
-                // story 3.1) in the same pass, not just to v3.
-                expect(versionRow.user_version).toBe(4);
+                // Migrates straight through to the current shared target (v5,
+                // story 3.3) in the same pass, not just to v3.
+                expect(versionRow.user_version).toBe(5);
                 const row = verifyDatabase.prepare(
                     'SELECT start_notified_at, end_notified_at FROM tdah_activity WHERE day_plan_date = ?;',
                 ).get(today) as { start_notified_at: string | null; end_notified_at: string | null };
@@ -3758,7 +4075,9 @@ describe('tdah module', () => {
             const database = new Database(databasePath, { readonly: true });
             try {
                 const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: number };
-                expect(versionRow.user_version).toBe(4);
+                // Story 3.3 bumped the shared schema target to v5 — a fresh
+                // database now migrates straight through v4 to v5.
+                expect(versionRow.user_version).toBe(5);
                 const columns = (database.prepare("PRAGMA table_info('tdah_profile');") as unknown as {
                     all(): { name: string }[];
                 }).all();
@@ -3815,11 +4134,128 @@ describe('tdah module', () => {
             const verifyDatabase = new Database(databasePath, { readonly: true });
             try {
                 const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
-                expect(versionRow.user_version).toBe(4);
+                // Migrates straight through to the current shared target (v5,
+                // story 3.3) in the same pass, not just to v4.
+                expect(versionRow.user_version).toBe(5);
                 const row = verifyDatabase.prepare('SELECT ritual_notified_date FROM tdah_profile WHERE id = 1;').get() as {
                     ritual_notified_date: string | null;
                 };
                 expect(row.ritual_notified_date).toBeNull();
+            } finally {
+                verifyDatabase.close();
+            }
+        });
+    });
+
+    describe('schema migration v4 -> v5 (sort_order/moved_at/confirmed_at, story 3.3)', () => {
+        test('a fresh database starts directly at schema v5 with sort_order/moved_at/confirmed_at present', async () => {
+            await activate({ timeZone: 'UTC' });
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(databasePath, { readonly: true });
+            try {
+                const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: number };
+                expect(versionRow.user_version).toBe(5);
+                const activityColumns = (database.prepare("PRAGMA table_info('tdah_activity');") as unknown as {
+                    all(): { name: string }[];
+                }).all();
+                expect(activityColumns.some((column) => column.name === 'sort_order')).toBe(true);
+                expect(activityColumns.some((column) => column.name === 'moved_at')).toBe(true);
+                const dayPlanColumns = (database.prepare("PRAGMA table_info('tdah_day_plan');") as unknown as {
+                    all(): { name: string }[];
+                }).all();
+                expect(dayPlanColumns.some((column) => column.name === 'confirmed_at')).toBe(true);
+            } finally {
+                database.close();
+            }
+        });
+
+        test('a pre-3.3 (schema v4) database on disk migrates transparently via ALTER TABLE, backfilling sort_order=0/moved_at=NULL/confirmed_at=NULL', async () => {
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            mkdirSync(join(dataDir, key, 'tdah'), { recursive: true });
+
+            const today = formatDateInTimeZone(new Date(), 'UTC');
+            const { Database } = await import('bun:sqlite');
+            const seedDatabase = new Database(databasePath);
+            try {
+                // Deliberately the pre-3.3 shape (story 3.1's schema v4): no
+                // sort_order/moved_at on tdah_activity, no confirmed_at on
+                // tdah_day_plan.
+                seedDatabase.exec(`
+                    CREATE TABLE tdah_profile (
+                        id INTEGER PRIMARY KEY CHECK (id = 1),
+                        mode TEXT NOT NULL CHECK (mode IN ('on', 'off')),
+                        time_zone TEXT NOT NULL,
+                        ritual_hour TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        ritual_notified_date TEXT
+                    );
+                `);
+                seedDatabase.exec(`
+                    CREATE TABLE tdah_day_plan (
+                        date TEXT PRIMARY KEY,
+                        generated_at TEXT NOT NULL
+                    );
+                `);
+                seedDatabase.exec(`
+                    CREATE TABLE tdah_activity (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        day_plan_date TEXT NOT NULL REFERENCES tdah_day_plan(date),
+                        block_id INTEGER,
+                        title TEXT NOT NULL,
+                        start_time TEXT,
+                        duration_minutes INTEGER,
+                        origin TEXT NOT NULL CHECK (origin IN ('routine', 'manual')),
+                        state TEXT NOT NULL CHECK (state IN ('pending', 'started', 'completed', 'missed', 'limbo', 'discarded')) DEFAULT 'pending',
+                        started_at TEXT,
+                        completed_at TEXT,
+                        start_notified_at TEXT,
+                        end_notified_at TEXT
+                    );
+                `);
+                seedDatabase
+                    .prepare('INSERT INTO tdah_profile (id, mode, time_zone, ritual_hour, created_at, updated_at) VALUES (1, ?, ?, ?, ?, ?);')
+                    .run('on', 'UTC', '23:00', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+                seedDatabase.prepare('INSERT INTO tdah_day_plan (date, generated_at) VALUES (?, ?);').run(today, '2026-01-01T00:00:00.000Z');
+                seedDatabase
+                    .prepare("INSERT INTO tdah_activity (day_plan_date, block_id, title, start_time, duration_minutes, origin, state) VALUES (?, NULL, 'Vieja', '08:00', 30, 'manual', 'pending');")
+                    .run(today);
+                // PRAGMA user_version = 4 — matches a real post-3.1/pre-3.3 file on disk.
+                seedDatabase.exec('PRAGMA user_version = 4;');
+            } finally {
+                seedDatabase.close();
+            }
+
+            // GET /day only reads (the profile and today's DayPlan already
+            // exist), but any request touching the module migrates the schema
+            // transparently first (withReadDatabase's own migrate-on-stale-
+            // version dance) — same as the earlier migration describe blocks'
+            // own read-triggered-migration test.
+            const dayResponse = await getDay();
+            expect(dayResponse.status).toBe(200);
+            const day = await readDay(dayResponse);
+            expect(day.activities).toHaveLength(1);
+            expect(day.activities[0]?.title).toBe('Vieja');
+            expect(day.activities[0]?.movedAt).toBeNull();
+            expect(day.confirmedAt).toBeNull();
+
+            const verifyDatabase = new Database(databasePath, { readonly: true });
+            try {
+                const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
+                expect(versionRow.user_version).toBe(5);
+                const row = verifyDatabase.prepare('SELECT sort_order, moved_at FROM tdah_activity WHERE day_plan_date = ?;').get(today) as {
+                    sort_order: number;
+                    moved_at: string | null;
+                };
+                expect(row.sort_order).toBe(0);
+                expect(row.moved_at).toBeNull();
+                const dayPlanRow = verifyDatabase.prepare('SELECT confirmed_at FROM tdah_day_plan WHERE date = ?;').get(today) as {
+                    confirmed_at: string | null;
+                };
+                expect(dayPlanRow.confirmed_at).toBeNull();
             } finally {
                 verifyDatabase.close();
             }

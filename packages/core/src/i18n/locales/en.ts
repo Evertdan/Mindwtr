@@ -1157,6 +1157,26 @@ export const en: Record<string, string> = {
         'tdahToday.continueToMorning': 'Continue to Tomorrow',
         'nav.tdahMorning': 'Tomorrow',
         'tdahToday.morningComingSoon': "Tomorrow's plan is coming soon",
+        // Story 3.3 — T-06's real editor: reorder/edit-hora-duración/delete
+        // are local-draft only (no request per action); "Confirmar mañana"
+        // persists the whole draft in one grouped request. T-07
+        // (tdahToday.confirmation*) shows the beat of success and a summary
+        // combining T-05's own 4 figures with T-06's local changes.
+        'tdahToday.morningHeader': 'Tomorrow {date}',
+        'tdahToday.morningRoutineLabel': 'Routine {name}',
+        'tdahToday.morningEmpty': 'Nothing planned for tomorrow yet.',
+        'tdahToday.morningAddManual': 'Add activity',
+        'tdahToday.morningConfirm': 'Confirm tomorrow',
+        'tdahToday.morningConfirmedBanner': 'You already confirmed tomorrow — you can still make changes and confirm again.',
+        'tdahToday.morningOverlapWarning': 'Some activities overlap in time.',
+        'tdahToday.morningMovedBadge': 'Moved from Cierre',
+        'tdahToday.confirmationMovedTomorrow': 'Moved to tomorrow: {count}',
+        'tdahToday.confirmationMovedDate': 'Moved to another date: {count}',
+        'tdahToday.confirmationDiscarded': 'Discarded: {count}',
+        'tdahToday.confirmationLimbo': 'Left in Limbo: {count}',
+        'tdahToday.confirmationChanges': 'Changes to tomorrow: {count}',
+        'tdahToday.confirmationSuccess': 'Tomorrow is ready.',
+        'tdahToday.confirmationDone': 'Done',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Routine',

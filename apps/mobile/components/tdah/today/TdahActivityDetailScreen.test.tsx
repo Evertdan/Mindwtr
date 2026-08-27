@@ -29,6 +29,18 @@ vi.mock('./use-tdah-today', () => ({
     useTdahToday: () => hookState,
 }));
 
+// Story 3.3: TdahActivityDetailScreen now also always instantiates
+// useTdahMorning() (Code Map: "ambos hooks se instancian condicionalmente
+// sin violar Rules of Hooks") — mocked separately so a targetDate='tomorrow'
+// submit can be asserted against its own addManualActivity spy, distinct
+// from useTdahToday's createManualActivity above.
+const morningHookState = vi.hoisted(() => ({
+    addManualActivity: vi.fn(),
+}));
+vi.mock('./use-tdah-morning', () => ({
+    useTdahMorning: () => morningHookState,
+}));
+
 const router = vi.hoisted(() => ({
     push: vi.fn(),
     back: vi.fn(),
@@ -76,6 +88,8 @@ describe('TdahActivityDetailScreen — create mode', () => {
         hookState.activities = [];
         hookState.createManualActivity.mockReset();
         hookState.registerActivityAction.mockReset();
+        hookState.reload.mockReset();
+        morningHookState.addManualActivity.mockReset();
         router.back.mockReset();
         router.canGoBack.mockReset().mockReturnValue(true);
     });
@@ -149,6 +163,70 @@ describe('TdahActivityDetailScreen — create mode', () => {
 
         expect(tree!.root.findByProps({ testID: 'tdah-activity-create-error' })).toBeTruthy();
         expect(router.back).not.toHaveBeenCalled();
+    });
+
+    it('without targetDate, never fetches useTdahMorning\'s own reload (only useTdahToday reloads today\'s day)', async () => {
+        await act(async () => { create(<TdahActivityDetailScreen mode="create" />); });
+        expect(hookState.reload).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('TdahActivityDetailScreen — create mode, story 3.3 targetDate="tomorrow" (T-06\'s own "Agregar manual")', () => {
+    beforeEach(() => {
+        hookState.phase = 'ready';
+        hookState.activities = [];
+        hookState.createManualActivity.mockReset();
+        hookState.reload.mockReset();
+        morningHookState.addManualActivity.mockReset();
+        router.back.mockReset();
+        router.canGoBack.mockReset().mockReturnValue(true);
+    });
+
+    it('submits via useTdahMorning\'s addManualActivity, never useTdahToday\'s createManualActivity, and never fetches useTdahToday\'s "hoy" day (spec Always: independent of "hoy")', async () => {
+        morningHookState.addManualActivity.mockResolvedValue({ ...activity, dayPlanDate: '2026-08-27' });
+        let tree: ReturnType<typeof create> | undefined;
+        await act(async () => { tree = create(<TdahActivityDetailScreen mode="create" targetDate="tomorrow" />); });
+        await act(async () => {
+            tree!.root.findByProps({ testID: 'tdah-activity-title-input' }).props.onChangeText('Para mañana');
+        });
+        await act(async () => {
+            await tree!.root.findByProps({ testID: 'tdah-activity-save' }).props.onPress();
+        });
+
+        expect(morningHookState.addManualActivity).toHaveBeenCalledWith({ title: 'Para mañana' });
+        expect(hookState.createManualActivity).not.toHaveBeenCalled();
+        expect(hookState.reload).not.toHaveBeenCalled();
+        expect(router.back).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the generic error banner and stays on the form when the tomorrow submission fails', async () => {
+        morningHookState.addManualActivity.mockRejectedValue(new Error('network down'));
+        let tree: ReturnType<typeof create> | undefined;
+        await act(async () => { tree = create(<TdahActivityDetailScreen mode="create" targetDate="tomorrow" />); });
+        await act(async () => {
+            tree!.root.findByProps({ testID: 'tdah-activity-title-input' }).props.onChangeText('Para mañana');
+        });
+        await act(async () => {
+            await tree!.root.findByProps({ testID: 'tdah-activity-save' }).props.onPress();
+        });
+
+        expect(tree!.root.findByProps({ testID: 'tdah-activity-create-error' })).toBeTruthy();
+        expect(router.back).not.toHaveBeenCalled();
+    });
+
+    it('targetDate="today" (explicit) behaves exactly like the omitted/default case — uses useTdahToday, still reloads', async () => {
+        hookState.createManualActivity.mockResolvedValue(activity);
+        let tree: ReturnType<typeof create> | undefined;
+        await act(async () => { tree = create(<TdahActivityDetailScreen mode="create" targetDate="today" />); });
+        expect(hookState.reload).toHaveBeenCalledTimes(1);
+        await act(async () => {
+            tree!.root.findByProps({ testID: 'tdah-activity-title-input' }).props.onChangeText('Hoy');
+        });
+        await act(async () => {
+            await tree!.root.findByProps({ testID: 'tdah-activity-save' }).props.onPress();
+        });
+        expect(hookState.createManualActivity).toHaveBeenCalledWith({ title: 'Hoy' });
+        expect(morningHookState.addManualActivity).not.toHaveBeenCalled();
     });
 });
 

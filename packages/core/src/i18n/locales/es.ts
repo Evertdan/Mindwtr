@@ -1531,6 +1531,27 @@ export const esOverrides: Record<string, string> = {
         'tdahToday.continueToMorning': 'Continuar a Mañana',
         'nav.tdahMorning': 'Mañana',
         'tdahToday.morningComingSoon': 'La pantalla de Mañana llega pronto',
+        // Story 3.3 — el editor real de T-06: reordenar/editar hora-
+        // duración/eliminar son borrador local (sin request por acción);
+        // "Confirmar mañana" persiste todo el borrador en una sola request
+        // agrupada. T-07 (tdahToday.confirmation*) muestra el beat de éxito
+        // y un resumen que combina las 4 cifras de T-05 con los cambios de
+        // T-06.
+        'tdahToday.morningHeader': 'Mañana {date}',
+        'tdahToday.morningRoutineLabel': 'Rutina {name}',
+        'tdahToday.morningEmpty': 'Todavía no hay nada planeado para mañana.',
+        'tdahToday.morningAddManual': 'Agregar actividad',
+        'tdahToday.morningConfirm': 'Confirmar mañana',
+        'tdahToday.morningConfirmedBanner': 'Ya confirmaste mañana — todavía podés hacer cambios y volver a confirmar.',
+        'tdahToday.morningOverlapWarning': 'Algunas actividades se superponen en el horario.',
+        'tdahToday.morningMovedBadge': 'Movido desde el Cierre',
+        'tdahToday.confirmationMovedTomorrow': 'Movidas a mañana: {count}',
+        'tdahToday.confirmationMovedDate': 'Movidas a otra fecha: {count}',
+        'tdahToday.confirmationDiscarded': 'Descartadas: {count}',
+        'tdahToday.confirmationLimbo': 'Quedaron en Limbo: {count}',
+        'tdahToday.confirmationChanges': 'Cambios en mañana: {count}',
+        'tdahToday.confirmationSuccess': 'Mañana está lista.',
+        'tdahToday.confirmationDone': 'Listo',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Rutina',

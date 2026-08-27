@@ -15,15 +15,18 @@ import { tdahActivityStateLabel } from './tdah-activity-labels';
 import { styles } from './tdah-today.styles';
 import type { TdahActivity, TdahActivityTransitionAction } from './tdah-today-types';
 import { formatIsoWallClockInTimeZone } from './tdah-time';
+import { useTdahMorning } from './use-tdah-morning';
 import { useTdahToday } from './use-tdah-today';
 
 // Same shape apps/cloud/src/tdah/routes.ts validates `startTime` with
 // (RITUAL_HOUR_PATTERN) — kept in sync by hand, clients never import server
 // types across the wire boundary (ADR 0026), mirroring
-// tdah-onboarding-step-ritual.tsx's own copy of this pattern.
-const START_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+// tdah-onboarding-step-ritual.tsx's own copy of this pattern. Exported (story
+// 3.3, spec Code Map) so TdahMorningScreen's own inline hora/duración edits
+// validate against the exact same shape instead of a second hand-copy.
+export const START_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const TITLE_MAX_LENGTH = 80;
-const DURATION_MAX_MINUTES = 1440;
+export const DURATION_MAX_MINUTES = 1440;
 
 // Story 2.3: the only two actions a notification tap can drive automatically
 // on mount — "No completada" stays app-exclusive (spec Never).
@@ -31,7 +34,10 @@ export type TdahActivityAutoAction = Extract<TdahActivityTransitionAction, 'star
 
 export type TdahActivityDetailScreenProps =
     | { mode: 'view'; activityId: number; autoAction?: TdahActivityAutoAction }
-    | { mode: 'create' };
+    // Story 3.3: `targetDate` lets T-06 reuse this same create form for
+    // "mañana" (spec Always) — omitted/'today' keeps the existing T-01
+    // behavior unchanged.
+    | { mode: 'create'; targetDate?: 'today' | 'tomorrow' };
 
 /**
  * T-02 — view mode registers Iniciar/Completar/No completar on an existing
@@ -47,10 +53,19 @@ export function TdahActivityDetailScreen(props: TdahActivityDetailScreenProps) {
     const { t } = useLanguage();
     const router = useRouter();
     const { phase, routineTitle, timeZone, activities, reload, createManualActivity, registerActivityAction } = useTdahToday();
+    // Always called (Rules of Hooks) even in view mode / create-for-today,
+    // where it stays fully idle — its own `reload()` is never invoked here,
+    // only `addManualActivity` for the targetDate==='tomorrow' create path
+    // below (spec Code Map: "ambos hooks se instancian condicionalmente sin
+    // violar Rules of Hooks — llamarlos siempre y usar el resultado
+    // correspondiente").
+    const { addManualActivity } = useTdahMorning();
 
+    const isTomorrowCreate = props.mode === 'create' && props.targetDate === 'tomorrow';
     useFocusEffect(useCallback(() => {
+        if (isTomorrowCreate) return;
         void reload();
-    }, [reload]));
+    }, [isTomorrowCreate, reload]));
 
     const goBack = useCallback(() => {
         if (router.canGoBack()) router.back();
@@ -80,18 +95,26 @@ export function TdahActivityDetailScreen(props: TdahActivityDetailScreenProps) {
         setCreating(true);
         setCreateError(false);
         try {
-            await createManualActivity({
+            const input = {
                 title: trimmedTitle,
                 ...(startTimeInput ? { startTime: startTimeInput } : {}),
                 ...(durationInput ? { durationMinutes: Number(durationInput) } : {}),
-            });
+            };
+            // Story 3.3 (spec Code Map): "mañana" goes through T-06's own
+            // hook/endpoint — the target day is never inferred from the
+            // request body, only from which create path this screen took.
+            if (isTomorrowCreate) {
+                await addManualActivity(input);
+            } else {
+                await createManualActivity(input);
+            }
             goBack();
         } catch {
             setCreateError(true);
         } finally {
             setCreating(false);
         }
-    }, [canSubmit, createManualActivity, durationInput, goBack, startTimeInput, trimmedTitle]);
+    }, [addManualActivity, canSubmit, createManualActivity, durationInput, goBack, isTomorrowCreate, startTimeInput, trimmedTitle]);
 
     if (props.mode === 'create') {
         return (
