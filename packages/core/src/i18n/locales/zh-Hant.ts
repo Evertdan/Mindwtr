@@ -1041,6 +1041,8 @@ export const zhHant: Record<string, string> = {
         'tdahToday.routineLabel': '常規 {name}',
         'tdahToday.noRoutineTitle': '今天沒有 Routine',
         'tdahToday.noRoutineBody': '新增一個手動活動即可開始。',
+        'tdahToday.unconfiguredTitle': '雲同步尚未設定',
+        'tdahToday.unconfiguredOpenSettings': '開啟設定',
         'tdahToday.addManual': '新增活動',
         'tdahToday.loading': '正在載入今天的安排…',
         'tdahToday.offlineBanner': '無法連線伺服器 — 正在重試',

@@ -2083,6 +2083,7 @@ export const frOverrides: Record<string, string> = {
         'settings.importDiagnostics.unsupportedRecurrence': "{{count}} règles de répétition non prises en charge ont été conservées dans les notes.",
 
         // TDAH mode activation & onboarding
+        'settings.tdah.needsSync': 'Configurez la synchronisation cloud auto-hébergée pour utiliser le mode TDAH.',
         'settings.tdah.activatePwaTitle': 'Activer le mode TDAH',
         'settings.tdah.activatePwaBody': "Confirmez votre fuseau horaire et l’heure du rituel pour l’activer.",
         'settings.tdah.activatePwaButton': 'Activer',
@@ -2143,8 +2144,11 @@ export const frOverrides: Record<string, string> = {
         // detail/registration screens.
         'nav.tdahToday': 'Aujourd’hui',
         'tdahToday.title': 'Aujourd’hui',
+        'tdahToday.routineLabel': 'Routine {name}',
         'tdahToday.noRoutineTitle': 'Aucune Routine aujourd’hui',
         'tdahToday.noRoutineBody': 'Ajoutez une activité manuelle pour commencer.',
+        'tdahToday.unconfiguredTitle': 'La synchronisation cloud n’est pas configurée',
+        'tdahToday.unconfiguredOpenSettings': 'Ouvrir les paramètres',
         'tdahToday.addManual': 'Ajouter une activité',
         'tdahToday.loading': 'Chargement de votre journée…',
         'tdahToday.offlineBanner': 'Pas de connexion au serveur — nouvelle tentative',
@@ -2154,6 +2158,7 @@ export const frOverrides: Record<string, string> = {
         'tdahToday.nowLabel': 'Maintenant',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
+        'tdahActivity.origin.routine': 'Routine',
         'tdahActivity.origin.manual': 'Manuel',
         'tdahActivity.state.pending': 'En attente',
         'tdahActivity.state.started': 'Commencée',

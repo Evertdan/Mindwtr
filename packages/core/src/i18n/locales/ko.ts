@@ -2347,6 +2347,7 @@ export const koOverrides: Record<string, string> = {
         'settings.importDiagnostics.unsupportedRecurrence': "지원하지 않는 반복 규칙 {{count}}개를 메모로 보존했습니다.",
 
         // TDAH onboarding activation flow (T-14)
+        'settings.tdah.needsSync': 'ADHD 모드를 사용하려면 셀프 호스팅 클라우드 동기화를 설정하세요.',
         'settings.tdah.activatePwaTitle': '주의력결핍과잉행동장애 모드 활성화',
         'settings.tdah.activatePwaBody': '켜려면 시간대와 리추얼 시간을 확인하세요.',
         'settings.tdah.activatePwaButton': '활성화',
@@ -2410,6 +2411,8 @@ export const koOverrides: Record<string, string> = {
         'tdahToday.routineLabel': '루틴 {name}',
         'tdahToday.noRoutineTitle': '오늘은 루틴이 없습니다',
         'tdahToday.noRoutineBody': '수동 활동을 추가하여 시작하세요.',
+        'tdahToday.unconfiguredTitle': '클라우드 동기화가 설정되지 않았습니다',
+        'tdahToday.unconfiguredOpenSettings': '설정 열기',
         'tdahToday.addManual': '활동 추가',
         'tdahToday.loading': '오늘 일정을 불러오는 중…',
         'tdahToday.offlineBanner': '서버에 연결할 수 없습니다 — 재시도 중',

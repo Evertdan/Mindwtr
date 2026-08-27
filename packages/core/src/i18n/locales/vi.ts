@@ -2322,6 +2322,7 @@ export const viOverrides: Record<string, string> = {
         'settings.importDiagnostics.unsupportedRecurrence': "{{count}} quy tắc lặp lại không được hỗ trợ đã được giữ trong ghi chú.",
 
         // TDAH onboarding & activation
+        'settings.tdah.needsSync': 'Thiết lập đồng bộ đám mây tự lưu trữ để sử dụng chế độ ADHD.',
         'settings.tdah.activatePwaTitle': 'Kích hoạt chế độ ADHD',
         'settings.tdah.activatePwaBody': 'Xác nhận múi giờ và giờ nghi thức để bật chế độ này.',
         'settings.tdah.activatePwaButton': 'Kích hoạt',
@@ -2385,6 +2386,8 @@ export const viOverrides: Record<string, string> = {
         'tdahToday.routineLabel': 'Thói quen {name}',
         'tdahToday.noRoutineTitle': 'Hôm nay không có Thói quen',
         'tdahToday.noRoutineBody': 'Thêm một hoạt động thủ công để bắt đầu.',
+        'tdahToday.unconfiguredTitle': 'Đồng bộ đám mây chưa được thiết lập',
+        'tdahToday.unconfiguredOpenSettings': 'Mở cài đặt',
         'tdahToday.addManual': 'Thêm hoạt động',
         'tdahToday.loading': 'Đang tải ngày của bạn…',
         'tdahToday.offlineBanner': 'Không có kết nối đến máy chủ — đang thử lại',

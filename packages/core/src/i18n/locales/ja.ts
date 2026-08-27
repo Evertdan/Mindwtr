@@ -1104,6 +1104,8 @@ export const jaOverrides: Record<string, string> = {
         'tdahToday.routineLabel': 'ルーティン {name}',
         'tdahToday.noRoutineTitle': '今日はルーティンがありません',
         'tdahToday.noRoutineBody': '手動でアクティビティを追加して始めましょう。',
+        'tdahToday.unconfiguredTitle': 'クラウド同期が設定されていません',
+        'tdahToday.unconfiguredOpenSettings': '設定を開く',
         'tdahToday.addManual': 'アクティビティを追加',
         'tdahToday.loading': '今日の予定を読み込み中…',
         'tdahToday.offlineBanner': 'サーバーに接続できません — 再試行しています',

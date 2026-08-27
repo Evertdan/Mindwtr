@@ -92,6 +92,16 @@ describe('locale parity', () => {
         expect(translationsByLocale[lang]['search.scopeHint']).toBeTruthy();
     });
 
+    // The ADHD today/activity screens render through tFallback, which masks a
+    // missing key with English — the exact regression story 1.6 shipped with in
+    // nine locales. Only a key-set assertion catches it, so every locale (not
+    // just the full-parity cohort) is held to the complete tdahToday.*/tdahActivity.* set.
+    it.each(locales)('keeps every ADHD today/activity key translated in %s', (lang) => {
+        const tdahScreenKeys = Object.keys(en).filter((key) => key.startsWith('tdahToday.') || key.startsWith('tdahActivity.'));
+        const missing = tdahScreenKeys.filter((key) => !translationsByLocale[lang][key]);
+        expect(missing).toEqual([]);
+    });
+
     it('defines the recovery settings copy in English', () => {
         const missing = recoverySettingsKeys.filter((key) => !en[key]);
         expect(missing).toEqual([]);

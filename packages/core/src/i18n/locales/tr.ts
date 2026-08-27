@@ -1515,6 +1515,7 @@ export const trOverrides: Record<string, string> = {
         'settings.importDiagnostics.unmappedStatus': "{{count}} durum değeri eşlenemedi; güvenli bir varsayılan kullanıldı.",
         'settings.importDiagnostics.unsupportedRecurrence': "{{count}} desteklenmeyen yineleme kuralı not olarak korundu.",
 
+        'settings.tdah.needsSync': 'DEHB modunu kullanmak için Kendi Kendine Barındırılan bulut eşitlemesini kurun.',
         'settings.tdah.activatePwaTitle': 'DEHB modunu etkinleştir',
         'settings.tdah.activatePwaBody': 'Etkinleştirmek için saat diliminizi ve ritüel saatinizi onaylayın.',
         'settings.tdah.activatePwaButton': 'Etkinleştir',
@@ -1578,6 +1579,8 @@ export const trOverrides: Record<string, string> = {
         'tdahToday.routineLabel': 'Rutin {name}',
         'tdahToday.noRoutineTitle': 'Bugün Rutin yok',
         'tdahToday.noRoutineBody': 'Başlamak için manuel bir etkinlik ekleyin.',
+        'tdahToday.unconfiguredTitle': 'Bulut eşitlemesi ayarlı değil',
+        'tdahToday.unconfiguredOpenSettings': 'Ayarları aç',
         'tdahToday.addManual': 'Etkinlik ekle',
         'tdahToday.loading': 'Gününüz yükleniyor…',
         'tdahToday.offlineBanner': 'Sunucuya bağlantı yok — yeniden deneniyor',

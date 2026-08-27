@@ -1073,6 +1073,8 @@ export const faOverrides: Record<string, string> = {
         'tdahToday.routineLabel': 'روتین {name}',
         'tdahToday.noRoutineTitle': 'امروز روتینی نیست',
         'tdahToday.noRoutineBody': 'برای شروع یک فعالیت دستی اضافه کن.',
+        'tdahToday.unconfiguredTitle': 'همگام‌سازی ابری تنظیم نشده است',
+        'tdahToday.unconfiguredOpenSettings': 'باز کردن تنظیمات',
         'tdahToday.addManual': 'افزودن فعالیت',
         'tdahToday.loading': 'در حال بارگذاری روزت…',
         'tdahToday.offlineBanner': 'اتصالی به سرور نیست — در حال تلاش دوباره',

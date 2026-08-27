@@ -1073,6 +1073,8 @@ export const svOverrides: Record<string, string> = {
         'tdahToday.routineLabel': 'Rutin {name}',
         'tdahToday.noRoutineTitle': 'Ingen rutin idag',
         'tdahToday.noRoutineBody': 'Lägg till en manuell aktivitet för att komma igång.',
+        'tdahToday.unconfiguredTitle': 'Molnsynkronisering är inte konfigurerad',
+        'tdahToday.unconfiguredOpenSettings': 'Öppna inställningar',
         'tdahToday.addManual': 'Lägg till aktivitet',
         'tdahToday.loading': 'Laddar din dag…',
         'tdahToday.offlineBanner': 'Ingen anslutning till servern — försöker igen',

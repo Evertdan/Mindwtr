@@ -1098,6 +1098,8 @@ export const en: Record<string, string> = {
         'tdahToday.routineLabel': 'Routine {name}',
         'tdahToday.noRoutineTitle': 'No Routine today',
         'tdahToday.noRoutineBody': 'Add a manual activity to get started.',
+        'tdahToday.unconfiguredTitle': 'Cloud sync is not set up',
+        'tdahToday.unconfiguredOpenSettings': 'Open settings',
         'tdahToday.addManual': 'Add activity',
         'tdahToday.loading': 'Loading your day…',
         'tdahToday.offlineBanner': 'No connection to the server — retrying',

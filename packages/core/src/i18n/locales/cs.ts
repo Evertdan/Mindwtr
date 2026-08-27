@@ -2274,6 +2274,7 @@ export const csOverrides: Record<string, string> = {
         'settings.importDiagnostics.unmappedStatus': "{{count}} hodnot stavu nebylo možné převést; byla použita bezpečná výchozí hodnota.",
         'settings.importDiagnostics.unsupportedRecurrence': "{{count}} nepodporovaných pravidel opakování bylo zachováno v poznámkách.",
         // Ratchet backfill: ADHD mode activation card + onboarding flow
+        'settings.tdah.needsSync': 'Pro použití režimu ADHD nastavte synchronizaci s Vlastním serverem.',
         'settings.tdah.activatePwaTitle': 'Aktivovat režim ADHD',
         'settings.tdah.activatePwaBody': 'Potvrďte časové pásmo a čas rituálu, abyste jej zapnuli.',
         'settings.tdah.activatePwaButton': 'Aktivovat',
@@ -2337,6 +2338,8 @@ export const csOverrides: Record<string, string> = {
         'tdahToday.routineLabel': 'Rutina {name}',
         'tdahToday.noRoutineTitle': 'Dnes žádná Rutina',
         'tdahToday.noRoutineBody': 'Přidejte ruční aktivitu a začněte.',
+        'tdahToday.unconfiguredTitle': 'Synchronizace s cloudem není nastavena',
+        'tdahToday.unconfiguredOpenSettings': 'Otevřít nastavení',
         'tdahToday.addManual': 'Přidat aktivitu',
         'tdahToday.loading': 'Načítání vašeho dne…',
         'tdahToday.offlineBanner': 'Žádné připojení k serveru — zkouší se znovu',

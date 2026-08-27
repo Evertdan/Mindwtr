@@ -1041,6 +1041,8 @@ export const zhHans: Record<string, string> = {
         'tdahToday.routineLabel': '常规 {name}',
         'tdahToday.noRoutineTitle': '今天没有 Routine',
         'tdahToday.noRoutineBody': '添加一个手动活动即可开始。',
+        'tdahToday.unconfiguredTitle': '云同步尚未设置',
+        'tdahToday.unconfiguredOpenSettings': '打开设置',
         'tdahToday.addManual': '添加活动',
         'tdahToday.loading': '正在加载今天的安排…',
         'tdahToday.offlineBanner': '无法连接服务器 — 正在重试',
