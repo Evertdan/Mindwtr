@@ -165,7 +165,8 @@
       "./plugins/android-network-security-config",
       "./plugins/android-system-bars",
       "./plugins/android-startup-trace",
-      "./plugins/patch-alarm-notification-gradle"
+      "./plugins/patch-alarm-notification-gradle",
+      "./plugins/android-persistent-connection-service"
     ],
     "experiments": {
       "typedRoutes": true

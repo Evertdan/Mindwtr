@@ -1107,6 +1107,25 @@ export const en: Record<string, string> = {
         'tdahToday.retry': 'Retry',
         'tdahToday.noTime': 'No time',
         'tdahToday.nowLabel': 'Now',
+        // Story 2.1 — the persistent connection channel (N-05) and its
+        // `connection-dot` (DESIGN.md §Components). connectionBanner is a
+        // distinct key from the pre-existing offlineBanner above even though
+        // the copy matches: offlineBanner covers the day-fetch API failing,
+        // connectionBanner covers the WebSocket channel going down while the
+        // already-loaded day still renders (AD-11 keeps those two states
+        // independent).
+        'tdahToday.connectionBanner': 'No connection to the server — retrying',
+        'tdahToday.connectionDotConnected': 'Connected',
+        'tdahToday.connectionDotReconnecting': 'Reconnecting…',
+        'tdahToday.connectionDotOffline': 'No server connection',
+        'tdahToday.connectionExplanationTitle': 'Connection status',
+        'tdahToday.connectionExplanationBody': "Mindwtr keeps a live connection to your server while ADHD Mode is on, so today's reminders arrive on time.",
+        'tdahToday.connectionBatteryChip': 'Connection limited by battery',
+        'tdahToday.connectionBatteryRequestButton': 'Allow unrestricted battery use',
+        'tdahToday.connectionNotificationTitle': 'Mindwtr connected',
+        'tdahToday.connectionNotificationText': "Your day's reminders are active",
+        'tdahToday.connectionNotificationReconnectingText': 'Reconnecting…',
+        'tdahToday.connectionNotificationChannelName': 'Connection',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Routine',

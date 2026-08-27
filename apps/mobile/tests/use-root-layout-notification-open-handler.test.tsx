@@ -192,6 +192,22 @@ describe('useRootLayoutNotificationOpenHandler', () => {
     });
   });
 
+  it("routes the story 2.1 'tdah-connection' kind (N-05's payload-store fallback) to T-01", () => {
+    const router = { push: vi.fn() };
+
+    act(() => {
+      create(<TestHarness router={router} />);
+    });
+
+    const handler = setNotificationOpenHandler.mock.calls[0]?.[0];
+
+    act(() => {
+      handler({ kind: 'tdah-connection' });
+    });
+
+    expect(router.push).toHaveBeenCalledWith('/tdah-today');
+  });
+
   it('waits for app readiness before replaying a pending open from the root path', async () => {
     const router = { push: vi.fn() };
     consumePendingNotificationOpenPayload.mockResolvedValue({

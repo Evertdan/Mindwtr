@@ -17,6 +17,8 @@ import {
 } from './storage';
 import { handleTdahRequest } from './routes';
 import { runNightlyTdahTick } from './scheduler';
+import { createTdahWsConnectionRegistry, resolveTdahWsAuth, TDAH_WS_PATH } from './ws-channel';
+import { createAllowedAuthTokens } from '../server-auth';
 
 const TOKEN_ALPHA = 'tdah-token-alpha-1234567890';
 const TOKEN_BETA = 'tdah-token-beta-1234567890';
@@ -2206,6 +2208,139 @@ describe('tdah module', () => {
         });
     });
 
+    describe('WS channel (story 2.1: persistent connection)', () => {
+        type TdahWsServerEventLike = { kind: string; at: string };
+
+        const wsUrl = (token: string = TOKEN_ALPHA): string => (
+            `ws://127.0.0.1:${server!.port}${TDAH_WS_PATH}?token=${encodeURIComponent(token)}`
+        );
+
+        // Resolves once the server's own "connected" event (types.ts's
+        // `TdahWsConnectedEvent`) arrives — proof the upgrade actually
+        // completed and the channel is live, not just that the client-side
+        // `open` event fired.
+        const openTdahWs = (token?: string): Promise<{ ws: WebSocket; connectedEvent: TdahWsServerEventLike }> => (
+            new Promise((resolve, reject) => {
+                const ws = new WebSocket(wsUrl(token));
+                const timeout = setTimeout(() => {
+                    reject(new Error('WS did not receive the connected event in time'));
+                }, 2000);
+                ws.onmessage = (event) => {
+                    clearTimeout(timeout);
+                    resolve({ ws, connectedEvent: JSON.parse(String(event.data)) as TdahWsServerEventLike });
+                };
+                ws.onerror = () => {
+                    clearTimeout(timeout);
+                    reject(new Error('WS errored before the connected event arrived'));
+                };
+            })
+        );
+
+        const waitForClose = (ws: WebSocket): Promise<void> => (
+            new Promise((resolve) => {
+                if (ws.readyState === ws.CLOSED) {
+                    resolve();
+                    return;
+                }
+                ws.onclose = () => resolve();
+            })
+        );
+
+        test('a valid token upgrades the connection and receives a "connected" event', async () => {
+            const { ws, connectedEvent } = await openTdahWs();
+            expect(connectedEvent.kind).toBe('connected');
+            expect(typeof connectedEvent.at).toBe('string');
+            expect(Number.isNaN(Date.parse(connectedEvent.at))).toBe(false);
+            ws.close();
+            await waitForClose(ws);
+        });
+
+        test('a missing token is rejected before the handshake, with 401 and a .code body', async () => {
+            const response = await fetch(`${baseUrl}${TDAH_WS_PATH}`);
+            expect(response.status).toBe(401);
+            expect(await readErrorCode(response)).toBe('TDAH_WS_UNAUTHORIZED');
+        });
+
+        test('a malformed token is rejected before the handshake, with 401 and a .code body', async () => {
+            const response = await fetch(`${baseUrl}${TDAH_WS_PATH}?token=short`);
+            expect(response.status).toBe(401);
+            expect(await readErrorCode(response)).toBe('TDAH_WS_UNAUTHORIZED');
+        });
+
+        test('a well-formed but unrecognized token is rejected the same way as a missing one', async () => {
+            // Same length/charset as TOKEN_ALPHA (passes the bearer-token
+            // format check) but never added to this server's
+            // allowedAuthTokens allowlist — proves the allowlist check runs,
+            // not just the format check.
+            const response = await fetch(`${baseUrl}${TDAH_WS_PATH}?token=tdah-token-unknown-0000000`);
+            expect(response.status).toBe(401);
+            expect(await readErrorCode(response)).toBe('TDAH_WS_UNAUTHORIZED');
+        });
+
+        test('non-GET requests to the WS path are rejected with 405, before auth is even checked', async () => {
+            const response = await fetch(`${baseUrl}${TDAH_WS_PATH}`, { method: 'POST' });
+            expect(response.status).toBe(405);
+            expect(await readErrorCode(response)).toBe('TDAH_METHOD_NOT_ALLOWED');
+        });
+
+        test('a valid token without a real WS handshake gets a plain 400, not the channel\'s .code', async () => {
+            // A plain fetch() GET never sends the Upgrade/Connection headers a
+            // real WS client sends, so `bunServer.upgrade()` returns false
+            // even though the token itself is valid and allowlisted — this is
+            // the "not a real handshake" branch, distinct from an auth
+            // rejection (server.ts's own comment on that branch).
+            const response = await fetch(`${baseUrl}${TDAH_WS_PATH}?token=${encodeURIComponent(TOKEN_ALPHA)}`);
+            expect(response.status).toBe(400);
+            const body = await response.json() as { error?: string };
+            expect(body.error).toBe('WebSocket upgrade required');
+        });
+
+        test('repeated invalid-token attempts trip the same auth-failure rate limit as HTTP routes, returning 429', async () => {
+            // Mirrors server.test.ts's "auth failure throttling never bypasses
+            // token checks" pattern: AUTH_FAILURE_RATE_MAX defaults to 30, so
+            // the 31st request in the same window trips it. All requests
+            // share the 'auth-failure:ip:unknown' bucket here (no
+            // trustProxyHeaders configured), same as that existing test.
+            let firstStatus = 0;
+            let lastStatus = 0;
+            for (let attempt = 0; attempt < 31; attempt += 1) {
+                const response = await fetch(`${baseUrl}${TDAH_WS_PATH}?token=not-a-real-token-at-all-000`);
+                if (attempt === 0) firstStatus = response.status;
+                lastStatus = response.status;
+            }
+            expect(firstStatus).toBe(401);
+            expect(lastStatus).toBe(429);
+        });
+
+        test('a client-initiated close is clean: the server keeps serving, and the same namespace can reconnect right away', async () => {
+            const { ws } = await openTdahWs();
+            ws.close(1000, 'done');
+            await waitForClose(ws);
+            expect(ws.readyState).toBe(ws.CLOSED);
+
+            // The disconnect must not affect the rest of the server.
+            const health = await fetch(`${baseUrl}/health`);
+            expect(health.status).toBe(200);
+
+            // And the closed connection's registry entry didn't leak or block
+            // a fresh upgrade for the very same namespace.
+            const reconnect = await openTdahWs();
+            expect(reconnect.connectedEvent.kind).toBe('connected');
+            reconnect.ws.close();
+            await waitForClose(reconnect.ws);
+        });
+
+        test('two different tokens each get their own independent, simultaneous connection', async () => {
+            const alpha = await openTdahWs(TOKEN_ALPHA);
+            const beta = await openTdahWs(TOKEN_BETA);
+            expect(alpha.ws.readyState).toBe(alpha.ws.OPEN);
+            expect(beta.ws.readyState).toBe(beta.ws.OPEN);
+            alpha.ws.close();
+            beta.ws.close();
+            await Promise.all([waitForClose(alpha.ws), waitForClose(beta.ws)]);
+        });
+    });
+
     describe('runNightlyTdahTick (story 1.5: nightly scheduler)', () => {
         // Mexico abolished DST in 2022 (fixed UTC-6 year-round), so tests can
         // build exact instants for this zone without any DST ambiguity.
@@ -2809,5 +2944,98 @@ describe('tdah module', () => {
             expect(isValidMonthString('2026-00')).toBe(false);
             expect(isValidMonthString('not-a-month')).toBe(false);
         });
+    });
+});
+
+describe('resolveTdahWsAuth (story 2.1: WS channel token resolution, no server/socket needed)', () => {
+    const ALLOWED = createAllowedAuthTokens(['tdah-token-alpha-1234567890']);
+    const wsUrlWithToken = (token: string | null): URL => {
+        const url = new URL('ws://127.0.0.1/v1/tdah/ws');
+        if (token !== null) url.searchParams.set('token', token);
+        return url;
+    };
+
+    test('accepts a valid, allowlisted token and returns its namespace key', () => {
+        const result = resolveTdahWsAuth(wsUrlWithToken('tdah-token-alpha-1234567890'), ALLOWED);
+        expect(result.ok).toBe(true);
+        expect(result.ok && typeof result.key).toBe('string');
+        expect(result.ok && result.key.length).toBe(64); // sha256 hex digest, same shape as tokenToKey elsewhere
+    });
+
+    test('rejects a missing token with TDAH_WS_UNAUTHORIZED', () => {
+        const result = resolveTdahWsAuth(wsUrlWithToken(null), ALLOWED);
+        expect(result).toEqual({ ok: false, code: 'TDAH_WS_UNAUTHORIZED' });
+    });
+
+    test('rejects a malformed token (fails BEARER_TOKEN_PATTERN) with the same code', () => {
+        const result = resolveTdahWsAuth(wsUrlWithToken('short'), ALLOWED);
+        expect(result).toEqual({ ok: false, code: 'TDAH_WS_UNAUTHORIZED' });
+    });
+
+    test('rejects a well-formed but non-allowlisted token with the same code', () => {
+        const result = resolveTdahWsAuth(wsUrlWithToken('tdah-token-unknown-0000000'), ALLOWED);
+        expect(result).toEqual({ ok: false, code: 'TDAH_WS_UNAUTHORIZED' });
+    });
+
+    test('a null allowlist (any-token mode) accepts any well-formed token', () => {
+        const result = resolveTdahWsAuth(wsUrlWithToken('tdah-token-anything-000000'), null);
+        expect(result.ok).toBe(true);
+    });
+});
+
+describe('createTdahWsConnectionRegistry (story 2.1: pure per-namespace connection bookkeeping)', () => {
+    test('starts empty', () => {
+        const registry = createTdahWsConnectionRegistry<string>();
+        expect(registry.namespaceCount()).toBe(0);
+        expect(registry.connectionCount('key-a')).toBe(0);
+        expect(registry.connectionsFor('key-a').size).toBe(0);
+    });
+
+    test('register adds a connection under its namespace key, visible via connectionsFor/connectionCount', () => {
+        const registry = createTdahWsConnectionRegistry<string>();
+        registry.register('key-a', 'conn-1');
+        expect(registry.connectionCount('key-a')).toBe(1);
+        expect(registry.connectionsFor('key-a')).toEqual(new Set(['conn-1']));
+        expect(registry.namespaceCount()).toBe(1);
+    });
+
+    test('a namespace can hold more than one simultaneous connection', () => {
+        const registry = createTdahWsConnectionRegistry<string>();
+        registry.register('key-a', 'conn-1');
+        registry.register('key-a', 'conn-2');
+        expect(registry.connectionCount('key-a')).toBe(2);
+        expect(registry.namespaceCount()).toBe(1);
+    });
+
+    test('different namespaces stay isolated from each other', () => {
+        const registry = createTdahWsConnectionRegistry<string>();
+        registry.register('key-a', 'conn-1');
+        registry.register('key-b', 'conn-2');
+        expect(registry.connectionCount('key-a')).toBe(1);
+        expect(registry.connectionCount('key-b')).toBe(1);
+        expect(registry.namespaceCount()).toBe(2);
+    });
+
+    test('unregister removes only the given connection and prunes an emptied namespace entirely', () => {
+        const registry = createTdahWsConnectionRegistry<string>();
+        registry.register('key-a', 'conn-1');
+        registry.register('key-a', 'conn-2');
+        registry.unregister('key-a', 'conn-1');
+        expect(registry.connectionCount('key-a')).toBe(1);
+        expect(registry.connectionsFor('key-a')).toEqual(new Set(['conn-2']));
+
+        registry.unregister('key-a', 'conn-2');
+        expect(registry.connectionCount('key-a')).toBe(0);
+        // The empty Set must not linger as a dangling namespace entry.
+        expect(registry.namespaceCount()).toBe(0);
+    });
+
+    test('unregistering an unknown connection or namespace is a harmless no-op', () => {
+        const registry = createTdahWsConnectionRegistry<string>();
+        registry.register('key-a', 'conn-1');
+        registry.unregister('key-a', 'conn-does-not-exist');
+        registry.unregister('key-does-not-exist', 'conn-1');
+        expect(registry.connectionCount('key-a')).toBe(1);
+        expect(registry.namespaceCount()).toBe(1);
     });
 });

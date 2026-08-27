@@ -275,8 +275,38 @@ const TDAH_ERROR_CODES = {
     notFound: 'TDAH_NOT_FOUND',
     storageFailed: 'TDAH_STORAGE_FAILED',
     activateRequired: 'TDAH_ACTIVATE_REQUIRED',
+    // Story 2.1: the WS channel upgrade's own bearer-token check (query
+    // param, not the `Authorization` header — see ws-channel.ts) rejects a
+    // missing/invalid/unauthorized token with this single code, before the
+    // handshake ever completes. The client treats any WS close/reject as
+    // "sin servidor" and never inspects a raw message (AGENTS.md's
+    // `.code`-only rule applies to the channel exactly like every HTTP
+    // TDAH route).
+    wsUnauthorized: 'TDAH_WS_UNAUTHORIZED',
 } as const;
 
 export type TdahErrorCode = (typeof TDAH_ERROR_CODES)[keyof typeof TDAH_ERROR_CODES];
 
 export const TDAH_ERRORS = TDAH_ERROR_CODES;
+
+/**
+ * Story 2.1 — the persistent WS channel's shared shapes. Same server-only
+ * rule as the rest of this file (ADR 0026): the channel lives entirely in
+ * server.ts + ws-channel.ts, and story 2.2 (activity-trigger notifications)
+ * will add its own event `kind`s onto this same envelope rather than
+ * inventing a second one.
+ */
+
+/**
+ * Sent once, immediately after a successful upgrade (server.ts's
+ * `websocket.open` handler) — the minimal "the channel is live" payload.
+ * `kind` is a discriminant so `TdahWsServerEvent` can grow into a real union
+ * once story 2.2 adds its own event kinds on top, without this story having
+ * to anticipate their fields.
+ */
+export type TdahWsConnectedEvent = {
+    kind: 'connected';
+    at: string;
+};
+
+export type TdahWsServerEvent = TdahWsConnectedEvent;

@@ -106,6 +106,13 @@ import {
     type CalendarFeedRecord,
 } from './server-calendar-feed';
 import { TDAH_PATH_PREFIX, handleTdahRequest, runNightlyTdahTick } from './tdah';
+import { TDAH_ERRORS } from './tdah/types';
+import {
+    buildTdahWsConnectedEvent,
+    createTdahWsConnectionRegistry,
+    resolveTdahWsAuth,
+    TDAH_WS_PATH,
+} from './tdah/ws-channel';
 
 const ANY_TOKEN_NAMESPACE_LIMIT_DEFAULT = 32;
 const NAMESPACE_ADMISSION_LOCK_KEY = '__namespace_admission__';
@@ -159,6 +166,7 @@ const STATIC_CLOUD_ROUTES = new Set([
     '/v1/tdah/routines/conflicts',
     '/v1/tdah/day',
     '/v1/tdah/day/activities',
+    '/v1/tdah/ws',
 ]);
 
 export function canonicalCloudRoute(pathname: string): string {
@@ -241,16 +249,38 @@ const loadExistingDataForMerge = (filePath: string): AppData | { error: Response
     return validateStoredAppData(filePath, rawData);
 };
 
+/** `.data` attached to a WS connection at upgrade time (server.ts's `bunServer.upgrade(req, { data })`) — carries only the namespace key, mirroring every HTTP route's `ctx.key`. */
+type TdahWsConnectionData = { key: string };
+
+/** Bun's `ServerWebSocket`, narrowed to the surface this module actually uses. */
+type BunServerWebSocket = {
+    readonly data: TdahWsConnectionData;
+    send: (data: string) => number;
+    close: (code?: number, reason?: string) => void;
+};
+
 type BunServer = {
     port: number;
     stop?: (closeIdleConnections?: boolean) => void | Promise<void>;
+    /** Native `Bun.serve` WS upgrade — returns `false` when the request isn't a valid upgrade (e.g. missing `Upgrade` header). */
+    upgrade: (req: Request, options?: { data?: TdahWsConnectionData }) => boolean;
 };
 
 type BunRuntime = {
     serve: (options: {
         hostname: string;
         port: number;
-        fetch: (req: Request) => Response | Promise<Response>;
+        // Bun passes the `Server` instance itself as the second argument —
+        // needed here because `server.upgrade()` must be called from inside
+        // `fetch`, before the `const server = bunRuntime.serve(...)` binding
+        // below even exists. Returning `undefined` (instead of a `Response`)
+        // is how a successful upgrade is signalled back to Bun: it has
+        // already sent the 101 Switching Protocols response itself.
+        fetch: (req: Request, server: BunServer) => Response | undefined | Promise<Response | undefined>;
+        websocket?: {
+            open?: (ws: BunServerWebSocket) => void;
+            close?: (ws: BunServerWebSocket, code: number, reason: string) => void;
+        };
     }) => BunServer;
 };
 
@@ -1041,6 +1071,11 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
         }
     });
     const rateLimiter = createRateLimiter({ windowMs, maxKeys: RATE_LIMIT_MAX_KEYS });
+    // Story 2.1 — one registry per running server instance (never
+    // module-scoped): tests spawn several `startCloudServer()` instances in
+    // the same process, and each must track only its own live WS
+    // connections.
+    const tdahWsRegistry = createTdahWsConnectionRegistry<BunServerWebSocket>();
 
     const getRequestIpAddress = (req: Request): string | null => {
         const bunServer = server as { requestIP?: (request: Request) => { address?: string | null } | null };
@@ -1068,6 +1103,30 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
             }
         }
         return errorResponse('Unauthorized', 401);
+    };
+
+    // Story 2.1 — same auth-failure rate limiting as `unauthorizedResponse`
+    // above (IP + token buckets, `AUTH_FAILURE_RATE_MAX`), but the channel's
+    // own `.code`-shaped body instead of a raw message: the WS upgrade
+    // rejects before any handshake completes, so the client only ever gets
+    // to inspect a JSON body, never a raw fs/sqlite `.message` (AGENTS.md).
+    const tdahWsUnauthorizedResponse = (req: Request, token?: string | null): Response => {
+        const authRateKey = getAuthFailureRateKey(req, {
+            trustProxyHeaders,
+            trustedProxyIps,
+            requestIpAddress: getRequestIpAddress(req),
+        });
+        const authRateLimitKeys = [
+            authRateKey,
+            getAuthFailureTokenRateKey({ token, authHeader: null }),
+        ].filter((key): key is string => Boolean(key));
+        for (const key of authRateLimitKeys) {
+            const authRateLimitResponse = rateLimiter.check(key, AUTH_FAILURE_RATE_MAX);
+            if (authRateLimitResponse) {
+                return authRateLimitResponse;
+            }
+        }
+        return jsonResponse({ error: { code: TDAH_ERRORS.wsUnauthorized } }, { status: 401 });
     };
 
     const baseServerConfig: ServerConfig = {
@@ -1211,7 +1270,19 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
     const server = bunRuntime.serve({
         hostname: host,
         port,
-        async fetch(req: Request) {
+        // Story 2.1 — the WS channel's real socket wiring: `open`/`close`
+        // only ever touch `tdahWsRegistry` (register/unregister), never
+        // decide anything themselves (that split lives in ws-channel.ts).
+        websocket: {
+            open(ws) {
+                tdahWsRegistry.register(ws.data.key, ws);
+                ws.send(JSON.stringify(buildTdahWsConnectedEvent(new Date())));
+            },
+            close(ws) {
+                tdahWsRegistry.unregister(ws.data.key, ws);
+            },
+        },
+        async fetch(req: Request, bunServer: BunServer) {
             const requestId = generateRequestId();
             const requestStartedAt = performance.now();
             let requestRoute = 'unmatched';
@@ -1226,7 +1297,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                 requestAbortController.abort(createRequestAbortError('Request timed out', 408));
             }, requestTimeoutMs);
             try {
-                const response = await (async (): Promise<Response> => {
+                const response = await (async (): Promise<Response | undefined> => {
                     try {
                         throwIfRequestAborted(requestAbortController.signal);
 
@@ -1238,6 +1309,37 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
 
                 if (req.method === 'GET' && pathname === '/health') {
                     return jsonResponse({ ok: true });
+                }
+
+                // Story 2.1 — the persistent WS channel. Dispatched by exact
+                // path match here, ahead of the TDAH HTTP block below (which
+                // matches any `${TDAH_PATH_PREFIX}/...` pathname and would
+                // otherwise swallow this one into a 404). Auth is the same
+                // bearer-token allowlist as every other TDAH route, just read
+                // from the `token` query param instead of `Authorization`
+                // (Design Notes: RN's WebSocket client can't set custom
+                // upgrade headers) — see ws-channel.ts's `resolveTdahWsAuth`.
+                if (pathname === TDAH_WS_PATH) {
+                    if (req.method !== 'GET') {
+                        return jsonResponse({ error: { code: TDAH_ERRORS.methodNotAllowed } }, { status: 405 });
+                    }
+                    const wsAuth = resolveTdahWsAuth(url, allowedAuthTokens);
+                    if (!wsAuth.ok) {
+                        return tdahWsUnauthorizedResponse(req, url.searchParams.get('token'));
+                    }
+                    const upgraded = bunServer.upgrade(req, { data: { key: wsAuth.key } });
+                    if (!upgraded) {
+                        // Not a real WS handshake (e.g. missing `Upgrade`
+                        // header) despite a valid token — a plain GET to this
+                        // path, not an auth failure, so the generic 400
+                        // rather than the channel's `.code`.
+                        return errorResponse('WebSocket upgrade required', 400);
+                    }
+                    // Bun has already sent the 101 Switching Protocols
+                    // response itself; returning undefined here is how that
+                    // is signalled back to it (see the BunRuntime type's own
+                    // comment above).
+                    return undefined;
                 }
 
                 if (
@@ -1610,6 +1712,26 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                         return createInternalServerErrorResponse('Internal server error', requestId);
                     }
                 })();
+                // Story 2.1 — `undefined` means the WS upgrade succeeded and
+                // Bun already sent the 101 response itself; there is no real
+                // Response object here to attach a request id to, but the
+                // completion record still gets built and sent through the
+                // exact same sink as every other request — status 101
+                // (Switching Protocols) stands in for `response.status`,
+                // which doesn't exist on this path.
+                if (response === undefined) {
+                    const wsCompletion: CloudRequestCompletion = {
+                        requestId,
+                        method: req.method,
+                        route: requestRoute,
+                        status: 101,
+                        elapsedMs: Math.max(0, Math.round(performance.now() - requestStartedAt)),
+                    };
+                    if (shouldLogCloudRequest(wsCompletion, logAllRequests, slowRequestMs)) {
+                        requestCompletionSink(wsCompletion);
+                    }
+                    return undefined;
+                }
                 attachRequestId(response, requestId);
                 const completion: CloudRequestCompletion = {
                     requestId,

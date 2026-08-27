@@ -34,6 +34,18 @@ function isDailyReviewOpen(kind: string | undefined, notificationId: string): bo
     return kind === 'daily-digest' || notificationId === 'digest:morning' || notificationId === 'digest:evening';
 }
 
+// N-05 (story 2.1's persistent connection notification) opens MainActivity
+// directly via a mindwtr:///tdah-today ACTION_VIEW intent, the same shape as
+// the pre-existing persistent-capture notification — Expo Router resolves
+// that URI to /tdah-today on its own, with no payload ever passed through
+// this dispatcher. This 'tdah-connection' kind is kept here regardless (spec
+// Code Map: "registrado como nuevo caso ... para el tap en N-05") so any
+// future caller that does route a payload through
+// consumePendingNotificationOpenPayload with this kind lands on T-01 too.
+function isTdahConnectionOpen(kind: string | undefined): boolean {
+    return kind === 'tdah-connection';
+}
+
 export function useRootLayoutNotificationOpenHandler({
     appReady,
     pathname,
@@ -124,6 +136,11 @@ export function useRootLayoutNotificationOpenHandler({
         }
         if (isWeeklyReviewOpen(kind, openToken)) {
             router.push({ pathname: '/weekly-review', params: { openToken } });
+            return;
+        }
+        if (isTdahConnectionOpen(kind)) {
+            router.push('/tdah-today');
+            return;
         }
     }, [router]);
 

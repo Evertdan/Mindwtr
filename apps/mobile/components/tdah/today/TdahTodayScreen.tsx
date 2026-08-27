@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useRef } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -10,9 +10,21 @@ import { formatI18nTemplate, safeFormatDate, tFallback } from '@mindwtr/core';
 
 import { useLanguage } from '@/contexts/language-context';
 import { useFilledButtonColors } from '@/hooks/use-filled-button-colors';
+import {
+    getTdahConnectionState,
+    subscribeTdahConnectionReconnected,
+    subscribeTdahConnectionState,
+} from '@/hooks/root-layout/use-root-layout-tdah-connection';
 import { useThemeColors } from '@/hooks/use-theme-colors';
+import {
+    isIgnoringBatteryOptimizations,
+    isPersistentConnectionSupported,
+    requestIgnoreBatteryOptimizations,
+    type TdahConnectionState,
+} from '@/lib/persistent-connection';
 
 import { TdahActivityRow } from './TdahActivityRow';
+import { TdahConnectionDot } from './TdahConnectionDot';
 import { TdahNowLine } from './TdahNowLine';
 import { findCurrentActivityId } from './tdah-current-activity';
 import {
@@ -37,6 +49,13 @@ const formatHourLabel = (hour: number): string => `${hour.toString().padStart(2,
 const TDAH_TODAY_SKELETON_HOURS = [6, 9, 12, 15, 18, 21] as const;
 const TDAH_TODAY_SKELETON_HEIGHT = 280;
 const TDAH_TODAY_SKELETON_ROW_TOPS = [28, 108, 188] as const;
+
+// Local, ad-hoc header layout (not added to tdah-today.styles.ts, out of this
+// story's owned files): places `connection-dot` at the header's corner
+// (DESIGN.md §Components: "8 pt, esquina") without disturbing the date/routine
+// column's own existing styles.
+const headerRowStyle = { flexDirection: 'row' as const, alignItems: 'flex-start' as const, justifyContent: 'space-between' as const };
+const headerTextColumnStyle = { flexShrink: 1 as const };
 
 /**
  * T-01 — the today timeline (spec Code Map). Every focus is a fresh
@@ -84,6 +103,61 @@ export function TdahTodayScreen() {
         return () => subscription.remove?.();
     }, [phase, reload]);
 
+    const [connectionState, setConnectionState] = useState<TdahConnectionState>(() => getTdahConnectionState());
+    const [batteryLimited, setBatteryLimited] = useState(false);
+    const connectionSupported = isPersistentConnectionSupported();
+    const reloadRef = useRef(reload);
+    reloadRef.current = reload;
+
+    const refreshBatteryLimited = useCallback(() => {
+        if (!connectionSupported) return;
+        setBatteryLimited(!isIgnoringBatteryOptimizations());
+    }, [connectionSupported]);
+
+    // Modo TDAH's connection channel now opens/closes with the mode itself,
+    // owned by the root layout (spec Always: "se abre al activar el modo y
+    // se cierra intencionalmente al desactivarlo") — see
+    // use-root-layout-tdah-connection.ts. T-01 only ever reads the current
+    // state here for its connection-dot; it never starts or stops the
+    // socket, so the channel survives navigating away from T-01 while the
+    // mode stays on.
+    useEffect(() => {
+        if (!connectionSupported) return undefined;
+        refreshBatteryLimited();
+        setConnectionState(getTdahConnectionState());
+        return subscribeTdahConnectionState(setConnectionState);
+    }, [connectionSupported, refreshBatteryLimited]);
+
+    // AC: "T-01 re-obtiene el plan del día automáticamente" on every
+    // reconnect, no user action — the root layout owns the socket, so it
+    // publishes this event instead of T-01 passing its own `reload` as
+    // `onReconnected` to `startPersistentConnection`.
+    useEffect(() => {
+        if (!connectionSupported) return undefined;
+        return subscribeTdahConnectionReconnected(() => {
+            void reloadRef.current();
+        });
+    }, [connectionSupported]);
+
+    // The battery-exemption chip can only clear once the user leaves system
+    // Settings and returns — re-check on every foreground transition.
+    useEffect(() => {
+        if (!connectionSupported) return undefined;
+        const subscription = AppState.addEventListener('change', (nextState) => {
+            if (nextState === 'active') refreshBatteryLimited();
+        });
+        return () => subscription.remove();
+    }, [connectionSupported, refreshBatteryLimited]);
+
+    const requestBatteryExemption = useCallback(() => {
+        requestIgnoreBatteryOptimizations();
+    }, []);
+
+    const showConnectionBanner = connectionSupported
+        && connectionState.status === 'offline'
+        && phase !== 'offline'
+        && phase !== 'unconfigured';
+
     const openActivity = useCallback((activity: TdahActivity) => {
         router.push(`/tdah-activity/${activity.id}`);
     }, [router]);
@@ -124,13 +198,35 @@ export function TdahTodayScreen() {
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: tc.bg }]} edges={['bottom']}>
             <View style={styles.header}>
-                <Text style={[styles.headerDate, { color: tc.text }]} accessibilityRole="header">
-                    {dateLabel}
-                </Text>
-                {routineLabel ? (
-                    <Text style={[styles.headerRoutine, { color: tc.secondaryText }]}>{routineLabel}</Text>
-                ) : null}
+                <View style={headerRowStyle}>
+                    <View style={headerTextColumnStyle}>
+                        <Text style={[styles.headerDate, { color: tc.text }]} accessibilityRole="header">
+                            {dateLabel}
+                        </Text>
+                        {routineLabel ? (
+                            <Text style={[styles.headerRoutine, { color: tc.secondaryText }]}>{routineLabel}</Text>
+                        ) : null}
+                    </View>
+                    {connectionSupported ? (
+                        <TdahConnectionDot
+                            status={connectionState.status}
+                            batteryLimited={batteryLimited}
+                            onRequestBatteryExemption={requestBatteryExemption}
+                        />
+                    ) : null}
+                </View>
             </View>
+
+            {showConnectionBanner ? (
+                <View
+                    style={[styles.offlineBanner, { borderColor: tc.danger, backgroundColor: tc.filterBg }]}
+                    testID="tdah-today-connection-banner"
+                >
+                    <Text style={[styles.offlineBannerText, { color: tc.text }]}>
+                        {tFallback(t, 'tdahToday.connectionBanner', 'No connection to the server — retrying')}
+                    </Text>
+                </View>
+            ) : null}
 
             {phase === 'loading' ? (
                 // AC: a skeleton that already draws the hour channel, not a
