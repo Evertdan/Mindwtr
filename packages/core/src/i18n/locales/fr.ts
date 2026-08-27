@@ -2174,6 +2174,8 @@ export const frOverrides: Record<string, string> = {
         'tdahToday.activityPostponeActionLabel': 'Reporter +10 min',
         'tdahToday.activityCompleteActionLabel': 'Terminer',
         'tdahToday.activityNotificationChannelName': 'Rappels d\'activités',
+        'tdahToday.ritualInvitationTitle': 'Ferme la journée — 10 minutes et demain est prêt',
+        'tdahToday.ritualComingSoon': 'Le rituel nocturne arrive bientôt',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Routine',

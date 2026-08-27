@@ -107,12 +107,13 @@ import {
 } from './server-calendar-feed';
 import { TDAH_PATH_PREFIX, handleTdahRequest, runNightlyTdahTick } from './tdah';
 import { runActivityTriggerTick } from './tdah/activity-trigger';
-import { TDAH_ERRORS, type TdahWsActivityTriggerEvent } from './tdah/types';
+import { TDAH_ERRORS, type TdahWsActivityTriggerEvent, type TdahWsRitualInvitationEvent } from './tdah/types';
 import {
     buildTdahWsConnectedEvent,
     createTdahWsConnectionRegistry,
     resolveTdahWsAuth,
     TDAH_WS_PATH,
+    type TdahWsConnectionRegistry,
 } from './tdah/ws-channel';
 
 const ANY_TOKEN_NAMESPACE_LIMIT_DEFAULT = 32;
@@ -963,6 +964,36 @@ export function resolveServerMergeTimestamp(..._dataSets: AppData[]): string {
 }
 
 /**
+ * Story 3.1 — builds the exact `hasOpenConnection`/`onRitualInvitationFire`
+ * pair `runNightlyTdahTick` needs, wired against a real `tdahWsRegistry`
+ * instance: `hasOpenConnection` reads `registry.connectionCount(key) > 0`,
+ * `onRitualInvitationFire` serializes the event once and `ws.send`s it to
+ * every open connection for that namespace. Factored out of the interval
+ * registration below (rather than inlined at that call site) so the SAME
+ * closures — not a hand-rolled test double — can also be exercised
+ * end-to-end from a test: `startCloudServer`'s returned handle exposes this
+ * pair, already built against its own live `tdahWsRegistry`, as
+ * `tdahRitualWiring` specifically so `tdah.test.ts`'s ritual-invitation
+ * describe block can open a real WS connection (`openTdahWs`) and assert the
+ * real client actually receives the message — the same end-to-end proof
+ * `openTdahWs` already gives the `'connected'` event.
+ */
+export const buildTdahRitualInvitationWiring = (
+    registry: TdahWsConnectionRegistry<BunServerWebSocket>,
+): {
+    hasOpenConnection: (key: string) => boolean;
+    onRitualInvitationFire: (key: string, event: TdahWsRitualInvitationEvent) => void;
+} => ({
+    hasOpenConnection: (key) => registry.connectionCount(key) > 0,
+    onRitualInvitationFire: (key, event) => {
+        const payload = JSON.stringify(event);
+        for (const ws of registry.connectionsFor(key)) {
+            ws.send(payload);
+        }
+    },
+});
+
+/**
  * The 60s TDAH interval callback's body, extracted so the audit contract is
  * directly testable: run one nightly tick against `dataDir` with the real
  * clock, then log the single `'tdah nightly trigger fired'` audit line with
@@ -972,10 +1003,21 @@ export function resolveServerMergeTimestamp(..._dataSets: AppData[]): string {
  * below; this function is exactly one tick, so a manual await of it can never
  * overlap itself. Log message strings are byte-identical to the pre-extract
  * inline callback (CLOUD_LOG_MESSAGES ratchet).
+ *
+ * `hasOpenConnection`/`onRitualInvitationFire` (story 3.1) default to
+ * `runNightlyTdahTick`'s own no-push defaults, so `server.test.ts`'s existing
+ * direct call (`runTdahNightlyIntervalTick(dataDir)`, no ritual wiring) keeps
+ * compiling and behaving exactly as before this story — the real interval
+ * registration below is the only caller that supplies the live
+ * `tdahWsRegistry`-backed pair.
  */
-export async function runTdahNightlyIntervalTick(dataDir: string): Promise<void> {
+export async function runTdahNightlyIntervalTick(
+    dataDir: string,
+    hasOpenConnection?: (key: string) => boolean,
+    onRitualInvitationFire?: (key: string, event: TdahWsRitualInvitationEvent) => void,
+): Promise<void> {
     try {
-        const summary = await runNightlyTdahTick(dataDir, new Date());
+        const summary = await runNightlyTdahTick(dataDir, new Date(), hasOpenConnection, onRitualInvitationFire);
         logInfo('tdah nightly trigger fired', {
             date: summary.date,
             failedCount: summary.failedCount,
@@ -983,6 +1025,7 @@ export async function runTdahNightlyIntervalTick(dataDir: string): Promise<void>
             generatedCount: summary.generatedCount,
             limboCount: summary.limboCount,
             namespaceCount: summary.namespaceCount,
+            ritualPushFailedCount: summary.ritualPushFailedCount,
             skippedCount: summary.skippedCount,
         });
     } catch (error) {
@@ -1058,6 +1101,18 @@ type CloudServerOptions = {
 type CloudServerHandle = {
     stop: () => void;
     port: number;
+    /**
+     * Story 3.1 — test-only seam: this instance's real `hasOpenConnection`/
+     * `onRitualInvitationFire` pair, already wired against its own live
+     * `tdahWsRegistry` by `buildTdahRitualInvitationWiring` above — the SAME
+     * closures the 60s nightly interval registers, not a reimplementation.
+     * Lets a test open a real WS connection against this running server
+     * (`openTdahWs` in `tdah.test.ts`) and call `runNightlyTdahTick` directly
+     * with this pair to prove the real client actually receives the
+     * `ritual-invitation` message, without waiting for the real 60s timer.
+     * Never used by `startCloudServer`'s own bootstrap.
+     */
+    tdahRitualWiring: ReturnType<typeof buildTdahRitualInvitationWiring>;
 };
 
 export async function startCloudServer(options: CloudServerOptions = {}): Promise<CloudServerHandle> {
@@ -1238,11 +1293,25 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
     // for correctness (every operation here is idempotent) but wasted work
     // and redundant DB contention, so a tick already in flight is skipped
     // rather than overlapped.
+    //
+    // Story 3.1 — this same tick also pushes the `ritual-invitation` WS
+    // event (AD-5: same disparo as close/generate, never a second
+    // independent timer). `hasOpenConnection`/`onRitualInvitationFire` come
+    // from `buildTdahRitualInvitationWiring` above, wired to this instance's
+    // own `tdahWsRegistry` exactly like the activity-trigger timer below
+    // wires its own `hasOpenConnection`/`onFire` — built once here (not
+    // per-tick) since the registry instance itself never changes, only its
+    // live connections.
+    const tdahRitualWiring = buildTdahRitualInvitationWiring(tdahWsRegistry);
     let tdahTickInFlight = false;
     const tdahNightlyTickTimer = setInterval(() => {
         if (tdahTickInFlight) return;
         tdahTickInFlight = true;
-        void runTdahNightlyIntervalTick(dataDir).finally(() => {
+        void runTdahNightlyIntervalTick(
+            dataDir,
+            tdahRitualWiring.hasOpenConnection,
+            tdahRitualWiring.onRitualInvitationFire,
+        ).finally(() => {
             tdahTickInFlight = false;
         });
     }, 60_000);
@@ -1854,6 +1923,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
             }
             void stopServer();
         },
+        tdahRitualWiring,
     };
 }
 

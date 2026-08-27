@@ -967,6 +967,61 @@ export async function showTdahActivityNotification(request: TdahActivityNotifica
   }
 }
 
+export type TdahRitualNotificationRequest = {
+  /** Stable, single key — the scheduler fires at most once per local calendar day per namespace (spec Always), so there is no per-instance id to key on the way tdah-activity's `{activityId}:{edge}` is; a duplicate WS delivery replaces rather than stacks. */
+  key: string;
+  title: string;
+  message?: string;
+  /** `[delay, on, off, on, ...]` ms — see TDAH_RITUAL_VIBRATION_PATTERN in components/tdah/today/tdah-ritual-notification.ts. */
+  vibrationPattern: number[];
+  /** Localized Android notification-channel display name — same pass-through as TdahActivityNotificationRequest.channelName; only takes effect the very first time the (already-existing) TDAH Activity channel gets created on a given device. */
+  channelName: string;
+  /** Caller-built payload — always includes `kind: 'tdah-ritual'` (see use-root-layout-notification-open-handler.ts's isTdahRitualOpen). */
+  data: Record<string, string>;
+};
+
+/**
+ * Story 3.1 ("La invitación nocturna") — shows N-03, the ritual-invitation
+ * notification pushed by the VPS's nightly tick over the WS channel (AD-5:
+ * same tick as the day close/generation). Reuses the existing
+ * `TDAH_ACTIVITY_NOTIFICATION_CHANNEL` (spec Always: no new Android channel
+ * — vibration is a per-notification `vibrationPattern`, not a channel
+ * property) but with all three action flags off: spec Always: "solo
+ * tap-to-open, sin botones", so `has_button` (computed from
+ * hasSnoozeAction/hasCompleteAction/hasStartAction in scheduleAlarmForKey)
+ * comes out `false` here, unlike showTdahActivityNotification's 3 real
+ * actions.
+ */
+export async function showTdahRitualNotification(request: TdahRitualNotificationRequest): Promise<void> {
+  const trimmedTitle = String(request.title || '').trim();
+  if (!trimmedTitle) return;
+
+  const api = await loadAlarmApi();
+  if (!api) return;
+
+  const permission = await requestLocalNotificationPermission();
+  if (!permission.granted) return;
+
+  await loadAlarmMapIfNeeded();
+  try {
+    await scheduleAlarmForKey(api, request.key, {
+      title: trimmedTitle,
+      message: request.message ?? trimmedTitle,
+      fireAt: new Date(Date.now() + 2000),
+      hasSnoozeAction: false,
+      hasCompleteAction: false,
+      hasStartAction: false,
+      channel: TDAH_ACTIVITY_NOTIFICATION_CHANNEL,
+      vibrate: true,
+      vibrationPattern: request.vibrationPattern,
+      channelDisplayName: request.channelName,
+      data: request.data,
+    });
+  } finally {
+    await saveAlarmMap();
+  }
+}
+
 export async function cancelLocalPomodoroCompletionNotification(
   loadedApi?: AlarmNotificationsApi | null,
   options: { removeFired?: boolean; reason?: string } = {},

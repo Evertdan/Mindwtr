@@ -2438,6 +2438,8 @@ export const koOverrides: Record<string, string> = {
         'tdahToday.activityPostponeActionLabel': '10분 연기',
         'tdahToday.activityCompleteActionLabel': '완료',
         'tdahToday.activityNotificationChannelName': '활동 알림',
+        'tdahToday.ritualInvitationTitle': '오늘을 마무리해요 — 10분이면 내일이 준비돼요',
+        'tdahToday.ritualComingSoon': '야간 의식이 곧 제공됩니다',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': '루틴',

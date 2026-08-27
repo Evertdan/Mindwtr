@@ -34,6 +34,7 @@ export const MORE_SHEET_ICON_COLORS = {
   settings: '#64748B',
   saved: '#4F8CF7',
   tdahToday: '#F97316',
+  tdahRitual: '#8B5CF6',
 };
 
 export function compactSlashLabel(label: string) {
@@ -77,6 +78,17 @@ export function buildMoreSheetPrimaryItems(options: {
       icon: 'house.fill' as IconSymbolName,
       iconColor: MORE_SHEET_ICON_COLORS.tdahToday,
       route: '/tdah-today',
+    }] : []),
+    // Story 3.1 ("La invitación nocturna"): first of two manual-open entries
+    // for T-05 (the other is T-01's header button) — same tdahModeActive
+    // gate as the tdah-today tile above, since the ritual only exists while
+    // Modo TDAH is on.
+    ...(tdahModeActive ? [{
+      id: 'tdah-ritual',
+      label: t('nav.tdahRitual'),
+      icon: 'moon.fill' as IconSymbolName,
+      iconColor: MORE_SHEET_ICON_COLORS.tdahRitual,
+      route: '/tdah-ritual',
     }] : []),
   ];
 }

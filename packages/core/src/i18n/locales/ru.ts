@@ -1559,6 +1559,8 @@ export const ruOverrides: Record<string, string> = {
         'tdahToday.activityPostponeActionLabel': 'Отложить +10 мин',
         'tdahToday.activityCompleteActionLabel': 'Завершить',
         'tdahToday.activityNotificationChannelName': 'Напоминания об активностях',
+        'tdahToday.ritualInvitationTitle': 'Закрой день — 10 минут, и завтра готово',
+        'tdahToday.ritualComingSoon': 'Ночной ритуал скоро появится',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Рутина',

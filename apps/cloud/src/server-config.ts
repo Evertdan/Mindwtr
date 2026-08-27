@@ -36,7 +36,14 @@ export type CloudFailureContext = {
         | 'tdah_activity_trigger_tick_crashed'
         | 'tdah_activity_trigger_tick_failed'
         | 'tdah_nightly_tick_crashed'
-        | 'tdah_nightly_tick_failed';
+        | 'tdah_nightly_tick_failed'
+        // Story 3.1: a namespace's ritual_notified_date mark already
+        // committed successfully — only the WS push of the resulting
+        // ritual-invitation event itself failed (e.g. a closing socket).
+        // Distinct from 'tdah_nightly_tick_failed' (a genuine namespace
+        // read/write failure) the same way 'tdah_activity_trigger_onfire_failed'
+        // is distinct from 'tdah_activity_trigger_tick_failed' above.
+        | 'tdah_ritual_invitation_push_failed';
     // S10: ONLY ever assign a bare fs/sqlite error code here (e.g. 'ENOENT', 'EACCES',
     // 'SQLITE_BUSY') — never error.message or a path. Privacy ratchet 9e1cd93b7 covers
     // this field too: logError does not sanitize it, the caller must.
@@ -64,6 +71,7 @@ export const CLOUD_LOG_MESSAGES = [
     'tdah activity trigger fired',
     'tdah activity trigger namespace failed',
     'tdah activity trigger onFire failed',
+    'tdah nightly ritual invitation push failed',
     'tdah nightly trigger crashed',
     'tdah nightly trigger fired',
     'tdah nightly trigger namespace failed',
@@ -100,6 +108,11 @@ type CloudOperationalLogContext = Partial<Record<
     | 'namespaceCount'
     | 'port'
     | 'requestId'
+    // Story 3.1: 'ritualPushFailedCount' backs the 'tdah nightly trigger
+    // fired' audit line's context alongside the story 1.5 fields above — the
+    // count of namespaces whose ritual_notified_date mark committed but
+    // whose WS push itself threw (see TdahNightlyTickSummary).
+    | 'ritualPushFailedCount'
     | 'route'
     | 'signal'
     | 'skippedCount'

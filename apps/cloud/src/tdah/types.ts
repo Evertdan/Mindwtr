@@ -249,9 +249,23 @@ export type TdahNightlyTickSummary = {
     date: string;
     /** Namespaces with an existing TDAH database, scanned this tick. */
     namespaceCount: number;
-    /** Namespaces that closed today and generated tomorrow this tick. */
+    /**
+     * Namespaces that did real write work this tick: closed today and/or
+     * generated tomorrow, and/or (story 3.1) marked+pushed the
+     * ritual-invitation event for the first time today — including a
+     * mark-only fire where close/generate both had nothing left to do
+     * (`generatedCount`/`limboCount` stay at their existing totals, but the
+     * namespace still counted here for the ritual-invitation push alone).
+     */
     firedCount: number;
-    /** Namespaces skipped this tick (mode off, ritual hour not yet reached, or tomorrow already generated). */
+    /**
+     * Namespaces skipped this tick — mode off, ritual hour not yet reached,
+     * OR (once the ritual hour has been reached) tomorrow already generated,
+     * nothing left to sweep-close, AND the ritual invitation is either
+     * already marked notified today or has no open WS connection to push to
+     * (story 3.1) — every one of those three conditions must hold for a
+     * namespace past its ritual hour to be skipped rather than fired.
+     */
     skippedCount: number;
     /** Namespaces whose write transaction failed this tick — retried automatically next tick. */
     failedCount: number;
@@ -259,6 +273,19 @@ export type TdahNightlyTickSummary = {
     generatedCount: number;
     /** Total Actividades moved to `limbo` across every namespace that fired this tick. */
     limboCount: number;
+    /**
+     * Story 3.1 — namespaces whose `ritual_notified_date` mark committed
+     * successfully this tick but whose WS push of the resulting
+     * `ritual-invitation` event itself threw (e.g. a closing socket). The
+     * mark is never rolled back for this (it is already durable by the time
+     * the push is attempted — see scheduler.ts's own doc comment), so this
+     * count is purely informational: it never causes a retry, since a retry
+     * would just find `ritual_notified_date` already set and skip. Included
+     * in `firedCount` above (the write itself still succeeded), never in
+     * `failedCount` (that is reserved for a genuine namespace read/write
+     * failure).
+     */
+    ritualPushFailedCount: number;
 };
 
 const TDAH_ERROR_CODES = {
@@ -345,7 +372,30 @@ export type TdahWsActivityTriggerEvent = {
     at: string;
 };
 
-export type TdahWsServerEvent = TdahWsConnectedEvent | TdahWsActivityTriggerEvent;
+/**
+ * Story 3.1 — the nightly ritual invitation's own WS event kind, added onto
+ * the same envelope as `TdahWsConnectedEvent`/`TdahWsActivityTriggerEvent`
+ * above. `cloud/src/tdah/scheduler.ts`'s `runNamespaceTick` pushes exactly
+ * one of these per namespace per local calendar day — the first tick that
+ * crosses the namespace's local ritual hour AND has an open WS connection to
+ * push to (AD-5: same tick as the close/generate write, never a second
+ * independent timer). Never a second `ritual-invitation` the same local day
+ * (`ritual_notified_date` in `tdah_profile`, storage.ts, tracks that), and
+ * never fired at all while no connection is open — the next tick retries
+ * once the phone reconnects, still the same local day.
+ *
+ * Deliberately as minimal as `TdahWsConnectedEvent` (just `kind` + `at`):
+ * this story only delivers the invitation trigger and the navigable route
+ * (`kind: 'tdah-ritual'` in the mobile notification-open handler), never any
+ * of T-05's real content (scoreboard, decision-chips) — that's Story 3.2, so
+ * there is no scoreboard/count payload to carry here yet.
+ */
+export type TdahWsRitualInvitationEvent = {
+    kind: 'ritual-invitation';
+    at: string;
+};
+
+export type TdahWsServerEvent = TdahWsConnectedEvent | TdahWsActivityTriggerEvent | TdahWsRitualInvitationEvent;
 
 /**
  * Story 2.2 — per-tick aggregate stats across every namespace scanned by

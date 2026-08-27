@@ -7,8 +7,13 @@ import {
     buildTdahActivityNotificationTitle,
     type TdahWsActivityTriggerEvent,
 } from '@/components/tdah/today/tdah-activity-notification';
+import {
+    parseTdahWsRitualInvitationEvent,
+    TDAH_RITUAL_VIBRATION_PATTERN,
+    type TdahWsRitualInvitationEvent,
+} from '@/components/tdah/today/tdah-ritual-notification';
 import { useTdahModeActive } from '@/components/tdah/today/use-tdah-mode-active';
-import { showTdahActivityNotification } from '@/lib/notification-service-local';
+import { showTdahActivityNotification, showTdahRitualNotification } from '@/lib/notification-service-local';
 import {
     INITIAL_TDAH_CONNECTION_STATE,
     isPersistentConnectionSupported,
@@ -109,6 +114,29 @@ function handleTdahActivityTriggerEvent(event: TdahWsActivityTriggerEvent, resol
     });
 }
 
+/**
+ * Story 3.1 ("La invitación nocturna") glue: WS raw message -> parsed
+ * ritual-invitation event -> local notification. Same seam as
+ * handleTdahActivityTriggerEvent above (Code Map: "el parseo/branching del
+ * nuevo evento debe vivir en su consumidor") — a single fixed key means a
+ * duplicate WS delivery on the same night replaces rather than stacks a
+ * second notification (the server already guards against a same-day
+ * re-send, spec Always, but the client stays defensive regardless).
+ */
+function handleTdahRitualInvitationEvent(_event: TdahWsRitualInvitationEvent, resolveText: ResolveText): void {
+    const title = resolveText('tdahToday.ritualInvitationTitle', 'Close today — 10 minutes and tomorrow is ready');
+
+    void showTdahRitualNotification({
+        key: 'tdah-ritual-invitation',
+        title,
+        vibrationPattern: TDAH_RITUAL_VIBRATION_PATTERN,
+        channelName: resolveText('tdahToday.activityNotificationChannelName', 'Activity reminders'),
+        data: {
+            kind: 'tdah-ritual',
+        },
+    });
+}
+
 // There is no push signal for the mode flag flipping off elsewhere in the
 // same foreground session (AD-1 forbids caching it client-side), so this
 // hook re-checks on the same 30s cadence already established for this exact
@@ -161,9 +189,15 @@ export function useRootLayoutTdahConnection({ resolveText }: UseRootLayoutTdahCo
                 reconnectedListeners.forEach((listener) => listener());
             },
             onMessage: (data) => {
-                const event = parseTdahWsActivityTriggerEvent(data);
-                if (!event) return;
-                handleTdahActivityTriggerEvent(event, resolveTextRef.current);
+                const activityEvent = parseTdahWsActivityTriggerEvent(data);
+                if (activityEvent) {
+                    handleTdahActivityTriggerEvent(activityEvent, resolveTextRef.current);
+                    return;
+                }
+                const ritualEvent = parseTdahWsRitualInvitationEvent(data);
+                if (ritualEvent) {
+                    handleTdahRitualInvitationEvent(ritualEvent, resolveTextRef.current);
+                }
             },
         });
         const unsubscribe = handle.subscribe(publishConnectionState);

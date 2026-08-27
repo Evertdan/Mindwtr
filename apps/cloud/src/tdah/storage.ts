@@ -80,6 +80,18 @@ export const tdahDatabasePath = (dataDir: string, key: string): string => (
     join(dataDir, key, TDAH_DIR_NAME, TDAH_DB_FILE_NAME)
 );
 
+// `ritual_notified_date` (story 3.1) tracks the local calendar date
+// (`YYYY-MM-DD`, same text key shape as `tdah_day_plan.date`) the nightly
+// ritual invitation (N-03) was already pushed for — a fresh database gets it
+// directly from this CREATE TABLE (so a new user starts at schema v4 with no
+// migration to run), while a pre-3.1 database needs
+// `migrateRitualNotificationColumnIfNeeded` below (a plain
+// `ALTER TABLE ... ADD COLUMN`, same shape as
+// `migrateActivityNotificationColumnsIfNeeded`'s pair, since it's a genuinely
+// new nullable column with no existing constraint to relax). It is never part
+// of the public `TdahProfile` shape (types.ts) — purely scheduler-internal
+// bookkeeping, read/written only through `readRitualNotifiedDate`/
+// `mutateMarkRitualNotified` below.
 const CREATE_PROFILE_TABLE_SQL = `
     CREATE TABLE IF NOT EXISTS tdah_profile (
         id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -87,7 +99,8 @@ const CREATE_PROFILE_TABLE_SQL = `
         time_zone TEXT NOT NULL,
         ritual_hour TEXT NOT NULL,
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        ritual_notified_date TEXT
     );
 `;
 
@@ -237,7 +250,9 @@ const SCHEMA_VERSION_ROUTINE_PATTERN_WIDENED = 1;
 const SCHEMA_VERSION_ACTIVITY_TIMESTAMPS = 2;
 // Story 2.2 — adds `tdah_activity.start_notified_at`/`end_notified_at`.
 const SCHEMA_VERSION_ACTIVITY_NOTIFICATIONS = 3;
-const SCHEMA_TARGET_VERSION = SCHEMA_VERSION_ACTIVITY_NOTIFICATIONS;
+// Story 3.1 — adds `tdah_profile.ritual_notified_date`.
+const SCHEMA_VERSION_RITUAL_NOTIFICATION = 4;
+const SCHEMA_TARGET_VERSION = SCHEMA_VERSION_RITUAL_NOTIFICATION;
 
 /**
  * v0 -> v1: a pre-1.4 database's `tdah_routine` still has the old
@@ -417,6 +432,41 @@ const migrateActivityNotificationColumnsIfNeeded = (database: TdahDatabase): voi
     database.exec(`PRAGMA user_version = ${SCHEMA_VERSION_ACTIVITY_NOTIFICATIONS};`);
 };
 
+/**
+ * v3 -> v4 (story 3.1): a pre-3.1 database's `tdah_profile` has no
+ * `ritual_notified_date` column — the persisted "already invited today" mark
+ * the nightly tick (scheduler.ts) needs so it fires the ritual-invitation WS
+ * event at most once per local calendar day, surviving a server restart
+ * between the ritual hour and the actual disparo. Like
+ * `migrateActivityNotificationColumnsIfNeeded`, this is a genuinely new
+ * nullable column with no existing `NOT NULL`/CHECK constraint to relax, so a
+ * plain `ALTER TABLE ... ADD COLUMN` suffices — no create-copy-drop-rename
+ * rebuild needed.
+ */
+const migrateRitualNotificationColumnIfNeeded = (database: TdahDatabase): void => {
+    const columns = prepareAll<{ name: unknown }>(database, "PRAGMA table_info('tdah_profile');").all();
+    const hasRitualNotifiedColumn = columns.some((column) => String(column.name) === 'ritual_notified_date');
+
+    if (!hasRitualNotifiedColumn) {
+        database.exec('BEGIN IMMEDIATE;');
+        try {
+            database.exec('ALTER TABLE tdah_profile ADD COLUMN ritual_notified_date TEXT;');
+            database.exec(`PRAGMA user_version = ${SCHEMA_VERSION_RITUAL_NOTIFICATION};`);
+            database.exec('COMMIT;');
+        } catch (error) {
+            try {
+                database.exec('ROLLBACK;');
+            } catch {
+                // Closing the handle in the caller releases the lock either way.
+            }
+            throw error;
+        }
+        return;
+    }
+
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION_RITUAL_NOTIFICATION};`);
+};
+
 const migrateSchemaIfNeeded = (database: TdahDatabase): void => {
     const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: unknown };
     let currentVersion = Number(versionRow.user_version ?? 0);
@@ -435,6 +485,11 @@ const migrateSchemaIfNeeded = (database: TdahDatabase): void => {
     if (currentVersion < SCHEMA_VERSION_ACTIVITY_NOTIFICATIONS) {
         migrateActivityNotificationColumnsIfNeeded(database);
         currentVersion = SCHEMA_VERSION_ACTIVITY_NOTIFICATIONS;
+    }
+
+    if (currentVersion < SCHEMA_VERSION_RITUAL_NOTIFICATION) {
+        migrateRitualNotificationColumnIfNeeded(database);
+        currentVersion = SCHEMA_VERSION_RITUAL_NOTIFICATION;
     }
 };
 
@@ -1272,6 +1327,47 @@ export type CloseOutgoingDayResult = { limboCount: number };
 export const mutateCloseOutgoingDay = (database: TdahDatabase, date: string): CloseOutgoingDayResult => {
     const result = database.prepare(CLOSE_OUTGOING_DAY_SQL).run(date);
     return { limboCount: Number(result.changes) };
+};
+
+// --- Ritual invitation primitives (story 3.1) -------------------------------
+
+const SELECT_RITUAL_NOTIFIED_DATE_SQL = 'SELECT ritual_notified_date FROM tdah_profile WHERE id = 1;';
+const UPDATE_RITUAL_NOTIFIED_DATE_SQL = 'UPDATE tdah_profile SET ritual_notified_date = ? WHERE id = 1;';
+
+type TdahRitualNotifiedDateRow = { ritual_notified_date: unknown };
+
+/**
+ * The namespace's last-marked "ritual invitation already pushed" local date
+ * (`YYYY-MM-DD`), or `null` when the profile row doesn't exist yet or no mark
+ * has ever been written. `scheduler.ts`'s `runNamespaceTick` compares this
+ * against `today` (`formatDateInTimeZone`, never UTC/device time — AD-6) to
+ * decide whether a fresh `ritual-invitation` WS event is due this tick; this
+ * function itself never computes "today" or decides anything, it only reads
+ * the persisted mark. Same already-open-handle contract as `hasDayPlan`/
+ * `hasPendingOrStartedUpTo`: the caller controls whether this read happens
+ * standalone (the pre-transaction check) or inside the held write transaction
+ * (the re-check right before marking).
+ */
+export const readRitualNotifiedDate = (database: TdahDatabase): string | null => {
+    const row = database.prepare(SELECT_RITUAL_NOTIFIED_DATE_SQL).get() as TdahRitualNotifiedDateRow | undefined | null;
+    return row ? asString(row.ritual_notified_date) : null;
+};
+
+/**
+ * Marks `date` as the local calendar day this namespace's ritual invitation
+ * was already pushed — the ONLY place `ritual_notified_date` is ever written
+ * (same single-writer discipline `mutateCloseOutgoingDay`/
+ * `mutateMarkDueActivityTriggersNotified` already establish for their own
+ * columns). Idempotent the same way those are: re-running it with the same
+ * `date` changes nothing observable, and a plain `UPDATE ... WHERE id = 1`
+ * against a namespace with no profile row yet is simply a 0-row no-op rather
+ * than a throw. Unlike `start_notified_at`/`end_notified_at` (set once,
+ * forever), this mark is meant to be overwritten on every new local day — the
+ * "at most one invitation per calendar day" guarantee lives in the caller's
+ * `readRitualNotifiedDate(...) !== today` check, not in this write.
+ */
+export const mutateMarkRitualNotified = (database: TdahDatabase, date: string): void => {
+    database.prepare(UPDATE_RITUAL_NOTIFIED_DATE_SQL).run(date);
 };
 
 // --- Activity-trigger primitives (story 2.2) --------------------------------

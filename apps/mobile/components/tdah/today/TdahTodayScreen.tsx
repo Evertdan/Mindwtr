@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { addNetworkStateListener } from 'expo-network';
-import { Plus } from 'lucide-react-native';
+import { Moon, Plus } from 'lucide-react-native';
 
 import { formatI18nTemplate, safeFormatDate, tFallback } from '@mindwtr/core';
 
@@ -56,6 +56,13 @@ const TDAH_TODAY_SKELETON_ROW_TOPS = [28, 108, 188] as const;
 // column's own existing styles.
 const headerRowStyle = { flexDirection: 'row' as const, alignItems: 'flex-start' as const, justifyContent: 'space-between' as const };
 const headerTextColumnStyle = { flexShrink: 1 as const };
+// Story 3.1 ("La invitación nocturna"): second of the two manual-open
+// entries for T-05 (the other is the More sheet's tdah-ritual tile) — a
+// same-row header action next to the connection dot, per Code Map
+// ("botón manual 'abrir ritual' en el header, junto al connection-dot").
+// Ad-hoc like the two styles above, for the same reason.
+const headerActionsStyle = { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 12 as const };
+const ritualButtonStyle = { padding: 4 as const };
 
 /**
  * T-01 — the today timeline (spec Code Map). Every focus is a fresh
@@ -166,6 +173,14 @@ export function TdahTodayScreen() {
         router.push('/tdah-activity/new');
     }, [router]);
 
+    // Story 3.1 ("La invitación nocturna"): AC — "puede abrir el ritual
+    // manualmente ... desde un botón en T-01, en cualquier momento", never
+    // gated on the day-fetch phase or the connection state, since the ritual
+    // itself never depends on either.
+    const openRitual = useCallback(() => {
+        router.push('/tdah-ritual');
+    }, [router]);
+
     // AD-6: the header date is always the server's own `date` field for the
     // profile's configured time zone, verbatim — never the device's local
     // `new Date()`, which can disagree with it (e.g. shortly after local
@@ -207,13 +222,25 @@ export function TdahTodayScreen() {
                             <Text style={[styles.headerRoutine, { color: tc.secondaryText }]}>{routineLabel}</Text>
                         ) : null}
                     </View>
-                    {connectionSupported ? (
-                        <TdahConnectionDot
-                            status={connectionState.status}
-                            batteryLimited={batteryLimited}
-                            onRequestBatteryExemption={requestBatteryExemption}
-                        />
-                    ) : null}
+                    <View style={headerActionsStyle}>
+                        <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel={tFallback(t, 'nav.tdahRitual', 'Night Ritual')}
+                            onPress={openRitual}
+                            style={ritualButtonStyle}
+                            hitSlop={8}
+                            testID="tdah-today-open-ritual"
+                        >
+                            <Moon size={20} color={tc.secondaryText} />
+                        </TouchableOpacity>
+                        {connectionSupported ? (
+                            <TdahConnectionDot
+                                status={connectionState.status}
+                                batteryLimited={batteryLimited}
+                                onRequestBatteryExemption={requestBatteryExemption}
+                            />
+                        ) : null}
+                    </View>
                 </View>
             </View>
 

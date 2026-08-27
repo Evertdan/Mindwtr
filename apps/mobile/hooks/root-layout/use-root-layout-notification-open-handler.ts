@@ -63,6 +63,15 @@ function isTdahActivityOpen(kind: string | undefined): boolean {
     return kind === 'tdah-activity';
 }
 
+// Story 3.1 ("La invitación nocturna"): a tap on N-03, the ritual-invitation
+// notification. Routes straight to /tdah-ritual (T-05's placeholder route —
+// the real scoreboard/decision-chips ship in Story 3.2); there is no
+// payload to carry (spec Always: no per-instance data, unlike
+// tdah-activity's `context`/`edge`), so this is a plain kind check.
+function isTdahRitualOpen(kind: string | undefined): boolean {
+    return kind === 'tdah-ritual';
+}
+
 export function useRootLayoutNotificationOpenHandler({
     appReady,
     pathname,
@@ -171,6 +180,10 @@ export function useRootLayoutNotificationOpenHandler({
                     ...(normalizedAction ? { autoAction: normalizedAction } : {}),
                 },
             });
+            return;
+        }
+        if (isTdahRitualOpen(kind)) {
+            router.push('/tdah-ritual');
             return;
         }
     }, [router]);

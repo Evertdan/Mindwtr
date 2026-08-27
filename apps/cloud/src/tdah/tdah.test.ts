@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -20,7 +20,7 @@ import { runNightlyTdahTick } from './scheduler';
 import { runActivityTriggerTick } from './activity-trigger';
 import { createTdahWsConnectionRegistry, resolveTdahWsAuth, TDAH_WS_PATH } from './ws-channel';
 import { createAllowedAuthTokens } from '../server-auth';
-import type { TdahWsActivityTriggerEvent } from './types';
+import type { TdahWsActivityTriggerEvent, TdahWsRitualInvitationEvent } from './types';
 
 const TOKEN_ALPHA = 'tdah-token-alpha-1234567890';
 const TOKEN_BETA = 'tdah-token-beta-1234567890';
@@ -214,6 +214,48 @@ describe('tdah module', () => {
         expect(response.status).toBe(400);
         expect(await readErrorCode(response)).toBe('TDAH_INVALID_BODY');
     };
+
+    // Story 2.1's WS channel test helpers — hoisted to this outer scope
+    // (rather than kept local to the 'WS channel' describe below) so the
+    // ritual-invitation end-to-end test (story 3.1, further down) can reuse
+    // the exact same real-WebSocket-against-the-running-server plumbing
+    // instead of a second copy.
+    type TdahWsServerEventLike = { kind: string; at: string };
+
+    const wsUrl = (token: string = TOKEN_ALPHA): string => (
+        `ws://127.0.0.1:${server!.port}${TDAH_WS_PATH}?token=${encodeURIComponent(token)}`
+    );
+
+    // Resolves once the server's own "connected" event (types.ts's
+    // `TdahWsConnectedEvent`) arrives — proof the upgrade actually
+    // completed and the channel is live, not just that the client-side
+    // `open` event fired.
+    const openTdahWs = (token?: string): Promise<{ ws: WebSocket; connectedEvent: TdahWsServerEventLike }> => (
+        new Promise((resolve, reject) => {
+            const ws = new WebSocket(wsUrl(token));
+            const timeout = setTimeout(() => {
+                reject(new Error('WS did not receive the connected event in time'));
+            }, 2000);
+            ws.onmessage = (event) => {
+                clearTimeout(timeout);
+                resolve({ ws, connectedEvent: JSON.parse(String(event.data)) as TdahWsServerEventLike });
+            };
+            ws.onerror = () => {
+                clearTimeout(timeout);
+                reject(new Error('WS errored before the connected event arrived'));
+            };
+        })
+    );
+
+    const waitForClose = (ws: WebSocket): Promise<void> => (
+        new Promise((resolve) => {
+            if (ws.readyState === ws.CLOSED) {
+                resolve();
+                return;
+            }
+            ws.onclose = () => resolve();
+        })
+    );
 
     beforeEach(async () => {
         sandbox = mkdtempSync(join(tmpdir(), 'mindwtr-cloud-tdah-'));
@@ -1407,11 +1449,13 @@ describe('tdah module', () => {
 
         // Story 1.6 added a second version bump (tdah_activity's
         // started_at/completed_at, SCHEMA_VERSION_ACTIVITY_TIMESTAMPS = 2),
-        // and story 2.2 added a third (start_notified_at/end_notified_at,
-        // SCHEMA_VERSION_ACTIVITY_NOTIFICATIONS = 3), so a fresh database —
-        // which gets all three widened/added shapes directly from their
-        // CREATE TABLE statements — now lands at v3, not v1.
-        test('a fresh database starts directly at schema v3 (no migration needed)', async () => {
+        // story 2.2 added a third (start_notified_at/end_notified_at,
+        // SCHEMA_VERSION_ACTIVITY_NOTIFICATIONS = 3), and story 3.1 added a
+        // fourth (tdah_profile's ritual_notified_date,
+        // SCHEMA_VERSION_RITUAL_NOTIFICATION = 4), so a fresh database —
+        // which gets all four widened/added shapes directly from their
+        // CREATE TABLE statements — now lands at v4, not v1.
+        test('a fresh database starts directly at schema v4 (no migration needed)', async () => {
             await activate({ timeZone: 'UTC' });
             const key = tokenToKey(TOKEN_ALPHA);
             const databasePath = tdahDatabasePath(dataDir, key);
@@ -1419,7 +1463,7 @@ describe('tdah module', () => {
             const database = new Database(databasePath, { readonly: true });
             try {
                 const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: number };
-                expect(versionRow.user_version).toBe(3);
+                expect(versionRow.user_version).toBe(4);
                 const columns = (database.prepare("PRAGMA table_info('tdah_routine');") as unknown as {
                     all(): { name: string }[];
                 }).all();
@@ -1477,17 +1521,19 @@ describe('tdah module', () => {
             expect(routines[0]?.pattern).toEqual({ kind: 'weekday', weekdays: [1, 2, 3, 4, 5] });
             expect(routines[0]?.blocks).toHaveLength(1);
 
-            // Story 1.6's v1->v2 step and story 2.2's v2->v3 step also run
-            // here: this seed never creates `tdah_activity` at all, so
-            // `ensureSchema`'s `CREATE TABLE IF NOT EXISTS` plants it already
-            // widened (started_at/completed_at and start_notified_at/
-            // end_notified_at included), and both migration steps see those
-            // columns present and stamp v3 directly — same as the "fresh
-            // database" case above.
+            // Story 1.6's v1->v2 step, story 2.2's v2->v3 step, and story
+            // 3.1's v3->v4 step also run here: this seed never creates
+            // `tdah_activity` at all, so `ensureSchema`'s
+            // `CREATE TABLE IF NOT EXISTS` plants it already widened
+            // (started_at/completed_at and start_notified_at/end_notified_at
+            // included), the `tdah_profile` CREATE TABLE already includes
+            // `ritual_notified_date`, and every migration step sees its own
+            // columns already present and stamps v4 directly — same as the
+            // "fresh database" case above.
             const verifyDatabase = new Database(databasePath, { readonly: true });
             try {
                 const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
-                expect(versionRow.user_version).toBe(3);
+                expect(versionRow.user_version).toBe(4);
             } finally {
                 verifyDatabase.close();
             }
@@ -1552,13 +1598,13 @@ describe('tdah module', () => {
             expect(routines[0]?.title).toBe('Día laboral');
             expect(routines[0]?.pattern).toEqual({ kind: 'weekday', weekdays: [1, 2, 3, 4, 5] });
 
-            // Same story 1.6 v1->v2 and story 2.2 v2->v3 cascade as the test
-            // above: this seed never creates `tdah_activity` either, so it
-            // lands on v3 too.
+            // Same story 1.6 v1->v2, story 2.2 v2->v3, and story 3.1 v3->v4
+            // cascade as the test above: this seed never creates
+            // `tdah_activity` either, so it lands on v4 too.
             const verifyDatabase = new Database(databasePath, { readonly: true });
             try {
                 const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
-                expect(versionRow.user_version).toBe(3);
+                expect(versionRow.user_version).toBe(4);
                 const tableNames = (verifyDatabase.prepare("SELECT name FROM sqlite_master WHERE type = 'table';") as unknown as {
                     all(): { name: string }[];
                 }).all().map((row) => row.name);
@@ -1971,7 +2017,7 @@ describe('tdah module', () => {
         });
 
         describe('schema migration v1 -> v2 (started_at/completed_at)', () => {
-            test('a fresh database starts directly at schema v3 (story 2.2 bump) with started_at/completed_at present and start_time/duration_minutes nullable', async () => {
+            test('a fresh database starts directly at schema v4 (story 3.1 bump) with started_at/completed_at present and start_time/duration_minutes nullable', async () => {
                 await activate({ timeZone: 'UTC' });
                 const key = tokenToKey(TOKEN_ALPHA);
                 const databasePath = tdahDatabasePath(dataDir, key);
@@ -1979,7 +2025,7 @@ describe('tdah module', () => {
                 const database = new Database(databasePath, { readonly: true });
                 try {
                     const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: number };
-                    expect(versionRow.user_version).toBe(3);
+                    expect(versionRow.user_version).toBe(4);
                     const columns = (database.prepare("PRAGMA table_info('tdah_activity');") as unknown as {
                         all(): { name: string; notnull: number }[];
                     }).all();
@@ -2087,9 +2133,10 @@ describe('tdah module', () => {
                 const verifyDatabase = new Database(databasePath, { readonly: true });
                 try {
                     const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
-                    // v1 -> v2 (this describe's own migration) then v2 -> v3
-                    // (story 2.2's) both run in sequence on this seeded v1 file.
-                    expect(versionRow.user_version).toBe(3);
+                    // v1 -> v2 (this describe's own migration), v2 -> v3
+                    // (story 2.2's), and v3 -> v4 (story 3.1's) all run in
+                    // sequence on this seeded v1 file.
+                    expect(versionRow.user_version).toBe(4);
                     const columns = (verifyDatabase.prepare("PRAGMA table_info('tdah_activity');") as unknown as {
                         all(): { name: string; notnull: number }[];
                     }).all();
@@ -2208,9 +2255,9 @@ describe('tdah module', () => {
                 const verifyDatabase = new Database(databasePath, { readonly: true });
                 try {
                     const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
-                    // All three migration steps (v0->v1, v1->v2, v2->v3) run in
-                    // sequence on this seeded v0 file.
-                    expect(versionRow.user_version).toBe(3);
+                    // All four migration steps (v0->v1, v1->v2, v2->v3,
+                    // v3->v4) run in sequence on this seeded v0 file.
+                    expect(versionRow.user_version).toBe(4);
                 } finally {
                     verifyDatabase.close();
                 }
@@ -2219,43 +2266,6 @@ describe('tdah module', () => {
     });
 
     describe('WS channel (story 2.1: persistent connection)', () => {
-        type TdahWsServerEventLike = { kind: string; at: string };
-
-        const wsUrl = (token: string = TOKEN_ALPHA): string => (
-            `ws://127.0.0.1:${server!.port}${TDAH_WS_PATH}?token=${encodeURIComponent(token)}`
-        );
-
-        // Resolves once the server's own "connected" event (types.ts's
-        // `TdahWsConnectedEvent`) arrives — proof the upgrade actually
-        // completed and the channel is live, not just that the client-side
-        // `open` event fired.
-        const openTdahWs = (token?: string): Promise<{ ws: WebSocket; connectedEvent: TdahWsServerEventLike }> => (
-            new Promise((resolve, reject) => {
-                const ws = new WebSocket(wsUrl(token));
-                const timeout = setTimeout(() => {
-                    reject(new Error('WS did not receive the connected event in time'));
-                }, 2000);
-                ws.onmessage = (event) => {
-                    clearTimeout(timeout);
-                    resolve({ ws, connectedEvent: JSON.parse(String(event.data)) as TdahWsServerEventLike });
-                };
-                ws.onerror = () => {
-                    clearTimeout(timeout);
-                    reject(new Error('WS errored before the connected event arrived'));
-                };
-            })
-        );
-
-        const waitForClose = (ws: WebSocket): Promise<void> => (
-            new Promise((resolve) => {
-                if (ws.readyState === ws.CLOSED) {
-                    resolve();
-                    return;
-                }
-                ws.onclose = () => resolve();
-            })
-        );
-
         test('a valid token upgrades the connection and receives a "connected" event', async () => {
             const { ws, connectedEvent } = await openTdahWs();
             expect(connectedEvent.kind).toBe('connected');
@@ -2886,6 +2896,370 @@ describe('tdah module', () => {
         });
     });
 
+    describe('ritual-invitation (story 3.1: N-03 nightly invite)', () => {
+        // Same offset/instant-building approach as the runNightlyTdahTick
+        // block above (Mexico City is fixed UTC-6 year-round, no DST
+        // ambiguity), redeclared locally the same way each describe block in
+        // this file already keeps its own scoped test helpers (see e.g.
+        // `runActivityTriggerTick`'s own `alwaysConnected`/`neverConnected`/
+        // `collectFires` below).
+        const MEXICO_CITY_OFFSET = '-06:00';
+        const localInstant = (date: string, time: string): Date => new Date(`${date}T${time}:00${MEXICO_CITY_OFFSET}`);
+
+        const alwaysConnected = (): boolean => true;
+        const neverConnected = (): boolean => false;
+
+        type CollectedRitualFire = { key: string; event: TdahWsRitualInvitationEvent };
+        const collectRitualFires = (): {
+            fires: CollectedRitualFire[];
+            onFire: (key: string, event: TdahWsRitualInvitationEvent) => void;
+        } => {
+            const fires: CollectedRitualFire[] = [];
+            return { fires, onFire: (key, event) => fires.push({ key, event }) };
+        };
+
+        const readPersistedRitualNotifiedDate = async (databasePath: string): Promise<string | null> => {
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(databasePath, { readonly: true });
+            try {
+                const row = database.prepare('SELECT ritual_notified_date FROM tdah_profile WHERE id = 1;').get() as {
+                    ritual_notified_date: string | null;
+                };
+                return row.ritual_notified_date;
+            } finally {
+                database.close();
+            }
+        };
+
+        test('at ritual hour, first time today, with an open connection: marks ritual_notified_date and fires exactly one ritual-invitation event', async () => {
+            const activation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            });
+            const activationBody = await readActivateResponse(activation);
+            const outgoingDate = activationBody.dayPlan.date;
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const now = localInstant(outgoingDate, '23:30');
+
+            const { fires, onFire } = collectRitualFires();
+            const summary = await runNightlyTdahTick(dataDir, now, alwaysConnected, onFire);
+
+            expect(summary.firedCount).toBe(1);
+            expect(summary.generatedCount).toBe(WORKDAY_ROUTINE.blocks.length);
+            expect(summary.limboCount).toBe(WORKDAY_ROUTINE.blocks.length);
+            expect(fires).toHaveLength(1);
+            expect(fires[0]?.key).toBe(key);
+            expect(fires[0]?.event.kind).toBe('ritual-invitation');
+            expect(typeof fires[0]?.event.at).toBe('string');
+            expect(new Date(fires[0]?.event.at ?? '').toString()).not.toBe('Invalid Date');
+
+            expect(await readPersistedRitualNotifiedDate(databasePath)).toBe(outgoingDate);
+        });
+
+        test('a second tick the same night (a late-Actividad sweep) still closes the sweep but never re-fires the WS event', async () => {
+            const activation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            });
+            const activationBody = await readActivateResponse(activation);
+            const outgoingDate = activationBody.dayPlan.date;
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+
+            const first = collectRitualFires();
+            const firstSummary = await runNightlyTdahTick(dataDir, localInstant(outgoingDate, '23:30'), alwaysConnected, first.onFire);
+            expect(firstSummary.firedCount).toBe(1);
+            expect(first.fires).toHaveLength(1);
+            expect(await readPersistedRitualNotifiedDate(databasePath)).toBe(outgoingDate);
+
+            // A manual add later the same evening, still before midnight —
+            // seeded directly (same technique the runNightlyTdahTick block
+            // above uses for its own "late Actividad" test) since the real
+            // clock, not the simulated one, is what createManualActivity
+            // would use.
+            const { Database } = await import('bun:sqlite');
+            const seedDatabase = new Database(databasePath);
+            try {
+                seedDatabase
+                    .prepare("INSERT INTO tdah_activity (day_plan_date, block_id, title, start_time, duration_minutes, origin, state) VALUES (?, NULL, 'Tardía', '23:45', 10, 'manual', 'pending');")
+                    .run(outgoingDate);
+            } finally {
+                seedDatabase.close();
+            }
+
+            const second = collectRitualFires();
+            const secondSummary = await runNightlyTdahTick(dataDir, localInstant(outgoingDate, '23:50'), alwaysConnected, second.onFire);
+            // The sweep still closes the late Actividad to limbo ...
+            expect(secondSummary.firedCount).toBe(1);
+            expect(secondSummary.limboCount).toBe(1);
+            // ... but the ritual invitation itself never re-fires the same local day.
+            expect(second.fires).toHaveLength(0);
+            expect(await readPersistedRitualNotifiedDate(databasePath)).toBe(outgoingDate);
+        });
+
+        test('at ritual hour with no open WS connection: neither marks ritual_notified_date nor fires, and the very next tick retries once reconnected, same local day', async () => {
+            const activation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            });
+            const activationBody = await readActivateResponse(activation);
+            const outgoingDate = activationBody.dayPlan.date;
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const now = localInstant(outgoingDate, '23:30');
+
+            const disconnected = collectRitualFires();
+            const disconnectedSummary = await runNightlyTdahTick(dataDir, now, neverConnected, disconnected.onFire);
+            // Close/generate still happen unconditionally, without a connection.
+            expect(disconnectedSummary.firedCount).toBe(1);
+            expect(disconnectedSummary.generatedCount).toBe(WORKDAY_ROUTINE.blocks.length);
+            expect(disconnectedSummary.limboCount).toBe(WORKDAY_ROUTINE.blocks.length);
+            expect(disconnected.fires).toHaveLength(0);
+            expect(await readPersistedRitualNotifiedDate(databasePath)).toBeNull();
+
+            // Connection now open (phone reconnected), same local day: the
+            // invitation is retried and fires — a mark-only fire, since
+            // close/generate already have nothing left to do.
+            const reconnected = collectRitualFires();
+            const reconnectedSummary = await runNightlyTdahTick(dataDir, localInstant(outgoingDate, '23:31'), alwaysConnected, reconnected.onFire);
+            expect(reconnected.fires).toHaveLength(1);
+            expect(reconnected.fires[0]?.key).toBe(key);
+            expect(reconnectedSummary.firedCount).toBe(1);
+            expect(reconnectedSummary.generatedCount).toBe(0);
+            expect(reconnectedSummary.limboCount).toBe(0);
+            expect(await readPersistedRitualNotifiedDate(databasePath)).toBe(outgoingDate);
+        });
+
+        test('runTdahNightlyIntervalTick with no ritual wiring never marks or fires (default no-push behavior preserved)', async () => {
+            const activation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            });
+            const activationBody = await readActivateResponse(activation);
+            const outgoingDate = activationBody.dayPlan.date;
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+
+            // Calling with no hasOpenConnection/onFire args at all — the
+            // pre-3.1 call shape every other `runNightlyTdahTick` test in
+            // this file still uses — must behave exactly as before this
+            // story: closing/generation still fire, but the ritual
+            // invitation itself never marks or pushes anything.
+            const summary = await runNightlyTdahTick(dataDir, localInstant(outgoingDate, '23:30'));
+            expect(summary.firedCount).toBe(1);
+            expect(await readPersistedRitualNotifiedDate(databasePath)).toBeNull();
+        });
+
+        // Review fix: `needsWrite`'s pre-transaction read and the write
+        // transaction's own re-check both call `hasOpenConnection` — a live
+        // external signal that (unlike `!hasDayPlan`/`hasPendingOrStartedUpTo`,
+        // both stable DB facts) genuinely can flip between the two calls
+        // (the socket drops in that exact window). This test forces exactly
+        // that race with a `hasOpenConnection` double that answers `true` on
+        // its first call (making the pre-check's `ritualInvitationDue` true)
+        // and `false` on every call after (making the write-transaction
+        // re-check fail) — the write ends up doing nothing at all and must
+        // be reported as skipped, not fired.
+        test('hasOpenConnection dropping between the pre-check and the write re-check reports skipped, not fired, for a tick that did nothing', async () => {
+            const activation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            });
+            const activationBody = await readActivateResponse(activation);
+            const outgoingDate = activationBody.dayPlan.date;
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+
+            // First tick closes/generates everything but — no connection —
+            // never marks the invitation notified (same "cierre/generación
+            // ocurren igual, incondicional" shape as the "no open WS
+            // connection" test above). Nothing is left to close/generate
+            // afterward, so the very next tick's only possible reason to
+            // write at all is the still-pending ritual invitation itself.
+            const first = collectRitualFires();
+            await runNightlyTdahTick(dataDir, localInstant(outgoingDate, '23:30'), neverConnected, first.onFire);
+            expect(first.fires).toHaveLength(0);
+            expect(await readPersistedRitualNotifiedDate(databasePath)).toBeNull();
+
+            // A second, DIFFERENT namespace has genuine sweep work (a
+            // pending Actividad on the outgoing day) so the tick as a whole
+            // still legitimately fires for someone — proving this
+            // namespace's own skip is due to the race, not a blanket bug.
+            const betaActivation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            }, TOKEN_BETA);
+            const betaBody = await readActivateResponse(betaActivation);
+            expect(betaBody.dayPlan.date).toBe(outgoingDate);
+            const keyBeta = tokenToKey(TOKEN_BETA);
+
+            let alphaCalls = 0;
+            const flakyHasOpenConnection = (candidateKey: string): boolean => {
+                if (candidateKey !== key) return true;
+                alphaCalls += 1;
+                // true on the pre-check, false on the write-transaction re-check.
+                return alphaCalls === 1;
+            };
+            const second = collectRitualFires();
+            const secondSummary = await runNightlyTdahTick(
+                dataDir,
+                localInstant(outgoingDate, '23:31'),
+                flakyHasOpenConnection,
+                second.onFire,
+            );
+
+            expect(alphaCalls).toBe(2);
+            // Alpha: the race made the write a no-op — skipped, not fired,
+            // and still NOT marked (the write did nothing), so the very
+            // next tick retries exactly like the "no open connection" test.
+            expect(second.fires.some((fire) => fire.key === key)).toBe(false);
+            expect(await readPersistedRitualNotifiedDate(databasePath)).toBeNull();
+            // Beta: genuinely had sweep work, unaffected by alpha's race —
+            // still counted as fired.
+            expect(second.fires.some((fire) => fire.key === keyBeta)).toBe(true);
+            expect(secondSummary.namespaceCount).toBe(2);
+            expect(secondSummary.firedCount).toBe(1);
+            expect(secondSummary.skippedCount).toBe(1);
+        });
+
+        // Review fix: onFire is caller code (server.ts's real wiring
+        // synchronously ws.send()s inside it) — one namespace's push failing
+        // (e.g. an already-closing socket) must never abort another
+        // namespace's own fire in the same tick, must never undo the
+        // already-durable ritual_notified_date mark (so a throwing push can
+        // never cause a re-fire on the next tick), and must be surfaced
+        // distinctly from a genuine namespace write failure. Mirrors
+        // `runActivityTriggerTick`'s own "one namespace's onFire throwing
+        // does not abort the remaining namespaces" test above.
+        test('one namespace\'s onFire throwing does not abort another namespace, never undoes the durable mark, and logs distinctly', async () => {
+            const keyAlpha = tokenToKey(TOKEN_ALPHA);
+            const keyBeta = tokenToKey(TOKEN_BETA);
+            const alphaActivation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            }, TOKEN_ALPHA);
+            const alphaBody = await readActivateResponse(alphaActivation);
+            const betaActivation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            }, TOKEN_BETA);
+            const betaBody = await readActivateResponse(betaActivation);
+            const outgoingDate = alphaBody.dayPlan.date;
+            expect(betaBody.dayPlan.date).toBe(outgoingDate);
+
+            const alphaPath = tdahDatabasePath(dataDir, keyAlpha);
+            const betaPath = tdahDatabasePath(dataDir, keyBeta);
+            const now = localInstant(outgoingDate, '23:30');
+
+            const captured: string[] = [];
+            const stderrSpy = spyOn(process.stderr, 'write').mockImplementation((chunk: unknown) => {
+                captured.push(String(chunk));
+                return true;
+            });
+
+            let onFireCalls = 0;
+            const betaFires: CollectedRitualFire[] = [];
+            let summary: Awaited<ReturnType<typeof runNightlyTdahTick>>;
+            try {
+                summary = await runNightlyTdahTick(dataDir, now, alwaysConnected, (fireKey, event) => {
+                    onFireCalls += 1;
+                    if (fireKey === keyAlpha) {
+                        throw new Error('boom - simulated closing socket');
+                    }
+                    betaFires.push({ key: fireKey, event });
+                });
+            } finally {
+                stderrSpy.mockRestore();
+            }
+
+            // Both namespaces still fired — the DB write, including the
+            // durable ritual_notified_date mark, already committed before
+            // onFire ran, so alpha's throwing push never aborts beta's own
+            // fire in the same tick.
+            expect(summary.firedCount).toBe(2);
+            expect(onFireCalls).toBe(2);
+            expect(betaFires).toHaveLength(1);
+            expect(betaFires[0]?.key).toBe(keyBeta);
+            // Surfaced distinctly from a genuine namespace write failure.
+            expect(summary.failedCount).toBe(0);
+            expect(summary.ritualPushFailedCount).toBe(1);
+
+            const serializedLogs = captured.join('');
+            expect(serializedLogs).toContain('"message":"tdah nightly ritual invitation push failed"');
+            expect(serializedLogs).toContain('"failureCode":"tdah_ritual_invitation_push_failed"');
+            expect(serializedLogs).not.toContain('"tdah_nightly_tick_failed"');
+
+            // Alpha's mark is durably committed despite its push throwing.
+            expect(await readPersistedRitualNotifiedDate(alphaPath)).toBe(outgoingDate);
+            expect(await readPersistedRitualNotifiedDate(betaPath)).toBe(outgoingDate);
+
+            // A throwing push must never cause a re-fire on the next tick.
+            const retry = collectRitualFires();
+            const retrySummary = await runNightlyTdahTick(dataDir, localInstant(outgoingDate, '23:31'), alwaysConnected, retry.onFire);
+            expect(retry.fires).toHaveLength(0);
+            expect(retrySummary.ritualPushFailedCount).toBe(0);
+        });
+
+        // Review fix: every ritual-invitation test above drives
+        // `runNightlyTdahTick` with hand-rolled `hasOpenConnection`/`onFire`
+        // test doubles — the REAL production wiring `startCloudServer`
+        // registers (`tdahWsRegistry.connectionCount`/`connectionsFor`,
+        // `JSON.stringify` + `ws.send`) is never exercised. This test opens a
+        // REAL WebSocket connection against the already-running test server
+        // (the same `openTdahWs` helper the WS-channel describe block above
+        // uses to prove the `'connected'` event), then calls
+        // `runNightlyTdahTick` with `server.tdahRitualWiring` — the exact
+        // closures `buildTdahRitualInvitationWiring` builds for the real 60s
+        // interval, wired against this server instance's own live
+        // `tdahWsRegistry` — and asserts the real client actually receives
+        // the `ritual-invitation` message.
+        test('end-to-end: the real startCloudServer wiring delivers ritual-invitation to a real WS client', async () => {
+            const activation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            });
+            const activationBody = await readActivateResponse(activation);
+            const outgoingDate = activationBody.dayPlan.date;
+            const now = localInstant(outgoingDate, '23:30');
+
+            const { ws } = await openTdahWs();
+            try {
+                const nextMessage = new Promise<TdahWsServerEventLike>((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        reject(new Error('did not receive the ritual-invitation event in time'));
+                    }, 2000);
+                    ws.addEventListener('message', (event) => {
+                        clearTimeout(timeout);
+                        resolve(JSON.parse(String(event.data)) as TdahWsServerEventLike);
+                    }, { once: true });
+                });
+
+                expect(server).not.toBeNull();
+                const { hasOpenConnection, onRitualInvitationFire } = server!.tdahRitualWiring;
+                const summary = await runNightlyTdahTick(dataDir, now, hasOpenConnection, onRitualInvitationFire);
+                expect(summary.firedCount).toBe(1);
+
+                const received = await nextMessage;
+                expect(received.kind).toBe('ritual-invitation');
+                expect(typeof received.at).toBe('string');
+                expect(Number.isNaN(Date.parse(received.at))).toBe(false);
+            } finally {
+                ws.close();
+                await waitForClose(ws);
+            }
+        });
+    });
+
     describe('schema migration v2 -> v3 (start_notified_at/end_notified_at, story 2.2)', () => {
         test('a fresh database starts directly at schema v3 with start_notified_at/end_notified_at present', async () => {
             await activate({ timeZone: 'UTC' });
@@ -2895,7 +3269,11 @@ describe('tdah module', () => {
             const database = new Database(databasePath, { readonly: true });
             try {
                 const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: number };
-                expect(versionRow.user_version).toBe(3);
+                // Story 3.1 bumped the shared schema target to v4
+                // (ritual_notified_date) — a fresh database now migrates
+                // straight through v3 to v4, so this is no longer the final
+                // version, just a column-presence check for the v2->v3 step.
+                expect(versionRow.user_version).toBe(4);
                 const columns = (database.prepare("PRAGMA table_info('tdah_activity');") as unknown as {
                     all(): { name: string }[];
                 }).all();
@@ -2963,12 +3341,91 @@ describe('tdah module', () => {
             const verifyDatabase = new Database(databasePath, { readonly: true });
             try {
                 const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
-                expect(versionRow.user_version).toBe(3);
+                // Migrates straight through to the current shared target (v4,
+                // story 3.1) in the same pass, not just to v3.
+                expect(versionRow.user_version).toBe(4);
                 const row = verifyDatabase.prepare(
                     'SELECT start_notified_at, end_notified_at FROM tdah_activity WHERE day_plan_date = ?;',
                 ).get(today) as { start_notified_at: string | null; end_notified_at: string | null };
                 expect(row.start_notified_at).toBeNull();
                 expect(row.end_notified_at).toBeNull();
+            } finally {
+                verifyDatabase.close();
+            }
+        });
+    });
+
+    describe('schema migration v3 -> v4 (ritual_notified_date, story 3.1)', () => {
+        test('a fresh database starts directly at schema v4 with ritual_notified_date present and NULL', async () => {
+            await activate({ timeZone: 'UTC' });
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(databasePath, { readonly: true });
+            try {
+                const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: number };
+                expect(versionRow.user_version).toBe(4);
+                const columns = (database.prepare("PRAGMA table_info('tdah_profile');") as unknown as {
+                    all(): { name: string }[];
+                }).all();
+                expect(columns.some((column) => column.name === 'ritual_notified_date')).toBe(true);
+                const row = database.prepare('SELECT ritual_notified_date FROM tdah_profile WHERE id = 1;').get() as {
+                    ritual_notified_date: string | null;
+                };
+                expect(row.ritual_notified_date).toBeNull();
+            } finally {
+                database.close();
+            }
+        });
+
+        test('a pre-3.1 (schema v3) database on disk migrates transparently via ALTER TABLE, backfilling ritual_notified_date as NULL', async () => {
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            mkdirSync(join(dataDir, key, 'tdah'), { recursive: true });
+
+            const { Database } = await import('bun:sqlite');
+            const seedDatabase = new Database(databasePath);
+            try {
+                // Deliberately the pre-3.1 shape (story 2.2's schema v3):
+                // tdah_profile with no ritual_notified_date column yet.
+                seedDatabase.exec(`
+                    CREATE TABLE tdah_profile (
+                        id INTEGER PRIMARY KEY CHECK (id = 1),
+                        mode TEXT NOT NULL CHECK (mode IN ('on', 'off')),
+                        time_zone TEXT NOT NULL,
+                        ritual_hour TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    );
+                `);
+                seedDatabase
+                    .prepare('INSERT INTO tdah_profile (id, mode, time_zone, ritual_hour, created_at, updated_at) VALUES (1, ?, ?, ?, ?, ?);')
+                    .run('on', 'UTC', '23:00', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+                // PRAGMA user_version = 3 — matches a real post-2.2/pre-3.1 file on disk.
+                seedDatabase.exec('PRAGMA user_version = 3;');
+            } finally {
+                seedDatabase.close();
+            }
+
+            // GET /profile only reads, but any request touching the module
+            // migrates the schema transparently first (withReadDatabase's own
+            // migrate-on-stale-version dance) — same as the v2->v3 sibling
+            // test's `activate` call, just via a read-only route here since a
+            // profile already exists and does not need (re-)activating.
+            const profileResponse = await getProfile();
+            expect(profileResponse.status).toBe(200);
+            const profile = await readProfile(profileResponse);
+            expect(profile?.mode).toBe('on');
+            expect(profile?.ritualHour).toBe('23:00');
+
+            const verifyDatabase = new Database(databasePath, { readonly: true });
+            try {
+                const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
+                expect(versionRow.user_version).toBe(4);
+                const row = verifyDatabase.prepare('SELECT ritual_notified_date FROM tdah_profile WHERE id = 1;').get() as {
+                    ritual_notified_date: string | null;
+                };
+                expect(row.ritual_notified_date).toBeNull();
             } finally {
                 verifyDatabase.close();
             }

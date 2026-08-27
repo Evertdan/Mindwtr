@@ -38,6 +38,19 @@ describe('buildMoreSheetPrimaryItems — E-05 tdah-today tile', () => {
         const withTile = usePrimaryItemsForSheet().map((item) => item.id);
         tdahMode.value = false;
         const withoutTile = usePrimaryItemsForSheet().map((item) => item.id);
-        expect(withoutTile).toEqual(withTile.filter((id) => id !== 'tdah-today'));
+        expect(withoutTile).toEqual(withTile.filter((id) => id !== 'tdah-today' && id !== 'tdah-ritual'));
+    });
+});
+
+describe('buildMoreSheetPrimaryItems — Story 3.1 tdah-ritual tile', () => {
+    it('includes the tdah-ritual tile (route /tdah-ritual) when the mode hook reports active', () => {
+        tdahMode.value = true;
+        const tile = usePrimaryItemsForSheet().find((item) => item.id === 'tdah-ritual');
+        expect(tile).toMatchObject({ id: 'tdah-ritual', label: 'nav.tdahRitual', route: '/tdah-ritual' });
+    });
+
+    it('omits the tdah-ritual tile entirely when the mode is inactive — same gate as tdah-today', () => {
+        tdahMode.value = false;
+        expect(usePrimaryItemsForSheet().some((item) => item.id === 'tdah-ritual')).toBe(false);
     });
 });

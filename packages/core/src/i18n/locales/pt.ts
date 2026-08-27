@@ -1650,6 +1650,8 @@ export const ptOverrides: Record<string, string> = {
         'tdahToday.activityPostponeActionLabel': 'Adiar +10 min',
         'tdahToday.activityCompleteActionLabel': 'Concluir',
         'tdahToday.activityNotificationChannelName': 'Lembretes de atividades',
+        'tdahToday.ritualInvitationTitle': 'Feche o dia — 10 minutos e amanhã está pronto',
+        'tdahToday.ritualComingSoon': 'O ritual noturno chega em breve',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Rotina',

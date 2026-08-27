@@ -84,6 +84,7 @@ vi.mock('react-native-safe-area-context', () => ({
 
 vi.mock('lucide-react-native', () => ({
     Plus: (props: any) => React.createElement('Plus', props),
+    Moon: (props: any) => React.createElement('Moon', props),
     Circle: (props: any) => React.createElement('Circle', props),
     CircleCheck: (props: any) => React.createElement('CircleCheck', props),
     CircleDashed: (props: any) => React.createElement('CircleDashed', props),
@@ -144,6 +145,36 @@ describe('TdahTodayScreen', () => {
         connection.reconnectedListeners.clear();
         connection.batteryLimited = false;
         connection.requestBatteryExemption.mockReset();
+    });
+
+    describe('Story 3.1 — manual "open ritual" header button (T-05\'s second manual-open entry)', () => {
+        it('navigates to /tdah-ritual on tap, regardless of the day-fetch phase', async () => {
+            hookState.phase = 'loading';
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+
+            const button = tree!.root.findByProps({ testID: 'tdah-today-open-ritual' });
+            await act(async () => { button.props.onPress(); });
+            expect(router.push).toHaveBeenCalledWith('/tdah-ritual');
+        });
+
+        it('is present in every day-fetch phase, not only "ready"', async () => {
+            for (const phase of ['loading', 'error', 'empty', 'offline', 'unconfigured', 'ready']) {
+                hookState.phase = phase;
+                let tree: ReturnType<typeof create> | undefined;
+                await act(async () => { tree = create(<TdahTodayScreen />); });
+                expect(tree!.root.findByProps({ testID: 'tdah-today-open-ritual' })).toBeTruthy();
+                await act(async () => { tree!.unmount(); });
+            }
+        });
+
+        it('carries a hitSlop, same convention as this app\'s other small icon-only touch targets', async () => {
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+
+            const button = tree!.root.findByProps({ testID: 'tdah-today-open-ritual' });
+            expect(button.props.hitSlop).toBe(8);
+        });
     });
 
     it('reloads on focus (AD-1: every screen load is a fresh fetch)', async () => {

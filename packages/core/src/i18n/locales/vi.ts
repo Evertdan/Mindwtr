@@ -2413,6 +2413,8 @@ export const viOverrides: Record<string, string> = {
         'tdahToday.activityPostponeActionLabel': 'Hoãn +10 phút',
         'tdahToday.activityCompleteActionLabel': 'Hoàn tất',
         'tdahToday.activityNotificationChannelName': 'Nhắc nhở hoạt động',
+        'tdahToday.ritualInvitationTitle': 'Đóng ngày — 10 phút và ngày mai đã sẵn sàng',
+        'tdahToday.ritualComingSoon': 'Nghi lễ ban đêm sắp ra mắt',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Thói quen',

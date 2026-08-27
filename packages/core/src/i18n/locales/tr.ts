@@ -1606,6 +1606,8 @@ export const trOverrides: Record<string, string> = {
         'tdahToday.activityPostponeActionLabel': '10 dk ertele',
         'tdahToday.activityCompleteActionLabel': 'Tamamla',
         'tdahToday.activityNotificationChannelName': 'Etkinlik hatırlatmaları',
+        'tdahToday.ritualInvitationTitle': 'Günü kapat — 10 dakika ve yarın hazır',
+        'tdahToday.ritualComingSoon': 'Gece ritüeli yakında geliyor',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Rutin',

@@ -704,6 +704,8 @@ export const nlOverrides: Record<string, string> = {
         'tdahToday.activityPostponeActionLabel': 'Uitstellen +10 min',
         'tdahToday.activityCompleteActionLabel': 'Voltooien',
         'tdahToday.activityNotificationChannelName': 'Activiteitherinneringen',
+        'tdahToday.ritualInvitationTitle': 'Sluit de dag af — 10 minuten en morgen is klaar',
+        'tdahToday.ritualComingSoon': 'Het avondritueel komt binnenkort',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Routine',

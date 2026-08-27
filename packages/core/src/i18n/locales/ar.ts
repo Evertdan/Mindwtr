@@ -1587,6 +1587,8 @@ export const arOverrides: Record<string, string> = {
         'tdahToday.activityPostponeActionLabel': 'تأجيل +10 دقائق',
         'tdahToday.activityCompleteActionLabel': 'إنهاء',
         'tdahToday.activityNotificationChannelName': 'تذكيرات الأنشطة',
+        'tdahToday.ritualInvitationTitle': 'أغلق يومك — 10 دقائق وغدك جاهز',
+        'tdahToday.ritualComingSoon': 'الطقوس الليلية قادمة قريبًا',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'روتين',

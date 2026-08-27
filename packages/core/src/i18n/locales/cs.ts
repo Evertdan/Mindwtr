@@ -2365,6 +2365,8 @@ export const csOverrides: Record<string, string> = {
         'tdahToday.activityPostponeActionLabel': 'Odložit +10 min',
         'tdahToday.activityCompleteActionLabel': 'Dokončit',
         'tdahToday.activityNotificationChannelName': 'Připomenutí aktivit',
+        'tdahToday.ritualInvitationTitle': 'Zavři den — 10 minut a zítřek je připravený',
+        'tdahToday.ritualComingSoon': 'Noční rituál už brzy',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Rutina',

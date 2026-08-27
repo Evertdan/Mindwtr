@@ -20,6 +20,7 @@ const {
     startPersistentConnectionMock,
     tdahModeActiveMock,
     showTdahActivityNotificationMock,
+    showTdahRitualNotificationMock,
 } = vi.hoisted(() => ({
     appState: { currentState: 'active' as 'active' | 'background' | 'inactive' },
     appStateListeners: new Set<(state: 'active' | 'background' | 'inactive') => void>(),
@@ -42,10 +43,19 @@ const {
         channelName: string;
         data: Record<string, string>;
     }) => Promise<void>>(async () => undefined),
+    showTdahRitualNotificationMock: vi.fn<(request: {
+        key: string;
+        title: string;
+        message?: string;
+        vibrationPattern: number[];
+        channelName: string;
+        data: Record<string, string>;
+    }) => Promise<void>>(async () => undefined),
 }));
 
 vi.mock('@/lib/notification-service-local', () => ({
     showTdahActivityNotification: showTdahActivityNotificationMock,
+    showTdahRitualNotification: showTdahRitualNotificationMock,
 }));
 
 vi.mock('react-native', async () => {
@@ -107,6 +117,8 @@ describe('useRootLayoutTdahConnection', () => {
         tdahModeActiveMock.mockReturnValue(false);
         showTdahActivityNotificationMock.mockReset();
         showTdahActivityNotificationMock.mockResolvedValue(undefined);
+        showTdahRitualNotificationMock.mockReset();
+        showTdahRitualNotificationMock.mockResolvedValue(undefined);
     });
 
     afterEach(() => {
@@ -311,6 +323,56 @@ describe('useRootLayoutTdahConnection', () => {
             });
 
             expect(showTdahActivityNotificationMock).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('story 3.1 — ritual-invitation WS message -> local notification', () => {
+        it('shows N-03 with the AC copy, the 3-soft-pulse haptics, and kind: tdah-ritual', async () => {
+            tdahModeActiveMock.mockReturnValue(true);
+            await act(async () => { tree = create(<TestHarness />); });
+            const { options } = fakeHandles[0];
+
+            await act(async () => {
+                options.onMessage(JSON.stringify({ kind: 'ritual-invitation', at: '2026-08-27T05:00:00.000Z' }));
+            });
+
+            expect(showTdahRitualNotificationMock).toHaveBeenCalledTimes(1);
+            const request = showTdahRitualNotificationMock.mock.calls[0][0];
+            expect(request.key).toBe('tdah-ritual-invitation');
+            expect(request.title).toBe('Close today — 10 minutes and tomorrow is ready');
+            expect(request.vibrationPattern).toEqual([0, 150, 300, 150, 300, 150]);
+            expect(request.data).toMatchObject({ kind: 'tdah-ritual' });
+            expect(showTdahActivityNotificationMock).not.toHaveBeenCalled();
+        });
+
+        it('resolves the title and channel name through resolveText instead of raw keys', async () => {
+            tdahModeActiveMock.mockReturnValue(true);
+            const resolveText = vi.fn((_key: string, fallback: string) => `translated:${fallback}`);
+            await act(async () => { tree = create(<TestHarness resolveText={resolveText} />); });
+            const { options } = fakeHandles[0];
+
+            await act(async () => {
+                options.onMessage(JSON.stringify({ kind: 'ritual-invitation', at: '2026-08-27T05:00:00.000Z' }));
+            });
+
+            const request = showTdahRitualNotificationMock.mock.calls[0][0];
+            expect(request.title).toBe('translated:Close today — 10 minutes and tomorrow is ready');
+            expect(request.channelName).toBe('translated:Activity reminders');
+        });
+
+        it('ignores an unparseable message (e.g. an activity-trigger event) without calling the ritual notifier', async () => {
+            tdahModeActiveMock.mockReturnValue(true);
+            await act(async () => { tree = create(<TestHarness />); });
+            const { options } = fakeHandles[0];
+
+            await act(async () => {
+                options.onMessage(JSON.stringify({
+                    kind: 'activity-trigger', edge: 'start', activityId: 1, title: 'Foo', durationMinutes: 10,
+                }));
+            });
+
+            expect(showTdahRitualNotificationMock).not.toHaveBeenCalled();
+            expect(showTdahActivityNotificationMock).toHaveBeenCalledTimes(1);
         });
     });
 });

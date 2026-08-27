@@ -1652,6 +1652,8 @@ export const deOverrides: Record<string, string> = {
         'tdahToday.activityPostponeActionLabel': 'Verschieben +10 Min.',
         'tdahToday.activityCompleteActionLabel': 'Abschließen',
         'tdahToday.activityNotificationChannelName': 'Aktivitätserinnerungen',
+        'tdahToday.ritualInvitationTitle': 'Schließe den Tag ab — 10 Minuten, dann ist morgen bereit',
+        'tdahToday.ritualComingSoon': 'Das nächtliche Ritual kommt bald',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Routine',

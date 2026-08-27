@@ -277,6 +277,24 @@ describe('useRootLayoutNotificationOpenHandler', () => {
     expect(updateTask).not.toHaveBeenCalled();
   });
 
+  it("routes story 3.1's 'tdah-ritual' kind (N-03's tap) straight to T-05's placeholder route", () => {
+    const router = { push: vi.fn() };
+
+    act(() => {
+      create(<TestHarness router={router} />);
+    });
+
+    const handler = setNotificationOpenHandler.mock.calls[0]?.[0];
+
+    act(() => {
+      handler({ kind: 'tdah-ritual' });
+    });
+
+    expect(router.push).toHaveBeenCalledWith('/tdah-ritual');
+    expect(updateTask).not.toHaveBeenCalled();
+    expect(setHighlightTask).not.toHaveBeenCalled();
+  });
+
   it('waits for app readiness before replaying a pending open from the root path', async () => {
     const router = { push: vi.fn() };
     consumePendingNotificationOpenPayload.mockResolvedValue({

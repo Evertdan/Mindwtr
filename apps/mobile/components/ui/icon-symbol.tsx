@@ -28,6 +28,13 @@ const MAPPING = {
   'trash.fill': 'trash',
   'gearshape.fill': 'settings',
   'questionmark.circle.fill': 'help-circle',
+  // Story 3.1 ("La invitación nocturna"): the More sheet's tdah-ritual tile
+  // — same moon concept as T-01's header button for the same manual-open
+  // action (instead of reusing the unrelated "done" checkmark), rendered
+  // via Ionicons' own `moon` glyph in this file's icon system rather than
+  // T-01's `lucide-react-native` Moon — two different icon libraries/art
+  // styles, not a literal shared asset.
+  'moon.fill': 'moon',
 } as const;
 
 /**

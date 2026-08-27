@@ -45,12 +45,14 @@ import {
     listActiveTdahNamespaces,
     mutateCloseOutgoingDay,
     mutateGenerateTomorrowIfMissing,
+    mutateMarkRitualNotified,
+    readRitualNotifiedDate,
     readTdahProfile,
     tdahDatabasePath,
     withReadDatabase,
     withWriteTransaction,
 } from './storage';
-import type { TdahNightlyTickSummary } from './types';
+import type { TdahNightlyTickSummary, TdahWsRitualInvitationEvent } from './types';
 
 /**
  * "HH:mm" wall-clock time in `timeZone` at `now`, resolved through
@@ -74,8 +76,21 @@ const isRitualHourReached = (timeZone: string, ritualHour: string, now: Date): b
 
 type NamespaceTickOutcome =
     | { kind: 'skipped' }
-    | { kind: 'fired'; generatedCount: number; limboCount: number }
+    | { kind: 'fired'; generatedCount: number; limboCount: number; ritualEvent: TdahWsRitualInvitationEvent | null }
     | { kind: 'failed'; code: string };
+
+/**
+ * Story 3.1 — the ready-to-send ritual-invitation WS event, built the moment
+ * `runNamespaceTick` marks a namespace notified for the day. Kept as a tiny,
+ * exported builder (mirrors `activity-trigger.ts`'s own
+ * `buildTdahActivityTriggerEvent`) so `runNightlyTdahTick`'s caller
+ * (server.ts) never constructs the envelope itself, only serializes and
+ * pushes what this returns.
+ */
+export const buildTdahRitualInvitationEvent = (now: Date): TdahWsRitualInvitationEvent => ({
+    kind: 'ritual-invitation',
+    at: now.toISOString(),
+});
 
 /**
  * One namespace's share of a tick. Never throws: any storage failure — even
@@ -89,12 +104,28 @@ type NamespaceTickOutcome =
  * abort the entire tick for every other namespace).
  *
  * 'fired' covers every tick that did write work — a full ritual fire
- * (generatedCount > 0) and a sweep-only close of late or stale Actividades
- * (generatedCount 0, limboCount > 0) both count; `generatedCount` reports
- * only Actividades actually created, never the existing count of an
- * already-present tomorrow plan.
+ * (generatedCount > 0), a sweep-only close of late or stale Actividades
+ * (generatedCount 0, limboCount > 0), and a mark-only ritual invitation
+ * (both counts 0, `ritualEvent` non-null — tomorrow already existed and
+ * nothing was left to sweep, but the namespace hadn't been invited yet today)
+ * all count; `generatedCount` reports only Actividades actually created,
+ * never the existing count of an already-present tomorrow plan.
+ *
+ * `hasOpenConnection` gates the ritual-invitation mark/push (story 3.1,
+ * AD-5): closing/generation stay exactly as unconditional as story 1.5 left
+ * them, but marking `ritual_notified_date` and returning a non-null
+ * `ritualEvent` only ever happens when there is an open WS connection to
+ * push to — with no connection, the mark is skipped entirely (never set)
+ * so the very next tick re-evaluates and retries, same local day, once the
+ * phone reconnects (the same reconnect discipline `activity-trigger.ts`'s
+ * own doc comment already documents for its start/end milestones).
  */
-const runNamespaceTick = async (dataDir: string, key: string, now: Date): Promise<NamespaceTickOutcome> => {
+const runNamespaceTick = async (
+    dataDir: string,
+    key: string,
+    now: Date,
+    hasOpenConnection: (key: string) => boolean,
+): Promise<NamespaceTickOutcome> => {
     try {
         const profile = await readTdahProfile(dataDir, key);
         if (!profile || profile.mode !== 'on') {
@@ -109,30 +140,66 @@ const runNamespaceTick = async (dataDir: string, key: string, now: Date): Promis
         const databasePath = tdahDatabasePath(dataDir, key);
 
         // Steady-state guard: open the write transaction only when there is
-        // real work — tomorrow's plan is missing (generate) OR any Actividad
+        // real work — tomorrow's plan is missing (generate), any Actividad
         // is still pending/started on today or a stale earlier day (sweep
-        // close). A namespace already through tonight's ritual matches
-        // neither and stays entirely read-only until the next local day.
-        const needsWrite = await withReadDatabase(databasePath, (database) => (
-            !hasDayPlan(database, tomorrow) || hasPendingOrStartedUpTo(database, today)
-        ));
+        // close), OR the ritual invitation is still due today and there is
+        // an open connection to push it to (mark-only fire). A namespace
+        // already through tonight's ritual (plan generated, nothing to
+        // sweep, already invited today) matches none of the three and stays
+        // entirely read-only until the next local day.
+        const needsWrite = await withReadDatabase(databasePath, (database) => {
+            const ritualInvitationDue = readRitualNotifiedDate(database) !== today && hasOpenConnection(key);
+            return !hasDayPlan(database, tomorrow) || hasPendingOrStartedUpTo(database, today) || ritualInvitationDue;
+        });
         if (!needsWrite) {
             return { kind: 'skipped' };
         }
         const result = await withWriteTransaction(databasePath, (database) => {
             const closed = mutateCloseOutgoingDay(database, today);
             const generated = mutateGenerateTomorrowIfMissing(database, tomorrow);
-            return { closed, generated };
+            // Re-evaluated INSIDE the held write transaction — never trusts
+            // the pre-transaction read above (same discipline
+            // `mutateMarkDueActivityTriggersNotified` documents for its own
+            // due-milestone re-check): an open connection can drop between
+            // the read and the write, and marking must stay atomic with the
+            // close/generate write it shares this transaction with.
+            let ritualEvent: TdahWsRitualInvitationEvent | null = null;
+            if (readRitualNotifiedDate(database) !== today && hasOpenConnection(key)) {
+                mutateMarkRitualNotified(database, today);
+                ritualEvent = buildTdahRitualInvitationEvent(now);
+            }
+            return { closed, generated, ritualEvent };
         });
+        // The narrow race `needsWrite`'s own doc comment above flags:
+        // `!hasDayPlan`/`hasPendingOrStartedUpTo` are stable DB facts that
+        // cannot flip between the pre-transaction read and this write (no
+        // other writer can interleave once BEGIN IMMEDIATE is held), so
+        // whichever of them made `needsWrite` true here still holds — but
+        // `hasOpenConnection` is a live external signal that genuinely can
+        // flip (the socket drops in that exact window). When `needsWrite`
+        // was true SOLELY because a connection was open a moment ago, and it
+        // is gone by the time this transaction re-checks, every one of the
+        // three write outcomes below is a no-op — that tick did nothing at
+        // all and must be reported as `skipped`, not `fired`, or
+        // `firedCount` inflates for ticks with zero real effect.
+        if (result.closed.limboCount === 0 && !result.generated.created && result.ritualEvent === null) {
+            return { kind: 'skipped' };
+        }
         return {
             kind: 'fired',
             generatedCount: result.generated.created ? result.generated.activityCount : 0,
             limboCount: result.closed.limboCount,
+            ritualEvent: result.ritualEvent,
         };
     } catch (error) {
         return { kind: 'failed', code: getFsErrorCode(error) };
     }
 };
+
+/** Default `hasOpenConnection` for callers that never pass one (every pre-3.1 call site) — no connection is ever "open", so the ritual invitation never marks/fires and behavior stays byte-identical to before this story. */
+const NO_OPEN_CONNECTIONS = (): boolean => false;
+/** Default `onRitualInvitationFire` for callers that never pass one — a no-op, paired with `NO_OPEN_CONNECTIONS` above so it can never actually be invoked by a caller that opted out of the WS push. */
+const NOOP_RITUAL_INVITATION_FIRE = (): void => undefined;
 
 /**
  * Runs one nightly tick across every namespace with a TDAH database. Never
@@ -148,8 +215,25 @@ const runNamespaceTick = async (dataDir: string, key: string, now: Date): Promis
  * `pruneOrphanedCalendarFeeds` (`server-calendar-feed.ts`), a pure function
  * that returns counts and lets its caller (`server.ts`'s interval callback)
  * own the one `'tdah nightly trigger fired'` audit line.
+ *
+ * `hasOpenConnection`/`onRitualInvitationFire` (story 3.1) are injected
+ * predicates/callbacks — same shape and same testability reasoning as
+ * `activity-trigger.ts`'s `runActivityTriggerTick` — with defaults that
+ * disable the ritual-invitation push entirely, so the many pre-3.1 callers
+ * (including `server.test.ts`'s own direct test of
+ * `runTdahNightlyIntervalTick`) keep compiling and behaving unchanged without
+ * having to pass anything new. server.ts's real interval wiring is the only
+ * caller that supplies real ones, mirroring its own activity-trigger timer:
+ * `hasOpenConnection` reads `tdahWsRegistry.connectionCount(key) > 0` and
+ * `onRitualInvitationFire` serializes the event and `ws.send`s it to every
+ * open connection for that namespace.
  */
-export async function runNightlyTdahTick(dataDir: string, now: Date): Promise<TdahNightlyTickSummary> {
+export async function runNightlyTdahTick(
+    dataDir: string,
+    now: Date,
+    hasOpenConnection: (key: string) => boolean = NO_OPEN_CONNECTIONS,
+    onRitualInvitationFire: (key: string, event: TdahWsRitualInvitationEvent) => void = NOOP_RITUAL_INVITATION_FIRE,
+): Promise<TdahNightlyTickSummary> {
     const namespaces = listActiveTdahNamespaces(dataDir);
     const summary: TdahNightlyTickSummary = {
         date: formatDateInTimeZone(now, 'UTC'),
@@ -159,16 +243,41 @@ export async function runNightlyTdahTick(dataDir: string, now: Date): Promise<Td
         failedCount: 0,
         generatedCount: 0,
         limboCount: 0,
+        ritualPushFailedCount: 0,
     };
 
     for (const key of namespaces) {
-        const outcome = await runNamespaceTick(dataDir, key, now);
+        const outcome = await runNamespaceTick(dataDir, key, now, hasOpenConnection);
         if (outcome.kind === 'skipped') {
             summary.skippedCount += 1;
         } else if (outcome.kind === 'fired') {
             summary.firedCount += 1;
             summary.generatedCount += outcome.generatedCount;
             summary.limboCount += outcome.limboCount;
+            if (outcome.ritualEvent) {
+                // The notified mark is already durably committed by this
+                // point (inside `mutateMarkRitualNotified`'s own write
+                // transaction, above) — same "the push can fail, the mark
+                // never re-fires" isolation `activity-trigger.ts`'s own
+                // `onFire` try/catch documents, so one bad push (a closing
+                // socket) can never cause a re-fire on the next tick, nor
+                // abort the remaining namespaces still left in this loop.
+                // Its own dedicated message/failureCode (mirrors
+                // 'tdah activity trigger onFire failed'/
+                // 'tdah_activity_trigger_onfire_failed'), distinct from a
+                // genuine namespace write failure — the write already
+                // succeeded here, only the push itself threw.
+                try {
+                    onRitualInvitationFire(key, outcome.ritualEvent);
+                } catch (error) {
+                    summary.ritualPushFailedCount += 1;
+                    logError('tdah nightly ritual invitation push failed', {
+                        failureClass: 'runtime',
+                        failureCode: 'tdah_ritual_invitation_push_failed',
+                        failureErrno: getFsErrorCode(error),
+                    });
+                }
+            }
         } else {
             summary.failedCount += 1;
             logError('tdah nightly trigger namespace failed', {

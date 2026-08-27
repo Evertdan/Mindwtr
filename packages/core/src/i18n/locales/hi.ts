@@ -1559,6 +1559,8 @@ export const hiOverrides: Record<string, string> = {
         'tdahToday.activityPostponeActionLabel': '+10 मिनट टालें',
         'tdahToday.activityCompleteActionLabel': 'पूर्ण',
         'tdahToday.activityNotificationChannelName': 'गतिविधि रिमाइंडर',
+        'tdahToday.ritualInvitationTitle': 'दिन बंद करें — 10 मिनट और कल तैयार है',
+        'tdahToday.ritualComingSoon': 'रात्रि अनुष्ठान जल्द आ रहा है',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'रूटीन',

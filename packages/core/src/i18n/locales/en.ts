@@ -1132,6 +1132,17 @@ export const en: Record<string, string> = {
         'tdahToday.activityPostponeActionLabel': 'Postpone +10 min',
         'tdahToday.activityCompleteActionLabel': 'Complete',
         'tdahToday.activityNotificationChannelName': 'Activity reminders',
+        // Story 3.1 — N-03 (ritual-invitation): the nightly notification
+        // that invites the user to close today and open T-05, plus the
+        // manual entry point's nav label (More sheet tile + T-01 header
+        // button). Reuses TDAH_ACTIVITY_NOTIFICATION_CHANNEL; no separate
+        // body copy — the title alone carries the full invitation.
+        'tdahToday.ritualInvitationTitle': 'Close today — 10 minutes and tomorrow is ready',
+        'nav.tdahRitual': 'Night Ritual',
+        // T-05's placeholder route (Story 3.1) — the real Cierre screen
+        // ships in Story 3.2; this honest "coming soon" copy replaces a
+        // permanent loading spinner so the invitation never reads as broken.
+        'tdahToday.ritualComingSoon': 'The night ritual is coming soon',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Routine',

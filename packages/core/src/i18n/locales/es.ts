@@ -1503,6 +1503,18 @@ export const esOverrides: Record<string, string> = {
         'tdahToday.activityPostponeActionLabel': 'Posponer +10 min',
         'tdahToday.activityCompleteActionLabel': 'Completada',
         'tdahToday.activityNotificationChannelName': 'Recordatorios de Actividades',
+        // Story 3.1 — N-03 (ritual-invitation): la notificación nocturna que
+        // invita a cerrar el día y abrir T-05, más la etiqueta de nav del
+        // punto de entrada manual (tile del More sheet + botón en T-01).
+        // Reutiliza TDAH_ACTIVITY_NOTIFICATION_CHANNEL; sin copy de body
+        // aparte — el título lleva la invitación completa.
+        'tdahToday.ritualInvitationTitle': 'Cerrá el día — 10 minutos y mañana está lista',
+        'nav.tdahRitual': 'Ritual nocturno',
+        // Ruta placeholder de T-05 (Story 3.1) — la pantalla real del Cierre
+        // llega en Story 3.2; este copy honesto de "próximamente" reemplaza
+        // un spinner de carga permanente para que la invitación nunca se
+        // sienta rota.
+        'tdahToday.ritualComingSoon': 'El ritual nocturno llega pronto',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Rutina',

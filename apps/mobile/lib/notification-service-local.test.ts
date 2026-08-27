@@ -144,6 +144,7 @@ import {
   sendLocalMobileNotification,
   setLocalNotificationOpenHandler,
   showTdahActivityNotification,
+  showTdahRitualNotification,
   startLocalMobileNotifications,
   stopLocalMobileNotifications,
   TDAH_ACTIVITY_NOTIFICATION_CHANNEL,
@@ -345,6 +346,55 @@ describe('notification-service-local', () => {
     // independent pipeline (ADR-0013).
     expect(mockAlarmScheduleAlarm).not.toHaveBeenCalledWith(
       expect.objectContaining({ channel: 'mindwtr_reminders_v2' })
+    );
+  });
+
+  // Story 3.1 ("La invitación nocturna"): N-03 reuses the same channel as
+  // N-01/N-02 but must show tap-to-open only (spec Always: "solo
+  // tap-to-open, sin botones") — no start/complete/snooze action, unlike the
+  // Activity-trigger notification above.
+  it('schedules the real ritual-invitation notification on the reused TDAH channel with no action buttons', async () => {
+    await showTdahRitualNotification({
+      key: 'tdah-ritual-invitation',
+      title: 'Cerrá el día — 10 minutos y mañana está lista',
+      vibrationPattern: [0, 150, 300, 150, 300, 150],
+      channelName: 'Recordatorios de Actividades',
+      data: { kind: 'tdah-ritual' },
+    });
+
+    expect(mockAlarmScheduleAlarm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Cerrá el día — 10 minutos y mañana está lista',
+        message: 'Cerrá el día — 10 minutos y mañana está lista',
+        channel: TDAH_ACTIVITY_NOTIFICATION_CHANNEL,
+        has_button: false,
+        has_complete_action: false,
+        vibrate: true,
+        data: expect.objectContaining({
+          kind: 'tdah-ritual',
+          vibrationPattern: '0,150,300,150,300,150',
+          tdahActivityNotificationChannelName: 'Recordatorios de Actividades',
+        }),
+      })
+    );
+
+    // toHaveBeenCalledWith(objectContaining(...)) above only asserts the keys
+    // it lists are present with those values — it can't assert a key is
+    // *absent*. These two calls close that gap: a stray action flag or
+    // snooze_interval here would silently turn N-03 into an actionable
+    // notification again (spec Always: "solo tap-to-open, sin botones").
+    expect(mockAlarmScheduleAlarm).not.toHaveBeenCalledWith(
+      expect.objectContaining({ snooze_interval: expect.anything() })
+    );
+    expect(mockAlarmScheduleAlarm).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ notificationActionStart: expect.anything() }),
+      })
+    );
+    expect(mockAlarmScheduleAlarm).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ notificationActionComplete: expect.anything() }),
+      })
     );
   });
 
