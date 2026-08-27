@@ -106,6 +106,22 @@ describe('cloud sync http helpers', () => {
         expect(JSON.parse(String(init.body))).toEqual({ title: 'hi' });
     });
 
+    it('sends a PUT request through the same request-json path as POST/PATCH/DELETE', async () => {
+        const fetcher = vi.fn(async () => okResponse(JSON.stringify({ routine: { id: 5 } })));
+        const result = await cloudRequestJson<{ routine: { id: number } }>(
+            'PUT',
+            'https://example.com/v1/tdah/routines/5',
+            { title: 'Workday' },
+            { fetcher, token: 'abc123' },
+        );
+        expect(result).toEqual({ routine: { id: 5 } });
+        const [, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
+        expect(init.method).toBe('PUT');
+        expect((init.headers as Record<string, string>).Authorization).toBe('Bearer abc123');
+        expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+        expect(JSON.parse(String(init.body))).toEqual({ title: 'Workday' });
+    });
+
     it('parses a successful response body larger than the error-message cap', async () => {
         const bigDescription = 'x'.repeat(150 * 1024);
         const fetcher = vi.fn(async () => okResponse(JSON.stringify({ task: { id: 't1', description: bigDescription } })));

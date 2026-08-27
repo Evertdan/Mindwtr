@@ -77,6 +77,22 @@ vi.mock('react-native-safe-area-context', () => ({
     useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
 
+type MockOnboardingProps = {
+    variant: 'full' | 'reactivation';
+    initialTimeZone: string;
+    onFinished: (result: unknown) => void;
+    onClose: () => void;
+};
+
+const mockOnboardingProps = vi.fn<(props: MockOnboardingProps) => void>();
+
+vi.mock('../tdah/onboarding/TdahOnboardingFlow', () => ({
+    TdahOnboardingFlow: (props: MockOnboardingProps) => {
+        mockOnboardingProps(props);
+        return React.createElement('TdahOnboardingFlow', { testID: 'tdah-onboarding-flow-mock' });
+    },
+}));
+
 const CLOUD_URL = 'https://sync.example.com';
 const CLOUD_TOKEN = 'cloud-token-1234567890';
 
@@ -109,6 +125,7 @@ describe('TdahSettingsScreen', () => {
         cloudPutJson.mockReset().mockResolvedValue({});
         asyncStorageGetItem.mockReset();
         getSecureConfigValue.mockReset();
+        mockOnboardingProps.mockReset();
     });
 
     it('falls back to UTC when the device time zone cannot be resolved', () => {
@@ -158,11 +175,9 @@ describe('TdahSettingsScreen', () => {
         expect(ritualHourValue).toBe('22:30');
     });
 
-    it('enabling the mode PUTs on with the detected time zone, then re-reads the server state', async () => {
+    it('opens the full onboarding flow instead of PUTting when the profile never existed (first activation)', async () => {
         configureCloudSync();
-        cloudGetJson
-            .mockResolvedValueOnce({ profile: null })
-            .mockResolvedValueOnce({ profile: { mode: 'on', timeZone: 'Europe/Madrid', ritualHour: '22:30' } });
+        cloudGetJson.mockResolvedValueOnce({ profile: null });
         const tree = await renderScreen();
 
         const modeSwitch = findSwitch(tree);
@@ -172,13 +187,115 @@ describe('TdahSettingsScreen', () => {
             await modeSwitch.props.onValueChange(true);
         });
 
-        expect(cloudPutJson).toHaveBeenCalledWith(
-            'https://sync.example.com/v1/tdah/profile',
-            { mode: 'on', timeZone: detectDeviceTimeZone() },
-            expect.objectContaining({ token: CLOUD_TOKEN }),
+        expect(cloudPutJson).not.toHaveBeenCalled();
+        expect(tree.root.findByProps({ testID: 'tdah-onboarding-flow-mock' })).toBeTruthy();
+        expect(mockOnboardingProps).toHaveBeenCalledWith(
+            expect.objectContaining({ variant: 'full' }),
         );
-        expect(cloudGetJson).toHaveBeenCalledTimes(2);
+    });
+
+    it('opens the reactivation onboarding step when a previously-off profile is turned back on', async () => {
+        configureCloudSync();
+        cloudGetJson.mockResolvedValueOnce({
+            profile: { mode: 'off', timeZone: 'Europe/Madrid', ritualHour: '22:30' },
+        });
+        const tree = await renderScreen();
+
+        await renderer.act(async () => {
+            await findSwitch(tree).props.onValueChange(true);
+        });
+
+        expect(cloudPutJson).not.toHaveBeenCalled();
+        expect(tree.root.findByProps({ testID: 'tdah-onboarding-flow-mock' })).toBeTruthy();
+        expect(mockOnboardingProps).toHaveBeenCalledWith(
+            expect.objectContaining({ variant: 'reactivation', initialTimeZone: 'Europe/Madrid' }),
+        );
+    });
+
+    it('ignores a redundant on-tap while the profile is already on (rapid double-tap guard)', async () => {
+        configureCloudSync();
+        cloudGetJson.mockResolvedValueOnce({
+            profile: { mode: 'on', timeZone: 'Europe/Madrid', ritualHour: '22:30' },
+        });
+        const tree = await renderScreen();
+
+        await renderer.act(async () => {
+            await findSwitch(tree).props.onValueChange(true);
+        });
+
+        expect(cloudPutJson).not.toHaveBeenCalled();
+        expect(tree.root.findAllByProps({ testID: 'tdah-onboarding-flow-mock' })).toHaveLength(0);
+        expect(mockOnboardingProps).not.toHaveBeenCalled();
+    });
+
+    it('closes the onboarding overlay and seeds the profile from the activate result without re-fetching', async () => {
+        configureCloudSync();
+        cloudGetJson.mockResolvedValueOnce({ profile: null });
+        const tree = await renderScreen();
+
+        await renderer.act(async () => {
+            await findSwitch(tree).props.onValueChange(true);
+        });
+        const { onFinished } = mockOnboardingProps.mock.calls[0][0];
+
+        await renderer.act(async () => {
+            onFinished({ profile: { mode: 'on', timeZone: 'Europe/Madrid', ritualHour: '22:30' }, routineCreated: false, dayPlan: { date: '2026-08-26', activityCount: 0 } });
+        });
+
+        expect(tree.root.findAllByProps({ testID: 'tdah-onboarding-flow-mock' })).toHaveLength(0);
+        // The activate response already carries the confirmed profile, so the
+        // screen must not fire an extra GET to learn what it already knows.
+        expect(cloudGetJson).toHaveBeenCalledTimes(1);
         expect(findSwitch(tree).props.value).toBe(true);
+        const timeZoneValue = tree.root.findByProps({ testID: 'tdah-time-zone-value' }).props.children;
+        expect(timeZoneValue).toBe('Europe/Madrid');
+        const ritualHourValue = tree.root.findByProps({ testID: 'tdah-ritual-hour-value' }).props.children;
+        expect(ritualHourValue).toBe('22:30');
+    });
+
+    it('reflects the activated profile even if a follow-up GET would have failed (no unhandled rejection)', async () => {
+        configureCloudSync();
+        cloudGetJson.mockResolvedValueOnce({ profile: null });
+        // Any further GET call would reject; the screen must never make one
+        // after onFinished, so this rejection should never be observed.
+        cloudGetJson.mockRejectedValue(new Error('transient network blip'));
+        const tree = await renderScreen();
+
+        await renderer.act(async () => {
+            await findSwitch(tree).props.onValueChange(true);
+        });
+        const { onFinished } = mockOnboardingProps.mock.calls[0][0];
+
+        await renderer.act(async () => {
+            onFinished({
+                profile: { mode: 'on', timeZone: 'Europe/Madrid', ritualHour: '22:30' },
+                routineCreated: false,
+                dayPlan: { date: '2026-08-26', activityCount: 0 },
+            });
+        });
+
+        expect(findSwitch(tree).props.value).toBe(true);
+        expect(tree.root.findAllByProps({ testID: 'tdah-load-error' })).toHaveLength(0);
+        expect(tree.root.findAllByProps({ testID: 'tdah-save-error' })).toHaveLength(0);
+    });
+
+    it('closes the onboarding overlay without any server call when the user backs out', async () => {
+        configureCloudSync();
+        cloudGetJson.mockResolvedValueOnce({ profile: null });
+        const tree = await renderScreen();
+
+        await renderer.act(async () => {
+            await findSwitch(tree).props.onValueChange(true);
+        });
+        const { onClose } = mockOnboardingProps.mock.calls[0][0];
+
+        await renderer.act(async () => {
+            onClose();
+        });
+
+        expect(tree.root.findAllByProps({ testID: 'tdah-onboarding-flow-mock' })).toHaveLength(0);
+        expect(cloudGetJson).toHaveBeenCalledTimes(1);
+        expect(cloudPutJson).not.toHaveBeenCalled();
     });
 
     it('disabling the mode PUTs off without touching the time zone', async () => {
@@ -220,31 +337,36 @@ describe('TdahSettingsScreen', () => {
 
     it('shows the save error and keeps the server state when the PUT fails', async () => {
         configureCloudSync();
-        cloudGetJson.mockResolvedValueOnce({ profile: null });
+        cloudGetJson.mockResolvedValueOnce({
+            profile: { mode: 'on', timeZone: 'Europe/Madrid', ritualHour: '22:30' },
+        });
         const tree = await renderScreen();
 
         cloudPutJson.mockRejectedValueOnce(new Error('network down'));
         await renderer.act(async () => {
-            await findSwitch(tree).props.onValueChange(true);
+            await findSwitch(tree).props.onValueChange(false);
         });
 
         expect(tree.root.findByProps({ testID: 'tdah-save-error' })).toBeTruthy();
-        expect(findSwitch(tree).props.value).toBe(false);
+        expect(findSwitch(tree).props.value).toBe(true);
     });
 
     it('keeps the toggle usable again after a failed mutation', async () => {
         configureCloudSync();
-        cloudGetJson.mockResolvedValue({ profile: null });
+        cloudGetJson.mockResolvedValue({
+            profile: { mode: 'on', timeZone: 'Europe/Madrid', ritualHour: '22:30' },
+        });
         const tree = await renderScreen();
 
         cloudPutJson.mockRejectedValueOnce(new Error('network down'));
         await renderer.act(async () => {
-            await findSwitch(tree).props.onValueChange(true);
+            await findSwitch(tree).props.onValueChange(false);
         });
         expect(findSwitch(tree).props.disabled).toBe(false);
 
+        cloudPutJson.mockResolvedValueOnce({});
         await renderer.act(async () => {
-            await findSwitch(tree).props.onValueChange(true);
+            await findSwitch(tree).props.onValueChange(false);
         });
         expect(tree.root.findAllByProps({ testID: 'tdah-save-error' })).toHaveLength(0);
     });

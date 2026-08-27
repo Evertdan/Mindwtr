@@ -63,6 +63,7 @@ import {
     createRequestAbortError,
     createWriteLockRunner,
     ensureWritableDir,
+    getFsErrorCode,
     isBodyReadError,
     isRequestAbortError,
     readData,
@@ -104,7 +105,7 @@ import {
     rotateCalendarFeed,
     type CalendarFeedRecord,
 } from './server-calendar-feed';
-import { TDAH_PATH_PREFIX, handleTdahRequest } from './tdah';
+import { TDAH_PATH_PREFIX, handleTdahRequest, runNightlyTdahTick } from './tdah';
 
 const ANY_TOKEN_NAMESPACE_LIMIT_DEFAULT = 32;
 const NAMESPACE_ADMISSION_LOCK_KEY = '__namespace_admission__';
@@ -154,6 +155,10 @@ const STATIC_CLOUD_ROUTES = new Set([
     '/v1/sections',
     '/v1/tasks',
     '/v1/tdah/profile',
+    '/v1/tdah/routines',
+    '/v1/tdah/routines/conflicts',
+    '/v1/tdah/day',
+    '/v1/tdah/day/activities',
 ]);
 
 export function canonicalCloudRoute(pathname: string): string {
@@ -166,6 +171,10 @@ export function canonicalCloudRoute(pathname: string): string {
     if (/^\/v1\/areas\/[^/]+$/.test(pathname)) return '/v1/areas/:id';
     if (/^\/v1\/calendar\/[^/]+\.ics$/.test(pathname)) return '/v1/calendar/:token';
     if (pathname.startsWith('/v1/attachments/')) return '/v1/attachments/:path';
+    if (/^\/v1\/tdah\/routines\/[^/]+\/preview$/.test(pathname)) return '/v1/tdah/routines/:id/preview';
+    if (/^\/v1\/tdah\/routines\/[^/]+$/.test(pathname)) return '/v1/tdah/routines/:id';
+    const activityActionMatch = pathname.match(/^\/v1\/tdah\/activities\/[^/]+\/(start|complete|miss)$/);
+    if (activityActionMatch) return `/v1/tdah/activities/:id/${activityActionMatch[1]}`;
     return 'unmatched';
 }
 
@@ -922,6 +931,38 @@ export function resolveServerMergeTimestamp(..._dataSets: AppData[]): string {
     return new Date().toISOString();
 }
 
+/**
+ * The 60s TDAH interval callback's body, extracted so the audit contract is
+ * directly testable: run one nightly tick against `dataDir` with the real
+ * clock, then log the single `'tdah nightly trigger fired'` audit line with
+ * the tick's summary — or the `'tdah nightly trigger crashed'` backstop if
+ * `runNightlyTdahTick` ever throws despite its own never-throws contract.
+ * The `tdahTickInFlight` overlap guard itself stays in the interval callback
+ * below; this function is exactly one tick, so a manual await of it can never
+ * overlap itself. Log message strings are byte-identical to the pre-extract
+ * inline callback (CLOUD_LOG_MESSAGES ratchet).
+ */
+export async function runTdahNightlyIntervalTick(dataDir: string): Promise<void> {
+    try {
+        const summary = await runNightlyTdahTick(dataDir, new Date());
+        logInfo('tdah nightly trigger fired', {
+            date: summary.date,
+            failedCount: summary.failedCount,
+            firedCount: summary.firedCount,
+            generatedCount: summary.generatedCount,
+            limboCount: summary.limboCount,
+            namespaceCount: summary.namespaceCount,
+            skippedCount: summary.skippedCount,
+        });
+    } catch (error) {
+        logError('tdah nightly trigger crashed', {
+            failureClass: 'runtime',
+            failureCode: 'tdah_nightly_tick_crashed',
+            failureErrno: getFsErrorCode(error),
+        });
+    }
+}
+
 function isProjectPurgePatch(bodyRecord: Record<string, unknown>): boolean {
     return typeof bodyRecord.purgedAt === 'string' && bodyRecord.purgedAt.trim().length > 0;
 }
@@ -1088,6 +1129,28 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
     }, rateLimitCleanupMs);
     if (typeof cleanupTimer.unref === 'function') {
         cleanupTimer.unref();
+    }
+
+    // The app's first background scheduler (ADR 0026 addendum, story 1.5):
+    // once a minute, walk every namespace with an active TDAH profile and
+    // fire its nightly ritual (close today, generate tomorrow) once its local
+    // ritual hour arrives. The tick body and its one audit line live in
+    // `runTdahNightlyIntervalTick` above (extracted for direct testing);
+    // `tdahTickInFlight` guards against a slow tick (many namespaces, retried
+    // write locks) still running when the next 60s interval fires — harmless
+    // for correctness (every operation here is idempotent) but wasted work
+    // and redundant DB contention, so a tick already in flight is skipped
+    // rather than overlapped.
+    let tdahTickInFlight = false;
+    const tdahNightlyTickTimer = setInterval(() => {
+        if (tdahTickInFlight) return;
+        tdahTickInFlight = true;
+        void runTdahNightlyIntervalTick(dataDir).finally(() => {
+            tdahTickInFlight = false;
+        });
+    }, 60_000);
+    if (typeof tdahNightlyTickTimer.unref === 'function') {
+        tdahNightlyTickTimer.unref();
     }
 
     const usingLegacyTokenVar = options.allowedAuthTokens === undefined
@@ -1570,6 +1633,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
         if (stopped) return;
         stopped = true;
         clearInterval(cleanupTimer);
+        clearInterval(tdahNightlyTickTimer);
         try {
             await Promise.resolve((server as { stop?: (closeIdleConnections?: boolean) => void | Promise<void> }).stop?.(true));
         } catch {

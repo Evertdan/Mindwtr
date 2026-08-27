@@ -8,6 +8,8 @@ import { getLocaleCoverageTier, normalizeWeekStartSetting } from '@mindwtr/core'
 import type { DesktopThemeMode } from '../../../lib/theme';
 import { Switch } from '../../ui/Switch';
 import { SettingRow, SettingsCard, SettingsSectionHeader } from './SettingRow';
+import { TdahActivationSection } from './TdahActivationSection';
+import { TdahRoutinesListView } from './TdahRoutinesListView';
 
 const FLATPAK_QUICK_ADD_COMMAND = 'flatpak run tech.dongdongbh.mindwtr --quick-add';
 
@@ -442,6 +444,17 @@ export function SettingsMainPage({
                     />
                 </SettingRow>
             </SettingsCard>
+
+            {/* ADHD mode activation (T-14, spec 1.3) — self-contained: resolves its
+                own cloud config, profile state and i18n rather than threading
+                through this page's `t: Labels` prop. */}
+            <TdahActivationSection />
+
+            {/* Rutinas CRUD (T-03/T-04, spec 1.4) — self-contained like
+                TdahActivationSection above; owns its own list <-> editor
+                navigation internally (no drill-in precedent exists elsewhere
+                in apps/desktop to follow instead). */}
+            <TdahRoutinesListView />
 
             {/* Window Behavior */}
             {hasWindowSection && (

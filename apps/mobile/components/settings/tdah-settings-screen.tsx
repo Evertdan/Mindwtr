@@ -10,6 +10,8 @@ import { getSecureConfigValue } from '@/lib/secure-config';
 import { CLOUD_ALLOW_INSECURE_HTTP_KEY, CLOUD_TOKEN_KEY, CLOUD_URL_KEY } from '@/lib/sync-constants';
 import { getMobileCloudRequestOptions } from '@/lib/webdav-request-options';
 
+import { TdahOnboardingFlow } from '../tdah/onboarding/TdahOnboardingFlow';
+import type { TdahActivateResult, TdahOnboardingVariant } from '../tdah/onboarding/tdah-onboarding-types';
 import { SettingRow, SettingToggleRow } from './setting-row';
 import { useSettingsLocalization, useSettingsScrollContent } from './settings.hooks';
 import { SettingsTopBar } from './settings.shell';
@@ -59,6 +61,7 @@ export function TdahSettingsScreen() {
     const [profile, setProfile] = useState<TdahProfileState | null>(null);
     const [mutating, setMutating] = useState(false);
     const [saveFailed, setSaveFailed] = useState(false);
+    const [onboardingVariant, setOnboardingVariant] = useState<TdahOnboardingVariant | null>(null);
 
     const loadProfile = useCallback(async (config: CloudSyncConfig): Promise<void> => {
         const result = await cloudGetJson<{ profile: TdahProfileState | null }>(
@@ -105,20 +108,43 @@ export function TdahSettingsScreen() {
 
     const handleToggleMode = useCallback(async (next: boolean) => {
         if (!cloud || mutating) return;
+        // A rapid double-tap can fire the handler again before the switch
+        // visually re-renders to reflect the first "on" tap; ignore a
+        // redundant on-tap instead of re-opening onboarding / re-activating.
+        if (next && profile?.mode === 'on') return;
+        if (next) {
+            // First-ever activation (profile never existed) runs the full T-14
+            // onboarding; reactivating a previously-off profile skips straight
+            // to its "Listo" step with tz/ritualHour already conserved
+            // server-side (spec Boundaries — never re-run steps 1-4).
+            setSaveFailed(false);
+            setOnboardingVariant(profile === null ? 'full' : 'reactivation');
+            return;
+        }
         setMutating(true);
         setSaveFailed(false);
         try {
-            const body = next
-                ? { mode: 'on' as const, timeZone: detectDeviceTimeZone() }
-                : { mode: 'off' as const };
-            await cloudPutJson(buildTdahProfileUrl(cloud.url), body, buildCloudOptions(cloud));
+            await cloudPutJson(buildTdahProfileUrl(cloud.url), { mode: 'off' as const }, buildCloudOptions(cloud));
             await loadProfile(cloud);
         } catch {
             setSaveFailed(true);
         } finally {
             setMutating(false);
         }
-    }, [cloud, loadProfile, mutating]);
+    }, [cloud, loadProfile, mutating, profile]);
+
+    const handleOnboardingFinished = useCallback((result: TdahActivateResult) => {
+        // The activate response already carries the server-confirmed profile
+        // (same shape as TdahProfileState) — seed this screen's state from it
+        // directly instead of firing an extra, unguarded GET whose failure
+        // would leave the toggle showing a stale "off" after a real "on".
+        setOnboardingVariant(null);
+        setProfile(result.profile);
+    }, []);
+
+    const handleOnboardingClose = useCallback(() => {
+        setOnboardingVariant(null);
+    }, []);
 
     const modeEnabled = profile?.mode === 'on';
 
@@ -209,6 +235,15 @@ export function TdahSettingsScreen() {
                     </View>
                 </View>
             </ScrollView>
+            {onboardingVariant && cloud ? (
+                <TdahOnboardingFlow
+                    cloud={cloud}
+                    variant={onboardingVariant}
+                    initialTimeZone={profile?.timeZone ?? detectDeviceTimeZone()}
+                    onFinished={handleOnboardingFinished}
+                    onClose={handleOnboardingClose}
+                />
+            ) : null}
         </SafeAreaView>
     );
 }

@@ -80,3 +80,145 @@ estructural del feed de calendario (`server-calendar-feed.ts`): autocontenido,
 montado bajo su prefijo, sin tocar las rutas de sync. Si un futuro requisito
 obligue a compartir esquema o transacciones con el documento de sincronización,
 esa sería una divergencia nueva a decidir aquí de nuevo.
+
+## Adenda (historia 1.4): mecanismo de migración de esquema
+
+La historia 1.4 (CRUD de Rutinas) fue la primera vez que este módulo necesitó
+ensanchar una tabla ya publicada en disco: `tdah_routine.pattern_kind` pasó de
+un único literal (`CHECK (pattern_kind IN ('weekday'))`) a un patrón de
+calendario real (`'weekday' | 'nthWeekdayOfMonth'`), con columnas nuevas
+nullable (`pattern_weekdays`, `pattern_nth_ordinal`, `pattern_nth_weekday`).
+`CREATE TABLE IF NOT EXISTS` — el único mecanismo de esquema que el módulo
+había usado hasta entonces — es un no-op permanente contra cualquier
+`tdah.sqlite` que ya exista en disco desde una activación 1.1–1.3 (DW-9): la
+restricción `CHECK` vieja se habría quedado vigente para siempre en esas bases.
+
+Mecanismo elegido: `PRAGMA user_version`, nativo de SQLite, sin framework de
+migraciones genérico (el módulo tiene exactamente un cambio de esquema que
+hacer; un runner reusable sería infraestructura que esta historia no
+necesita — mismo criterio "aditivo, mínimo" del resto de este ADR). Un único
+salto de versión `0 → 1`:
+
+- `apps/cloud/src/tdah/storage.ts`'s `migrateSchemaIfNeeded(database)` corre
+  dentro de `ensureSchema()`, en el mismo paso donde ya viven los `CREATE
+  TABLE IF NOT EXISTS` — es decir, en cada apertura de escritura
+  (`withWriteTransaction`) y, si hace falta, también en cada apertura de
+  lectura (`withReadDatabase`, ver abajo), antes de servir la petición.
+- Detecta si la base necesita migrar por presencia de columna
+  (`PRAGMA table_info('tdah_routine')` buscando `pattern_weekdays`), no solo
+  por `user_version`: una base nueva ya nace con el esquema ensanchado
+  (`CREATE_ROUTINE_TABLE_SQL` lo declara directamente), así que solo necesita
+  que se le estampe `user_version = 1`, nunca una reconstrucción.
+- Cuando sí hace falta reconstruir (base 1.1–1.3 real): crea
+  `tdah_routine_v2` con las columnas nuevas, copia las filas existentes
+  (`pattern_weekdays = '1,2,3,4,5'` para cada fila `'weekday'` — el único
+  patrón que la plantilla fija de onboarding pudo haber creado, y que siempre
+  implicó Lunes–Viernes aunque nunca se guardó explícitamente), hace `DROP
+  TABLE`/`RENAME` y fija `PRAGMA user_version = 1`.
+- **Lecturas también migran.** La migración es DDL y exige un handle no
+  `readonly`, pero varias rutas nuevas (`GET /v1/tdah/routines`, el preview de
+  aplicabilidad) son de solo lectura y podrían ser la primera petición del
+  módulo tras el upgrade — típicamente al abrir la vista de lista de Rutinas.
+  `withReadDatabase` resuelve esto con una sonda: abre readonly, lee
+  `PRAGMA user_version`; si ya está al día, sigue igual que antes (un
+  `PRAGMA` de más, sin costo real); si detecta una base vieja, dispara una
+  pasada corta de `withWriteTransaction` (que reutiliza su propio backoff ante
+  `SQLITE_BUSY` en vez de duplicarlo) para migrar, y luego abre el handle
+  readonly real. Así "cualquier petición migra el esquema de forma
+  transparente antes de ser servida" vale también para las rutas de solo
+  lectura, no solo para las de escritura.
+
+Además de la migración de esquema, la historia 1.4 fijó tres decisiones de
+producto/diseño que valen la pena dejar registradas aquí junto al mecanismo:
+
+- **Desempate de precedencia entre Rutinas de igual especificidad: gana la más
+  reciente (`created_at` DESC, empate por `id` DESC).** `nthWeekdayOfMonth`
+  siempre supera a `weekday` (AD-5), pero cuando dos Rutinas empatan en
+  especificidad no hay un campo de prioridad explícito que el usuario pueda
+  fijar — se eligió deliberadamente "la más reciente gana" porque es el
+  cambio mínimo que preserva el comportamiento *ya existente* antes de 1.4
+  ("gana la más reciente" era la selección implícita cuando solo podía existir
+  una Rutina), en vez de introducir una UI de prioridad ordenable que el spec
+  de UX de esta historia no pedía. El indicador de conflicto en la lista sigue
+  mostrando qué Rutina gana, así que el desempate es visible para el usuario,
+  no silencioso (ver spec 1.4, sección "Design Notes").
+- **El solape de Bloques pasó de rechazo duro (historia 1.3) a aviso no
+  bloqueante.** Antes de esta historia, `POST /activate` rechazaba con 400
+  `TDAH_ROUTINE_INVALID` cualquier Rutina cuyos Bloques se solaparan en el
+  tiempo. La historia 1.4 relaja eso: el solape (y el cruce de medianoche) se
+  computan en cada lectura (`computeOverlapWarnings`/
+  `computeMidnightCrossingWarnings` en storage.ts) y se devuelven como
+  advertencias no bloqueantes junto a un guardado exitoso — el usuario puede
+  querer solapes deliberados (p. ej. un Bloque de "disponibilidad" que cubre
+  varios Bloques más específicos), y forzarlo a resolver eso antes de guardar
+  no aportaba valor.
+- **El CRUD de Rutinas no está condicionado por `TdahProfile.mode`.** Se puede
+  crear, editar, duplicar y borrar Rutinas con el modo en `'off'` — `mode`
+  únicamente controla si el módulo genera DayPlans/Actividades (la espina de
+  AD-1), no si el usuario puede administrar sus datos. Es consistente con el
+  resto del módulo: el perfil y las Rutinas son almacenamiento de servidor
+  independiente de si la generación automática está activa.
+
+## Adenda (historia 1.5): el primer scheduler en segundo plano de la aplicación
+
+La historia 1.5 (generación nocturna) introdujo el primer disparador
+server-side que corre sin que ninguna petición HTTP lo invoque: hasta ahora,
+`mutateGenerateTomorrowIfMissing` solo se ejecutaba de forma síncrona dentro de
+`POST /v1/tdah/activate`, así que el plan del día se generaba exactamente una
+vez, en la activación, y nunca más — el andamio dependía de que el usuario
+reactivara el modo cada noche, justo lo que la espina del épico prohíbe
+(`epic-1-context.md`: "el andamio nunca depende de la disciplina nocturna del
+usuario").
+
+**Mecanismo elegido: un `setInterval` de 60s en proceso, no un framework de
+colas de trabajos.** `apps/cloud/src/server.ts`'s `startCloudServer` registra
+un segundo temporizador (`.unref()`'d, igual que el `cleanupTimer` del rate
+limiter ya existente) que cada 60 segundos invoca
+`runNightlyTdahTick(dataDir, new Date())` (`apps/cloud/src/tdah/scheduler.ts`).
+A la escala esperada de este módulo (un VPS por usuario o un puñado de
+usuarios por instancia auto-alojada), un job-queue genérico sería
+infraestructura que esta historia no necesita — mismo criterio "aditivo,
+mínimo" del resto de este ADR. El propio `setInterval` del rate limiter ya era
+precedente directo de esta forma de cableado.
+
+**Recomputa zona horaria/hora del ritual desde el perfil vivo en cada tick, sin
+caché de "próxima disparada".** Cada tick vuelve a leer `readTdahProfile` por
+namespace y recalcula "hoy"/"mañana" y si la hora local ya alcanzó
+`ritualHour` — nunca guarda un timestamp "próximo disparo" derivado. Esto
+satisface con cero lógica de invalidación el requisito de que un `PUT
+/v1/tdah/profile` que cambie `timeZone`/`ritualHour` surta efecto en el
+siguiente tick, sin tocar ninguna Actividad ya registrada.
+
+**Una transacción por namespace, nunca una transacción cruzada.** Cada
+namespace tiene su propio archivo SQLite (ADR 0026 original); no existe
+atomicidad cruzada que ganar, y el aislamiento de fallos por namespace (un
+caso de borde que la historia exige explícitamente) necesita transacciones
+separadas de todos modos. `mutateCloseOutgoingDay` (la transición a `limbo` de
+Actividades `pending`/`started`) y la ya existente `mutateGenerateTomorrowIfMissing`
+corren dentro de un único `withWriteTransaction` sostenido por namespace —
+`scheduler.ts` es el único código autorizado a invocar `mutateCloseOutgoingDay`;
+ninguna ruta puede poner `limbo` en bloque (coincide con AD-5/AD-11 del spec de
+UX).
+
+**Sin columna ni bandera nueva de "última vez disparado": la fila
+`tdah_day_plan` de mañana sigue siendo la única señal de completitud**, vía su
+PRIMARY KEY ya existente desde la historia 1.3 — un namespace cuyo
+DayPlan-de-mañana ya existe se salta con una lectura barata (`hasDayPlan`), sin
+abrir siquiera una transacción de escritura. Añadir una segunda marca de
+completitud habría exigido su propia migración para un hecho que el esquema ya
+codifica — mismo precedente de minimalismo que la migración única de la
+historia 1.4.
+
+**Auditoría de logs sin identidad de namespace, siguiendo el mismo patrón que
+`pruneOrphanedCalendarFeeds`.** `runNightlyTdahTick` es una función pura que
+solo devuelve conteos (`TdahNightlyTickSummary`); es su llamador en
+`server.ts` quien emite la única línea de auditoría por tick
+(`'tdah nightly trigger fired'`, contexto `{date, generatedCount, limboCount,
+namespaceCount}`) — el mismo reparto de responsabilidades que
+`server-calendar-feed.ts`'s `pruneOrphanedCalendarFeeds` ya establecía (una
+función de storage que nunca loggea, un caller en `server.ts` que sí). Un
+fallo de escritura en un namespace individual se loggea con el mensaje
+genérico ya existente `'request failed'` y su `.code` de fs/sqlite —
+nunca la clave del namespace ni el título de una Actividad — y ese namespace
+simplemente se reintenta en el siguiente tick sin abortar ni demorar a los
+demás namespaces del mismo tick.
