@@ -83,8 +83,34 @@ describe('parseTdahWsActivityTriggerEvent', () => {
         ['missing title', { kind: 'activity-trigger', edge: 'start', activityId: 1, durationMinutes: 1 }],
         ['negative durationMinutes', { kind: 'activity-trigger', edge: 'start', activityId: 1, title: 'x', durationMinutes: -1 }],
         ['non-numeric durationMinutes', { kind: 'activity-trigger', edge: 'start', activityId: 1, title: 'x', durationMinutes: 'abc' }],
+        // Review fix (LOW): durationMinutes must be a genuine number —
+        // `Number('') === 0` and `Number(true) === 1` used to slip through
+        // the coercion path.
+        ['empty-string durationMinutes', { kind: 'activity-trigger', edge: 'start', activityId: 1, title: 'x', durationMinutes: '' }],
+        ['boolean durationMinutes', { kind: 'activity-trigger', edge: 'start', activityId: 1, title: 'x', durationMinutes: true }],
     ])('returns null for %s', (_label, input) => {
         expect(parseTdahWsActivityTriggerEvent(input)).toBeNull();
+    });
+
+    // Review fix (LOW): a canonical positive integer only — 0, negatives,
+    // fractions, and `Number(null) === 0` can never reference a real
+    // Activity.
+    it.each([
+        ['zero', 0],
+        ['negative', -3],
+        ['fractional', 42.5],
+        ['null', null],
+    ])('returns null for an activityId of %s', (_label, activityId) => {
+        expect(parseTdahWsActivityTriggerEvent({
+            kind: 'activity-trigger', edge: 'start', activityId, title: 'x', durationMinutes: 1,
+        })).toBeNull();
+    });
+
+    it('still accepts a numeric 0 durationMinutes (a zero-length Activity is not invalid)', () => {
+        const parsed = parseTdahWsActivityTriggerEvent({
+            kind: 'activity-trigger', edge: 'start', activityId: 9, title: 'Duración cero', durationMinutes: 0,
+        });
+        expect(parsed?.durationMinutes).toBe(0);
     });
 });
 

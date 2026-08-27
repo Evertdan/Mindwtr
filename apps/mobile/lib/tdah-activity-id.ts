@@ -11,6 +11,10 @@
  */
 export function parseTdahActivityId(value: string | undefined | null): number | null {
     if (!value) return null;
+    // Review fix (LOW): canonical decimal form only — `Number('1e2') === 100`
+    // and `Number('0x2A') === 42` would otherwise pass the integer check
+    // below despite no server ever emitting them as an Activity id.
+    if (!/^\d+$/.test(value.trim())) return null;
     const activityId = Number(value);
     if (!Number.isInteger(activityId) || activityId <= 0) return null;
     return activityId;

@@ -57,8 +57,11 @@ export function parseTdahWsActivityTriggerEvent(raw: unknown): TdahWsActivityTri
     if (obj.kind !== TDAH_WS_ACTIVITY_TRIGGER_KIND) return null;
     if (obj.edge !== 'start' && obj.edge !== 'end') return null;
 
+    // Review fix (LOW): a canonical positive integer only — an Activity id
+    // of 0, a negative, or a fraction can never reference a real Activity,
+    // and `Number(null) === 0` must not sneak through either.
     const activityId = Number(obj.activityId);
-    if (!Number.isFinite(activityId)) return null;
+    if (!Number.isFinite(activityId) || !Number.isInteger(activityId) || activityId <= 0) return null;
 
     const title = typeof obj.title === 'string' ? obj.title.trim() : '';
     if (!title) return null;
@@ -67,11 +70,13 @@ export function parseTdahWsActivityTriggerEvent(raw: unknown): TdahWsActivityTri
     // opcionales" — a manual Activity can have a startTime without a
     // durationMinutes), not a malformed payload — only reject genuinely
     // invalid values (missing entirely, non-numeric, negative).
+    // Review fix (LOW): the value must be a genuine `number` — coercing via
+    // `Number(...)` also accepted `'' -> 0`, `true -> 1`, and `[] -> 0`.
     let durationMinutes: number | null = null;
     if (obj.durationMinutes !== null && obj.durationMinutes !== undefined) {
-        const parsedDuration = Number(obj.durationMinutes);
-        if (!Number.isFinite(parsedDuration) || parsedDuration < 0) return null;
-        durationMinutes = parsedDuration;
+        if (typeof obj.durationMinutes !== 'number') return null;
+        if (!Number.isFinite(obj.durationMinutes) || obj.durationMinutes < 0) return null;
+        durationMinutes = obj.durationMinutes;
     }
 
     return {
