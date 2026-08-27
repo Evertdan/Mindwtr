@@ -8,6 +8,7 @@ import type { TdahActivity } from './tdah-today-types';
 
 const hookState = vi.hoisted(() => ({
     phase: 'ready' as string,
+    timeZone: 'America/Mexico_City',
     routineTitle: null as string | null,
     activities: [] as TdahActivity[],
     reload: vi.fn(),
@@ -240,5 +241,35 @@ describe('TdahActivityDetailScreen — view mode', () => {
             tree!.root.findByProps({ testID: 'tdah-activity-retry' }).props.onPress();
         });
         expect(hookState.reload).toHaveBeenCalled();
+    });
+
+    it('renders startedAt/completedAt in the profile time zone (AD-6: one clock everywhere), not the device zone', async () => {
+        hookState.phase = 'ready';
+        hookState.timeZone = 'America/Mexico_City'; // UTC-6, no DST
+        hookState.activities = [{
+            ...activity,
+            state: 'started',
+            startedAt: '2026-08-26T15:30:00.000Z', // 09:30 in Mexico City
+            completedAt: '2026-08-26T16:00:00.000Z', // 10:00 in Mexico City
+        }];
+        let tree: ReturnType<typeof create> | undefined;
+        await act(async () => { tree = create(<TdahActivityDetailScreen mode="view" activityId={5} />); });
+
+        const texts = tree!.root.findAllByType(Text).map((node) => node.props.children);
+        expect(texts.flat()).toContain('Started: 09:30');
+        expect(texts.flat()).toContain('Completed: 10:00');
+        // A device-zone implementation on a UTC test runner would render 15:30/16:00.
+        expect(texts.flat().join(' ')).not.toContain('15:30');
+        expect(texts.flat().join(' ')).not.toContain('16:00');
+    });
+
+    it('falls back to the raw instant string when it cannot be formatted, without crashing', async () => {
+        hookState.phase = 'ready';
+        hookState.activities = [{ ...activity, state: 'started', startedAt: 'not-an-instant', completedAt: null }];
+        let tree: ReturnType<typeof create> | undefined;
+        await act(async () => { tree = create(<TdahActivityDetailScreen mode="view" activityId={5} />); });
+
+        const texts = tree!.root.findAllByType(Text).map((node) => node.props.children);
+        expect(texts.flat()).toContain('Started: not-an-instant');
     });
 });

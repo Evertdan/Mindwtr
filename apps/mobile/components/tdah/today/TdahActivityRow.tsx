@@ -8,13 +8,17 @@ import { useThemeColors } from '@/hooks/use-theme-colors';
 
 import { TdahStatusGlyph } from './TdahStatusGlyph';
 import { tdahActivityOriginLabel, tdahActivityStateLabel } from './tdah-activity-labels';
-import { styles } from './tdah-today.styles';
-import { computeActivityLayout } from './tdah-timeline-layout';
+import { styles, TDAH_TIMELINE_GUTTER_WIDTH } from './tdah-today.styles';
+import { computeActivityLayout, TDAH_TIMELINE_LANE_OFFSET_PX } from './tdah-timeline-layout';
 import type { TdahActivity } from './tdah-today-types';
 
 export type TdahActivityRowProps = {
     activity: TdahActivity;
     onPress: (activity: TdahActivity) => void;
+    /** Story 1.6 AC: emphasis for the "vigente" Activity (its window contains now, state pending/started). */
+    isCurrent?: boolean;
+    /** Overlap lane from `computeActivityLaneOffsets` — offsets the row right (narrowing it) so stacked rows stay visible/tappable. */
+    laneIndex?: number;
 };
 
 /**
@@ -27,8 +31,12 @@ export type TdahActivityRowProps = {
  * estado, origen" in that order when a time exists (spec Always), or
  * "título, estado, origen" — the time segment dropped entirely rather than
  * left as an empty/garbled placeholder — when it doesn't.
+ *
+ * AC "fila se apila a 200% sin truncar": the timeline slot is a `minHeight`,
+ * never a fixed `height`, and the title has no line cap — content grows the
+ * row instead of being clipped at large font scales.
  */
-export function TdahActivityRow({ activity, onPress }: TdahActivityRowProps) {
+export function TdahActivityRow({ activity, onPress, isCurrent = false, laneIndex = 0 }: TdahActivityRowProps) {
     const tc = useThemeColors();
     const { t } = useLanguage();
     const layout = computeActivityLayout(activity.startTime, activity.durationMinutes);
@@ -45,10 +53,23 @@ export function TdahActivityRow({ activity, onPress }: TdahActivityRowProps) {
             { title: activity.title, state: stateLabel, origin: originLabel },
         );
 
-    const wrapperStyle = layout ? [styles.rowWrapper, { top: layout.top, height: layout.height }] : [styles.rowWrapperStatic];
+    // The vigente emphasis stays in the semantic token set (UX-DR3/AC 1.6):
+    // surfaceContainerHigh (`tc.taskItemBg` in the token source) behind a
+    // 1px primary (`tc.tint`) border — red stays reserved for errors.
+    const emphasisStyle = isCurrent
+        ? { backgroundColor: tc.taskItemBg, borderColor: tc.tint }
+        : { backgroundColor: tc.cardBg, borderColor: tc.border };
+    const laneOffset = laneIndex * TDAH_TIMELINE_LANE_OFFSET_PX;
+    const wrapperStyle = layout
+        ? [styles.rowWrapper, {
+            top: layout.top,
+            minHeight: layout.height,
+            left: TDAH_TIMELINE_GUTTER_WIDTH + 4 + laneOffset,
+        }]
+        : [styles.rowWrapperStatic];
     const rowStyle = layout
-        ? [styles.row, { backgroundColor: tc.cardBg, borderColor: tc.border, height: layout.height }]
-        : [styles.row, { backgroundColor: tc.cardBg, borderColor: tc.border }];
+        ? [styles.row, emphasisStyle, { minHeight: layout.height }]
+        : [styles.row, emphasisStyle];
 
     return (
         <View style={wrapperStyle}>
@@ -67,7 +88,7 @@ export function TdahActivityRow({ activity, onPress }: TdahActivityRowProps) {
                         {activity.startTime !== null ? (
                             <Text style={[styles.rowTime, { color: tc.secondaryText }]}>{activity.startTime}</Text>
                         ) : null}
-                        <Text style={[styles.rowTitle, { color: tc.text }]} numberOfLines={2}>
+                        <Text style={[styles.rowTitle, { color: tc.text }]}>
                             {activity.title}
                         </Text>
                     </View>

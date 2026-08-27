@@ -11,8 +11,9 @@ vi.mock('@/hooks/use-reduced-motion', () => ({
     useReducedMotion: () => reducedMotion.value,
 }));
 
+const THEME = { tint: '#3b82f6', danger: '#ef4444' };
 vi.mock('@/hooks/use-theme-colors', () => ({
-    useThemeColors: () => ({ danger: '#ef4444' }),
+    useThemeColors: () => THEME,
 }));
 
 const flattenStyle = (style: unknown): Record<string, unknown> => (
@@ -58,6 +59,47 @@ describe('TdahNowLine', () => {
         const marker = tree.root.findByProps({ testID: 'tdah-now-line' });
         const style = flattenStyle(marker.props.style);
         expect(style.top).toBe((3 * 60 + 30) * TDAH_TIMELINE_PIXELS_PER_MINUTE);
+    });
+
+    it('uses the theme primary token for the dot and rule (UX-DR3), never the danger/error color', () => {
+        const tree = renderNowLine();
+        const dotStyle = flattenStyle(tree.root.findByProps({ testID: 'tdah-now-line-dot' }).props.style);
+        const ruleStyle = flattenStyle(tree.root.findByProps({ testID: 'tdah-now-line-rule' }).props.style);
+        expect(dotStyle.backgroundColor).toBe(THEME.tint);
+        expect(ruleStyle.backgroundColor).toBe(THEME.tint);
+        expect(dotStyle.backgroundColor).not.toBe(THEME.danger);
+        expect(ruleStyle.backgroundColor).not.toBe(THEME.danger);
+    });
+
+    it('draws an 8% primary halo behind the dot (UX-DR3), larger than the dot itself', () => {
+        const tree = renderNowLine();
+        const halo = tree.root.findByProps({ testID: 'tdah-now-line-halo' });
+        const haloStyle = flattenStyle(halo.props.style);
+        expect(haloStyle.backgroundColor).toBe(THEME.tint);
+        expect(haloStyle.backgroundColor).not.toBe(THEME.danger);
+        expect(haloStyle.opacity).toBe(0.08);
+        expect(haloStyle.width).toBeGreaterThan(8);
+        expect(haloStyle.height).toBeGreaterThan(8);
+    });
+
+    it('labels the line with the HH:mm wall clock in the profile timeZone, advancing with the position tick', () => {
+        vi.setSystemTime(new Date('2026-08-26T09:29:50Z'));
+        const tree = renderNowLine('UTC');
+        const label = () => tree.root.findByProps({ testID: 'tdah-now-line-time' });
+        expect(label().props.children).toBe('09:29');
+
+        act(() => {
+            vi.advanceTimersByTime(30_000);
+        });
+        // Same tick that moves the position moves the label: 09:29:50 -> 09:30:20.
+        expect(label().props.children).toBe('09:30');
+        const marker = flattenStyle(tree.root.findByProps({ testID: 'tdah-now-line' }).props.style);
+        expect(marker.top).toBe((9 * 60 + 30) * TDAH_TIMELINE_PIXELS_PER_MINUTE);
+    });
+
+    it('labels the time in the profile zone, not the device zone (AD-6)', () => {
+        const tree = renderNowLine('America/Mexico_City');
+        expect(tree.root.findByProps({ testID: 'tdah-now-line-time' }).props.children).toBe('03:30');
     });
 
     it('pulses the dot opacity over time when reduced motion is off', () => {

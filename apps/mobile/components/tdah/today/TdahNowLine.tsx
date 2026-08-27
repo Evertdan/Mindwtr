@@ -1,34 +1,14 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Text, View } from 'react-native';
 
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 
 import { styles, TDAH_TIMELINE_DAY_START_HOUR, TDAH_TIMELINE_PIXELS_PER_MINUTE } from './tdah-today.styles';
+import { formatWallClockInTimeZone, getMinutesSinceMidnightInTimeZone } from './tdah-time';
 
 const NOW_TICK_INTERVAL_MS = 30_000;
 const PULSE_DURATION_MS = 900;
-
-/**
- * Minutes-since-midnight of `date`'s wall-clock time *in `timeZone`* — the
- * same `Intl.DateTimeFormat`-in-time-zone technique as the cloud side's
- * `formatDateInTimeZone` (apps/cloud/src/tdah/storage.ts), never the
- * device's own local `Date.getHours()`/`getMinutes()` (AD-6: wall-clock
- * always in the TDAH profile's own configured zone, not the requesting
- * device's — a device set to a different zone than the profile would
- * otherwise show the "ahora" marker in the wrong position).
- */
-const getMinutesSinceMidnightInTimeZone = (date: Date, timeZone: string): number => {
-    const parts = new Intl.DateTimeFormat('en-US', {
-        timeZone,
-        hour: '2-digit',
-        minute: '2-digit',
-        hourCycle: 'h23',
-    }).formatToParts(date);
-    const hour = Number(parts.find((part) => part.type === 'hour')?.value ?? '0');
-    const minute = Number(parts.find((part) => part.type === 'minute')?.value ?? '0');
-    return hour * 60 + minute;
-};
 
 export type TdahNowLineProps = {
     /** The TDAH profile's own configured IANA zone (`GET /v1/tdah/day`'s `timeZone`). */
@@ -42,6 +22,12 @@ export type TdahNowLineProps = {
  * `((hours - DAY_START_HOUR) * 60 + minutes) * PIXELS_PER_MINUTE` — not its
  * column-layout logic, but with hours/minutes resolved in the profile's own
  * `timeZone` rather than the device's local clock (AD-6).
+ *
+ * UX-DR3: the marker is the theme's PRIMARY semantic token (`tc.tint`, what
+ * the token source maps to M3 `primary`) with an 8% halo — `tc.danger` stays
+ * reserved for error semantics. The line also carries the real time: a
+ * small HH:mm label at the gutter's edge, resolved in the same `timeZone`
+ * and advancing together with the position tick (the same `now` state).
  */
 export function TdahNowLine({ timeZone }: TdahNowLineProps) {
     const tc = useThemeColors();
@@ -77,17 +63,21 @@ export function TdahNowLine({ timeZone }: TdahNowLineProps) {
         return () => clearInterval(interval);
     }, [pulse, reducedMotion]);
 
-    const top = useMemo(() => (
-        (getMinutesSinceMidnightInTimeZone(now, timeZone) - TDAH_TIMELINE_DAY_START_HOUR * 60) * TDAH_TIMELINE_PIXELS_PER_MINUTE
-    ), [now, timeZone]);
+    const minutesSinceMidnight = getMinutesSinceMidnightInTimeZone(now, timeZone);
+    const top = (minutesSinceMidnight - TDAH_TIMELINE_DAY_START_HOUR * 60) * TDAH_TIMELINE_PIXELS_PER_MINUTE;
+    const timeLabel = formatWallClockInTimeZone(now, timeZone);
 
     return (
         <View pointerEvents="none" style={[styles.nowLine, { top }]} testID="tdah-now-line">
+            <View style={[styles.nowHalo, { backgroundColor: tc.tint }]} testID="tdah-now-line-halo" />
             <Animated.View
-                style={[styles.nowDot, { backgroundColor: tc.danger, opacity: pulse }]}
+                style={[styles.nowDot, { backgroundColor: tc.tint, opacity: pulse }]}
                 testID="tdah-now-line-dot"
             />
-            <View style={[styles.nowRule, { backgroundColor: tc.danger }]} />
+            <View style={[styles.nowRule, { backgroundColor: tc.tint }]} testID="tdah-now-line-rule" />
+            <Text style={[styles.nowTimeLabel, { color: tc.tint }]} testID="tdah-now-line-time">
+                {timeLabel}
+            </Text>
         </View>
     );
 }

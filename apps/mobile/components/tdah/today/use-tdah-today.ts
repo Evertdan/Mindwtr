@@ -18,15 +18,18 @@ import type {
 } from './tdah-today-types';
 
 /**
- * `loading` -> `ready`/`empty`/`offline`/`error`, mirroring
+ * `loading` -> `ready`/`empty`/`offline`/`unconfigured`/`error`, mirroring
  * tdah-settings-screen.tsx's phase pattern but splitting network failure
  * into its own `offline` phase (AD-11: an offline banner, never a stale plan
  * rendered as if it were live) instead of collapsing every failure into one
  * generic `error`. `error` is reserved for a real server response (a bad
- * status, or Self-Hosted sync not configured yet); `offline` is reserved for
- * a request that never reached the server (network unreachable, timeout).
+ * status, e.g. a 409 when the mode is off); `offline` is reserved for a
+ * request that never reached the server (network unreachable, timeout);
+ * `unconfigured` is Self-Hosted sync not set up yet — a distinct phase, not
+ * a fake `error`, because its Retry can never succeed until the user
+ * configures sync in Settings (UX-DR5: no dead-end error loop).
  */
-export type TdahTodayPhase = 'loading' | 'ready' | 'empty' | 'offline' | 'error';
+export type TdahTodayPhase = 'loading' | 'ready' | 'empty' | 'offline' | 'error' | 'unconfigured';
 
 export type UseTdahTodayResult = {
     phase: TdahTodayPhase;
@@ -46,6 +49,18 @@ const mergeActivity = (activities: TdahActivity[], next: TdahActivity): TdahActi
     merged[index] = next;
     return merged;
 };
+
+/**
+ * Midnight-day merge guard: a mutation whose response spans the profile's
+ * local midnight (the server assigns it to the *new* day's plan) must never
+ * splice into the still-rendered previous day's timeline — only merge when
+ * the returned activity belongs to the loaded day. A dropped merge is safe:
+ * every screen refetches on focus (AD-1), so the new day's plan renders as
+ * soon as the user re-enters T-01 or the rollover reload fires.
+ */
+const shouldMergeIntoRenderedDay = (activity: TdahActivity, renderedDate: string | null): boolean => (
+    activity.dayPlanDate === renderedDate
+);
 
 // Fallback only: used before the first successful `GET /v1/tdah/day`
 // resolves (`day.timeZone`, AD-6's real source of truth), and when a
@@ -79,6 +94,10 @@ export function useTdahToday(): UseTdahTodayResult {
     const [routineTitle, setRoutineTitle] = useState<string | null>(null);
     const [activities, setActivities] = useState<TdahActivity[]>([]);
     const mountedRef = useRef(true);
+    // The rendered day (`date`), readable from the mutation callbacks below
+    // without re-creating them whenever the day changes — the merge guard
+    // compares each server-returned activity's `dayPlanDate` against it.
+    const dateRef = useRef<string | null>(null);
     // A stale in-flight `reload()` resolving after a newer one (retry tap,
     // screen refocus) must never overwrite the fresher state — same
     // request-id idiom as quick-capture-sheet.tsx's `contextOptionsRequestRef`.
@@ -101,7 +120,7 @@ export function useTdahToday(): UseTdahTodayResult {
         try {
             const cloud = await loadTdahCloudConfig();
             if (!cloud) {
-                if (!isStale()) setPhase('error');
+                if (!isStale()) setPhase('unconfigured');
                 return;
             }
             const day = await cloudGetJson<TdahDayResponse>(buildTdahDayUrl(cloud.url), buildTdahRequestOptions(cloud));
@@ -118,6 +137,7 @@ export function useTdahToday(): UseTdahTodayResult {
                 return;
             }
             setDate(day.date);
+            dateRef.current = day.date;
             setTimeZone(typeof day.timeZone === 'string' && day.timeZone.length > 0 ? day.timeZone : DEVICE_TIME_ZONE);
             setRoutineTitle(day.routineTitle);
             setActivities(day.activities);
@@ -138,7 +158,9 @@ export function useTdahToday(): UseTdahTodayResult {
             buildTdahRequestOptions(cloud),
         );
         if (!result) throw new Error('TDAH manual activity creation returned no body');
-        if (mountedRef.current) setActivities((current) => mergeActivity(current, result.activity));
+        if (mountedRef.current && shouldMergeIntoRenderedDay(result.activity, dateRef.current)) {
+            setActivities((current) => mergeActivity(current, result.activity));
+        }
         return result.activity;
     }, []);
 
@@ -155,7 +177,9 @@ export function useTdahToday(): UseTdahTodayResult {
             buildTdahRequestOptions(cloud),
         );
         if (!result) throw new Error('TDAH activity action returned no body');
-        if (mountedRef.current) setActivities((current) => mergeActivity(current, result.activity));
+        if (mountedRef.current && shouldMergeIntoRenderedDay(result.activity, dateRef.current)) {
+            setActivities((current) => mergeActivity(current, result.activity));
+        }
         return result.activity;
     }, []);
 

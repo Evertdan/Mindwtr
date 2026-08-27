@@ -1,8 +1,9 @@
 import React from 'react';
 import { act, create } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TdahTodayScreen } from './TdahTodayScreen';
+import { TDAH_NOW_TICK_INTERVAL_MS } from './use-tdah-now';
 import type { TdahActivity } from './tdah-today-types';
 
 const hookState = vi.hoisted(() => ({
@@ -29,6 +30,19 @@ vi.mock('@react-navigation/native', () => ({
     },
 }));
 
+const networkListeners = vi.hoisted(() => [] as ((state: { isConnected: boolean | null }) => void)[]);
+vi.mock('expo-network', () => ({
+    addNetworkStateListener: (listener: (state: { isConnected: boolean | null }) => void) => {
+        networkListeners.push(listener);
+        return {
+            remove: () => {
+                const index = networkListeners.indexOf(listener);
+                if (index !== -1) networkListeners.splice(index, 1);
+            },
+        };
+    },
+}));
+
 vi.mock('react-native-safe-area-context', () => ({
     SafeAreaView: (props: any) => React.createElement('SafeAreaView', props, props.children),
 }));
@@ -43,15 +57,19 @@ vi.mock('lucide-react-native', () => ({
     CircleX: (props: any) => React.createElement('CircleX', props),
 }));
 
+const THEME = {
+    bg: '#fff', text: '#0f172a', secondaryText: '#94a3b8', cardBg: '#fff', border: '#e2e8f0',
+    filterBg: '#eef2f7', tint: '#3b82f6', onTint: '#fff', danger: '#ef4444',
+    // TdahStatusGlyph reads these for the limbo/completed glyph colors —
+    // omitting them left any color assertion for those two states
+    // exercising `undefined` instead of a real value.
+    warning: '#f59e0b', success: '#10b981',
+    // surfaceContainerHigh in the token source's M3 mapping; primary = tint.
+    taskItemBg: '#f1f5f9',
+};
+
 vi.mock('@/hooks/use-theme-colors', () => ({
-    useThemeColors: () => ({
-        bg: '#fff', text: '#0f172a', secondaryText: '#94a3b8', cardBg: '#fff', border: '#e2e8f0',
-        filterBg: '#eef2f7', tint: '#3b82f6', onTint: '#fff', danger: '#ef4444',
-        // TdahStatusGlyph reads these for the limbo/completed glyph colors —
-        // omitting them left any color assertion for those two states
-        // exercising `undefined` instead of a real value.
-        warning: '#f59e0b', success: '#10b981',
-    }),
+    useThemeColors: () => THEME,
 }));
 
 vi.mock('@/hooks/use-filled-button-colors', () => ({
@@ -72,6 +90,10 @@ const noTimeActivity: TdahActivity = {
     durationMinutes: null, origin: 'manual', state: 'pending', startedAt: null, completedAt: null,
 };
 
+const flattenStyle = (style: unknown): Record<string, unknown> => (
+    Array.isArray(style) ? Object.assign({}, ...style.map(flattenStyle)) : (style as Record<string, unknown>)
+);
+
 describe('TdahTodayScreen', () => {
     beforeEach(() => {
         hookState.phase = 'loading';
@@ -80,6 +102,7 @@ describe('TdahTodayScreen', () => {
         hookState.activities = [];
         hookState.reload.mockReset();
         router.push.mockReset();
+        networkListeners.length = 0;
     });
 
     it('reloads on focus (AD-1: every screen load is a fresh fetch)', async () => {
@@ -89,10 +112,13 @@ describe('TdahTodayScreen', () => {
         expect(hookState.reload).toHaveBeenCalledTimes(1);
     });
 
-    it('shows the loading state', async () => {
+    it('shows the loading state with the skeleton channel rows (AC: "skeleton con canal dibujado")', async () => {
         let tree: ReturnType<typeof create> | undefined;
         await act(async () => { tree = create(<TdahTodayScreen />); });
         expect(tree!.root.findByProps({ testID: 'tdah-today-loading' })).toBeTruthy();
+        [0, 1, 2].forEach((index) => {
+            expect(tree!.root.findByProps({ testID: `tdah-today-skeleton-row-${index}` })).toBeTruthy();
+        });
     });
 
     it('shows the error state with a working retry', async () => {
@@ -156,5 +182,173 @@ describe('TdahTodayScreen', () => {
         await act(async () => { tree = create(<TdahTodayScreen />); });
 
         expect(tree!.root.findAllByProps({ testID: 'tdah-today-no-time-section' })).toHaveLength(0);
+    });
+
+    describe('unconfigured phase (UX-DR5: not an error, a way out)', () => {
+        it('renders the unconfigured state with a Settings CTA instead of a dead-end retry', async () => {
+            hookState.phase = 'unconfigured';
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+
+            expect(tree!.root.findByProps({ testID: 'tdah-today-unconfigured' })).toBeTruthy();
+            expect(tree!.root.findAllByProps({ testID: 'tdah-today-retry' })).toHaveLength(0);
+
+            const openSettings = tree!.root.findByProps({ testID: 'tdah-today-open-settings' });
+            await act(async () => { openSettings.props.onPress(); });
+            expect(router.push).toHaveBeenCalledWith('/settings');
+        });
+    });
+
+    describe('offline -> online recovery (AD-11: the copy promises retrying)', () => {
+        it('reloads when connectivity is restored during the offline phase', async () => {
+            hookState.phase = 'offline';
+            await act(async () => { create(<TdahTodayScreen />); });
+            expect(hookState.reload).toHaveBeenCalledTimes(1); // focus only
+
+            await act(async () => {
+                networkListeners.forEach((listener) => listener({ isConnected: true }));
+            });
+            expect(hookState.reload).toHaveBeenCalledTimes(2);
+        });
+
+        it('guards against duplicate recovery reloads from a burst of connectivity events', async () => {
+            hookState.phase = 'offline';
+            await act(async () => { create(<TdahTodayScreen />); });
+
+            await act(async () => {
+                networkListeners.forEach((listener) => listener({ isConnected: true }));
+                networkListeners.forEach((listener) => listener({ isConnected: true }));
+                networkListeners.forEach((listener) => listener({ isConnected: true }));
+            });
+            expect(hookState.reload).toHaveBeenCalledTimes(2); // focus + exactly one recovery
+        });
+
+        it('ignores connectivity events that are not a restoration (isConnected false)', async () => {
+            hookState.phase = 'offline';
+            await act(async () => { create(<TdahTodayScreen />); });
+
+            await act(async () => {
+                networkListeners.forEach((listener) => listener({ isConnected: false }));
+                networkListeners.forEach((listener) => listener({ isConnected: null }));
+            });
+            expect(hookState.reload).toHaveBeenCalledTimes(1);
+        });
+
+        it('subscribes only while in the offline phase and unsubscribes on unmount', async () => {
+            hookState.phase = 'ready';
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+            expect(networkListeners).toHaveLength(0);
+
+            hookState.phase = 'offline';
+            await act(async () => { tree!.update(<TdahTodayScreen />); });
+            expect(networkListeners).toHaveLength(1);
+
+            await act(async () => { tree!.unmount(); });
+            expect(networkListeners).toHaveLength(0);
+        });
+    });
+
+    describe('midnight rollover in the profile zone', () => {
+        beforeEach(() => {
+            vi.useFakeTimers();
+        });
+
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        it('does not reload while the loaded day still matches the zone\'s day key', async () => {
+            hookState.phase = 'ready';
+            hookState.date = '2026-08-26';
+            hookState.timeZone = 'UTC';
+            vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
+
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+            expect(hookState.reload).toHaveBeenCalledTimes(1);
+
+            await act(async () => { vi.advanceTimersByTime(TDAH_NOW_TICK_INTERVAL_MS * 4); });
+            expect(hookState.reload).toHaveBeenCalledTimes(1);
+
+            await act(async () => { tree!.unmount(); });
+        });
+
+        it('reloads once the zone\'s day key rolls past the loaded date', async () => {
+            hookState.phase = 'ready';
+            hookState.date = '2026-08-26';
+            hookState.timeZone = 'UTC';
+            // 10s before local midnight; the next 30s tick lands past it.
+            vi.setSystemTime(new Date('2026-08-26T23:59:50Z'));
+
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+            expect(hookState.reload).toHaveBeenCalledTimes(1);
+
+            await act(async () => { vi.advanceTimersByTime(TDAH_NOW_TICK_INTERVAL_MS); });
+            expect(hookState.reload).toHaveBeenCalledTimes(2);
+
+            await act(async () => { tree!.unmount(); });
+        });
+
+        it('cleans the interval up on unmount — no further reloads fire', async () => {
+            hookState.phase = 'ready';
+            hookState.date = '2026-08-26';
+            hookState.timeZone = 'UTC';
+            vi.setSystemTime(new Date('2026-08-26T23:59:50Z'));
+
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+            await act(async () => { tree!.unmount(); });
+
+            await act(async () => { vi.advanceTimersByTime(TDAH_NOW_TICK_INTERVAL_MS * 3); });
+            expect(hookState.reload).toHaveBeenCalledTimes(1); // focus only
+        });
+    });
+
+    describe('vigente emphasis (story 1.6 AC, AD-6: now resolved in the profile zone)', () => {
+        beforeEach(() => {
+            vi.useFakeTimers();
+        });
+
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        it('emphasizes exactly the Activity whose window contains now (pending/started only)', async () => {
+            hookState.phase = 'ready';
+            hookState.timeZone = 'America/Mexico_City'; // UTC-6, no DST
+            const current: TdahActivity = {
+                id: 21, dayPlanDate: '2026-08-26', blockId: null, title: 'Ahora toca', startTime: '09:30',
+                durationMinutes: 60, origin: 'routine', state: 'pending', startedAt: null, completedAt: null,
+            };
+            const later: TdahActivity = {
+                id: 22, dayPlanDate: '2026-08-26', blockId: null, title: 'Más tarde', startTime: '12:00',
+                durationMinutes: 30, origin: 'routine', state: 'pending', startedAt: null, completedAt: null,
+            };
+            const doneOverlapping: TdahActivity = {
+                id: 23, dayPlanDate: '2026-08-26', blockId: null, title: 'Ya terminada', startTime: '09:00',
+                durationMinutes: 120, origin: 'routine', state: 'completed', startedAt: null, completedAt: null,
+            };
+            hookState.activities = [current, later, doneOverlapping];
+            // 16:00 UTC == 10:00 in Mexico City: inside 21's [09:30, 10:30) and
+            // 23's [09:00, 11:00), past 22's start.
+            vi.setSystemTime(new Date('2026-08-26T16:00:00Z'));
+
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+
+            const currentRow = flattenStyle(tree!.root.findByProps({ testID: 'tdah-activity-row-21' }).props.style);
+            expect(currentRow.backgroundColor).toBe(THEME.taskItemBg);
+            expect(currentRow.borderColor).toBe(THEME.tint);
+
+            for (const id of [22, 23]) {
+                const row = flattenStyle(tree!.root.findByProps({ testID: `tdah-activity-row-${id}` }).props.style);
+                expect(row.backgroundColor).toBe(THEME.cardBg);
+                expect(row.borderColor).toBe(THEME.border);
+            }
+
+            await act(async () => { tree!.unmount(); });
+        });
     });
 });

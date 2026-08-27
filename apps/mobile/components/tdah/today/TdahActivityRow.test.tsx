@@ -4,7 +4,8 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { TdahActivityRow } from './TdahActivityRow';
-import { styles } from './tdah-today.styles';
+import { styles, TDAH_TIMELINE_GUTTER_WIDTH, TDAH_TIMELINE_MIN_ROW_HEIGHT } from './tdah-today.styles';
+import { computeActivityLayout, TDAH_TIMELINE_LANE_OFFSET_PX } from './tdah-timeline-layout';
 import type { TdahActivity } from './tdah-today-types';
 
 const flattenStyle = (style: unknown): Record<string, unknown> => (
@@ -20,10 +21,13 @@ vi.mock('lucide-react-native', () => ({
     CircleX: (props: any) => React.createElement('CircleX', props),
 }));
 
+const THEME = {
+    text: '#0f172a', secondaryText: '#94a3b8', cardBg: '#ffffff', border: '#e2e8f0', filterBg: '#eef2f7',
+    // surfaceContainerHigh in the token source's M3 mapping; primary = tint.
+    taskItemBg: '#f1f5f9', tint: '#3b82f6',
+};
 vi.mock('@/hooks/use-theme-colors', () => ({
-    useThemeColors: () => ({
-        text: '#0f172a', secondaryText: '#94a3b8', cardBg: '#ffffff', border: '#e2e8f0', filterBg: '#eef2f7',
-    }),
+    useThemeColors: () => THEME,
 }));
 
 // Miss every key so labels resolve through tFallback's English fallback text
@@ -45,10 +49,21 @@ const baseActivity: TdahActivity = {
     completedAt: null,
 };
 
-const renderRow = (activity: TdahActivity, onPress: (activity: TdahActivity) => void): ReactTestRenderer => {
+const renderRow = (
+    activity: TdahActivity,
+    onPress: (activity: TdahActivity) => void,
+    options?: { isCurrent?: boolean; laneIndex?: number },
+): ReactTestRenderer => {
     let tree!: ReactTestRenderer;
     act(() => {
-        tree = create(<TdahActivityRow activity={activity} onPress={onPress} />);
+        tree = create(
+            <TdahActivityRow
+                activity={activity}
+                onPress={onPress}
+                isCurrent={options?.isCurrent}
+                laneIndex={options?.laneIndex}
+            />,
+        );
     });
     return tree;
 };
@@ -65,6 +80,18 @@ describe('TdahActivityRow', () => {
         const tree = renderRow(activity, () => undefined);
         const pressable = tree.root.findByType(Pressable);
         expect(pressable.props.accessibilityLabel).toBe('09:30, Caminadora, Completed, Manual');
+    });
+
+    it('renders the origin badge text (Routine) alongside the accessibility label', () => {
+        const tree = renderRow(baseActivity, () => undefined);
+        const texts = tree.root.findAll((node) => node.type === Text).map((node) => node.props.children);
+        expect(texts.flat()).toContain('Routine');
+    });
+
+    it('renders the origin badge text (Manual) for a manual-origin Activity', () => {
+        const tree = renderRow({ ...baseActivity, origin: 'manual' }, () => undefined);
+        const texts = tree.root.findAll((node) => node.type === Text).map((node) => node.props.children);
+        expect(texts.flat()).toContain('Manual');
     });
 
     it('shows the duration label when durationMinutes is above zero', () => {
@@ -124,10 +151,72 @@ describe('TdahActivityRow', () => {
             expect(flattenStyle(topLine!.props.style)).toMatchObject({ flexWrap: 'wrap' });
         });
 
-        it('never artificially caps the title to a single line', () => {
+        it('never caps the title to a fixed number of lines — it wraps fully', () => {
             const tree = renderRow(baseActivity, () => undefined);
             const title = tree.root.findByProps({ children: baseActivity.title });
-            expect(title.props.numberOfLines).toBeGreaterThan(1);
+            expect(title.props.numberOfLines).toBeUndefined();
+        });
+
+        it('sizes the timeline slot with minHeight, never a fixed height, so 200% content grows the row', () => {
+            const tree = renderRow(baseActivity, () => undefined);
+            const wrapper = tree.root.findAllByType(View).find((node) => {
+                const flat = flattenStyle(node.props.style);
+                return flat.position === 'absolute' && typeof flat.top === 'number';
+            });
+            const wrapperStyle = flattenStyle(wrapper!.props.style);
+            const expectedHeight = computeActivityLayout(baseActivity.startTime, baseActivity.durationMinutes)!.height;
+            expect(wrapperStyle.minHeight).toBe(expectedHeight);
+            expect(wrapperStyle.height).toBeUndefined();
+
+            const rowStyle = flattenStyle(tree.root.findByType(Pressable).props.style);
+            expect(rowStyle.minHeight).toBe(expectedHeight);
+            expect(rowStyle.height).toBeUndefined();
+        });
+
+        it('still guarantees the 48dp accessibility minimum on the timed row', () => {
+            const shortActivity: TdahActivity = { ...baseActivity, durationMinutes: 0 };
+            const tree = renderRow(shortActivity, () => undefined);
+            const rowStyle = flattenStyle(tree.root.findByType(Pressable).props.style);
+            expect(rowStyle.minHeight).toBe(TDAH_TIMELINE_MIN_ROW_HEIGHT);
+        });
+    });
+
+    describe('overlap lane offsetting', () => {
+        it('offsets a lane-1 row right of the gutter by the lane width, narrowing it', () => {
+            const tree = renderRow(baseActivity, () => undefined, { laneIndex: 1 });
+            const wrapper = tree.root.findAllByType(View).find((node) => {
+                const flat = flattenStyle(node.props.style);
+                return flat.position === 'absolute' && typeof flat.top === 'number';
+            });
+            const wrapperStyle = flattenStyle(wrapper!.props.style);
+            expect(wrapperStyle.left).toBe(TDAH_TIMELINE_GUTTER_WIDTH + 4 + TDAH_TIMELINE_LANE_OFFSET_PX);
+        });
+
+        it('keeps the default row at the gutter when no lane is given', () => {
+            const tree = renderRow(baseActivity, () => undefined);
+            const wrapper = tree.root.findAllByType(View).find((node) => {
+                const flat = flattenStyle(node.props.style);
+                return flat.position === 'absolute' && typeof flat.top === 'number';
+            });
+            const wrapperStyle = flattenStyle(wrapper!.props.style);
+            expect(wrapperStyle.left).toBe(TDAH_TIMELINE_GUTTER_WIDTH + 4);
+        });
+    });
+
+    describe('vigente emphasis (story 1.6 AC: "la línea \'ahora\' marca la Actividad vigente")', () => {
+        it('emphasizes the current row with surfaceContainerHigh + a primary border', () => {
+            const tree = renderRow(baseActivity, () => undefined, { isCurrent: true });
+            const rowStyle = flattenStyle(tree.root.findByType(Pressable).props.style);
+            expect(rowStyle.backgroundColor).toBe(THEME.taskItemBg);
+            expect(rowStyle.borderColor).toBe(THEME.tint);
+            expect(rowStyle.borderWidth).toBe(1);
+        });
+
+        it('leaves non-current rows on the plain card/border tokens', () => {
+            const tree = renderRow(baseActivity, () => undefined, { isCurrent: false });
+            const rowStyle = flattenStyle(tree.root.findByType(Pressable).props.style);
+            expect(rowStyle.backgroundColor).toBe(THEME.cardBg);
+            expect(rowStyle.borderColor).toBe(THEME.border);
         });
     });
 });

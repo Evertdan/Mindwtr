@@ -117,6 +117,33 @@ export const styles = StyleSheet.create({
         height: 8,
         borderRadius: 4,
     },
+    // UX-DR3's 8% primary halo: a circle ~2.5x the dot, centered behind it
+    // (dot center is (4, 5) inside the 10px-tall nowLine container, so a
+    // 20px halo sits at left -6 / top -5).
+    nowHalo: {
+        position: 'absolute',
+        left: -6,
+        top: -5,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        opacity: 0.08,
+    },
+    // The HH:mm label at the line's gutter edge: spans the full hour-gutter
+    // width (its text right edge lands where hourLabel's does, 8px of
+    // padding in from the channel), keeping the real time readable exactly
+    // where "now" crosses the channel.
+    nowTimeLabel: {
+        position: 'absolute',
+        left: -(TDAH_TIMELINE_GUTTER_WIDTH - 6),
+        width: TDAH_TIMELINE_GUTTER_WIDTH,
+        top: -2,
+        fontSize: 11,
+        fontWeight: '700',
+        textAlign: 'right',
+        paddingRight: 8,
+        fontVariant: ['tabular-nums'],
+    },
     nowRule: {
         flex: 1,
         height: 2,

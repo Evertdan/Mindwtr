@@ -157,11 +157,18 @@ describe('useTdahToday', () => {
         expect(latest?.phase).toBe('error');
     });
 
-    it('moves to the error phase when Self-Hosted sync is not configured, without ever fetching', async () => {
-        configureCloudSync(null, null);
+    it('moves to the generic error phase (never a crash) on a 409 TDAH_ACTIVATE_REQUIRED — the mode is off', async () => {
+        cloudGetJson.mockRejectedValue(new MockCloudHttpError('TDAH_ACTIVATE_REQUIRED', 409));
         await mount();
         await act(async () => { await latest?.reload(); });
         expect(latest?.phase).toBe('error');
+    });
+
+    it('moves to the unconfigured phase (never error) when Self-Hosted sync is not configured, without ever fetching', async () => {
+        configureCloudSync(null, null);
+        await mount();
+        await act(async () => { await latest?.reload(); });
+        expect(latest?.phase).toBe('unconfigured');
         expect(cloudGetJson).not.toHaveBeenCalled();
     });
 
@@ -186,6 +193,39 @@ describe('useTdahToday', () => {
         expect(latest?.activities.map((activity) => activity.id)).toEqual([2]);
     });
 
+    it('createManualActivity drops the merge when the response belongs to another day (mutation spanning midnight)', async () => {
+        cloudGetJson.mockResolvedValue({ date: '2026-08-26', timeZone: 'UTC', routineTitle: null, activities: [] });
+        cloudRequestJson.mockResolvedValue({
+            activity: {
+                // The server assigned it to tomorrow's plan (past the profile's midnight).
+                id: 2, dayPlanDate: '2026-08-27', blockId: null, title: 'Late add', startTime: '23:50',
+                durationMinutes: 30, origin: 'manual', state: 'pending', startedAt: null, completedAt: null,
+            },
+        });
+        await mount();
+        await act(async () => { await latest?.reload(); });
+        await act(async () => { await latest?.createManualActivity({ title: 'Late add', startTime: '23:50' }); });
+
+        // The created Activity is still returned to the caller, but never
+        // spliced into yesterday's (2026-08-26) timeline.
+        expect(latest?.activities).toHaveLength(0);
+    });
+
+    it('createManualActivity still merges when the response belongs to the loaded day', async () => {
+        cloudGetJson.mockResolvedValue({ date: '2026-08-26', timeZone: 'UTC', routineTitle: null, activities: [] });
+        cloudRequestJson.mockResolvedValue({
+            activity: {
+                id: 2, dayPlanDate: '2026-08-26', blockId: null, title: 'Same day', startTime: '10:00',
+                durationMinutes: 0, origin: 'manual', state: 'pending', startedAt: null, completedAt: null,
+            },
+        });
+        await mount();
+        await act(async () => { await latest?.reload(); });
+        await act(async () => { await latest?.createManualActivity({ title: 'Same day' }); });
+
+        expect(latest?.activities.map((activity) => activity.id)).toEqual([2]);
+    });
+
     it('registerActivityAction POSTs to the action URL and merges the returned Activity by id', async () => {
         const activity = {
             id: 3, dayPlanDate: '2026-08-26', blockId: null, title: 'X', startTime: '09:00',
@@ -206,5 +246,26 @@ describe('useTdahToday', () => {
         );
         expect(latest?.activities[0]?.state).toBe('started');
         expect(latest?.activities[0]?.startedAt).toBe('2026-08-26T09:00:00.000Z');
+    });
+
+    it('registerActivityAction drops the merge when the server moves the Activity to another day (midnight span)', async () => {
+        const activity = {
+            id: 3, dayPlanDate: '2026-08-26', blockId: null, title: 'X', startTime: '23:30',
+            durationMinutes: 30, origin: 'routine' as const, state: 'pending' as const, startedAt: null, completedAt: null,
+        };
+        cloudGetJson.mockResolvedValue({ date: '2026-08-26', timeZone: 'UTC', routineTitle: null, activities: [activity] });
+        // Started after the profile's midnight: the server now files it under 2026-08-27.
+        cloudRequestJson.mockResolvedValue({
+            activity: { ...activity, dayPlanDate: '2026-08-27', state: 'started', startedAt: '2026-08-26T23:45:00.000Z' },
+        });
+
+        await mount();
+        await act(async () => { await latest?.reload(); });
+        await act(async () => { await latest?.registerActivityAction(3, 'start'); });
+
+        // Yesterday's rendered row keeps its own snapshot; the new-day copy
+        // never replaces it in state.
+        expect(latest?.activities[0]?.state).toBe('pending');
+        expect(latest?.activities[0]?.dayPlanDate).toBe('2026-08-26');
     });
 });

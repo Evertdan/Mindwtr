@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 
-import { formatI18nTemplate, safeFormatDate, tFallback } from '@mindwtr/core';
+import { formatI18nTemplate, tFallback } from '@mindwtr/core';
 
 import { useLanguage } from '@/contexts/language-context';
 import { useFilledButtonColors } from '@/hooks/use-filled-button-colors';
@@ -13,6 +13,7 @@ import { useThemeColors } from '@/hooks/use-theme-colors';
 import { tdahActivityStateLabel } from './tdah-activity-labels';
 import { styles } from './tdah-today.styles';
 import type { TdahActivity, TdahActivityTransitionAction } from './tdah-today-types';
+import { formatIsoWallClockInTimeZone } from './tdah-time';
 import { useTdahToday } from './use-tdah-today';
 
 // Same shape apps/cloud/src/tdah/routes.ts validates `startTime` with
@@ -40,7 +41,7 @@ export function TdahActivityDetailScreen(props: TdahActivityDetailScreenProps) {
     const filledButton = useFilledButtonColors();
     const { t } = useLanguage();
     const router = useRouter();
-    const { phase, routineTitle, activities, reload, createManualActivity, registerActivityAction } = useTdahToday();
+    const { phase, routineTitle, timeZone, activities, reload, createManualActivity, registerActivityAction } = useTdahToday();
 
     useFocusEffect(useCallback(() => {
         void reload();
@@ -190,6 +191,7 @@ export function TdahActivityDetailScreen(props: TdahActivityDetailScreenProps) {
             reload={reload}
             registerActivityAction={registerActivityAction}
             routineTitle={routineTitle}
+            timeZone={timeZone}
             goBack={goBack}
         />
     );
@@ -202,6 +204,8 @@ type TdahActivityViewModeProps = {
     reload: () => Promise<void>;
     registerActivityAction: (activityId: number, action: TdahActivityTransitionAction) => Promise<TdahActivity>;
     routineTitle: string | null;
+    /** The day's profile zone (AD-6): startedAt/completedAt render in this zone, one clock everywhere. */
+    timeZone: string;
     goBack: () => void;
 };
 
@@ -212,6 +216,7 @@ function TdahActivityViewMode({
     reload,
     registerActivityAction,
     routineTitle,
+    timeZone,
     goBack,
 }: TdahActivityViewModeProps) {
     const tc = useThemeColors();
@@ -246,7 +251,7 @@ function TdahActivityViewMode({
         );
     }
 
-    if (phase === 'offline' || phase === 'error') {
+    if (phase === 'offline' || phase === 'error' || phase === 'unconfigured') {
         return (
             <SafeAreaView style={[styles.centered, { backgroundColor: tc.bg }]} edges={['bottom']}>
                 <Text style={[styles.emptyTitle, { color: tc.text }]} testID="tdah-activity-load-error">
@@ -287,14 +292,17 @@ function TdahActivityViewMode({
     }
 
     const stateLabel = tdahActivityStateLabel(t, activity.state);
+    // AD-6, one clock everywhere: these instants render in the profile's own
+    // zone — the same clock the timeline and now-line use — never the
+    // device's local zone.
     const startedAtLabel = activity.startedAt
         ? formatI18nTemplate(tFallback(t, 'tdahActivity.startedAtLabel', 'Started: {time}'), {
-            time: safeFormatDate(activity.startedAt, 'p', activity.startedAt),
+            time: formatIsoWallClockInTimeZone(activity.startedAt, timeZone),
         })
         : null;
     const completedAtLabel = activity.completedAt
         ? formatI18nTemplate(tFallback(t, 'tdahActivity.completedAtLabel', 'Completed: {time}'), {
-            time: safeFormatDate(activity.completedAt, 'p', activity.completedAt),
+            time: formatIsoWallClockInTimeZone(activity.completedAt, timeZone),
         })
         : null;
 

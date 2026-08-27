@@ -1,8 +1,9 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
+import { addNetworkStateListener } from 'expo-network';
 import { Plus } from 'lucide-react-native';
 
 import { formatI18nTemplate, safeFormatDate, tFallback } from '@mindwtr/core';
@@ -13,6 +14,7 @@ import { useThemeColors } from '@/hooks/use-theme-colors';
 
 import { TdahActivityRow } from './TdahActivityRow';
 import { TdahNowLine } from './TdahNowLine';
+import { findCurrentActivityId } from './tdah-current-activity';
 import {
     styles,
     TDAH_TIMELINE_DAY_END_HOUR,
@@ -20,6 +22,9 @@ import {
     TDAH_TIMELINE_PIXELS_PER_MINUTE,
 } from './tdah-today.styles';
 import type { TdahActivity } from './tdah-today-types';
+import { formatDayKeyInTimeZone, getMinutesSinceMidnightInTimeZone } from './tdah-time';
+import { computeActivityLaneOffsets } from './tdah-timeline-layout';
+import { useTdahNow, TDAH_NOW_TICK_INTERVAL_MS } from './use-tdah-now';
 import { useTdahToday } from './use-tdah-today';
 
 const formatHourLabel = (hour: number): string => `${hour.toString().padStart(2, '0')}:00`;
@@ -44,10 +49,40 @@ export function TdahTodayScreen() {
     const { t } = useLanguage();
     const router = useRouter();
     const { phase, date, timeZone, routineTitle, activities, reload } = useTdahToday();
+    const now = useTdahNow();
+    // One-shot latch per offline stint: connectivity events can arrive in a
+    // burst and only one recovery reload may start per stint.
+    const offlineRecoveryFiredRef = useRef(false);
 
     useFocusEffect(useCallback(() => {
         void reload();
     }, [reload]));
+
+    // A screen focused across the profile zone's midnight would otherwise
+    // render yesterday's plan forever (AD-1 has no client cache to expire):
+    // when the zone's day key stops matching the loaded `date`, reload.
+    useEffect(() => {
+        if (date === null) return undefined;
+        const interval = setInterval(() => {
+            if (formatDayKeyInTimeZone(new Date(), timeZone) !== date) void reload();
+        }, TDAH_NOW_TICK_INTERVAL_MS);
+        return () => clearInterval(interval);
+    }, [date, timeZone, reload]);
+
+    // AD-11's offline copy promises retrying, so connectivity restoration
+    // during the offline phase reloads without waiting for a Retry tap.
+    useEffect(() => {
+        if (phase !== 'offline') {
+            offlineRecoveryFiredRef.current = false;
+            return undefined;
+        }
+        const subscription = addNetworkStateListener((state) => {
+            if (state.isConnected !== true || offlineRecoveryFiredRef.current) return;
+            offlineRecoveryFiredRef.current = true;
+            void reload();
+        });
+        return () => subscription.remove?.();
+    }, [phase, reload]);
 
     const openActivity = useCallback((activity: TdahActivity) => {
         router.push(`/tdah-activity/${activity.id}`);
@@ -80,6 +115,11 @@ export function TdahTodayScreen() {
     // apps/cloud/src/tdah/storage.ts's SELECT_ACTIVITIES_FOR_DAY_SQL).
     const timedActivities = activities.filter((activity) => activity.startTime !== null);
     const noTimeActivities = activities.filter((activity) => activity.startTime === null);
+    const laneOffsets = computeActivityLaneOffsets(activities);
+    const currentActivityId = findCurrentActivityId(
+        activities,
+        getMinutesSinceMidnightInTimeZone(now, timeZone),
+    );
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: tc.bg }]} edges={['bottom']}>
@@ -144,6 +184,30 @@ export function TdahTodayScreen() {
                     >
                         <Text style={[styles.ctaButtonText, { color: filledButton.textColor ?? tc.onTint }]}>
                             {tFallback(t, 'tdahToday.retry', 'Retry')}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            ) : null}
+
+            {phase === 'unconfigured' ? (
+                // UX-DR5: Self-Hosted sync not set up is not an error — a
+                // Retry here could never succeed. The way out is Settings,
+                // where the sync backend is configured.
+                <View style={styles.centered} testID="tdah-today-unconfigured">
+                    <Text style={[styles.emptyTitle, { color: tc.text }]}>
+                        {tFallback(t, 'tdahToday.unconfiguredTitle', 'Cloud sync is not set up')}
+                    </Text>
+                    <Text style={[styles.emptyBody, { color: tc.secondaryText }]}>
+                        {t('settings.tdah.needsSync')}
+                    </Text>
+                    <TouchableOpacity
+                        accessibilityRole="button"
+                        onPress={() => router.push('/settings')}
+                        style={[styles.ctaButton, { backgroundColor: filledButton.backgroundColor }]}
+                        testID="tdah-today-open-settings"
+                    >
+                        <Text style={[styles.ctaButtonText, { color: filledButton.textColor ?? tc.onTint }]}>
+                            {tFallback(t, 'tdahToday.unconfiguredOpenSettings', 'Open settings')}
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -218,7 +282,13 @@ export function TdahTodayScreen() {
                             })}
                             <TdahNowLine timeZone={timeZone} />
                             {timedActivities.map((activity) => (
-                                <TdahActivityRow key={activity.id} activity={activity} onPress={openActivity} />
+                                <TdahActivityRow
+                                    key={activity.id}
+                                    activity={activity}
+                                    onPress={openActivity}
+                                    isCurrent={activity.id === currentActivityId}
+                                    laneIndex={laneOffsets.get(activity.id) ?? 0}
+                                />
                             ))}
                         </View>
                         {noTimeActivities.length > 0 ? (
