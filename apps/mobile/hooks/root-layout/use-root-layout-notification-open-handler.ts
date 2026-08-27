@@ -46,6 +46,20 @@ function isTdahConnectionOpen(kind: string | undefined): boolean {
     return kind === 'tdah-connection';
 }
 
+// Story 2.2 ("La vibra en la muñeca"): a tap on the Activity-trigger
+// notification's Iniciar or Completada action (or its body). Spec Always:
+// this is a tap-through only — no mutation happens from the notification
+// handler; the real Iniciar/Completada registration is story 2.3's. The
+// Activity id rides in `context` rather than a new field: both the live
+// OnNotificationOpened event and the Android cold-start payload store
+// (apps/mobile/modules/notification-open-intents) only forward a fixed
+// field allowlist with no `activityId` slot, and `context` is the one
+// generic passthrough field that allowlist already carries end-to-end (see
+// use-root-layout-tdah-connection.ts's handleTdahActivityTriggerEvent).
+function isTdahActivityOpen(kind: string | undefined): boolean {
+    return kind === 'tdah-activity';
+}
+
 export function useRootLayoutNotificationOpenHandler({
     appReady,
     pathname,
@@ -140,6 +154,16 @@ export function useRootLayoutNotificationOpenHandler({
         }
         if (isTdahConnectionOpen(kind)) {
             router.push('/tdah-today');
+            return;
+        }
+        if (isTdahActivityOpen(kind)) {
+            router.push({
+                pathname: '/tdah-today',
+                params: {
+                    ...(context ? { activityId: context } : {}),
+                    ...(normalizedAction ? { tdahAction: normalizedAction } : {}),
+                },
+            });
             return;
         }
     }, [router]);

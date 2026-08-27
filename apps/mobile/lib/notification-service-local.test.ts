@@ -143,8 +143,10 @@ import {
   scheduleLocalPomodoroCompletionNotification,
   sendLocalMobileNotification,
   setLocalNotificationOpenHandler,
+  showTdahActivityNotification,
   startLocalMobileNotifications,
   stopLocalMobileNotifications,
+  TDAH_ACTIVITY_NOTIFICATION_CHANNEL,
 } from './notification-service-local';
 
 describe('notification-service-local', () => {
@@ -293,6 +295,56 @@ describe('notification-service-local', () => {
           taskId: 'task-1',
         }),
       })
+    );
+  });
+
+  // Story 2.2 ("La vibra en la muñeca"): the only other coverage of this
+  // function (use-root-layout-tdah-connection.test.tsx) fully mocks
+  // '@/lib/notification-service-local', so it never exercises the real
+  // scheduleAlarmForKey/buildAlarmConfigSignature wiring below — a
+  // regression there (wrong channel, `vibrate` flipped back to `false`, a
+  // missing `notificationActionStart`/`vibrationPattern` data field, or the
+  // wrong snooze_interval) would ship with every other test still green.
+  // This calls the real, unmocked function end to end.
+  it('schedules the real TDAH Activity notification on its own high-importance, vibrating channel with all 3 actions and the localized channel name', async () => {
+    await showTdahActivityNotification({
+      key: 'tdah-activity:42:start',
+      title: 'Ordenar el escritorio — 25 min',
+      message: "It's time to start.",
+      vibrationPattern: [0, 120, 120, 120],
+      actionLabels: { start: 'Iniciar', complete: 'Completada', snooze: 'Posponer +10 min' },
+      channelName: 'Recordatorios de Actividades',
+      data: { kind: 'tdah-activity', context: '42', edge: 'start' },
+    });
+
+    expect(mockAlarmScheduleAlarm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Ordenar el escritorio — 25 min',
+        message: "It's time to start.",
+        channel: TDAH_ACTIVITY_NOTIFICATION_CHANNEL,
+        has_button: true,
+        has_complete_action: true,
+        vibrate: true,
+        snooze_interval: 10,
+        data: expect.objectContaining({
+          kind: 'tdah-activity',
+          context: '42',
+          edge: 'start',
+          notificationActionStart: 'true',
+          notificationActionComplete: 'true',
+          vibrationPattern: '0,120,120,120',
+          tdahStartActionLabel: 'Iniciar',
+          tdahCompleteActionLabel: 'Completada',
+          tdahSnoozeActionLabel: 'Posponer +10 min',
+          tdahActivityNotificationChannelName: 'Recordatorios de Actividades',
+        }),
+      })
+    );
+
+    // Never the GTD reminder channel/snooze constant — this is TDAH's own,
+    // independent pipeline (ADR-0013).
+    expect(mockAlarmScheduleAlarm).not.toHaveBeenCalledWith(
+      expect.objectContaining({ channel: 'mindwtr_reminders_v2' })
     );
   });
 

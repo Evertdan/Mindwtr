@@ -19,6 +19,7 @@ const {
     isPersistentConnectionSupportedMock,
     startPersistentConnectionMock,
     tdahModeActiveMock,
+    showTdahActivityNotificationMock,
 } = vi.hoisted(() => ({
     appState: { currentState: 'active' as 'active' | 'background' | 'inactive' },
     appStateListeners: new Set<(state: 'active' | 'background' | 'inactive') => void>(),
@@ -32,6 +33,19 @@ const {
     isPersistentConnectionSupportedMock: vi.fn(() => true),
     startPersistentConnectionMock: vi.fn(),
     tdahModeActiveMock: vi.fn((_refreshKey?: unknown) => false),
+    showTdahActivityNotificationMock: vi.fn<(request: {
+        key: string;
+        title: string;
+        message?: string;
+        vibrationPattern: number[];
+        actionLabels: { start: string; complete: string; snooze: string };
+        channelName: string;
+        data: Record<string, string>;
+    }) => Promise<void>>(async () => undefined),
+}));
+
+vi.mock('@/lib/notification-service-local', () => ({
+    showTdahActivityNotification: showTdahActivityNotificationMock,
 }));
 
 vi.mock('react-native', async () => {
@@ -91,6 +105,8 @@ describe('useRootLayoutTdahConnection', () => {
         startPersistentConnectionMock.mockReset();
         tdahModeActiveMock.mockReset();
         tdahModeActiveMock.mockReturnValue(false);
+        showTdahActivityNotificationMock.mockReset();
+        showTdahActivityNotificationMock.mockResolvedValue(undefined);
     });
 
     afterEach(() => {
@@ -214,5 +230,87 @@ describe('useRootLayoutTdahConnection', () => {
         });
         expect(listener).toHaveBeenCalledWith(nextState);
         unsubscribe();
+    });
+
+    describe('story 2.2 — activity-trigger WS message -> local notification', () => {
+        it('shows a start notification with the "{Actividad} — {duración}" title, 2-short-pulse haptics, and no truncation', async () => {
+            tdahModeActiveMock.mockReturnValue(true);
+            await act(async () => { tree = create(<TestHarness />); });
+            const { options } = fakeHandles[0];
+
+            const longTitle = 'Preparar la presentación completa para la reunión trimestral de todo el equipo';
+            await act(async () => {
+                options.onMessage(JSON.stringify({
+                    kind: 'activity-trigger',
+                    edge: 'start',
+                    activityId: 42,
+                    title: longTitle,
+                    durationMinutes: 25,
+                }));
+            });
+
+            expect(showTdahActivityNotificationMock).toHaveBeenCalledTimes(1);
+            const request = showTdahActivityNotificationMock.mock.calls[0][0];
+            expect(request.key).toBe('tdah-activity:42:start');
+            expect(request.title).toBe(`${longTitle} — 25 min`);
+            expect(request.title).not.toContain('…');
+            expect(request.vibrationPattern).toEqual([0, 120, 120, 120]);
+            expect(request.data).toMatchObject({ kind: 'tdah-activity', context: '42', edge: 'start' });
+        });
+
+        it('shows an end notification with the 1-long-pulse haptic pattern', async () => {
+            tdahModeActiveMock.mockReturnValue(true);
+            await act(async () => { tree = create(<TestHarness />); });
+            const { options } = fakeHandles[0];
+
+            await act(async () => {
+                options.onMessage(JSON.stringify({
+                    kind: 'activity-trigger',
+                    edge: 'end',
+                    activityId: 7,
+                    title: 'Llamar al banco',
+                    durationMinutes: 15,
+                }));
+            });
+
+            expect(showTdahActivityNotificationMock).toHaveBeenCalledTimes(1);
+            const request = showTdahActivityNotificationMock.mock.calls[0][0];
+            expect(request.key).toBe('tdah-activity:7:end');
+            expect(request.vibrationPattern).toEqual([0, 650]);
+            expect(request.data).toMatchObject({ kind: 'tdah-activity', context: '7', edge: 'end' });
+        });
+
+        it('resolves the 3 action labels through resolveText instead of raw keys', async () => {
+            tdahModeActiveMock.mockReturnValue(true);
+            const resolveText = vi.fn((_key: string, fallback: string) => `translated:${fallback}`);
+            await act(async () => { tree = create(<TestHarness resolveText={resolveText} />); });
+            const { options } = fakeHandles[0];
+
+            await act(async () => {
+                options.onMessage(JSON.stringify({
+                    kind: 'activity-trigger', edge: 'start', activityId: 1, title: 'Foo', durationMinutes: 10,
+                }));
+            });
+
+            const request = showTdahActivityNotificationMock.mock.calls[0][0];
+            expect(request.actionLabels).toEqual({
+                start: 'translated:Start',
+                complete: 'translated:Complete',
+                snooze: 'translated:Postpone +10 min',
+            });
+            expect(request.channelName).toBe('translated:Activity reminders');
+        });
+
+        it('ignores an unparseable message (e.g. story 2.1\'s own {kind: "connected"} event) without calling the notifier', async () => {
+            tdahModeActiveMock.mockReturnValue(true);
+            await act(async () => { tree = create(<TestHarness />); });
+            const { options } = fakeHandles[0];
+
+            await act(async () => {
+                options.onMessage(JSON.stringify({ kind: 'connected', at: '2026-08-27T09:00:00.000Z' }));
+            });
+
+            expect(showTdahActivityNotificationMock).not.toHaveBeenCalled();
+        });
     });
 });

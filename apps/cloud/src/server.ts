@@ -106,7 +106,8 @@ import {
     type CalendarFeedRecord,
 } from './server-calendar-feed';
 import { TDAH_PATH_PREFIX, handleTdahRequest, runNightlyTdahTick } from './tdah';
-import { TDAH_ERRORS } from './tdah/types';
+import { runActivityTriggerTick } from './tdah/activity-trigger';
+import { TDAH_ERRORS, type TdahWsActivityTriggerEvent } from './tdah/types';
 import {
     buildTdahWsConnectedEvent,
     createTdahWsConnectionRegistry,
@@ -993,6 +994,43 @@ export async function runTdahNightlyIntervalTick(dataDir: string): Promise<void>
     }
 }
 
+/**
+ * Story 2.2 — the activity-trigger interval's callback body, extracted for
+ * the same directly-testable reason as `runTdahNightlyIntervalTick` above:
+ * run one tick against `dataDir` with the real clock, then log a single
+ * `'tdah activity trigger fired'` audit line only when the tick actually did
+ * something (fired or failed) — unlike the once-a-minute nightly tick, this
+ * one runs every `TDAH_ACTIVITY_TRIGGER_TICK_INTERVAL_MS`, so logging every
+ * steady-state no-op tick would flood the audit log for no reason. The
+ * `'tdah activity trigger crashed'` backstop covers `runActivityTriggerTick`
+ * ever throwing despite its own never-throws contract.
+ */
+export async function runTdahActivityTriggerIntervalTick(
+    dataDir: string,
+    hasOpenConnection: (key: string) => boolean,
+    onFire: (key: string, event: TdahWsActivityTriggerEvent) => void,
+): Promise<void> {
+    try {
+        const summary = await runActivityTriggerTick(dataDir, new Date(), hasOpenConnection, onFire);
+        if (summary.firedEventCount > 0 || summary.failedCount > 0) {
+            logInfo('tdah activity trigger fired', {
+                date: summary.date,
+                failedCount: summary.failedCount,
+                firedEventCount: summary.firedEventCount,
+                firedNamespaceCount: summary.firedNamespaceCount,
+                namespaceCount: summary.namespaceCount,
+                skippedCount: summary.skippedCount,
+            });
+        }
+    } catch (error) {
+        logError('tdah activity trigger crashed', {
+            failureClass: 'runtime',
+            failureCode: 'tdah_activity_trigger_tick_crashed',
+            failureErrno: getFsErrorCode(error),
+        });
+    }
+}
+
 function isProjectPurgePatch(bodyRecord: Record<string, unknown>): boolean {
     return typeof bodyRecord.purgedAt === 'string' && bodyRecord.purgedAt.trim().length > 0;
 }
@@ -1210,6 +1248,38 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
     }, 60_000);
     if (typeof tdahNightlyTickTimer.unref === 'function') {
         tdahNightlyTickTimer.unref();
+    }
+
+    // Story 2.2 — the activity-trigger tick's own sibling `setInterval`:
+    // every `TDAH_ACTIVITY_TRIGGER_TICK_INTERVAL_MS`, walk every namespace
+    // with a live WS connection and push a start/end notification event for
+    // any Actividad milestone that just crossed. 15s comfortably clears the
+    // epic's ±30s window (Design Notes: "cualquier intervalo razonable ...
+    // no está prescrito un valor exacto, pero debe documentarse en el
+    // código") while staying cheap — every tick is read-only unless there is
+    // real work (`runActivityTriggerTick`'s own per-namespace guard).
+    // `tdahActivityTriggerTickInFlight` guards against overlap the same way
+    // `tdahTickInFlight` does for the nightly tick above.
+    const TDAH_ACTIVITY_TRIGGER_TICK_INTERVAL_MS = 15_000;
+    let tdahActivityTriggerTickInFlight = false;
+    const tdahActivityTriggerTickTimer = setInterval(() => {
+        if (tdahActivityTriggerTickInFlight) return;
+        tdahActivityTriggerTickInFlight = true;
+        void runTdahActivityTriggerIntervalTick(
+            dataDir,
+            (key) => tdahWsRegistry.connectionCount(key) > 0,
+            (key, event) => {
+                const payload = JSON.stringify(event);
+                for (const ws of tdahWsRegistry.connectionsFor(key)) {
+                    ws.send(payload);
+                }
+            },
+        ).finally(() => {
+            tdahActivityTriggerTickInFlight = false;
+        });
+    }, TDAH_ACTIVITY_TRIGGER_TICK_INTERVAL_MS);
+    if (typeof tdahActivityTriggerTickTimer.unref === 'function') {
+        tdahActivityTriggerTickTimer.unref();
     }
 
     const usingLegacyTokenVar = options.allowedAuthTokens === undefined
@@ -1756,6 +1826,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
         stopped = true;
         clearInterval(cleanupTimer);
         clearInterval(tdahNightlyTickTimer);
+        clearInterval(tdahActivityTriggerTickTimer);
         try {
             await Promise.resolve((server as { stop?: (closeIdleConnections?: boolean) => void | Promise<void> }).stop?.(true));
         } catch {

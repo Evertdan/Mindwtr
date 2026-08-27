@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
+import {
+    getTdahActivityVibrationPattern,
+    parseTdahWsActivityTriggerEvent,
+    buildTdahActivityNotificationTitle,
+    type TdahWsActivityTriggerEvent,
+} from '@/components/tdah/today/tdah-activity-notification';
 import { useTdahModeActive } from '@/components/tdah/today/use-tdah-mode-active';
+import { showTdahActivityNotification } from '@/lib/notification-service-local';
 import {
     INITIAL_TDAH_CONNECTION_STATE,
     isPersistentConnectionSupported,
@@ -59,6 +66,49 @@ export function subscribeTdahConnectionReconnected(listener: () => void): () => 
     };
 }
 
+/**
+ * Story 2.2 glue: WS raw message -> parsed Activity-trigger event -> local
+ * notification. Lives here per Code Map ("el parseo/branching del nuevo
+ * evento debe vivir en su consumidor"), not in persistent-connection.ts
+ * (whose `onMessage` stays a raw, event-agnostic pass-through) nor in
+ * notification-service-local.ts (which only knows how to *show* a
+ * notification, never what triggered it). Every string is resolved through
+ * the same `resolveText(key, fallback)` seam `useRootLayoutTdahConnection`
+ * already uses for N-05's strings.
+ */
+function handleTdahActivityTriggerEvent(event: TdahWsActivityTriggerEvent, resolveText: ResolveText): void {
+    const title = buildTdahActivityNotificationTitle(event.title, event.durationMinutes);
+    const body = event.edge === 'start'
+        ? resolveText('tdahToday.activityStartNotificationBody', "It's time to start.")
+        : resolveText('tdahToday.activityEndNotificationBody', "Time's up — see what's next.");
+
+    void showTdahActivityNotification({
+        key: `tdah-activity:${event.activityId}:${event.edge}`,
+        title,
+        message: body,
+        vibrationPattern: getTdahActivityVibrationPattern(event.edge),
+        actionLabels: {
+            start: resolveText('tdahToday.activityStartActionLabel', 'Start'),
+            complete: resolveText('tdahToday.activityCompleteActionLabel', 'Complete'),
+            snooze: resolveText('tdahToday.activityPostponeActionLabel', 'Postpone +10 min'),
+        },
+        channelName: resolveText('tdahToday.activityNotificationChannelName', 'Activity reminders'),
+        data: {
+            kind: 'tdah-activity',
+            // The existing native->JS open-payload path (both the live
+            // OnNotificationOpened event and the Android cold-start payload
+            // store — see apps/mobile/modules/notification-open-intents)
+            // only forwards a fixed field allowlist that has no `activityId`
+            // slot; `context` is the one generic passthrough field both
+            // paths already carry end-to-end, so the Activity id rides there
+            // instead of a new field this story can't add outside its owned
+            // files.
+            context: String(event.activityId),
+            edge: event.edge,
+        },
+    });
+}
+
 // There is no push signal for the mode flag flipping off elsewhere in the
 // same foreground session (AD-1 forbids caching it client-side), so this
 // hook re-checks on the same 30s cadence already established for this exact
@@ -109,6 +159,11 @@ export function useRootLayoutTdahConnection({ resolveText }: UseRootLayoutTdahCo
             },
             onReconnected: () => {
                 reconnectedListeners.forEach((listener) => listener());
+            },
+            onMessage: (data) => {
+                const event = parseTdahWsActivityTriggerEvent(data);
+                if (!event) return;
+                handleTdahActivityTriggerEvent(event, resolveTextRef.current);
             },
         });
         const unsubscribe = handle.subscribe(publishConnectionState);

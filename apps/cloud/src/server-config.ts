@@ -32,6 +32,9 @@ export type CloudFailureContext = {
         | 'server_start_failed'
         | 'stored_data_invalid'
         | 'stored_data_invalid_json'
+        | 'tdah_activity_trigger_onfire_failed'
+        | 'tdah_activity_trigger_tick_crashed'
+        | 'tdah_activity_trigger_tick_failed'
         | 'tdah_nightly_tick_crashed'
         | 'tdah_nightly_tick_failed';
     // S10: ONLY ever assign a bare fs/sqlite error code here (e.g. 'ENOENT', 'EACCES',
@@ -57,6 +60,10 @@ export const CLOUD_LOG_MESSAGES = [
     'request completed',
     'request failed',
     'shutdown signal received',
+    'tdah activity trigger crashed',
+    'tdah activity trigger fired',
+    'tdah activity trigger namespace failed',
+    'tdah activity trigger onFire failed',
     'tdah nightly trigger crashed',
     'tdah nightly trigger fired',
     'tdah nightly trigger namespace failed',
@@ -79,6 +86,12 @@ type CloudOperationalLogContext = Partial<Record<
     | 'elapsedMs'
     | 'failedCount'
     | 'firedCount'
+    // Story 2.2 (tdah activity-trigger tick): 'firedNamespaceCount' and
+    // 'firedEventCount' back the 'tdah activity trigger fired' audit line's
+    // context (TdahActivityTriggerTickSummary) — same counts-only,
+    // never-a-namespace-key discipline as the nightly tick's own context above.
+    | 'firedNamespaceCount'
+    | 'firedEventCount'
     | 'generatedCount'
     | 'hint'
     | 'limboCount'

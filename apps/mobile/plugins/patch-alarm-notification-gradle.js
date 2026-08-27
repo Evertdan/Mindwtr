@@ -472,6 +472,19 @@ const applyAlarmCompleteConstantsPatchToSource = (original) => {
   );
 };
 
+// Story 2.2 ("La vibra en la muñeca"): a third real action distinct from
+// SNOOZE/COMPLETE — the Actividad notification's "Iniciar" button. Mirrors
+// how NOTIFICATION_ACTION_COMPLETE was added above; runs after that patch
+// (registry order), so its own anchor is always present by the time this
+// one applies.
+const applyAlarmTdahActivityConstantsPatchToSource = (original) => {
+  if (original.includes('NOTIFICATION_ACTION_START')) return original;
+  return original.replace(
+    '    static final String NOTIFICATION_ACTION_COMPLETE = "ACTION_COMPLETE";',
+    '    static final String NOTIFICATION_ACTION_COMPLETE = "ACTION_COMPLETE";\n    static final String NOTIFICATION_ACTION_START = "ACTION_START";'
+  );
+};
+
 const applyAlarmTaskOpenIntentPatchToSource = (original) => {
   let next = original;
 
@@ -561,6 +574,150 @@ const applyAlarmCompleteUtilPatchToSource = (original) => {
             }
 `
   );
+};
+
+// Story 2.2 ("La vibra en la muñeca") — four independent, additive changes
+// to the same `sendNotification` method the two patches above already touch,
+// every one gated on data the GTD/pomodoro call sites never set (so their
+// behavior is provably unchanged when this patch's own markers are absent):
+//
+// 1. A `data.vibrationPattern` override (a comma-separated `long[]`) — the
+//    library's own `vibrationPattern` formula (`DEFAULT_VIBRATE_PATTERN` or
+//    `{0, vibration, 1000, vibration}`) can only ever produce a two-pulse
+//    shape; spec Always requires a genuine single long pulse for the "end"
+//    edge, which that formula cannot express.
+// 2. A TDAH-Activity-channel-aware importance/name/priority (IMPORTANCE_HIGH
+//    + PRIORITY_HIGH instead of the GTD reminder channel's IMPORTANCE_DEFAULT
+//    the `alarm-reminder-behavior` patch above hardcodes) — channel
+//    importance is immutable after first creation, so this only matters the
+//    very first time `TDAH_ACTIVITY_NOTIFICATION_CHANNEL_ID` is created, same
+//    as any other Android notification channel.
+// 3. A third real "Iniciar" action button (`data.notificationActionStart`),
+//    ahead of COMPLETE, and DISMISS suppressed whenever it's present — spec
+//    Always: exactly 3 distinct native buttons (Iniciar/Posponer/Completada),
+//    never a 4th.
+// 4. Localized action labels (`data.tdahStartActionLabel` /
+//    `tdahCompleteActionLabel` / `tdahSnoozeActionLabel`) instead of the
+//    hardcoded "START"/"COMPLETE"/"SNOOZE" — spec Always: "toda copy nueva
+//    ... se localiza por clave".
+const applyAlarmTdahActivityUtilPatchToSource = (original) => {
+  let next = original;
+
+  if (!next.includes('NOTIFICATION_ACTION_START')) {
+    next = next.replace(
+      'import static com.emekalites.react.alarm.notification.Constants.NOTIFICATION_ACTION_COMPLETE;',
+      'import static com.emekalites.react.alarm.notification.Constants.NOTIFICATION_ACTION_COMPLETE;\nimport static com.emekalites.react.alarm.notification.Constants.NOTIFICATION_ACTION_START;'
+    );
+  }
+
+  if (!next.includes('TDAH_ACTIVITY_NOTIFICATION_CHANNEL_ID')) {
+    next = next.replace(
+      '    static final long[] DEFAULT_VIBRATE_PATTERN = {0, 250, 250, 250};',
+      '    static final long[] DEFAULT_VIBRATE_PATTERN = {0, 250, 250, 250};\n    // Must match TDAH_ACTIVITY_NOTIFICATION_CHANNEL in apps/mobile/lib/notification-service-local.ts.\n    static final String TDAH_ACTIVITY_NOTIFICATION_CHANNEL_ID = "mindwtr_tdah_activity_v1";'
+    );
+  }
+
+  if (!next.includes('customVibrationPattern')) {
+    next = next.replace(
+      '            long[] vibrationPattern = vibration == 0 ? DEFAULT_VIBRATE_PATTERN : new long[]{0, vibration, 1000, vibration};',
+      `            long[] vibrationPattern = vibration == 0 ? DEFAULT_VIBRATE_PATTERN : new long[]{0, vibration, 1000, vibration};
+
+            String customVibrationPattern = bundle.getString("vibrationPattern");
+            if (customVibrationPattern != null && !customVibrationPattern.equals("")) {
+                String[] vibrationPatternParts = customVibrationPattern.split(",");
+                long[] parsedVibrationPattern = new long[vibrationPatternParts.length];
+                boolean vibrationPatternParsedOk = vibrationPatternParts.length > 0;
+                for (int i = 0; i < vibrationPatternParts.length; i++) {
+                    try {
+                        parsedVibrationPattern[i] = Long.parseLong(vibrationPatternParts[i].trim());
+                    } catch (NumberFormatException e) {
+                        vibrationPatternParsedOk = false;
+                        break;
+                    }
+                }
+                if (vibrationPatternParsedOk) {
+                    vibrationPattern = parsedVibrationPattern;
+                }
+            }`
+    );
+  }
+
+  next = next.replace(
+    'NotificationChannel mChannel = new NotificationChannel(channelID, "Mindwtr reminders", NotificationManager.IMPORTANCE_DEFAULT);',
+    `boolean isTdahActivityNotification = TDAH_ACTIVITY_NOTIFICATION_CHANNEL_ID.equals(channelID);
+                String tdahActivityNotificationChannelName = bundle.getString("tdahActivityNotificationChannelName");
+                if (tdahActivityNotificationChannelName == null || tdahActivityNotificationChannelName.equals("")) tdahActivityNotificationChannelName = "Mindwtr TDAH activities";
+                NotificationChannel mChannel = new NotificationChannel(
+                        channelID,
+                        isTdahActivityNotification ? tdahActivityNotificationChannelName : "Mindwtr reminders",
+                        isTdahActivityNotification ? NotificationManager.IMPORTANCE_HIGH : NotificationManager.IMPORTANCE_DEFAULT
+                );`
+  );
+
+  next = next.replace(
+    '.setPriority(NotificationCompat.PRIORITY_DEFAULT)',
+    '.setPriority(TDAH_ACTIVITY_NOTIFICATION_CHANNEL_ID.equals(channelID) ? NotificationCompat.PRIORITY_HIGH : NotificationCompat.PRIORITY_DEFAULT)'
+  );
+
+  if (!next.includes('hasStartAction')) {
+    next = next.replace(
+      '                boolean hasCompleteAction = "true".equals(bundle.getString("notificationActionComplete"));',
+      `                boolean hasStartAction = "true".equals(bundle.getString("notificationActionStart"));
+                String tdahStartActionLabel = bundle.getString("tdahStartActionLabel");
+                if (tdahStartActionLabel == null || tdahStartActionLabel.equals("")) tdahStartActionLabel = "START";
+                if (hasStartAction) {
+                    Intent startIntent = new Intent(mContext, AlarmReceiver.class);
+                    startIntent.setAction(NOTIFICATION_ACTION_START);
+                    startIntent.putExtra("AlarmId", alarm.getId());
+                    startIntent.putExtra("NotificationId", notificationID);
+                    startIntent.putExtras(bundle);
+                    PendingIntent pendingStart = PendingIntent.getBroadcast(mContext, notificationID + 3, startIntent, getUpdateCurrentImmutableFlags());
+                    NotificationCompat.Action startAction = new NotificationCompat.Action(android.R.drawable.ic_media_play, tdahStartActionLabel, pendingStart);
+                    mBuilder.addAction(startAction);
+                }
+
+                boolean hasCompleteAction = "true".equals(bundle.getString("notificationActionComplete"));`
+    );
+  }
+
+  next = next.replace(
+    'NotificationCompat.Action completeAction = new NotificationCompat.Action(android.R.drawable.checkbox_on_background, "COMPLETE", pendingComplete);',
+    `String tdahCompleteActionLabel = bundle.getString("tdahCompleteActionLabel");
+                    if (tdahCompleteActionLabel == null || tdahCompleteActionLabel.equals("")) tdahCompleteActionLabel = "COMPLETE";
+                    NotificationCompat.Action completeAction = new NotificationCompat.Action(android.R.drawable.checkbox_on_background, tdahCompleteActionLabel, pendingComplete);`
+  );
+
+  next = next.replace(
+    'NotificationCompat.Action snoozeAction = new NotificationCompat.Action(R.drawable.ic_snooze, "SNOOZE", pendingSnooze);',
+    `String tdahSnoozeActionLabel = bundle.getString("tdahSnoozeActionLabel");
+                if (tdahSnoozeActionLabel == null || tdahSnoozeActionLabel.equals("")) tdahSnoozeActionLabel = "SNOOZE";
+                NotificationCompat.Action snoozeAction = new NotificationCompat.Action(R.drawable.ic_snooze, tdahSnoozeActionLabel, pendingSnooze);`
+  );
+
+  if (!next.includes('if (!hasStartAction) {')) {
+    next = next.replace(
+      `                Intent dismissIntent = new Intent(mContext, AlarmReceiver.class);
+                dismissIntent.setAction(NOTIFICATION_ACTION_DISMISS);
+                dismissIntent.putExtra("AlarmId", alarm.getId());
+                dismissIntent.putExtra("NotificationId", notificationID);
+                PendingIntent pendingDismiss = PendingIntent.getBroadcast(mContext, notificationID, dismissIntent, getUpdateCurrentImmutableFlags());
+                NotificationCompat.Action dismissAction = new NotificationCompat.Action(android.R.drawable.ic_lock_idle_alarm, "DISMISS", pendingDismiss);
+                mBuilder.addAction(dismissAction);
+            }`,
+      `                if (!hasStartAction) {
+                    Intent dismissIntent = new Intent(mContext, AlarmReceiver.class);
+                    dismissIntent.setAction(NOTIFICATION_ACTION_DISMISS);
+                    dismissIntent.putExtra("AlarmId", alarm.getId());
+                    dismissIntent.putExtra("NotificationId", notificationID);
+                    PendingIntent pendingDismiss = PendingIntent.getBroadcast(mContext, notificationID, dismissIntent, getUpdateCurrentImmutableFlags());
+                    NotificationCompat.Action dismissAction = new NotificationCompat.Action(android.R.drawable.ic_lock_idle_alarm, "DISMISS", pendingDismiss);
+                    mBuilder.addAction(dismissAction);
+                }
+            }`
+    );
+  }
+
+  return next;
 };
 
 const applyAlarmCompleteReceiverPatchToSource = (original) => {
@@ -945,6 +1102,85 @@ const applyAlarmActionDeadRowPatchToSource = (original) => {
   return next;
 };
 
+// Story 2.2 ("La vibra en la muñeca") — the "Iniciar" action button's
+// receiver case. Behaviorally identical to the COMPLETE case just above (tap
+// caches the payload + opens the app, no mutation — spec Always: "el tap-
+// through es el 'punto de entrada' que 2.3 conectará después"), just with a
+// different action constant/log tag/`actionIdentifier` value, so it's
+// derived from that exact (already-hardened, post `alarm-dead-row-actions`)
+// case text rather than duplicated by hand. Runs after `alarm-dead-row-
+// actions` in the registry, so its anchor — the hardened COMPLETE case,
+// including the "NotificationId" dead-row fallback — is always present by
+// the time this one applies.
+const applyAlarmTdahActivityReceiverPatchToSource = (original) => {
+  if (original.includes('case Constants.NOTIFICATION_ACTION_START')) return original;
+
+  const completeCaseHardened = `                    case Constants.NOTIFICATION_ACTION_COMPLETE:
+                        id = intent.getExtras().getInt("AlarmId");
+
+                        try {
+                            alarm = alarmDB.getAlarm(id);
+                            Log.d(TAG, "ACTION_COMPLETE id=" + id + " alarmFound=" + (alarm != null));
+                            Bundle payload = new Bundle();
+                            if (intent.getExtras() != null) {
+                                payload.putAll(intent.getExtras());
+                            }
+                            payload.putString("id", String.valueOf(alarm != null ? alarm.getId() : id));
+                            if (payload.getString("alarmKey") == null && payload.getString("taskId") != null) {
+                                payload.putString("alarmKey", "task:" + payload.getString("taskId"));
+                            }
+                            payload.putString("actionIdentifier", "complete");
+                            LinkedHashMap<String, String> pendingPayload = new LinkedHashMap<>();
+                            for (String key : payload.keySet()) {
+                                Object value = payload.get(key);
+                                if (value != null) {
+                                    pendingPayload.put(key, String.valueOf(value));
+                                }
+                            }
+                            NotificationOpenPayloadStore.cache(pendingPayload);
+
+                            if (alarm != null) {
+                                alarmUtil.removeFiredNotification(alarm.getId());
+                                alarmUtil.cancelAlarm(alarm, false);
+                            } else if (intent.getExtras().containsKey("NotificationId")) {
+                                alarmUtil.clearNotification(intent.getExtras().getInt("NotificationId"));
+                            } else {
+                                alarmUtil.removeFiredNotification(id);
+                            }
+                            alarmUtil.stopAlarmSound();
+
+                            if (ANModule.getReactAppContext() != null) {
+                                ANModule.getReactAppContext().getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class).emit("OnNotificationOpened", BundleJSONConverter.convertToJSON(payload).toString());
+                            } else {
+                                Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+                                if (launchIntent != null) {
+                                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                                    launchIntent.putExtras(payload);
+                                    context.startActivity(launchIntent);
+                                }
+                            }
+                        } catch (Exception e) {
+                            alarmUtil.stopAlarmSound();
+                            e.printStackTrace();
+                        }
+                        break;
+`;
+
+  if (!original.includes(completeCaseHardened)) {
+    // Loud, not silent: `alarm-tdah-activity-receiver`'s `required: true` +
+    // `appliedMarker` below already catches a missing marker, but this gives
+    // the actual reason (anchor drift) instead of a generic "did not apply".
+    return original;
+  }
+
+  const startCase = completeCaseHardened
+    .replace('case Constants.NOTIFICATION_ACTION_COMPLETE:', 'case Constants.NOTIFICATION_ACTION_START:')
+    .replace('Log.d(TAG, "ACTION_COMPLETE id="', 'Log.d(TAG, "ACTION_START id="')
+    .replace('payload.putString("actionIdentifier", "complete");', 'payload.putString("actionIdentifier", "start");');
+
+  return original.replace(completeCaseHardened, `${startCase}\n${completeCaseHardened}`);
+};
+
 const getAndroidSourceCandidates = (projectRoot, fileName) => [
   path.join(projectRoot, 'node_modules', 'react-native-alarm-notification', 'android', 'src', 'main', 'java', 'com', 'emekalites', 'react', 'alarm', 'notification', fileName),
   path.join(projectRoot, '..', '..', 'node_modules', 'react-native-alarm-notification', 'android', 'src', 'main', 'java', 'com', 'emekalites', 'react', 'alarm', 'notification', fileName),
@@ -1302,6 +1538,18 @@ const PATCHES = [
     appliedMarker: 'void clearNotification(int notificationId)',
   },
   {
+    id: 'alarm-tdah-activity-util',
+    platform: 'android',
+    getCandidates: androidJavaCandidates('AlarmUtil.java'),
+    transform: applyAlarmTdahActivityUtilPatchToSource,
+    required: true,
+    // Must run after alarm-complete-action-util and alarm-dead-row-util: its
+    // own anchors are the "hasCompleteAction"/"...+2, completeIntent..."
+    // block those two patches produce.
+    firstMatchOnly: false,
+    appliedMarker: 'TDAH_ACTIVITY_NOTIFICATION_CHANNEL_ID',
+  },
+  {
     id: 'alarm-audio-interface',
     platform: 'android',
     getCandidates: androidJavaCandidates('AudioInterface.java'),
@@ -1362,6 +1610,17 @@ const PATCHES = [
     appliedMarker: 'Log.d(TAG, "ACTION_SNOOZE id="',
   },
   {
+    id: 'alarm-tdah-activity-receiver',
+    platform: 'android',
+    getCandidates: androidJavaCandidates('AlarmReceiver.java'),
+    transform: applyAlarmTdahActivityReceiverPatchToSource,
+    required: true,
+    // Must run after alarm-complete-action-receiver and alarm-dead-row-actions:
+    // its anchor is the hardened COMPLETE case those two patches produce.
+    firstMatchOnly: false,
+    appliedMarker: 'case Constants.NOTIFICATION_ACTION_START',
+  },
+  {
     id: 'alarm-complete-action-constants',
     platform: 'android',
     getCandidates: androidJavaCandidates('Constants.java'),
@@ -1370,6 +1629,17 @@ const PATCHES = [
     // Original loop broke after the first successful write.
     firstMatchOnly: true,
     appliedMarker: 'NOTIFICATION_ACTION_COMPLETE',
+  },
+  {
+    id: 'alarm-tdah-activity-constants',
+    platform: 'android',
+    getCandidates: androidJavaCandidates('Constants.java'),
+    transform: applyAlarmTdahActivityConstantsPatchToSource,
+    required: true,
+    // Must run after alarm-complete-action-constants: its own anchor is the
+    // NOTIFICATION_ACTION_COMPLETE constant that patch adds.
+    firstMatchOnly: true,
+    appliedMarker: 'NOTIFICATION_ACTION_START',
   },
   {
     id: 'alarm-ios-complete-action',
@@ -1520,7 +1790,7 @@ const applyAlarmManifestEntries = (manifest) => {
       'android:enabled': 'true',
       'android:exported': 'false',
     },
-    ['ACTION_DISMISS', 'ACTION_SNOOZE', 'ACTION_COMPLETE']
+    ['ACTION_DISMISS', 'ACTION_SNOOZE', 'ACTION_COMPLETE', 'ACTION_START']
   );
 
   ensureReceiver(
