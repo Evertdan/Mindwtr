@@ -1097,7 +1097,7 @@ export const faOverrides: Record<string, string> = {
         'tdahToday.activityStartNotificationBody': 'وقت شروع است.',
         'tdahToday.activityEndNotificationBody': 'زمان تمام شد — ببین بعدش چیست.',
         'tdahToday.activityStartActionLabel': 'شروع',
-        'tdahToday.activityPostponeActionLabel': 'به تعویق انداختن +۱۰ دقیقه',
+        'tdahToday.activityPostponeActionLabel': 'تعویق \u2066+۱۰\u2069 دقیقه',
         'tdahToday.activityCompleteActionLabel': 'اتمام',
         'tdahToday.activityNotificationChannelName': 'یادآوری‌های فعالیت',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',

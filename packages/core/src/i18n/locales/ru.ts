@@ -1554,7 +1554,7 @@ export const ruOverrides: Record<string, string> = {
         'tdahToday.connectionNotificationReconnectingText': 'Повторное подключение…',
         'tdahToday.connectionNotificationChannelName': 'Соединение',
         'tdahToday.activityStartNotificationBody': 'Пора начинать.',
-        'tdahToday.activityEndNotificationBody': 'Время вышло — посмотри, что дальше.',
+        'tdahToday.activityEndNotificationBody': 'Время вышло — посмотрите, что дальше.',
         'tdahToday.activityStartActionLabel': 'Начать',
         'tdahToday.activityPostponeActionLabel': 'Отложить +10 мин',
         'tdahToday.activityCompleteActionLabel': 'Завершить',

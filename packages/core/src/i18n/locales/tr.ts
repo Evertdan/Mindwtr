@@ -1601,7 +1601,7 @@ export const trOverrides: Record<string, string> = {
         'tdahToday.connectionNotificationReconnectingText': 'Yeniden bağlanıyor…',
         'tdahToday.connectionNotificationChannelName': 'Bağlantı',
         'tdahToday.activityStartNotificationBody': 'Başlama zamanı.',
-        'tdahToday.activityEndNotificationBody': 'Süre doldu — sırada ne var bak.',
+        'tdahToday.activityEndNotificationBody': 'Süre doldu — sıradakine bak.',
         'tdahToday.activityStartActionLabel': 'Başlat',
         'tdahToday.activityPostponeActionLabel': '10 dk ertele',
         'tdahToday.activityCompleteActionLabel': 'Tamamla',
