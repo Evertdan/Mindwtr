@@ -937,13 +937,24 @@ export type TdahActivityNotificationRequest = {
  */
 export async function showTdahActivityNotification(request: TdahActivityNotificationRequest): Promise<void> {
   const trimmedTitle = String(request.title || '').trim();
-  if (!trimmedTitle) return;
+  if (!trimmedTitle) {
+    // Review fix (MEDIUM): every skip path must say why (#1028) — a silently
+    // skipped Activity notification is indistinguishable from a lost WS event.
+    logNotificationInfo('TDAH Activity notification skipped: blank title');
+    return;
+  }
 
   const api = await loadAlarmApi();
-  if (!api) return;
+  if (!api) {
+    logNotificationInfo('TDAH Activity notification skipped: alarm API unavailable');
+    return;
+  }
 
   const permission = await requestLocalNotificationPermission();
-  if (!permission.granted) return;
+  if (!permission.granted) {
+    logNotificationInfo('TDAH Activity notification skipped: notification permission denied');
+    return;
+  }
 
   await loadAlarmMapIfNeeded();
   try {

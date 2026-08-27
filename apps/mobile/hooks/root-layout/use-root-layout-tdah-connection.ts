@@ -8,6 +8,7 @@ import {
     type TdahWsActivityTriggerEvent,
 } from '@/components/tdah/today/tdah-activity-notification';
 import { useTdahModeActive } from '@/components/tdah/today/use-tdah-mode-active';
+import { logWarn } from '@/lib/app-log';
 import { showTdahActivityNotification } from '@/lib/notification-service-local';
 import {
     INITIAL_TDAH_CONNECTION_STATE,
@@ -106,6 +107,18 @@ function handleTdahActivityTriggerEvent(event: TdahWsActivityTriggerEvent, resol
             context: String(event.activityId),
             edge: event.edge,
         },
+    }).catch((error) => {
+        // Outcome evidence (#1028 convention): a failed notifier must be
+        // distinguishable from a lost WS event. Id/edge level only — never
+        // the notification's user-facing text.
+        void logWarn('[Local Notifications] Failed to show TDAH Activity notification', {
+            scope: 'notifications',
+            extra: {
+                error: error instanceof Error ? error.message : String(error),
+                activityId: String(event.activityId),
+                edge: event.edge,
+            },
+        });
     });
 }
 

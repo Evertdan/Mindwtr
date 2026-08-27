@@ -348,6 +348,90 @@ describe('notification-service-local', () => {
     );
   });
 
+  // Review fix (MEDIUM): the three early-return paths below used to return
+  // silently — a skipped Activity notification was indistinguishable from a
+  // lost WS event. Each must now say why it skipped (and never schedule).
+  it('skips the TDAH Activity notification (and says why) when the title is blank', async () => {
+    await showTdahActivityNotification({
+      key: 'tdah-activity:42:start',
+      title: '   ',
+      message: "It's time to start.",
+      vibrationPattern: [0, 120, 120, 120],
+      actionLabels: { start: 'Iniciar', complete: 'Completada', snooze: 'Posponer +10 min' },
+      channelName: 'Recordatorios de Actividades',
+      data: { kind: 'tdah-activity', context: '42', edge: 'start' },
+    });
+
+    expect(mockAlarmScheduleAlarm).not.toHaveBeenCalled();
+    expect(mockLogInfo).toHaveBeenCalledWith(
+      '[Local Notifications] TDAH Activity notification skipped: blank title',
+      expect.anything()
+    );
+  });
+
+  it('skips the TDAH Activity notification (and says why) when the alarm API is unavailable', async () => {
+    // loadAlarmApi() only returns null when the native module is missing its
+    // scheduleAlarm bridge; the static module mock always provides it, so
+    // re-import the service against a stub without it (same vi.resetModules +
+    // vi.doMock idiom speech-to-text.test.ts uses for its missing-RNFS cases).
+    vi.resetModules();
+    vi.doMock('react-native-alarm-notification', () => ({ default: {} }));
+    try {
+      const freshService = await import('./notification-service-local');
+      await freshService.showTdahActivityNotification({
+        key: 'tdah-activity:42:start',
+        title: 'Ordenar el escritorio — 25 min',
+        message: "It's time to start.",
+        vibrationPattern: [0, 120, 120, 120],
+        actionLabels: { start: 'Iniciar', complete: 'Completada', snooze: 'Posponer +10 min' },
+        channelName: 'Recordatorios de Actividades',
+        data: { kind: 'tdah-activity', context: '42', edge: 'start' },
+      });
+
+      expect(mockAlarmScheduleAlarm).not.toHaveBeenCalled();
+      expect(mockLogInfo).toHaveBeenCalledWith(
+        '[Local Notifications] TDAH Activity notification skipped: alarm API unavailable',
+        expect.anything()
+      );
+    } finally {
+      vi.doMock('react-native-alarm-notification', () => ({
+        default: {
+          parseDate: (date: Date) => date.toISOString(),
+          scheduleAlarm: mockAlarmScheduleAlarm,
+          sendNotification: mockAlarmSendNotification,
+          deleteAlarm: mockAlarmDeleteAlarm,
+          deleteRepeatingAlarm: mockAlarmDeleteRepeatingAlarm,
+          removeFiredNotification: mockAlarmRemoveFiredNotification,
+          removeAllFiredNotifications: mockAlarmRemoveAllFiredNotifications,
+          getScheduledAlarms: mockAlarmGetScheduledAlarms,
+          requestPermissions: mockAlarmRequestPermissions,
+        },
+      }));
+      vi.resetModules();
+    }
+  });
+
+  it('skips the TDAH Activity notification (and says why) when notification permission is denied', async () => {
+    mockPermissionsAndroidCheck.mockResolvedValue(false);
+    mockPermissionsAndroidRequest.mockResolvedValue('never_ask_again');
+
+    await showTdahActivityNotification({
+      key: 'tdah-activity:42:start',
+      title: 'Ordenar el escritorio — 25 min',
+      message: "It's time to start.",
+      vibrationPattern: [0, 120, 120, 120],
+      actionLabels: { start: 'Iniciar', complete: 'Completada', snooze: 'Posponer +10 min' },
+      channelName: 'Recordatorios de Actividades',
+      data: { kind: 'tdah-activity', context: '42', edge: 'start' },
+    });
+
+    expect(mockAlarmScheduleAlarm).not.toHaveBeenCalled();
+    expect(mockLogInfo).toHaveBeenCalledWith(
+      '[Local Notifications] TDAH Activity notification skipped: notification permission denied',
+      expect.anything()
+    );
+  });
+
   it('schedules future due-time repeat occurrences as :r{i} keyed one-shots', async () => {
     mockStoreState.tasks = [{
       id: 'task-1',
