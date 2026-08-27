@@ -133,16 +133,86 @@ export type TdahActivityOrigin = (typeof TDAH_ACTIVITY_ORIGINS)[number];
 export const TDAH_ACTIVITY_STATES = ['pending', 'started', 'completed', 'missed', 'limbo', 'discarded'] as const;
 export type TdahActivityState = (typeof TDAH_ACTIVITY_STATES)[number];
 
+/**
+ * `startedAt`/`completedAt` are story 1.6's own AD-7 fields: each is written
+ * exactly once, by its own dedicated endpoint (`POST .../start`,
+ * `POST .../complete`), and never re-editable afterward. `miss` sets
+ * `state:'missed'` without writing a timestamp — the état table has no
+ * "missedAt" concept, only started/completed instants.
+ *
+ * `startTime`/`durationMinutes` are `null` for a manual Activity created
+ * without an explicit time/duration (doc 02's T-01 "sin hora" trailing
+ * section; epics.md's own AC for this story: title, hora/duración
+ * opcionales). A Bloque-instantiated Activity (`origin: 'routine'`) always
+ * has both non-null, since it copies them straight from its Bloque.
+ */
 export type TdahActivity = {
     id: number;
     dayPlanDate: string;
     blockId: number | null;
     title: string;
-    startTime: string;
-    durationMinutes: number;
+    startTime: string | null;
+    durationMinutes: number | null;
     origin: TdahActivityOrigin;
     state: TdahActivityState;
+    startedAt: string | null;
+    completedAt: string | null;
 };
+
+/**
+ * GET /v1/tdah/day — story 1.6. `routineTitle` is `null` whenever today has
+ * no block-linked (origin:'routine') Activity, whether because no Rutina
+ * applies (FR-3) or because today is manual-only. Always 200: the day is
+ * generated on demand if missing (AD-5's idempotent generator, called with
+ * today's date instead of tomorrow's), so there's no "day not found" case.
+ *
+ * `timeZone` is the caller's own TDAH profile time zone (falling back to
+ * `TDAH_DEFAULT_TIME_ZONE` the same way `date`/`activities` already do when no
+ * profile exists yet) — AD-6 requires wall-clock in the user's own configured
+ * time zone, not the requesting device's local clock, so the client needs
+ * this value to compute "now" and render the header date correctly even when
+ * the device itself is set to a different zone.
+ */
+export type TdahDayResponse = {
+    date: string;
+    timeZone: string;
+    routineTitle: string | null;
+    activities: TdahActivity[];
+};
+
+/**
+ * POST /v1/tdah/day/activities body — story 1.6 (FR-4). `title` is required
+ * (trimmed, capped at `TDAH_ROUTINE_TITLE_MAX_LENGTH`, the same cap Rutina
+ * Bloques already enforce — not a new, separate one). `startTime`/
+ * `durationMinutes` are genuinely optional (epics.md's own AC: "hora/duración
+ * opcionales"): an omitted `startTime` and/or `durationMinutes` persists as
+ * `NULL` (doc 02's T-01 "sin hora" trailing section), never a defaulted
+ * "now"/`0` — see `mutateCreateManualActivity` in storage.ts.
+ */
+export type TdahCreateManualActivityRequest = {
+    title: string;
+    startTime?: string;
+    durationMinutes?: number;
+};
+
+export type TdahActivityResponse = {
+    activity: TdahActivity;
+};
+
+/**
+ * POST /v1/tdah/activities/:id/{start|complete|miss} — story 1.6, AD-7.
+ * `start` only ever transitions a `pending` Activity; any other current
+ * state (already `started` or beyond) is a no-op returning the current
+ * state unchanged, never an error (covers a raced double-tap).
+ * `complete`/`miss` only ever transition a `pending`/`started` Activity into
+ * their target state; calling one when the Activity is already in that exact
+ * target state is the same kind of no-op, while any other non-`pending`/
+ * `started` current state is rejected with `TDAH_ACTIVITY_INVALID` — this
+ * story only ever registers actions on *today's* Activities, so `limbo`/
+ * `discarded` (set later, by the scheduler or a future ritual flow) are never
+ * reachable through these endpoints in practice.
+ */
+export type TdahActivityTransitionAction = 'start' | 'complete' | 'miss';
 
 /**
  * POST /v1/tdah/activate body. Always turns the mode on (first activation or
@@ -196,6 +266,11 @@ const TDAH_ERROR_CODES = {
     invalidTimeZone: 'TDAH_INVALID_TIME_ZONE',
     invalidRitualHour: 'TDAH_INVALID_RITUAL_HOUR',
     routineInvalid: 'TDAH_ROUTINE_INVALID',
+    // Story 1.6: covers both a malformed/oversized manual-Activity input and
+    // an invalid `start`/`complete`/`miss` state transition (e.g. `complete`
+    // on an Activity already `missed`) — mirrors `routineInvalid` covering
+    // both Rutina input validation and the routine-count cap.
+    activityInvalid: 'TDAH_ACTIVITY_INVALID',
     methodNotAllowed: 'TDAH_METHOD_NOT_ALLOWED',
     notFound: 'TDAH_NOT_FOUND',
     storageFailed: 'TDAH_STORAGE_FAILED',

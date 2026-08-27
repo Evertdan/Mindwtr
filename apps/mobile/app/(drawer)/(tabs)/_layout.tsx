@@ -9,6 +9,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { MobileAreaSwitcher } from '@/components/mobile-area-switcher';
+import { useTdahModeActive } from '@/components/tdah/today/use-tdah-mode-active';
 import { useMobileAreaFilter } from '@/hooks/use-mobile-area-filter';
 import { useMobileSyncBadge } from '@/hooks/use-mobile-sync-badge';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
@@ -156,6 +157,11 @@ function MoreNavigationSheet({
   quickAccessView: MobileQuickAccessView;
 }) {
   const reducedMotion = useReducedMotion();
+  // Story 1.6 — E-05: a guaranteed, always-present entry point to T-01 when
+  // ADHD mode is active (spec Boundaries). This sheet stays mounted across
+  // opens/closes, so `visible` is passed as the hook's refresh key — every
+  // open re-checks the server fresh, never a value cached client-side.
+  const tdahModeActive = useTdahModeActive(visible);
   const sheetTranslateY = useRef(new Animated.Value(Dimensions.get('window').height)).current;
   const lastCloseRequestIdRef = useRef(closeRequestId);
   const hiddenTranslateY = Dimensions.get('window').height;
@@ -173,6 +179,7 @@ function MoreNavigationSheet({
     trash: '#EF4444',
     settings: '#64748B',
     saved: '#4F8CF7',
+    tdahToday: '#F97316',
   };
 
   const animateClosed = useCallback(() => {
@@ -269,6 +276,13 @@ function MoreNavigationSheet({
     },
     moreQuickAccessItem('contexts'),
     moreQuickAccessItem('calendar'),
+    ...(tdahModeActive ? [{
+      id: 'tdah-today',
+      label: t('nav.tdahToday'),
+      icon: 'house.fill' as IconSymbolName,
+      iconColor: iconColors.tdahToday,
+      route: '/tdah-today',
+    }] : []),
   ];
   const secondaryItems: MoreDestination[] = [
     { id: 'trash', label: t('nav.trash'), icon: 'trash.fill', iconColor: iconColors.trash, route: '/trash' },

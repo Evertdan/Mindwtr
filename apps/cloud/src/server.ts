@@ -157,6 +157,8 @@ const STATIC_CLOUD_ROUTES = new Set([
     '/v1/tdah/profile',
     '/v1/tdah/routines',
     '/v1/tdah/routines/conflicts',
+    '/v1/tdah/day',
+    '/v1/tdah/day/activities',
 ]);
 
 export function canonicalCloudRoute(pathname: string): string {
@@ -171,6 +173,8 @@ export function canonicalCloudRoute(pathname: string): string {
     if (pathname.startsWith('/v1/attachments/')) return '/v1/attachments/:path';
     if (/^\/v1\/tdah\/routines\/[^/]+\/preview$/.test(pathname)) return '/v1/tdah/routines/:id/preview';
     if (/^\/v1\/tdah\/routines\/[^/]+$/.test(pathname)) return '/v1/tdah/routines/:id';
+    const activityActionMatch = pathname.match(/^\/v1\/tdah\/activities\/[^/]+\/(start|complete|miss)$/);
+    if (activityActionMatch) return `/v1/tdah/activities/:id/${activityActionMatch[1]}`;
     return 'unmatched';
 }
 

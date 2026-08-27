@@ -21,6 +21,10 @@ import { existsSync, readdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { ensureDurableDirectory } from '../server-storage';
 import type {
+    TdahActivity,
+    TdahActivityOrigin,
+    TdahActivityState,
+    TdahActivityTransitionAction,
     TdahMode,
     TdahProfile,
     TdahProfileUpsertRequest,
@@ -128,16 +132,35 @@ const CREATE_DAY_PLAN_TABLE_SQL = `
     );
 `;
 
+// Story 1.6 (DW-2 sibling): a fresh database gets `started_at`/`completed_at`
+// AND nullable `start_time`/`duration_minutes` directly from this CREATE
+// TABLE (so a new user starts at schema v2 with no migration to run), while a
+// pre-1.6 database already has a `tdah_activity` table on disk without the
+// timestamp columns and with `start_time`/`duration_minutes` still
+// `NOT NULL` — `CREATE TABLE IF NOT EXISTS` alone is a permanent no-op
+// against it, which is what `migrateActivityTimestampColumnsIfNeeded` below
+// exists to fix (v1->v2, a full create-copy-drop-rename rebuild rather than
+// `ALTER TABLE ... ADD COLUMN`, since SQLite cannot relax an existing
+// `NOT NULL` constraint via `ALTER TABLE`).
+//
+// `start_time`/`duration_minutes` are nullable so a manual Activity's
+// time/duration can be genuinely optional (doc 02's T-01 "sin hora" trailing
+// section; epics.md's own AC for this story): a Bloque-instantiated Activity
+// always has both, since it copies them straight from its Bloque, but a
+// manual Activity created without an explicit time must persist `NULL`
+// rather than a defaulted "now"/`0` — see `mutateCreateManualActivity`.
 const CREATE_ACTIVITY_TABLE_SQL = `
     CREATE TABLE IF NOT EXISTS tdah_activity (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         day_plan_date TEXT NOT NULL REFERENCES tdah_day_plan(date),
         block_id INTEGER REFERENCES tdah_routine_block(id),
         title TEXT NOT NULL,
-        start_time TEXT NOT NULL,
-        duration_minutes INTEGER NOT NULL,
+        start_time TEXT,
+        duration_minutes INTEGER,
         origin TEXT NOT NULL CHECK (origin IN ('routine', 'manual')),
-        state TEXT NOT NULL CHECK (state IN ('pending', 'started', 'completed', 'missed', 'limbo', 'discarded')) DEFAULT 'pending'
+        state TEXT NOT NULL CHECK (state IN ('pending', 'started', 'completed', 'missed', 'limbo', 'discarded')) DEFAULT 'pending',
+        started_at TEXT,
+        completed_at TEXT
     );
 `;
 
@@ -189,13 +212,21 @@ const prepareAll = <Row>(database: TdahDatabase, sql: string): TdahStatementWith
     database.prepare(sql) as unknown as TdahStatementWithAll<Row>
 );
 
-// --- Schema migration (story 1.4, DW-9) -------------------------------------
+// --- Schema migration (story 1.4 DW-9, extended by story 1.6) --------------
 //
-// One version bump, `PRAGMA user_version` 0 -> 1: widen `tdah_routine`'s
-// pattern columns to support `nthWeekdayOfMonth`. Deliberately not a generic
-// migration framework — the module has exactly this one schema change to
-// make, and SQLite already ships version tracking for free.
-const SCHEMA_TARGET_VERSION = 1;
+// Two sequential version bumps tracked via `PRAGMA user_version`: 0 -> 1
+// widens `tdah_routine`'s pattern columns (story 1.4); 1 -> 2 adds
+// `tdah_activity.started_at`/`completed_at` and relaxes
+// `start_time`/`duration_minutes` to nullable, so a manual Activity's
+// time/duration can be genuinely optional (story 1.6). Deliberately not a
+// generic migration framework — the module has exactly these two schema
+// changes to make, and SQLite already ships version tracking for free. A
+// database more than one version behind (a pre-1.4 file opened for the first
+// time after 1.6 shipped) runs both steps in sequence within the same
+// `migrateSchemaIfNeeded` call.
+const SCHEMA_VERSION_ROUTINE_PATTERN_WIDENED = 1;
+const SCHEMA_VERSION_ACTIVITY_TIMESTAMPS = 2;
+const SCHEMA_TARGET_VERSION = SCHEMA_VERSION_ACTIVITY_TIMESTAMPS;
 
 /**
  * v0 -> v1: a pre-1.4 database's `tdah_routine` still has the old
@@ -206,11 +237,7 @@ const SCHEMA_TARGET_VERSION = 1;
  * directly) is recognised as already-current and only needs its version
  * stamped, not rebuilt.
  */
-const migrateSchemaIfNeeded = (database: TdahDatabase): void => {
-    const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: unknown };
-    const currentVersion = Number(versionRow.user_version ?? 0);
-    if (currentVersion >= SCHEMA_TARGET_VERSION) return;
-
+const migrateRoutinePatternWideningIfNeeded = (database: TdahDatabase): void => {
     const columns = prepareAll<{ name: unknown }>(database, "PRAGMA table_info('tdah_routine');").all();
     const hasWidenedColumns = columns.some((column) => String(column.name) === 'pattern_weekdays');
 
@@ -256,7 +283,7 @@ const migrateSchemaIfNeeded = (database: TdahDatabase): void => {
             `);
             database.exec('DROP TABLE tdah_routine;');
             database.exec('ALTER TABLE tdah_routine_v2 RENAME TO tdah_routine;');
-            database.exec(`PRAGMA user_version = ${SCHEMA_TARGET_VERSION};`);
+            database.exec(`PRAGMA user_version = ${SCHEMA_VERSION_ROUTINE_PATTERN_WIDENED};`);
             database.exec('COMMIT;');
         } catch (error) {
             try {
@@ -269,7 +296,94 @@ const migrateSchemaIfNeeded = (database: TdahDatabase): void => {
         return;
     }
 
-    database.exec(`PRAGMA user_version = ${SCHEMA_TARGET_VERSION};`);
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION_ROUTINE_PATTERN_WIDENED};`);
+};
+
+/**
+ * v1 -> v2 (story 1.6): a pre-1.6 database's `tdah_activity` has neither
+ * `started_at` nor `completed_at`, and its `start_time`/`duration_minutes`
+ * columns are still `NOT NULL` (inherited from the original
+ * Rutina-Bloque-instantiation-only design, before manual Activities existed).
+ * Adding the two new nullable timestamp columns alone would be a plain
+ * `ALTER TABLE ... ADD COLUMN`, but relaxing `start_time`/`duration_minutes`
+ * to nullable (so a manual Activity's time/duration can be genuinely
+ * optional, per doc 02's "sin hora" trailing section) is NOT something
+ * `ALTER TABLE` can do in SQLite — it cannot drop or relax an existing
+ * `NOT NULL`/CHECK constraint on a column. So this step is a full
+ * create-copy-drop-rename rebuild, matching the style of the v0->v1 Rutina
+ * widening migration above, rather than the narrower `ADD COLUMN` approach a
+ * timestamp-only change would have allowed. Every pre-1.6 row already has
+ * real (non-null) `start_time`/`duration_minutes` values — the rebuild only
+ * widens the column definitions, it never touches existing data — so the
+ * copy is a straight `INSERT...SELECT` with `NULL` backfilled for the two new
+ * timestamp columns. Still wrapped in its own explicit transaction for the
+ * same crash-safety reason as every other migration step in this file: a
+ * throw mid-rebuild rolls back to the pre-migration state, safe to retry from
+ * scratch, instead of leaving a stray `tdah_activity_v2` that would make the
+ * next attempt's `CREATE TABLE tdah_activity_v2` (no `IF NOT EXISTS`) throw
+ * "table already exists" forever.
+ */
+const migrateActivityTimestampColumnsIfNeeded = (database: TdahDatabase): void => {
+    const columns = prepareAll<{ name: unknown }>(database, "PRAGMA table_info('tdah_activity');").all();
+    const hasTimestampColumns = columns.some((column) => String(column.name) === 'started_at');
+
+    if (!hasTimestampColumns) {
+        database.exec('BEGIN IMMEDIATE;');
+        try {
+            // Defense-in-depth for a database that already has a stray
+            // tdah_activity_v2 left over from a migration interrupted before
+            // reaching COMMIT.
+            database.exec('DROP TABLE IF EXISTS tdah_activity_v2;');
+            database.exec(`
+                CREATE TABLE tdah_activity_v2 (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    day_plan_date TEXT NOT NULL REFERENCES tdah_day_plan(date),
+                    block_id INTEGER REFERENCES tdah_routine_block(id),
+                    title TEXT NOT NULL,
+                    start_time TEXT,
+                    duration_minutes INTEGER,
+                    origin TEXT NOT NULL CHECK (origin IN ('routine', 'manual')),
+                    state TEXT NOT NULL CHECK (state IN ('pending', 'started', 'completed', 'missed', 'limbo', 'discarded')) DEFAULT 'pending',
+                    started_at TEXT,
+                    completed_at TEXT
+                );
+            `);
+            database.exec(`
+                INSERT INTO tdah_activity_v2 (id, day_plan_date, block_id, title, start_time, duration_minutes, origin, state, started_at, completed_at)
+                SELECT id, day_plan_date, block_id, title, start_time, duration_minutes, origin, state, NULL, NULL FROM tdah_activity;
+            `);
+            database.exec('DROP TABLE tdah_activity;');
+            database.exec('ALTER TABLE tdah_activity_v2 RENAME TO tdah_activity;');
+            database.exec(`PRAGMA user_version = ${SCHEMA_VERSION_ACTIVITY_TIMESTAMPS};`);
+            database.exec('COMMIT;');
+        } catch (error) {
+            try {
+                database.exec('ROLLBACK;');
+            } catch {
+                // Closing the handle in the caller releases the lock either way.
+            }
+            throw error;
+        }
+        return;
+    }
+
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION_ACTIVITY_TIMESTAMPS};`);
+};
+
+const migrateSchemaIfNeeded = (database: TdahDatabase): void => {
+    const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: unknown };
+    let currentVersion = Number(versionRow.user_version ?? 0);
+    if (currentVersion >= SCHEMA_TARGET_VERSION) return;
+
+    if (currentVersion < SCHEMA_VERSION_ROUTINE_PATTERN_WIDENED) {
+        migrateRoutinePatternWideningIfNeeded(database);
+        currentVersion = SCHEMA_VERSION_ROUTINE_PATTERN_WIDENED;
+    }
+
+    if (currentVersion < SCHEMA_VERSION_ACTIVITY_TIMESTAMPS) {
+        migrateActivityTimestampColumnsIfNeeded(database);
+        currentVersion = SCHEMA_VERSION_ACTIVITY_TIMESTAMPS;
+    }
 };
 
 /** Schema init (`CREATE TABLE IF NOT EXISTS` x5) plus the migration step above, run on every open. */
@@ -1168,4 +1282,282 @@ export async function activateTdahProfile(
         const dayPlan = mutateGenerateTomorrowIfMissing(database, date, profile.timeZone);
         return { profile, routineCreated: routineResult?.created ?? false, dayPlan };
     });
+}
+
+// --- Today / Activities (story 1.6) -----------------------------------------
+
+// Timed Activities first (ascending by `start_time`), then every "sin hora"
+// (no-time) Activity trailing at the end in `id` order — doc 02's T-01
+// layout puts the "sin hora" section after the timed timeline, and without
+// the explicit `(start_time IS NULL) ASC` clause SQLite's default `ASC`
+// ordering treats `NULL` as smaller than any real value, which would sort
+// no-time Activities FIRST instead of last.
+const SELECT_ACTIVITIES_FOR_DAY_SQL = `
+    SELECT id, day_plan_date, block_id, title, start_time, duration_minutes, origin, state, started_at, completed_at
+    FROM tdah_activity
+    WHERE day_plan_date = ?
+    ORDER BY (start_time IS NULL) ASC, start_time ASC, id ASC;
+`;
+// `null` whenever today has no block-linked (origin:'routine') Activity —
+// either no Rutina applies (FR-3) or today is manual-only. A routine-edit
+// that deletes a Bloque after generation (block_id nullable, not
+// FK-enforced, per storage.ts's existing update/delete comments) makes this
+// JOIN stop matching for that Activity too — accepted the same way that
+// existing divergence already is elsewhere in this file.
+// `ORDER BY tdah_activity.id ASC` makes the `LIMIT 1` pick deterministic —
+// current design only ever has every routine-linked Activity for a day share
+// the same Rutina (so there's exactly one candidate title in practice), but
+// the query itself should never depend on SQLite's unspecified row order for
+// the theoretical case where more than one candidate exists.
+const SELECT_ROUTINE_TITLE_FOR_DAY_SQL = `
+    SELECT tdah_routine.title AS title
+    FROM tdah_activity
+    JOIN tdah_routine_block ON tdah_activity.block_id = tdah_routine_block.id
+    JOIN tdah_routine ON tdah_routine_block.routine_id = tdah_routine.id
+    WHERE tdah_activity.day_plan_date = ?
+    ORDER BY tdah_activity.id ASC
+    LIMIT 1;
+`;
+const SELECT_ACTIVITY_BY_ID_SQL = 'SELECT id, day_plan_date, block_id, title, start_time, duration_minutes, origin, state, started_at, completed_at FROM tdah_activity WHERE id = ?;';
+const INSERT_MANUAL_ACTIVITY_SQL = `
+    INSERT INTO tdah_activity (day_plan_date, block_id, title, start_time, duration_minutes, origin, state)
+    VALUES (?, NULL, ?, ?, ?, 'manual', 'pending');
+`;
+const UPDATE_ACTIVITY_START_SQL = "UPDATE tdah_activity SET state = 'started', started_at = ? WHERE id = ?;";
+const UPDATE_ACTIVITY_COMPLETE_SQL = "UPDATE tdah_activity SET state = 'completed', completed_at = ? WHERE id = ?;";
+const UPDATE_ACTIVITY_MISS_SQL = "UPDATE tdah_activity SET state = 'missed' WHERE id = ?;";
+
+type TdahActivityRow = {
+    id: unknown;
+    day_plan_date: unknown;
+    block_id: unknown;
+    title: unknown;
+    start_time: unknown;
+    duration_minutes: unknown;
+    origin: unknown;
+    state: unknown;
+    started_at: unknown;
+    completed_at: unknown;
+};
+
+const asNumberOrNull = (value: unknown): number | null => (
+    value === null || value === undefined ? null : Number(value)
+);
+
+const rowToActivity = (row: TdahActivityRow): TdahActivity => ({
+    id: Number(row.id),
+    dayPlanDate: String(row.day_plan_date),
+    blockId: row.block_id === null || row.block_id === undefined ? null : Number(row.block_id),
+    title: String(row.title),
+    // `null` for a manual Activity created without an explicit time/duration
+    // (doc 02's "sin hora" case) — a Bloque-instantiated Activity always has
+    // both, since it copies them straight from its Bloque.
+    startTime: asString(row.start_time),
+    durationMinutes: asNumberOrNull(row.duration_minutes),
+    origin: row.origin as TdahActivityOrigin,
+    state: row.state as TdahActivityState,
+    startedAt: asString(row.started_at),
+    completedAt: asString(row.completed_at),
+});
+
+const selectActivityById = (database: TdahDatabase, activityId: number): TdahActivity | null => {
+    const row = database.prepare(SELECT_ACTIVITY_BY_ID_SQL).get(activityId) as TdahActivityRow | undefined | null;
+    return row ? rowToActivity(row) : null;
+};
+
+export type TdahDayPlanView = {
+    date: string;
+    timeZone: string;
+    routineTitle: string | null;
+    activities: TdahActivity[];
+};
+
+/**
+ * `getTodayDayPlan`'s raw-database read half — every Activity for `date`
+ * (ordered by `plannedStart`, doc 02's T-01 layout) plus the applicable
+ * Rutina's title, if any. `timeZone` is threaded through rather than reread
+ * from the profile here, since the caller already resolved it (with the
+ * `TDAH_DEFAULT_TIME_ZONE` fallback) before opening this transaction.
+ */
+const selectDayPlanView = (database: TdahDatabase, date: string, timeZone: string): TdahDayPlanView => {
+    const activities = prepareAll<TdahActivityRow>(database, SELECT_ACTIVITIES_FOR_DAY_SQL).all(date).map(rowToActivity);
+    const routineTitleRow = database.prepare(SELECT_ROUTINE_TITLE_FOR_DAY_SQL).get(date) as { title: unknown } | undefined | null;
+    return { date, timeZone, routineTitle: routineTitleRow ? String(routineTitleRow.title) : null, activities };
+};
+
+/**
+ * GET /v1/tdah/day — today's DayPlan (AD-1: always fetched fresh, server
+ * computes "today" from the caller's own profile time zone, never the
+ * client). Auto-generates today's DayPlan on demand if missing, reusing
+ * `mutateGenerateTomorrowIfMissing` with today's date instead of tomorrow's
+ * (the design's own gap-filler for a same-day-as-activation "Hoy" view,
+ * which the nightly scheduler — story 1.5 — never has a chance to generate
+ * itself, since it only ever generates *tomorrow's* plan). Both the
+ * generate-if-missing write and the read happen inside the same held
+ * transaction, so a concurrent request can never observe a half-generated
+ * day.
+ */
+export async function getTodayDayPlan(
+    dataDir: string,
+    key: string,
+    timeZone: string,
+): Promise<TdahDayPlanView> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    const durableDir = ensureDurableDirectory(dirname(databasePath));
+    if (!durableDir) {
+        throw new Error('TDAH database directory is unsafe');
+    }
+    const date = formatDateInTimeZone(new Date(), timeZone);
+    return await withWriteTransaction(databasePath, (database) => {
+        mutateGenerateTomorrowIfMissing(database, date, timeZone);
+        return selectDayPlanView(database, date, timeZone);
+    });
+}
+
+export type TdahCreateManualActivityInput = {
+    title: string;
+    startTime?: string;
+    durationMinutes?: number;
+};
+
+// A single day's timeline cannot reasonably need more Actividades than this —
+// caps otherwise-unbounded manual-Activity creation via
+// POST /v1/tdah/day/activities, the same DW-2-style resource-cost concern
+// `TDAH_ROUTINE_MAX_BLOCKS`/`TDAH_ROUTINE_MAX_COUNT` already guard against for
+// Rutina Bloques/count. Counts every Activity for the day (routine-generated
+// included, not just manual ones) since both share the same rendered
+// timeline.
+export const TDAH_DAY_MAX_ACTIVITIES = 50;
+
+/**
+ * `mutateCreateManualActivity`'s own day-plan bootstrap: FR-4 lets a manual
+ * Activity be added "at any moment", including before today's DayPlan has
+ * ever been fetched (and thus generated) — reusing
+ * `mutateGenerateTomorrowIfMissing` here (rather than a bare
+ * `INSERT INTO tdah_day_plan`) means a first-ever manual add on an
+ * un-generated day still applies today's Rutina, if any, instead of
+ * silently creating an empty day that then blocks the real Rutina Activities
+ * from ever being generated (`tdah_day_plan.date` is a PRIMARY KEY).
+ *
+ * `null` means the day was already at `TDAH_DAY_MAX_ACTIVITIES` — the count
+ * check and the insert run inside the same held transaction (matching
+ * `insertRoutineIfUnderCap`'s own cap discipline), so a burst of concurrent
+ * creates can never all observe count < the cap and collectively overshoot
+ * it.
+ */
+const mutateCreateManualActivity = (
+    database: TdahDatabase,
+    date: string,
+    timeZone: string,
+    input: TdahCreateManualActivityInput,
+): TdahActivity | null => {
+    mutateGenerateTomorrowIfMissing(database, date, timeZone);
+    const countRow = database.prepare(COUNT_ACTIVITIES_FOR_DAY_PLAN_SQL).get(date) as { count: unknown };
+    if (Number(countRow.count) >= TDAH_DAY_MAX_ACTIVITIES) return null;
+    // FR-4/doc 02: time and duration are genuinely optional on a manual
+    // Activity — an omitted `startTime`/`durationMinutes` persists as `NULL`
+    // (the "sin hora" case), never a defaulted "now"/`0`. Only
+    // Bloque-instantiated Activities (INSERT_ACTIVITY_FROM_BLOCK_SQL) always
+    // have a real time, since they copy it straight from their Bloque.
+    const startTime = input.startTime ?? null;
+    const durationMinutes = input.durationMinutes ?? null;
+    const inserted = database.prepare(INSERT_MANUAL_ACTIVITY_SQL).run(date, input.title, startTime, durationMinutes);
+    const activityId = Number(inserted.lastInsertRowid);
+    const created = selectActivityById(database, activityId);
+    if (!created) {
+        throw new Error('TDAH activity readback failed after insert');
+    }
+    return created;
+};
+
+/**
+ * POST /v1/tdah/day/activities — creates a manual Activity for today (FR-4),
+ * origin:'manual', state:'pending'. `null` when the day is already at
+ * `TDAH_DAY_MAX_ACTIVITIES` — the insert never ran (routes.ts turns that into
+ * 400 `TDAH_ACTIVITY_INVALID`).
+ */
+export async function createManualActivity(
+    dataDir: string,
+    key: string,
+    timeZone: string,
+    input: TdahCreateManualActivityInput,
+): Promise<TdahActivity | null> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    const durableDir = ensureDurableDirectory(dirname(databasePath));
+    if (!durableDir) {
+        throw new Error('TDAH database directory is unsafe');
+    }
+    const date = formatDateInTimeZone(new Date(), timeZone);
+    return await withWriteTransaction(databasePath, (database) => mutateCreateManualActivity(database, date, timeZone, input));
+}
+
+export type TdahActivityTransitionResult =
+    | { kind: 'notFound' }
+    | { kind: 'rejected' }
+    | { kind: 'ok'; activity: TdahActivity };
+
+/**
+ * AD-7: `startedAt`/`completedAt` are each written exactly once, by their own
+ * dedicated endpoint, and never re-editable afterward. `start`/`complete`/
+ * `miss` are idempotent — a raced double-tap (or a tap on an
+ * already-further-along Activity) never produces a duplicate write or an
+ * error:
+ * - `start` only transitions a `pending` Activity; any other current state
+ *   is a no-op returning the current state unchanged.
+ * - `complete`/`miss` only transition a `pending`/`started` Activity into
+ *   their target state (`completed`/`missed`). Calling one when the
+ *   Activity is already in that exact target state is the same kind of
+ *   no-op; any other non-`pending`/`started` current state is `rejected`
+ *   (routes.ts turns that into 400 `TDAH_ACTIVITY_INVALID`) — `limbo`/
+ *   `discarded` are set later by the scheduler or a future ritual flow and
+ *   are never reachable through these endpoints in practice, since this
+ *   story only ever registers actions on *today's* Activities.
+ */
+const mutateTransitionActivityState = (
+    database: TdahDatabase,
+    activityId: number,
+    action: TdahActivityTransitionAction,
+): TdahActivityTransitionResult => {
+    const activity = selectActivityById(database, activityId);
+    if (!activity) return { kind: 'notFound' };
+
+    if (action === 'start') {
+        if (activity.state !== 'pending') return { kind: 'ok', activity };
+        database.prepare(UPDATE_ACTIVITY_START_SQL).run(new Date().toISOString(), activityId);
+        const updated = selectActivityById(database, activityId);
+        if (!updated) throw new Error('TDAH activity readback failed after start');
+        return { kind: 'ok', activity: updated };
+    }
+
+    const targetState: TdahActivityState = action === 'complete' ? 'completed' : 'missed';
+    if (activity.state === targetState) {
+        return { kind: 'ok', activity };
+    }
+    if (activity.state !== 'pending' && activity.state !== 'started') {
+        return { kind: 'rejected' };
+    }
+    if (action === 'complete') {
+        database.prepare(UPDATE_ACTIVITY_COMPLETE_SQL).run(new Date().toISOString(), activityId);
+    } else {
+        database.prepare(UPDATE_ACTIVITY_MISS_SQL).run(activityId);
+    }
+    const updated = selectActivityById(database, activityId);
+    if (!updated) throw new Error('TDAH activity readback failed after transition');
+    return { kind: 'ok', activity: updated };
+};
+
+/** POST /v1/tdah/activities/:id/{start|complete|miss} — see `mutateTransitionActivityState` for the idempotency/rejection rules. */
+export async function transitionActivityState(
+    dataDir: string,
+    key: string,
+    activityId: number,
+    action: TdahActivityTransitionAction,
+): Promise<TdahActivityTransitionResult> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    if (!existsSync(databasePath)) return { kind: 'notFound' };
+    const durableDir = ensureDurableDirectory(dirname(databasePath));
+    if (!durableDir) {
+        throw new Error('TDAH database directory is unsafe');
+    }
+    return await withWriteTransaction(databasePath, (database) => mutateTransitionActivityState(database, activityId, action));
 }

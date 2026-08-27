@@ -1826,6 +1826,9 @@ describe('cloud server api', () => {
         expect(canonicalCloudRoute('/v1/calendar/private-token.ics')).toBe('/v1/calendar/:token');
         expect(canonicalCloudRoute('/v1/tdah/routines/42')).toBe('/v1/tdah/routines/:id');
         expect(canonicalCloudRoute('/v1/tdah/routines/42/preview')).toBe('/v1/tdah/routines/:id/preview');
+        expect(canonicalCloudRoute('/v1/tdah/activities/private-activity-id/start')).toBe('/v1/tdah/activities/:id/start');
+        expect(canonicalCloudRoute('/v1/tdah/activities/private-activity-id/complete')).toBe('/v1/tdah/activities/:id/complete');
+        expect(canonicalCloudRoute('/v1/tdah/activities/private-activity-id/miss')).toBe('/v1/tdah/activities/:id/miss');
         expect(canonicalCloudRoute('/private/unknown/path')).toBe('unmatched');
     });
 
