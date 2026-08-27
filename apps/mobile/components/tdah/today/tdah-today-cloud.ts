@@ -62,3 +62,8 @@ export function buildTdahActivityActionUrl(
 ): string {
     return `${getCloudBaseUrl(cloudUrl)}/tdah/activities/${activityId}/${action}`;
 }
+
+/** T-05's decide endpoint (spec Code Map): `POST /v1/tdah/activities/:id/decide`. */
+export function buildTdahActivityDecideUrl(cloudUrl: string, activityId: number): string {
+    return `${getCloudBaseUrl(cloudUrl)}/tdah/activities/${activityId}/decide`;
+}

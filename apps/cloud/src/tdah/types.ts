@@ -215,6 +215,50 @@ export type TdahActivityResponse = {
 export type TdahActivityTransitionAction = 'start' | 'complete' | 'miss';
 
 /**
+ * POST /v1/tdah/activities/:id/decide — story 3.2, T-05's decision-chip row
+ * under every `missed`/`limbo` Actividad on the ritual close screen. Reuses
+ * `TdahActivityResponse` (above) as its response shape, same as
+ * start/complete/miss.
+ *
+ * `move-tomorrow`/`move-date` share "reprogram as a fresh attempt on a new
+ * day" semantics: `state` goes to `pending`, `startedAt`/`completedAt` are
+ * cleared to `null`, and the destination day's `tdah_day_plan` row is
+ * materialized on demand (`mutateGenerateTomorrowIfMissing` in storage.ts),
+ * capped at `TDAH_DAY_MAX_ACTIVITIES` same as every other Activity-creating
+ * path. `move-date`'s `date` must be strictly after "today" in the caller's
+ * profile time zone (AD-6) — `date` <= today is rejected.
+ *
+ * `discard` sets `state:'discarded'` (terminal, never reappears in any
+ * DayPlan) without touching `dayPlanDate`.
+ *
+ * `undated` is deliberately a data no-op — FR-9 only recognizes
+ * move/discard/complete-late as Limbo exits, so "sin fecha" never writes
+ * `state`/`dayPlanDate`; it only closes the row client-side for this ritual
+ * session (see storage.ts's `mutateDecideActivity` doc comment). It still
+ * shares the same `missed`/`limbo` eligibility gate as the other three
+ * decisions, so calling it on, say, an already-`completed` Activity is
+ * rejected exactly like the others.
+ *
+ * Every decision only ever transitions a `missed`/`limbo` Activity; any other
+ * current state is `rejected` → 400 `TDAH_ACTIVITY_INVALID` (same contract as
+ * start/complete/miss), UNLESS the request is an AD-7 idempotent retry whose
+ * result already matches what's being asked for (same `state`, and for
+ * move-tomorrow/move-date a `dayPlanDate` on or after "today" — not a strict
+ * equality against the freshly recomputed target, so a retry that lands
+ * after local midnight has rolled over between calls still matches;
+ * `state:'discarded'` already for discard) — that responds 200 without
+ * rewriting, never 400.
+ */
+export const TDAH_ACTIVITY_DECISIONS = ['move-tomorrow', 'move-date', 'discard', 'undated'] as const;
+export type TdahActivityDecision = (typeof TDAH_ACTIVITY_DECISIONS)[number];
+
+export type TdahActivityDecideRequest =
+    | { decision: 'move-tomorrow' }
+    | { decision: 'move-date'; date: string }
+    | { decision: 'discard' }
+    | { decision: 'undated' };
+
+/**
  * POST /v1/tdah/activate body. Always turns the mode on (first activation or
  * reactivation) — `PUT /tdah/profile` remains the only way to turn it off.
  * `routine` is optional: omitting it skips Rutina creation and yields an

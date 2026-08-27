@@ -22,6 +22,7 @@ import { dirname, join } from 'path';
 import { ensureDurableDirectory } from '../server-storage';
 import type {
     TdahActivity,
+    TdahActivityDecideRequest,
     TdahActivityOrigin,
     TdahActivityState,
     TdahActivityTransitionAction,
@@ -1146,6 +1147,22 @@ export async function deleteRoutine(dataDir: string, key: string, routineId: num
 const TDAH_MONTH_PATTERN = /^(19[7-9]\d|2\d{3})-(0[1-9]|1[0-2])$/;
 export const isValidMonthString = (value: string): boolean => TDAH_MONTH_PATTERN.test(value);
 
+// Story 3.2 — `move-date`'s own `YYYY-MM-DD` validator, same bounded-year
+// rationale as `TDAH_MONTH_PATTERN` above (a caller-controlled year string
+// otherwise risks JS's legacy two-digit-year `Date.UTC` folding). Unlike
+// `TDAH_MONTH_PATTERN`, this also round-trips the parsed Y-M-D through
+// `Date.UTC` and checks the result's own components still match, so a
+// syntactically-shaped but calendar-impossible date (e.g. "2026-02-30")
+// is rejected too, rather than silently rolling over into March.
+const TDAH_DATE_SHAPE_PATTERN = /^(19[7-9]\d|2\d{3})-(0[1-9]|1[0-2])-([0-2]\d|3[01])$/;
+export const isValidDateString = (value: string): boolean => {
+    if (!TDAH_DATE_SHAPE_PATTERN.test(value)) return false;
+    const parts = value.split('-').map(Number);
+    const [year, month, day] = parts as [number, number, number];
+    const roundTrip = new Date(Date.UTC(year, month - 1, day));
+    return roundTrip.getUTCFullYear() === year && roundTrip.getUTCMonth() === month - 1 && roundTrip.getUTCDate() === day;
+};
+
 const selectApplicabilityPreviewDates = (
     database: TdahDatabase,
     routineId: number,
@@ -1638,6 +1655,11 @@ const INSERT_MANUAL_ACTIVITY_SQL = `
 const UPDATE_ACTIVITY_START_SQL = "UPDATE tdah_activity SET state = 'started', started_at = ? WHERE id = ?;";
 const UPDATE_ACTIVITY_COMPLETE_SQL = "UPDATE tdah_activity SET state = 'completed', completed_at = ? WHERE id = ?;";
 const UPDATE_ACTIVITY_MISS_SQL = "UPDATE tdah_activity SET state = 'missed' WHERE id = ?;";
+// Story 3.2 — `move-tomorrow`/`move-date`: reprogramming is a fresh attempt
+// on a new day, so `startedAt`/`completedAt` are cleared back to NULL rather
+// than carried over from the missed/limbo attempt being replaced.
+const UPDATE_ACTIVITY_DECIDE_MOVE_SQL = "UPDATE tdah_activity SET state = 'pending', day_plan_date = ?, started_at = NULL, completed_at = NULL WHERE id = ?;";
+const UPDATE_ACTIVITY_DECIDE_DISCARD_SQL = "UPDATE tdah_activity SET state = 'discarded' WHERE id = ?;";
 
 type TdahActivityRow = {
     id: unknown;
@@ -1883,4 +1905,129 @@ export async function transitionActivityState(
         throw new Error('TDAH database directory is unsafe');
     }
     return await withWriteTransaction(databasePath, (database) => mutateTransitionActivityState(database, activityId, action));
+}
+
+export type TdahActivityDecideResult =
+    | { kind: 'notFound' }
+    | { kind: 'rejected' }
+    | { kind: 'ok'; activity: TdahActivity };
+
+/**
+ * Story 3.2 — T-05's decision-chip mutation. Every branch only ever
+ * transitions a `missed`/`limbo` Activity; any other current state is
+ * `rejected` (routes.ts turns that into 400 `TDAH_ACTIVITY_INVALID`) UNLESS
+ * it's an AD-7 idempotent retry that already landed exactly on the requested
+ * outcome, in which case it's a 200 no-op — mirroring
+ * `mutateTransitionActivityState`'s own "already at target state" shortcut,
+ * just checked against `dayPlanDate` too for the two move decisions.
+ *
+ * `undated` never writes (see `TdahActivityDecideRequest`'s doc comment in
+ * types.ts for why) but still enforces the same missed/limbo eligibility gate
+ * as the other three, so it can't be used to "no-op past" an ineligible
+ * current state (e.g. an already-`completed` Activity).
+ *
+ * `move-tomorrow`/`move-date` re-resolve and re-validate their destination
+ * date on every call, including a retry — a date that was invalid on the
+ * first call is never legitimized by that first call having failed, since a
+ * genuinely successful first call could only ever have landed on a valid
+ * date in the first place.
+ */
+const mutateDecideActivity = (
+    database: TdahDatabase,
+    activityId: number,
+    request: TdahActivityDecideRequest,
+    timeZone: string,
+): TdahActivityDecideResult => {
+    const activity = selectActivityById(database, activityId);
+    if (!activity) return { kind: 'notFound' };
+
+    if (request.decision === 'undated') {
+        if (activity.state !== 'missed' && activity.state !== 'limbo') return { kind: 'rejected' };
+        return { kind: 'ok', activity };
+    }
+
+    if (request.decision === 'discard') {
+        if (activity.state === 'discarded') return { kind: 'ok', activity };
+        if (activity.state !== 'missed' && activity.state !== 'limbo') return { kind: 'rejected' };
+        database.prepare(UPDATE_ACTIVITY_DECIDE_DISCARD_SQL).run(activityId);
+        const updated = selectActivityById(database, activityId);
+        if (!updated) throw new Error('TDAH activity readback failed after discard');
+        return { kind: 'ok', activity: updated };
+    }
+
+    // move-tomorrow / move-date: destination day must be strictly after
+    // "today" in the caller's own profile time zone (AD-6) — `computeTomorrowDate`
+    // always satisfies this by construction, so the check only ever actually
+    // rejects a `move-date` target.
+    const today = formatDateInTimeZone(new Date(), timeZone);
+    const targetDate = request.decision === 'move-tomorrow' ? computeTomorrowDate(timeZone) : request.date;
+    if (targetDate <= today) return { kind: 'rejected' };
+
+    // AD-7 idempotency: already a fresh, never-started pending Activity on
+    // this exact destination day — a raced double-tap responds 200 without
+    // rewriting, never a rejection. Compared against `>= today` rather than
+    // `=== targetDate`: the ritual runs close to local midnight, so a retry
+    // can realistically land after local midnight has rolled over between
+    // the original call and the retry. When that happens, `today` (and thus
+    // `targetDate` for move-tomorrow, which is always "today + 1") has
+    // itself advanced by one day, so the activity's actual `dayPlanDate`
+    // (set by the original, successful call) now equals the *new* `today`
+    // instead of the freshly recomputed `targetDate` — a strict `===`
+    // comparison would wrongly treat that legitimate retry as a fresh,
+    // ineligible request and 400 it. `>= today` still requires the activity
+    // to be parked on-or-after "now", so a genuinely stale/unrelated
+    // Activity (dayPlanDate in the past) is never matched here.
+    //
+    // This is deliberately checked ahead of the missed/limbo eligibility
+    // check below — not because eligibility could safely run first (a
+    // retry's current state is already this decision's *outcome*, e.g.
+    // `pending`, so eligibility alone can never recognize a retry) — and it
+    // can, in theory, also match an Activity that was never missed/limbo but
+    // happens to already sit in this exact shape (e.g. a routine-generated
+    // Activity for tomorrow, or any ordinary pending Activity already dated
+    // today/later — there is no persisted signal distinguishing a genuine
+    // retry from a coincidentally-shaped one). That's unreachable through
+    // the real UI (which only ever calls decide on a missed/limbo id) and
+    // writes nothing, so it's accepted as a known, low-risk limitation
+    // rather than solved with new persisted state.
+    const alreadyApplied = activity.state === 'pending'
+        && activity.dayPlanDate >= today
+        && activity.startedAt === null
+        && activity.completedAt === null;
+    if (alreadyApplied) return { kind: 'ok', activity };
+
+    if (activity.state !== 'missed' && activity.state !== 'limbo') {
+        return { kind: 'rejected' };
+    }
+
+    // Materialize the destination day's tdah_day_plan (and its own routine
+    // Bloques, if any apply there) before the cap check — same order
+    // `mutateCreateManualActivity` already uses, so a bootstrap write still
+    // happens even on the over-cap rejection path.
+    mutateGenerateTomorrowIfMissing(database, targetDate);
+    const countRow = database.prepare(COUNT_ACTIVITIES_FOR_DAY_PLAN_SQL).get(targetDate) as { count: unknown };
+    if (Number(countRow.count) >= TDAH_DAY_MAX_ACTIVITIES) {
+        return { kind: 'rejected' };
+    }
+    database.prepare(UPDATE_ACTIVITY_DECIDE_MOVE_SQL).run(targetDate, activityId);
+    const updated = selectActivityById(database, activityId);
+    if (!updated) throw new Error('TDAH activity readback failed after decide');
+    return { kind: 'ok', activity: updated };
+};
+
+/** POST /v1/tdah/activities/:id/decide — see `mutateDecideActivity` for the idempotency/rejection/date rules. */
+export async function decideActivity(
+    dataDir: string,
+    key: string,
+    activityId: number,
+    request: TdahActivityDecideRequest,
+    timeZone: string,
+): Promise<TdahActivityDecideResult> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    if (!existsSync(databasePath)) return { kind: 'notFound' };
+    const durableDir = ensureDurableDirectory(dirname(databasePath));
+    if (!durableDir) {
+        throw new Error('TDAH database directory is unsafe');
+    }
+    return await withWriteTransaction(databasePath, (database) => mutateDecideActivity(database, activityId, request, timeZone));
 }

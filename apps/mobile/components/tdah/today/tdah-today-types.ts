@@ -69,3 +69,21 @@ export type TdahActivityTransitionAction = 'start' | 'complete' | 'miss';
 
 /** Mirrors TDAH_ERRORS.activityInvalid in apps/cloud/src/tdah/types.ts. */
 export const TDAH_ACTIVITY_INVALID_CODE = 'TDAH_ACTIVITY_INVALID';
+
+/**
+ * T-05's one-tap Cierre decision for a `missed`/`limbo` Activity (spec
+ * Code Map). Mirrors `TdahActivityDecision`/`TdahActivityDecideRequest` in
+ * apps/cloud/src/tdah/types.ts by hand (ADR 0026). `'undated'` ("sin
+ * fecha") is a deliberate no-op on the server (Design Notes: `state`/
+ * `dayPlanDate` never change) — it still round-trips through
+ * `POST .../decide` so the row collapses only after a real 200, never
+ * optimistically.
+ */
+export const TDAH_ACTIVITY_DECISIONS = ['move-tomorrow', 'move-date', 'discard', 'undated'] as const;
+export type TdahActivityDecision = (typeof TDAH_ACTIVITY_DECISIONS)[number];
+
+export type TdahActivityDecideRequest =
+    | { decision: 'move-tomorrow' }
+    | { decision: 'move-date'; date: string }
+    | { decision: 'discard' }
+    | { decision: 'undated' };

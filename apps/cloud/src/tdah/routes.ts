@@ -4,8 +4,9 @@
  * — GET/POST `/v1/tdah/routines`, GET/PUT/DELETE `/v1/tdah/routines/:id`,
  * GET `/v1/tdah/routines/:id/preview`, and GET `/v1/tdah/routines/conflicts`
  * — and the "Hoy" surface (story 1.6): GET `/v1/tdah/day`,
- * POST `/v1/tdah/day/activities`, and
- * POST `/v1/tdah/activities/:id/{start|complete|miss}`. PUT `/tdah/profile`
+ * POST `/v1/tdah/day/activities`,
+ * POST `/v1/tdah/activities/:id/{start|complete|miss}`, and (story 3.2, T-05)
+ * POST `/v1/tdah/activities/:id/decide`. PUT `/tdah/profile`
  * only ever sets `mode:'off'` or updates timeZone/ritualHour on an existing
  * profile — POST /activate is the only way to set `mode:'on'`, and PUT
  * rejects a `mode:'on'` body outright with `TDAH_ACTIVATE_REQUIRED`.
@@ -24,9 +25,11 @@ import {
     computeRoutineConflicts,
     createManualActivity,
     createRoutine,
+    decideActivity,
     deleteRoutine,
     getRoutineWithBlocks,
     getTodayDayPlan,
+    isValidDateString,
     isValidMonthString,
     listRoutinesWithBlocks,
     readTdahProfile,
@@ -41,6 +44,7 @@ import {
     isTdahMode,
     TDAH_ERRORS,
     type TdahActivateResponse,
+    type TdahActivityDecideRequest,
     type TdahActivityResponse,
     type TdahActivityTransitionAction,
     type TdahDayResponse,
@@ -65,6 +69,10 @@ const TDAH_ROUTINE_PREVIEW_PATTERN = /^\/v1\/tdah\/routines\/([^/]+)\/preview$/;
 const TDAH_DAY_PATH = `${TDAH_PATH_PREFIX}/day`;
 const TDAH_DAY_ACTIVITIES_PATH = `${TDAH_DAY_PATH}/activities`;
 const TDAH_ACTIVITY_ACTION_PATTERN = /^\/v1\/tdah\/activities\/([^/]+)\/(start|complete|miss)$/;
+// Story 3.2 — T-05's decision-chip endpoint. A separate pattern (rather than
+// widening TDAH_ACTIVITY_ACTION_PATTERN's alternation) since `decide` takes a
+// body while start/complete/miss never do.
+const TDAH_ACTIVITY_DECIDE_PATTERN = /^\/v1\/tdah\/activities\/([^/]+)\/decide$/;
 
 const IANA_TIME_ZONE_PATTERN = /^[A-Za-z0-9+_/-]{1,64}$/;
 const RITUAL_HOUR_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -318,6 +326,35 @@ const parseManualActivityInput = (value: unknown): TdahCreateManualActivityInput
         parsed.durationMinutes = raw.durationMinutes;
     }
     return parsed;
+};
+
+type TdahActivityDecideBody = {
+    decision?: unknown;
+    date?: unknown;
+};
+
+/**
+ * POST /v1/tdah/activities/:id/decide body (story 3.2). Same shape-invalid
+ * → `null` → `TDAH_ACTIVITY_INVALID` 400 convention as
+ * `parseManualActivityInput` above (not `TDAH_INVALID_BODY` — see that
+ * function's own error-code choice). `date` is only read/validated for
+ * `move-date`; `isValidDateString` (storage.ts) rejects both a malformed
+ * `YYYY-MM-DD` shape and a calendar-impossible one (e.g. "2026-02-30").
+ * Whether `date` is actually in the future is a semantic check left to
+ * `mutateDecideActivity` (storage.ts), which needs the caller's profile time
+ * zone (AD-6) to know "today" — not available at this parsing stage.
+ */
+const parseDecideRequestBody = (value: unknown): TdahActivityDecideRequest | null => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+    const raw = value as TdahActivityDecideBody;
+    if (raw.decision === 'move-tomorrow' || raw.decision === 'discard' || raw.decision === 'undated') {
+        return { decision: raw.decision };
+    }
+    if (raw.decision === 'move-date') {
+        if (typeof raw.date !== 'string' || !isValidDateString(raw.date)) return null;
+        return { decision: 'move-date', date: raw.date };
+    }
+    return null;
 };
 
 const parseActivateBody = (body: unknown): { ok: true; body: TdahParsedActivate } | { ok: false; code: TdahErrorCode } => {
@@ -664,6 +701,44 @@ const handleTransitionActivity = async (
     }
 };
 
+/**
+ * POST /v1/tdah/activities/:id/decide — story 3.2, T-05's decision-chip.
+ * Same FR-1 mode gate + 404/rejected→400/500 shape as
+ * `handleTransitionActivity` above; see `mutateDecideActivity` (storage.ts)
+ * for the exact idempotency/eligibility/date rules `result.kind` encodes.
+ */
+const handleDecideActivity = async (
+    req: Request,
+    activityId: number,
+    ctx: TdahRequestContext,
+    options: TdahRequestOptions,
+): Promise<Response> => {
+    const body = await readJsonBody(req, options.maxBodyBytes, options.signal);
+    if (isBodyReadError(body)) {
+        return tdahErrorResponse(TDAH_ERRORS.invalidBody, body.__mindwtrError.status);
+    }
+    const decideRequest = parseDecideRequestBody(body);
+    if (!decideRequest) return tdahErrorResponse(TDAH_ERRORS.activityInvalid, 400);
+    try {
+        const profile = await readTdahProfile(options.dataDir, ctx.key);
+        if (!profile || profile.mode !== 'on') {
+            return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
+        }
+        const result = await decideActivity(options.dataDir, ctx.key, activityId, decideRequest, profile.timeZone);
+        if (result.kind === 'notFound') return tdahErrorResponse(TDAH_ERRORS.notFound, 404);
+        if (result.kind === 'rejected') return tdahErrorResponse(TDAH_ERRORS.activityInvalid, 400);
+        const responseBody: TdahActivityResponse = { activity: result.activity };
+        return jsonResponse(responseBody);
+    } catch (error) {
+        logError('request failed', {
+            failureClass: 'filesystem',
+            failureCode: 'request_failed',
+            failureErrno: getFsErrorCode(error),
+        });
+        return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
+    }
+};
+
 export async function handleTdahRequest(
     req: Request,
     pathname: string,
@@ -728,6 +803,16 @@ export async function handleTdahRequest(
         if (req.method !== 'POST') return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
         const action = activityActionMatch[2] as TdahActivityTransitionAction;
         return handleTransitionActivity(activityId, action, ctx, options);
+    }
+
+    // Story 3.2 — must be checked ahead of TDAH_PROFILE_PATH's catch-all
+    // fallback below, same as every other sub-path above.
+    const decideMatch = pathname.match(TDAH_ACTIVITY_DECIDE_PATTERN);
+    if (decideMatch) {
+        const activityId = parsePositiveIntegerId(decideMatch[1] as string);
+        if (activityId === null) return tdahErrorResponse(TDAH_ERRORS.notFound, 404);
+        if (req.method !== 'POST') return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
+        return handleDecideActivity(req, activityId, ctx, options);
     }
 
     if (pathname !== TDAH_PROFILE_PATH) {

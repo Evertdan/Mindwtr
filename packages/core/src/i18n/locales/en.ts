@@ -1143,6 +1143,20 @@ export const en: Record<string, string> = {
         // ships in Story 3.2; this honest "coming soon" copy replaces a
         // permanent loading spinner so the invitation never reads as broken.
         'tdahToday.ritualComingSoon': 'The night ritual is coming soon',
+        // Story 3.2 — T-05's real Cierre content: the 3-figure scoreboard,
+        // the per-row one-tap decision chips (quickDate.tomorrow/noDate and
+        // common.discard are reused as-is for 3 of the 4 chips), the "N left
+        // undecided" summary, and the CTA into T-06's own placeholder route
+        // (nav.tdahMorning/tdahToday.morningComingSoon, same pattern as
+        // Story 3.1's own tdahToday.ritualComingSoon).
+        'tdahToday.scoreboardOnTime': 'On time',
+        'tdahToday.scoreboardMissed': 'Missed',
+        'tdahToday.scoreboardLimbo': 'In limbo',
+        'tdahToday.decisionDate': 'Date',
+        'tdahToday.closeSummary': "{count} left undecided — they'll stay in Limbo whenever you're ready.",
+        'tdahToday.continueToMorning': 'Continue to Tomorrow',
+        'nav.tdahMorning': 'Tomorrow',
+        'tdahToday.morningComingSoon': "Tomorrow's plan is coming soon",
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Routine',

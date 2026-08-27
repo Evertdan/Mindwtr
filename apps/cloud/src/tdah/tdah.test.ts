@@ -141,6 +141,30 @@ describe('tdah module', () => {
         authedFetch(`/v1/tdah/activities/${id}/${action}`, { method: 'POST', token })
     );
 
+    const decideActivityApi = (
+        id: number,
+        body: unknown,
+        token?: string,
+    ): Promise<Response> => (
+        authedFetch(`/v1/tdah/activities/${id}/decide`, { method: 'POST', body: JSON.stringify(body), token })
+    );
+
+    // Story 3.2's decide endpoint only ever accepts a `missed`/`limbo`
+    // Activity. There's no HTTP path to `limbo` a Activity outside the
+    // nightly scheduler (story 1.5), so this reaches straight into the
+    // namespace's own sqlite file — same direct-SQL fixture technique the
+    // schema-migration describe block below already uses — rather than
+    // dragging a whole runNightlyTdahTick day-rollover into every decide test.
+    // Scoped to a single activity id (rather than every 'pending'/'started'
+    // row in the namespace) so a describe block with more than one Activity
+    // in play never has this silently limbo an unrelated fixture too.
+    const forceActivityLimbo = async (activityId: number, token: string = TOKEN_ALPHA): Promise<void> => {
+        const databasePath = tdahDatabasePath(dataDir, tokenToKey(token));
+        await withWriteTransaction(databasePath, (database) => {
+            database.prepare("UPDATE tdah_activity SET state = 'limbo' WHERE id = ? AND state IN ('pending', 'started');").run(activityId);
+        });
+    };
+
     type TdahTestActivity = {
         id: number;
         dayPlanDate: string;
@@ -2013,6 +2037,376 @@ describe('tdah module', () => {
                 const response = await authedFetch(`/v1/tdah/activities/${created.id}/start`, { method: 'GET' });
                 expect(response.status).toBe(405);
                 expect(await readErrorCode(response)).toBe('TDAH_METHOD_NOT_ALLOWED');
+            });
+        });
+
+        describe('POST /v1/tdah/activities/:id/decide (story 3.2, T-05, AD-7 idempotency)', () => {
+            const createTodayActivity = async (): Promise<TdahTestActivity> => (
+                await readActivity(await createManualActivityApi({ title: 'Meditar', startTime: '07:00', durationMinutes: 10 }))
+            );
+
+            // Same YYYY-MM-DD shift technique `computeTomorrowDate` itself
+            // uses internally — kept local to this describe since it's only
+            // ever needed to build move-date fixtures (a future date beyond
+            // "tomorrow", or a past one).
+            const addDaysToDateString = (date: string, days: number): string => {
+                const parts = date.split('-').map(Number);
+                const [year, month, day] = parts as [number, number, number];
+                return formatDateInTimeZone(new Date(Date.UTC(year, month - 1, day + days)), 'UTC');
+            };
+
+            // FR-1 mode gate: createTodayActivity posts through the gated
+            // manual-Activity endpoint, so the profile must be active first.
+            beforeEach(async () => {
+                await activate({ timeZone: 'UTC' });
+            });
+
+            test('move-tomorrow on a started-then-limbo Activity sets pending on tomorrow, clearing startedAt/completedAt', async () => {
+                const created = await createTodayActivity();
+                await transitionActivityApi(created.id, 'start');
+                await forceActivityLimbo(created.id);
+                const response = await decideActivityApi(created.id, { decision: 'move-tomorrow' });
+                expect(response.status).toBe(200);
+                const activity = await readActivity(response);
+                expect(activity.state).toBe('pending');
+                expect(activity.dayPlanDate).toBe(computeTomorrowDate('UTC'));
+                expect(activity.startedAt).toBeNull();
+                expect(activity.completedAt).toBeNull();
+            });
+
+            test('move-tomorrow on a missed Activity behaves the same as on limbo', async () => {
+                const created = await createTodayActivity();
+                await transitionActivityApi(created.id, 'miss');
+                const response = await decideActivityApi(created.id, { decision: 'move-tomorrow' });
+                expect(response.status).toBe(200);
+                const activity = await readActivity(response);
+                expect(activity.state).toBe('pending');
+                expect(activity.dayPlanDate).toBe(computeTomorrowDate('UTC'));
+            });
+
+            test('move-date to a valid future date moves the Activity there, materializing its DayPlan', async () => {
+                const created = await createTodayActivity();
+                await transitionActivityApi(created.id, 'miss');
+                const futureDate = addDaysToDateString(computeTomorrowDate('UTC'), 5);
+                const response = await decideActivityApi(created.id, { decision: 'move-date', date: futureDate });
+                expect(response.status).toBe(200);
+                const activity = await readActivity(response);
+                expect(activity.state).toBe('pending');
+                expect(activity.dayPlanDate).toBe(futureDate);
+                expect(activity.startedAt).toBeNull();
+                expect(activity.completedAt).toBeNull();
+            });
+
+            test('move-date to a date <= today is rejected with 400 TDAH_ACTIVITY_INVALID and leaves the row unchanged', async () => {
+                const created = await createTodayActivity();
+                await transitionActivityApi(created.id, 'miss');
+                const pastDate = addDaysToDateString(created.dayPlanDate, -1);
+                const response = await decideActivityApi(created.id, { decision: 'move-date', date: pastDate });
+                expect(response.status).toBe(400);
+                expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+
+                const day = await readDay(await getDay());
+                const unchanged = day.activities.find((entry) => entry.id === created.id);
+                expect(unchanged?.state).toBe('missed');
+                expect(unchanged?.dayPlanDate).toBe(created.dayPlanDate);
+            });
+
+            test("move-date to today's own date is rejected with 400 TDAH_ACTIVITY_INVALID (destination must be strictly after today)", async () => {
+                const created = await createTodayActivity();
+                await transitionActivityApi(created.id, 'miss');
+                const response = await decideActivityApi(created.id, { decision: 'move-date', date: created.dayPlanDate });
+                expect(response.status).toBe(400);
+                expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+            });
+
+            test('destination day already at TDAH_DAY_MAX_ACTIVITIES (50) rejects move-tomorrow with 400 TDAH_ACTIVITY_INVALID, without writing', async () => {
+                const created = await createTodayActivity();
+                await transitionActivityApi(created.id, 'miss');
+                const tomorrow = computeTomorrowDate('UTC');
+                const databasePath = tdahDatabasePath(dataDir, tokenToKey(TOKEN_ALPHA));
+                await withWriteTransaction(databasePath, (database) => {
+                    // `activate` (beforeEach) already generated tomorrow's
+                    // (empty) tdah_day_plan row — only the 50 Activities are
+                    // seeded here, not a second INSERT INTO tdah_day_plan.
+                    for (let i = 0; i < 50; i += 1) {
+                        database
+                            .prepare("INSERT INTO tdah_activity (day_plan_date, block_id, title, start_time, duration_minutes, origin, state) VALUES (?, NULL, ?, NULL, NULL, 'manual', 'pending');")
+                            .run(tomorrow, `Full ${i}`);
+                    }
+                });
+
+                const response = await decideActivityApi(created.id, { decision: 'move-tomorrow' });
+                expect(response.status).toBe(400);
+                expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+
+                const day = await readDay(await getDay());
+                const unchanged = day.activities.find((entry) => entry.id === created.id);
+                expect(unchanged?.state).toBe('missed');
+            });
+
+            test('destination day already at TDAH_DAY_MAX_ACTIVITIES (50) rejects move-date with 400 TDAH_ACTIVITY_INVALID, without writing', async () => {
+                const created = await createTodayActivity();
+                await transitionActivityApi(created.id, 'miss');
+                const futureDate = addDaysToDateString(computeTomorrowDate('UTC'), 5);
+                const databasePath = tdahDatabasePath(dataDir, tokenToKey(TOKEN_ALPHA));
+                await withWriteTransaction(databasePath, (database) => {
+                    // Unlike the move-tomorrow cap test above, `futureDate`'s
+                    // tdah_day_plan row doesn't exist yet (only "tomorrow"'s
+                    // does, from `activate`'s beforeEach) — mutateDecideActivity
+                    // materializes it itself before the cap check, so it's
+                    // never pre-inserted here, only the 50 Activities are.
+                    for (let i = 0; i < 50; i += 1) {
+                        database
+                            .prepare("INSERT INTO tdah_day_plan (date, generated_at) VALUES (?, ?) ON CONFLICT(date) DO NOTHING;")
+                            .run(futureDate, new Date().toISOString());
+                        database
+                            .prepare("INSERT INTO tdah_activity (day_plan_date, block_id, title, start_time, duration_minutes, origin, state) VALUES (?, NULL, ?, NULL, NULL, 'manual', 'pending');")
+                            .run(futureDate, `Full ${i}`);
+                    }
+                });
+
+                const response = await decideActivityApi(created.id, { decision: 'move-date', date: futureDate });
+                expect(response.status).toBe(400);
+                expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+
+                const day = await readDay(await getDay());
+                const unchanged = day.activities.find((entry) => entry.id === created.id);
+                expect(unchanged?.state).toBe('missed');
+            });
+
+            test('a raced double-tap of move-tomorrow is a 200 no-op — same dayPlanDate, never a second write', async () => {
+                const created = await createTodayActivity();
+                await transitionActivityApi(created.id, 'miss');
+                const first = await readActivity(await decideActivityApi(created.id, { decision: 'move-tomorrow' }));
+                const second = await readActivity(await decideActivityApi(created.id, { decision: 'move-tomorrow' }));
+                expect(second.state).toBe('pending');
+                expect(second.dayPlanDate).toBe(first.dayPlanDate);
+            });
+
+            test('a raced double-tap of move-date to the same future date is a 200 no-op', async () => {
+                const created = await createTodayActivity();
+                await transitionActivityApi(created.id, 'miss');
+                const futureDate = addDaysToDateString(computeTomorrowDate('UTC'), 3);
+                const first = await readActivity(await decideActivityApi(created.id, { decision: 'move-date', date: futureDate }));
+                const second = await readActivity(await decideActivityApi(created.id, { decision: 'move-date', date: futureDate }));
+                expect(second.state).toBe('pending');
+                expect(second.dayPlanDate).toBe(first.dayPlanDate);
+            });
+
+            test('a move-tomorrow retry that lands after local midnight has rolled over is still a 200 no-op, not a spurious 400', async () => {
+                const created = await createTodayActivity();
+                await transitionActivityApi(created.id, 'miss');
+                const first = await readActivity(await decideActivityApi(created.id, { decision: 'move-tomorrow' }));
+                expect(first.dayPlanDate).toBe(computeTomorrowDate('UTC'));
+
+                // Simulate local midnight rolling over between the original
+                // call and this retry: by the time the retry lands, what was
+                // "tomorrow" at the original call is now "today". There's no
+                // fake-clock harness in this suite to advance the real clock
+                // by a day, so the equivalent relative shift is applied to
+                // the row instead — moving its dayPlanDate one day into the
+                // past reproduces the exact same "already-applied destination
+                // is now == today, not > today" shape a real midnight
+                // crossing would leave behind, without needing to wait a day.
+                const databasePath = tdahDatabasePath(dataDir, tokenToKey(TOKEN_ALPHA));
+                const rolledOverDate = addDaysToDateString(first.dayPlanDate, -1);
+                // `created.dayPlanDate` is today's own date (createTodayActivity
+                // posts onto today's DayPlan) — confirming the shift lands
+                // exactly there is what makes this a faithful stand-in for
+                // "today" having advanced by one real day.
+                expect(rolledOverDate).toBe(created.dayPlanDate);
+                await withWriteTransaction(databasePath, (database) => {
+                    database.prepare('UPDATE tdah_activity SET day_plan_date = ? WHERE id = ?;').run(rolledOverDate, created.id);
+                });
+
+                const second = await decideActivityApi(created.id, { decision: 'move-tomorrow' });
+                expect(second.status).toBe(200);
+                const activity = await readActivity(second);
+                expect(activity.state).toBe('pending');
+                expect(activity.dayPlanDate).toBe(rolledOverDate);
+            });
+
+            test('discard on a missed Activity sets state:discarded without touching dayPlanDate', async () => {
+                const created = await createTodayActivity();
+                await transitionActivityApi(created.id, 'miss');
+                const response = await decideActivityApi(created.id, { decision: 'discard' });
+                expect(response.status).toBe(200);
+                const activity = await readActivity(response);
+                expect(activity.state).toBe('discarded');
+                expect(activity.dayPlanDate).toBe(created.dayPlanDate);
+            });
+
+            test('a discarded Activity never reappears in a later DayPlan read', async () => {
+                const created = await createTodayActivity();
+                await transitionActivityApi(created.id, 'miss');
+                await decideActivityApi(created.id, { decision: 'discard' });
+                const day = await readDay(await getDay());
+                expect(day.activities.find((entry) => entry.id === created.id)?.state).toBe('discarded');
+            });
+
+            test('a repeated discard is a 200 no-op, not a duplicate write', async () => {
+                const created = await createTodayActivity();
+                await transitionActivityApi(created.id, 'miss');
+                const first = await decideActivityApi(created.id, { decision: 'discard' });
+                expect(first.status).toBe(200);
+                const second = await decideActivityApi(created.id, { decision: 'discard' });
+                expect(second.status).toBe(200);
+                expect((await readActivity(second)).state).toBe('discarded');
+            });
+
+            test('undated on a limbo Activity returns 200 with the row unchanged in DB (deliberate data no-op)', async () => {
+                const created = await createTodayActivity();
+                await forceActivityLimbo(created.id);
+                const response = await decideActivityApi(created.id, { decision: 'undated' });
+                expect(response.status).toBe(200);
+                const activity = await readActivity(response);
+                expect(activity.state).toBe('limbo');
+                expect(activity.dayPlanDate).toBe(created.dayPlanDate);
+            });
+
+            test('undated on a missed Activity returns 200 with the row unchanged in DB', async () => {
+                const created = await createTodayActivity();
+                await transitionActivityApi(created.id, 'miss');
+                const response = await decideActivityApi(created.id, { decision: 'undated' });
+                expect(response.status).toBe(200);
+                const activity = await readActivity(response);
+                expect(activity.state).toBe('missed');
+                expect(activity.dayPlanDate).toBe(created.dayPlanDate);
+            });
+
+            test('deciding on an already-completed Activity is rejected with 400 TDAH_ACTIVITY_INVALID', async () => {
+                const created = await createTodayActivity();
+                await transitionActivityApi(created.id, 'complete');
+                for (const decision of [{ decision: 'move-tomorrow' }, { decision: 'discard' }, { decision: 'undated' }]) {
+                    const response = await decideActivityApi(created.id, decision);
+                    expect(response.status).toBe(400);
+                    expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+                }
+            });
+
+            // 'discard'/'undated', not 'move-tomorrow': `createTodayActivity`
+            // is dated today, and move-tomorrow's own AD-7 shortcut now
+            // matches any `dayPlanDate >= today` (see the midnight-crossing
+            // retry test above) — a still-pending Activity dated today is
+            // exactly that shape, so `move-tomorrow` on it is a legitimate
+            // 200, not the 400 this test exists to prove. `discard`/`undated`
+            // have no such collision (see the "discard on a pending Activity
+            // that was never missed/limbo" test above) and still fully cover
+            // the same "only missed/limbo is decidable" invariant.
+            test('deciding on a still-pending Activity (never missed/limbo) is rejected with 400 TDAH_ACTIVITY_INVALID', async () => {
+                const created = await createTodayActivity();
+                for (const decision of [{ decision: 'discard' }, { decision: 'undated' }]) {
+                    const response = await decideActivityApi(created.id, decision);
+                    expect(response.status).toBe(400);
+                    expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+                }
+            });
+
+            // The move-tomorrow/move-date AD-7 idempotent-retry shortcut
+            // (mutateDecideActivity, storage.ts) recognizes an "already
+            // applied" Activity purely by its current shape (state:'pending',
+            // cleared timestamps, dayPlanDate on/after today) — a shape a
+            // routine-generated or manually-created Activity that was NEVER
+            // missed/limbo can also coincidentally have (e.g. one already
+            // sitting on tomorrow's DayPlan). `discard`'s own shortcut isn't
+            // exposed to that ambiguity — it only ever matches
+            // `state:'discarded'`, a state nothing but a prior successful
+            // discard can produce — so it still proves the endpoint's
+            // documented "only missed/limbo is decidable" invariant holds for
+            // an Activity that merely looks like it could already be decided.
+            test('discard on a pending Activity that was never missed/limbo is rejected with 400 TDAH_ACTIVITY_INVALID, not a spurious 200', async () => {
+                const tomorrow = computeTomorrowDate('UTC');
+                const databasePath = tdahDatabasePath(dataDir, tokenToKey(TOKEN_ALPHA));
+                const activityId = await withWriteTransaction(databasePath, (database) => {
+                    // `activate` (beforeEach) already generated tomorrow's
+                    // (empty) tdah_day_plan row.
+                    database
+                        .prepare("INSERT INTO tdah_activity (day_plan_date, block_id, title, start_time, duration_minutes, origin, state) VALUES (?, NULL, 'Meditar', NULL, NULL, 'manual', 'pending');")
+                        .run(tomorrow);
+                    const row = database.prepare('SELECT last_insert_rowid() AS id;').get() as { id: number };
+                    return row.id;
+                });
+
+                const response = await decideActivityApi(activityId, { decision: 'discard' });
+                expect(response.status).toBe(400);
+                expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+            });
+
+            test('unknown Activity id returns 404 TDAH_NOT_FOUND', async () => {
+                const response = await decideActivityApi(999999, { decision: 'move-tomorrow' });
+                expect(response.status).toBe(404);
+                expect(await readErrorCode(response)).toBe('TDAH_NOT_FOUND');
+            });
+
+            test("deciding on another namespace's Activity 404s (namespace isolation)", async () => {
+                const created = await createTodayActivity();
+                await transitionActivityApi(created.id, 'miss');
+                // Beta needs its own active profile: the FR-1 mode gate would
+                // otherwise 409 before this test could assert the
+                // activity-level 404 it exists for.
+                await activate({ timeZone: 'UTC' }, TOKEN_BETA);
+                const response = await decideActivityApi(created.id, { decision: 'move-tomorrow' }, TOKEN_BETA);
+                expect(response.status).toBe(404);
+                expect(await readErrorCode(response)).toBe('TDAH_NOT_FOUND');
+            });
+
+            test('an unrecognized decision value returns 400 TDAH_ACTIVITY_INVALID', async () => {
+                const created = await createTodayActivity();
+                const response = await decideActivityApi(created.id, { decision: 'later' });
+                expect(response.status).toBe(400);
+                expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+            });
+
+            test('move-date without a date field returns 400 TDAH_ACTIVITY_INVALID', async () => {
+                const created = await createTodayActivity();
+                const response = await decideActivityApi(created.id, { decision: 'move-date' });
+                expect(response.status).toBe(400);
+                expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+            });
+
+            test('move-date with a calendar-impossible date shape (2026-02-30) returns 400 TDAH_ACTIVITY_INVALID', async () => {
+                const created = await createTodayActivity();
+                const response = await decideActivityApi(created.id, { decision: 'move-date', date: '2026-02-30' });
+                expect(response.status).toBe(400);
+                expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+            });
+
+            // isValidDateString (storage.ts) bounds the year to 1970-2999
+            // specifically to reject a syntactically-shaped-but-out-of-range
+            // year before it can ever reach JS's legacy two-digit-year
+            // `Date.UTC` folding (e.g. `Date.UTC(99, ...)` silently mapping to
+            // 1999) — same rationale TDAH_MONTH_PATTERN's own doc comment
+            // already calls out. Neither of these two years is itself
+            // two-digit, but both fall outside the bounded range, exercising
+            // the guard from both ends.
+            test('move-date with an out-of-range year (1969-01-01) returns 400 TDAH_ACTIVITY_INVALID', async () => {
+                const created = await createTodayActivity();
+                const response = await decideActivityApi(created.id, { decision: 'move-date', date: '1969-01-01' });
+                expect(response.status).toBe(400);
+                expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+            });
+
+            test('move-date with an out-of-range year (3000-01-01) returns 400 TDAH_ACTIVITY_INVALID', async () => {
+                const created = await createTodayActivity();
+                const response = await decideActivityApi(created.id, { decision: 'move-date', date: '3000-01-01' });
+                expect(response.status).toBe(400);
+                expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+            });
+
+            test('GET on a decide path returns 405 TDAH_METHOD_NOT_ALLOWED', async () => {
+                const created = await createTodayActivity();
+                const response = await authedFetch(`/v1/tdah/activities/${created.id}/decide`, { method: 'GET' });
+                expect(response.status).toBe(405);
+                expect(await readErrorCode(response)).toBe('TDAH_METHOD_NOT_ALLOWED');
+            });
+
+            test('decide is rejected with 409 TDAH_ACTIVATE_REQUIRED when the mode is off', async () => {
+                const created = await createTodayActivity();
+                await transitionActivityApi(created.id, 'miss');
+                await putProfile({ mode: 'off' });
+                const response = await decideActivityApi(created.id, { decision: 'move-tomorrow' });
+                expect(response.status).toBe(409);
+                expect(await readErrorCode(response)).toBe('TDAH_ACTIVATE_REQUIRED');
             });
         });
 

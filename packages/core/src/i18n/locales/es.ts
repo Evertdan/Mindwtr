@@ -935,6 +935,11 @@ export const esOverrides: Record<string, string> = {
         'common.days': 'días',
         'common.cancel': 'Cancelar',
         'common.save': 'Guardar',
+        // Story 3.2 (T-05 decision chips) reuses this key for the
+        // "Descartar" chip — it was missing here even though en.ts already
+        // has it (a pre-existing gap, es not being a full-parity locale
+        // never surfaced it in i18n:check).
+        'common.discard': 'Descartar',
         'quickAdd.speechNotConfigured': 'Activa un modelo de voz a texto en Ajustes para usar la entrada de voz.',
         'common.delete': 'Eliminar',
         'common.rename': 'Renombrar',
@@ -1515,6 +1520,17 @@ export const esOverrides: Record<string, string> = {
         // un spinner de carga permanente para que la invitación nunca se
         // sienta rota.
         'tdahToday.ritualComingSoon': 'El ritual nocturno llega pronto',
+        // Story 3.2 — contenido real del Cierre en T-05: el marcador de 3
+        // cifras, los chips de decisión de un tap por fila, el resumen "N
+        // sin decidir" y el CTA hacia el placeholder de T-06.
+        'tdahToday.scoreboardOnTime': 'A tiempo',
+        'tdahToday.scoreboardMissed': 'No completadas',
+        'tdahToday.scoreboardLimbo': 'En Limbo',
+        'tdahToday.decisionDate': 'Fecha',
+        'tdahToday.closeSummary': 'Quedaron {count} sin decidir — están en el Limbo cuando quieras.',
+        'tdahToday.continueToMorning': 'Continuar a Mañana',
+        'nav.tdahMorning': 'Mañana',
+        'tdahToday.morningComingSoon': 'La pantalla de Mañana llega pronto',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Rutina',
