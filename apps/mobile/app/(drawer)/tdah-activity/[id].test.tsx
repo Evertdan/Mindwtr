@@ -35,6 +35,20 @@ describe('TdahActivityDetailRoute (T-02 route wrapper)', () => {
         expect(screen.props.autoAction).toBe('start');
     });
 
+    // Review fix (LOW): pins the 'complete' passthrough symmetric to 'start'
+    // — the route-level allowlist must forward both notification-driven
+    // actions, not just the first one wired.
+    it("forwards a notification-tapped 'complete' autoAction from the route params to T-02", () => {
+        searchParams.current = { id: '7', autoAction: 'complete' };
+        let tree: ReturnType<typeof create> | undefined;
+        act(() => {
+            tree = create(<TdahActivityDetailRoute />);
+        });
+        const screen = tree!.root.findByType('TdahActivityDetailScreen' as never);
+        expect(screen.props.activityId).toBe(7);
+        expect(screen.props.autoAction).toBe('complete');
+    });
+
     // Story 2.3 Never: "No completada" stays app-exclusive — a forbidden
     // autoAction value must never reach T-02, not even as a passthrough.
     it("drops a 'miss' autoAction (spec Never: never auto-fired from a notification) instead of forwarding it to T-02", () => {

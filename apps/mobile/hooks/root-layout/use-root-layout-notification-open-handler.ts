@@ -162,9 +162,18 @@ export function useRootLayoutNotificationOpenHandler({
         if (isTdahActivityOpen(kind)) {
             const activityId = parseTdahActivityId(context);
             if (activityId === null) {
+                // Review fix (LOW): a received action that changes nothing
+                // must say why (#1028) — the fallback itself is the outcome.
+                logNotificationOutcome('TDAH Activity notification open fell back to T-01', {
+                    kind: kind ?? '',
+                    context: context ?? '',
+                });
                 router.push('/tdah-today');
                 return;
             }
+            logNotificationOutcome('TDAH Activity notification open routed to T-02', {
+                route: `/tdah-activity/${activityId}`,
+            });
             router.push({
                 pathname: `/tdah-activity/${activityId}`,
                 params: {

@@ -249,6 +249,27 @@ describe('useRootLayoutNotificationOpenHandler', () => {
     expect(updateTask).not.toHaveBeenCalled();
   });
 
+  it("routes a body tap (no actionIdentifier) on a 'tdah-activity' notification to T-02 with no autoAction param", () => {
+    const router = { push: vi.fn() };
+
+    act(() => {
+      create(<TestHarness router={router} />);
+    });
+
+    const handler = setNotificationOpenHandler.mock.calls[0]?.[0];
+
+    act(() => {
+      handler({ kind: 'tdah-activity', context: '42', notificationId: 'tdah-activity:42:start' });
+    });
+
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: '/tdah-activity/42',
+      params: {},
+    });
+    expect(updateTask).not.toHaveBeenCalled();
+    expect(setHighlightTask).not.toHaveBeenCalled();
+  });
+
   it("falls back to T-01 with no automatic action when the 'tdah-activity' notification's context is missing or not a valid positive integer id", () => {
     const router = { push: vi.fn() };
 
@@ -266,15 +287,41 @@ describe('useRootLayoutNotificationOpenHandler', () => {
       // A non-integer numeric string (e.g. a float) is not a valid Activity
       // id either — Number.isFinite alone would wrongly accept it.
       handler({ kind: 'tdah-activity', actionIdentifier: 'start', context: '42.5', notificationId: 'tdah-activity:float:start' });
+      // Review fix (LOW): parseTdahActivityId must reject non-canonical
+      // numeric forms — `Number('1e2') === 100` and `Number('0x2A') === 42`
+      // would otherwise pass the integer check.
+      handler({ kind: 'tdah-activity', actionIdentifier: 'start', context: '1e2', notificationId: 'tdah-activity:exponent:start' });
+      handler({ kind: 'tdah-activity', actionIdentifier: 'start', context: '0x2A', notificationId: 'tdah-activity:hex:start' });
     });
 
-    expect(router.push).toHaveBeenCalledTimes(5);
+    expect(router.push).toHaveBeenCalledTimes(7);
     expect(router.push).toHaveBeenNthCalledWith(1, '/tdah-today');
     expect(router.push).toHaveBeenNthCalledWith(2, '/tdah-today');
     expect(router.push).toHaveBeenNthCalledWith(3, '/tdah-today');
     expect(router.push).toHaveBeenNthCalledWith(4, '/tdah-today');
     expect(router.push).toHaveBeenNthCalledWith(5, '/tdah-today');
+    expect(router.push).toHaveBeenNthCalledWith(6, '/tdah-today');
+    expect(router.push).toHaveBeenNthCalledWith(7, '/tdah-today');
     expect(updateTask).not.toHaveBeenCalled();
+  });
+
+  it("still routes to T-02 when the 'tdah-activity' context has surrounding whitespace (canonical after trim)", () => {
+    const router = { push: vi.fn() };
+
+    act(() => {
+      create(<TestHarness router={router} />);
+    });
+
+    const handler = setNotificationOpenHandler.mock.calls[0]?.[0];
+
+    act(() => {
+      handler({ kind: 'tdah-activity', actionIdentifier: 'start', context: ' 42 ', notificationId: 'tdah-activity:spaced:start' });
+    });
+
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: '/tdah-activity/42',
+      params: { autoAction: 'start' },
+    });
   });
 
   it('waits for app readiness before replaying a pending open from the root path', async () => {
