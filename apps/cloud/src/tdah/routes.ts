@@ -31,7 +31,6 @@ import {
     listRoutinesWithBlocks,
     readTdahProfile,
     TDAH_BLOCK_DURATION_MAX_MINUTES,
-    TDAH_DEFAULT_TIME_ZONE,
     TDAH_ROUTINE_TITLE_MAX_LENGTH,
     transitionActivityState,
     type TdahCreateManualActivityInput,
@@ -69,6 +68,13 @@ const TDAH_ACTIVITY_ACTION_PATTERN = /^\/v1\/tdah\/activities\/([^/]+)\/(start|c
 
 const IANA_TIME_ZONE_PATTERN = /^[A-Za-z0-9+_/-]{1,64}$/;
 const RITUAL_HOUR_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+// The profile's own ritualHour additionally rejects exactly '00:00': every
+// local wall-clock time of the day is >= '00:00', so a 00:00 ritual would
+// make isRitualHourReached true all day and the scheduler's sweep-close
+// would limbo the just-started day's Actividades on every tick. Shared with
+// Bloque/manual-Activity startTime validation above, which must KEEP
+// accepting '00:00' — a Bloque may legitimately start at midnight.
+const PROFILE_RITUAL_HOUR_PATTERN = /^(?!00:00$)([01]\d|2[0-3]):[0-5]\d$/;
 // A single day's routine cannot reasonably need more Bloques than this —
 // caps the otherwise-unbounded `blocks` array on the input.
 const TDAH_ROUTINE_MAX_BLOCKS = 24;
@@ -144,7 +150,7 @@ const parseProfilePutBody = (body: unknown): { ok: true; body: TdahParsedProfile
     if (raw.ritualHour !== undefined && typeof raw.ritualHour !== 'string') {
         return { ok: false, code: TDAH_ERRORS.invalidBody };
     }
-    if (raw.ritualHour !== undefined && !RITUAL_HOUR_PATTERN.test(raw.ritualHour)) {
+    if (raw.ritualHour !== undefined && !PROFILE_RITUAL_HOUR_PATTERN.test(raw.ritualHour)) {
         return { ok: false, code: TDAH_ERRORS.invalidRitualHour };
     }
     if (raw.mode === 'on') {
@@ -328,7 +334,7 @@ const parseActivateBody = (body: unknown): { ok: true; body: TdahParsedActivate 
     if (raw.ritualHour !== undefined && typeof raw.ritualHour !== 'string') {
         return { ok: false, code: TDAH_ERRORS.invalidBody };
     }
-    if (raw.ritualHour !== undefined && !RITUAL_HOUR_PATTERN.test(raw.ritualHour)) {
+    if (raw.ritualHour !== undefined && !PROFILE_RITUAL_HOUR_PATTERN.test(raw.ritualHour)) {
         return { ok: false, code: TDAH_ERRORS.invalidRitualHour };
     }
     const parsed: TdahParsedActivate = {};
@@ -514,8 +520,9 @@ const handleDeleteRoutine = async (
 /**
  * GET /v1/tdah/routines/:id/preview?month=YYYY-MM — every date that month
  * where this Rutina currently wins precedence (AD-5: server computes, UI only
- * requests/renders). Uses the caller's profile time zone, falling back to
- * `TDAH_DEFAULT_TIME_ZONE` the same way profile creation does.
+ * requests/renders). Pattern matching is calendar-date arithmetic
+ * (`weekdayOfDate` is timezone-independent), so no profile read is needed
+ * here — the Y-M-D dates themselves are timezone-free.
  */
 const handleGetRoutinePreview = async (
     req: Request,
@@ -529,9 +536,7 @@ const handleGetRoutinePreview = async (
         return tdahErrorResponse(TDAH_ERRORS.invalidBody, 400);
     }
     try {
-        const profile = await readTdahProfile(options.dataDir, ctx.key);
-        const timeZone = profile?.timeZone ?? TDAH_DEFAULT_TIME_ZONE;
-        const dates = await computeApplicabilityPreview(options.dataDir, ctx.key, routineId, month, timeZone);
+        const dates = await computeApplicabilityPreview(options.dataDir, ctx.key, routineId, month);
         if (!dates) return tdahErrorResponse(TDAH_ERRORS.notFound, 404);
         return jsonResponse({ dates });
     } catch (error) {
@@ -566,16 +571,20 @@ const handleGetRoutineConflicts = async (ctx: TdahRequestContext, options: TdahR
 };
 
 /**
- * GET /v1/tdah/day — story 1.6, T-01. Always 200 (auto-generates today's
- * DayPlan on demand if missing, AD-5) — uses the caller's profile time zone,
- * falling back to `TDAH_DEFAULT_TIME_ZONE` the same way
- * `handleGetRoutinePreview` already does for a namespace with no profile yet.
+ * GET /v1/tdah/day — story 1.6, T-01. Always 200 when the mode is on
+ * (auto-generates today's DayPlan on demand if missing, AD-5), in the
+ * caller's own profile time zone. FR-1 gate: with the mode off — or no
+ * profile at all, i.e. a namespace that never activated — this must NOT
+ * auto-generate DayPlans/Actividades (and must not plant `tdah.sqlite` for a
+ * never-activated namespace), so it returns 409 TDAH_ACTIVATE_REQUIRED.
  */
 const handleGetDay = async (ctx: TdahRequestContext, options: TdahRequestOptions): Promise<Response> => {
     try {
         const profile = await readTdahProfile(options.dataDir, ctx.key);
-        const timeZone = profile?.timeZone ?? TDAH_DEFAULT_TIME_ZONE;
-        const day = await getTodayDayPlan(options.dataDir, ctx.key, timeZone);
+        if (!profile || profile.mode !== 'on') {
+            return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
+        }
+        const day = await getTodayDayPlan(options.dataDir, ctx.key, profile.timeZone);
         const responseBody: TdahDayResponse = day;
         return jsonResponse(responseBody);
     } catch (error) {
@@ -588,7 +597,7 @@ const handleGetDay = async (ctx: TdahRequestContext, options: TdahRequestOptions
     }
 };
 
-/** POST /v1/tdah/day/activities — story 1.6, FR-4: adds a manual Activity to today's timeline. */
+/** POST /v1/tdah/day/activities — story 1.6, FR-4: adds a manual Activity to today's timeline. FR-1 gate: 409 TDAH_ACTIVATE_REQUIRED unless the mode is on (see handleGetDay). */
 const handleCreateManualActivity = async (
     req: Request,
     ctx: TdahRequestContext,
@@ -602,8 +611,10 @@ const handleCreateManualActivity = async (
     if (!input) return tdahErrorResponse(TDAH_ERRORS.activityInvalid, 400);
     try {
         const profile = await readTdahProfile(options.dataDir, ctx.key);
-        const timeZone = profile?.timeZone ?? TDAH_DEFAULT_TIME_ZONE;
-        const activity = await createManualActivity(options.dataDir, ctx.key, timeZone, input);
+        if (!profile || profile.mode !== 'on') {
+            return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
+        }
+        const activity = await createManualActivity(options.dataDir, ctx.key, profile.timeZone, input);
         // `null` means today's DayPlan was already at TDAH_DAY_MAX_ACTIVITIES —
         // the insert never ran (checked and rejected atomically inside the same
         // write transaction, see storage.ts).
@@ -624,6 +635,8 @@ const handleCreateManualActivity = async (
  * POST /v1/tdah/activities/:id/{start|complete|miss} — story 1.6, T-02/AD-7.
  * See `mutateTransitionActivityState` (storage.ts) for the exact idempotency
  * and rejection rules this only translates into HTTP status/error codes.
+ * FR-1 gate first: 409 TDAH_ACTIVATE_REQUIRED unless the mode is on — the
+ * whole mutation surface pauses with the mode (see handleGetDay).
  */
 const handleTransitionActivity = async (
     activityId: number,
@@ -632,6 +645,10 @@ const handleTransitionActivity = async (
     options: TdahRequestOptions,
 ): Promise<Response> => {
     try {
+        const profile = await readTdahProfile(options.dataDir, ctx.key);
+        if (!profile || profile.mode !== 'on') {
+            return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
+        }
         const result = await transitionActivityState(options.dataDir, ctx.key, activityId, action);
         if (result.kind === 'notFound') return tdahErrorResponse(TDAH_ERRORS.notFound, 404);
         if (result.kind === 'rejected') return tdahErrorResponse(TDAH_ERRORS.activityInvalid, 400);
@@ -735,7 +752,11 @@ export async function handleTdahRequest(
     if (req.method === 'PUT') {
         const body = await readJsonBody(req, options.maxBodyBytes, options.signal);
         if (isBodyReadError(body)) {
-            return tdahErrorResponse(TDAH_ERRORS.invalidBody, 413);
+            // Same as handleActivate: `body.__mindwtrError.status` already
+            // distinguishes a genuinely oversized payload (413) from a request
+            // abort/timeout (408) — a hardcoded 413 here would misreport an
+            // abort as Payload Too Large.
+            return tdahErrorResponse(TDAH_ERRORS.invalidBody, body.__mindwtrError.status);
         }
         const parsed = parseProfilePutBody(body);
         if (!parsed.ok) {

@@ -74,6 +74,7 @@ import {
 import {
     canonicalCloudRoute,
     resolveServerMergeTimestamp,
+    runTdahNightlyIntervalTick,
     shouldLogCloudRequest,
     startCloudServer,
     type CloudRequestCompletion,
@@ -1743,6 +1744,47 @@ describe('cloud server api', () => {
         baseUrl = '';
     });
 
+    // Review FIX 7c: the ONLY audit record of nightly TDAH generation is the
+    // 'tdah nightly trigger fired' line inside the 60s interval callback —
+    // extracted into the exported `runTdahNightlyIntervalTick` so this test
+    // can invoke one tick directly and assert the audit line (message string
+    // byte-identical, CLOUD_LOG_MESSAGES ratchet) carries the tick summary.
+    // Captured through process.stdout because logInfo writes there; the
+    // 'request completed' lines from the activate call may interleave, so
+    // only the audit line's presence and contents are asserted.
+    test('runTdahNightlyIntervalTick logs the tdah nightly trigger fired audit line with the tick summary', async () => {
+        const activation = await fetch(`${baseUrl}/v1/tdah/activate`, {
+            method: 'POST',
+            headers: { ...authHeaders, 'content-type': 'application/json' },
+            body: JSON.stringify({ timeZone: 'UTC' }),
+        });
+        expect(activation.status).toBe(200);
+
+        const captured: string[] = [];
+        const stdoutSpy = spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+            captured.push(String(chunk));
+            return true;
+        });
+        try {
+            await runTdahNightlyIntervalTick(dataDir);
+        } finally {
+            stdoutSpy.mockRestore();
+        }
+
+        const auditLine = captured.find((line) => line.includes('"message":"tdah nightly trigger fired"'));
+        if (!auditLine) {
+            throw new Error('expected the tdah nightly trigger fired audit line to be logged');
+        }
+        const parsed = JSON.parse(auditLine) as { message?: string; context?: Record<string, unknown> };
+        expect(parsed.message).toBe('tdah nightly trigger fired');
+        expect(Number(parsed.context?.namespaceCount)).toBe(1);
+        expect(Number(parsed.context?.firedCount ?? -1) + Number(parsed.context?.skippedCount ?? -1)
+            + Number(parsed.context?.failedCount ?? -1)).toBe(1);
+        expect(typeof parsed.context?.generatedCount).toBe('number');
+        expect(typeof parsed.context?.limboCount).toBe('number');
+        expect(typeof parsed.context?.date).toBe('string');
+    });
+
     test('handles CORS preflight without requiring auth or returning JSON', async () => {
         const response = await fetch(`${baseUrl}/v1/tasks`, {
             method: 'OPTIONS',
@@ -1752,7 +1794,6 @@ describe('cloud server api', () => {
                 'Access-Control-Request-Headers': 'Authorization, Content-Type',
             },
         });
-
         expect(response.status).toBe(204);
         expect(response.headers.get('Access-Control-Allow-Origin')).toBe(corsOrigin);
         expect(response.headers.get('Access-Control-Allow-Headers')).toBe('Authorization, Content-Type');

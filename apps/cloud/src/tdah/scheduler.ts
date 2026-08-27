@@ -14,11 +14,21 @@
  * very next tick with no invalidation logic, and never touches
  * already-recorded Activity times.
  *
- * Idempotent via tomorrow's `tdah_day_plan` row (its existing PRIMARY KEY,
- * unchanged from story 1.3/1.4): a namespace whose tomorrow-DayPlan already
- * exists is skipped by a cheap read (`hasDayPlan`), without ever opening a
- * write transaction. Closing is separately idempotent because it only ever
- * touches rows still in `pending`/`started`.
+ * Closing is a SWEEP: `mutateCloseOutgoingDay` limboes every Actividad still
+ * `pending`/`started` on the outgoing local day OR ANY EARLIER day, so (a) a
+ * day whose plan was already generated earlier (e.g. by POST /activate) is
+ * still closed — generation existing must never short-circuit the close —
+ * (b) an Actividad added or started after the ritual fired is closed by the
+ * next tick, and (c) a whole ritual window missed (server down 23:00–00:00)
+ * is swept at the next ritual tick instead of staying pending forever.
+ *
+ * Steady-state ticks stay read-only: a cheap pre-transaction check
+ * (`hasDayPlan` for tomorrow + `hasPendingOrStartedUpTo` for anything left
+ * to close) opens a write transaction only when there is real work.
+ * Generation remains generate-if-missing via tomorrow's `tdah_day_plan` row
+ * (its existing PRIMARY KEY, unchanged from story 1.3/1.4), and closing only
+ * ever touches rows still in `pending`/`started`, so every part of the write
+ * is idempotent.
  *
  * A write failure for one namespace is logged (`.code` only, never a raw
  * message or a namespace key — AGENTS.md's privacy rule) and left for the
@@ -31,6 +41,7 @@ import {
     computeTomorrowDate,
     formatDateInTimeZone,
     hasDayPlan,
+    hasPendingOrStartedUpTo,
     listActiveTdahNamespaces,
     mutateCloseOutgoingDay,
     mutateGenerateTomorrowIfMissing,
@@ -72,6 +83,12 @@ type NamespaceTickOutcome =
  * transaction, and must isolate the same way (a prior version only wrapped
  * the read/write-transaction calls, which let a bad profile read escape and
  * abort the entire tick for every other namespace).
+ *
+ * 'fired' covers every tick that did write work — a full ritual fire
+ * (generatedCount > 0) and a sweep-only close of late or stale Actividades
+ * (generatedCount 0, limboCount > 0) both count; `generatedCount` reports
+ * only Actividades actually created, never the existing count of an
+ * already-present tomorrow plan.
  */
 const runNamespaceTick = async (dataDir: string, key: string, now: Date): Promise<NamespaceTickOutcome> => {
     try {
@@ -87,18 +104,25 @@ const runNamespaceTick = async (dataDir: string, key: string, now: Date): Promis
         const tomorrow = computeTomorrowDate(profile.timeZone, now);
         const databasePath = tdahDatabasePath(dataDir, key);
 
-        const alreadyGenerated = await withReadDatabase(databasePath, (database) => hasDayPlan(database, tomorrow));
-        if (alreadyGenerated) {
+        // Steady-state guard: open the write transaction only when there is
+        // real work — tomorrow's plan is missing (generate) OR any Actividad
+        // is still pending/started on today or a stale earlier day (sweep
+        // close). A namespace already through tonight's ritual matches
+        // neither and stays entirely read-only until the next local day.
+        const needsWrite = await withReadDatabase(databasePath, (database) => (
+            !hasDayPlan(database, tomorrow) || hasPendingOrStartedUpTo(database, today)
+        ));
+        if (!needsWrite) {
             return { kind: 'skipped' };
         }
         const result = await withWriteTransaction(databasePath, (database) => {
             const closed = mutateCloseOutgoingDay(database, today);
-            const generated = mutateGenerateTomorrowIfMissing(database, tomorrow, profile.timeZone);
+            const generated = mutateGenerateTomorrowIfMissing(database, tomorrow);
             return { closed, generated };
         });
         return {
             kind: 'fired',
-            generatedCount: result.generated.activityCount,
+            generatedCount: result.generated.created ? result.generated.activityCount : 0,
             limboCount: result.closed.limboCount,
         };
     } catch (error) {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { tokenToKey } from '../server-auth';
@@ -12,6 +12,8 @@ import {
     listActiveTdahNamespaces,
     readTdahProfile,
     tdahDatabasePath,
+    weekdayOfDate,
+    withWriteTransaction,
 } from './storage';
 import { handleTdahRequest } from './routes';
 import { runNightlyTdahTick } from './scheduler';
@@ -277,6 +279,36 @@ describe('tdah module', () => {
         expect(profile?.ritualHour).toBe('23:00');
     });
 
+    // server.ts's tdahServerConfig sets initializeNamespace: () => undefined
+    // (the base config would plant the <key>.json sync document) — activating
+    // TDAH must never reserve a sync document for the namespace.
+    test('a full activation plants only the tdah artifacts — no sync document is reserved for the namespace', async () => {
+        const response = await activate({ timeZone: 'UTC', routine: WORKDAY_ROUTINE });
+        expect(response.status).toBe(200);
+
+        const key = tokenToKey(TOKEN_ALPHA);
+        expect(existsSync(join(dataDir, `${key}.json`))).toBe(false);
+        expect(readdirSync(join(dataDir, key))).toEqual(['tdah']);
+        expect(readdirSync(dataDir)).toEqual([key]);
+    });
+
+    // The module header documents WAL + synchronous=FULL as the durable
+    // equivalent of the repo's temp->fsync->rename pattern. synchronous is
+    // per-connection, so the assertion must read it from INSIDE a write
+    // transaction (the exact connection shape withWriteTransaction opens).
+    // SQLite's documented mapping: 1 = NORMAL, 2 = FULL, 3 = EXTRA.
+    test('every write transaction opens with journal_mode=wal and synchronous=FULL (2)', async () => {
+        await activate({ timeZone: 'UTC' });
+        const databasePath = tdahDatabasePath(dataDir, tokenToKey(TOKEN_ALPHA));
+
+        const pragmas = await withWriteTransaction(databasePath, (database) => ({
+            journalMode: (database.prepare('PRAGMA journal_mode;').get() as { journal_mode?: string }).journal_mode,
+            synchronous: (database.prepare('PRAGMA synchronous;').get() as { synchronous?: number }).synchronous,
+        }));
+        expect(pragmas.journalMode).toBe('wal');
+        expect(pragmas.synchronous).toBe(2);
+    });
+
     test('invalid IANA time zone returns 400 TDAH_INVALID_TIME_ZONE without a raw message', async () => {
         const response = await putProfile({ mode: 'on', timeZone: 'No/Una::Zona' });
         expect(response.status).toBe(400);
@@ -300,6 +332,43 @@ describe('tdah module', () => {
         const response = await putProfile({ mode: 'on', ritualHour: '25:99' });
         expect(response.status).toBe(400);
         expect(await readErrorCode(response)).toBe('TDAH_INVALID_RITUAL_HOUR');
+    });
+
+    // A '00:00' ritual hour is degenerate: every local time of day is
+    // >= '00:00', so the scheduler's ritual-hour gate would be true all day
+    // and the sweep-close would limbo the just-started day's Actividades on
+    // every tick. '00:01' (the earliest non-degenerate value) must stay
+    // valid, on both the PUT and the activate paths.
+    test("ritualHour '00:00' is rejected on PUT /profile with 400 TDAH_INVALID_RITUAL_HOUR", async () => {
+        const response = await putProfile({ timeZone: 'UTC', ritualHour: '00:00' });
+        expect(response.status).toBe(400);
+        expect(await readErrorCode(response)).toBe('TDAH_INVALID_RITUAL_HOUR');
+    });
+
+    test("ritualHour '00:00' is rejected on POST /activate with 400 TDAH_INVALID_RITUAL_HOUR", async () => {
+        const response = await activate({ ritualHour: '00:00' });
+        expect(response.status).toBe(400);
+        expect(await readErrorCode(response)).toBe('TDAH_INVALID_RITUAL_HOUR');
+    });
+
+    test("ritualHour '00:01' and '23:00' remain valid on both the activate and PUT /profile paths", async () => {
+        const activated = await activate({ timeZone: 'UTC', ritualHour: '00:01' });
+        expect(activated.status).toBe(200);
+        expect((await readProfile(activated))?.ritualHour).toBe('00:01');
+
+        const updated = await putProfile({ ritualHour: '23:00' });
+        expect(updated.status).toBe(200);
+        expect((await readProfile(updated))?.ritualHour).toBe('23:00');
+    });
+
+    // A Bloque startTime of exactly midnight stays legal — the 00:00
+    // rejection is a ritualHour-only rule, never a general HH:mm rule.
+    test("a Bloque startTime of '00:00' is still valid (the 00:00 rejection is ritualHour-only)", async () => {
+        const response = await activate({
+            timeZone: 'UTC',
+            routine: { title: 'Día laboral', blocks: [{ title: 'Medianoche', startTime: '00:00', durationMinutes: 30 }] },
+        });
+        expect(response.status).toBe(200);
     });
 
     test('malformed JSON body returns 400 TDAH_INVALID_BODY', async () => {
@@ -580,36 +649,52 @@ describe('tdah module', () => {
             expect(await readErrorCode(response)).toBe('TDAH_METHOD_NOT_ALLOWED');
         });
 
-        test('a request abort/timeout during activate is reported with its own status, not always 413', async () => {
+        test('a request abort/timeout during activate or PUT /profile is reported with its own status, not always 413', async () => {
             // Bypasses HTTP/fetch on purpose: an aborted ReadableStream body,
             // fed straight into the exported handleTdahRequest, is the only
             // reliable way to force readJsonBody down the BodyReadError path
             // for the "aborted mid-read" cause (status 408) rather than the
             // "declared/observed length over the limit" cause (status 413).
+            // PUT /profile used to hardcode 413 here while every sibling
+            // handler (including activate) propagated the real status.
+            const abortedBodyRequest = (path: string): { req: Request; signal: AbortSignal } => {
+                const abortController = new AbortController();
+                const req = new Request(`http://localhost${path}`, {
+                    method: path === '/v1/tdah/activate' ? 'POST' : 'PUT',
+                    body: new ReadableStream({
+                        start(streamController) {
+                            streamController.enqueue(new TextEncoder().encode('{"timeZone":'));
+                        },
+                        cancel() {
+                            return undefined;
+                        },
+                    }),
+                    duplex: 'half' as RequestDuplex,
+                });
+                abortController.abort(new Error('Request timed out'));
+                return { req, signal: abortController.signal };
+            };
             const key = tokenToKey(TOKEN_ALPHA);
-            const abortController = new AbortController();
-            const req = new Request('http://localhost/v1/tdah/activate', {
-                method: 'POST',
-                body: new ReadableStream({
-                    start(streamController) {
-                        streamController.enqueue(new TextEncoder().encode('{"timeZone":'));
-                    },
-                    cancel() {
-                        return undefined;
-                    },
-                }),
-                duplex: 'half' as RequestDuplex,
-            });
-            abortController.abort(new Error('Request timed out'));
 
-            const response = await handleTdahRequest(req, '/v1/tdah/activate', { key }, {
+            const activateAborted = abortedBodyRequest('/v1/tdah/activate');
+            const activateResponse = await handleTdahRequest(activateAborted.req, '/v1/tdah/activate', { key }, {
                 dataDir,
                 maxBodyBytes: 1024,
-                signal: abortController.signal,
+                signal: activateAborted.signal,
             });
-            expect(response).not.toBeNull();
-            expect(response?.status).toBe(408);
-            expect(await readErrorCode(response as Response)).toBe('TDAH_INVALID_BODY');
+            expect(activateResponse).not.toBeNull();
+            expect(activateResponse?.status).toBe(408);
+            expect(await readErrorCode(activateResponse as Response)).toBe('TDAH_INVALID_BODY');
+
+            const profileAborted = abortedBodyRequest('/v1/tdah/profile');
+            const profileResponse = await handleTdahRequest(profileAborted.req, '/v1/tdah/profile', { key }, {
+                dataDir,
+                maxBodyBytes: 1024,
+                signal: profileAborted.signal,
+            });
+            expect(profileResponse).not.toBeNull();
+            expect(profileResponse?.status).toBe(408);
+            expect(await readErrorCode(profileResponse as Response)).toBe('TDAH_INVALID_BODY');
         });
 
         test('a genuinely oversized activate body still returns 413 TDAH_INVALID_BODY', async () => {
@@ -618,6 +703,15 @@ describe('tdah module', () => {
                 // startCloudServer's default maxBodyBytes is 2_000_000 (server.ts);
                 // pad well past it so this is unambiguously the oversized-body case.
                 body: JSON.stringify({ timeZone: 'UTC', routine: WORKDAY_ROUTINE, padding: 'x'.repeat(3 * 1024 * 1024) }),
+            });
+            expect(response.status).toBe(413);
+            expect(await readErrorCode(response)).toBe('TDAH_INVALID_BODY');
+        });
+
+        test('a genuinely oversized PUT /profile body still returns 413 TDAH_INVALID_BODY (real status propagated, not hardcoded)', async () => {
+            const response = await authedFetch('/v1/tdah/profile', {
+                method: 'PUT',
+                body: JSON.stringify({ timeZone: 'UTC', padding: 'x'.repeat(3 * 1024 * 1024) }),
             });
             expect(response.status).toBe(413);
             expect(await readErrorCode(response)).toBe('TDAH_INVALID_BODY');
@@ -1479,16 +1573,43 @@ describe('tdah module', () => {
             ],
         };
 
-        test('GET without any profile still auto-generates an empty today DayPlan (UTC default)', async () => {
+        // FR-1 gate (review fix): the Hoy mutation surface must not plant
+        // DayPlans/Actividades — or tdah.sqlite itself — for a namespace that
+        // never activated. This test used to enshrine the opposite
+        // ("still auto-generates an empty today DayPlan").
+        test('GET without any profile returns 409 TDAH_ACTIVATE_REQUIRED and plants nothing on disk', async () => {
             const response = await getDay();
-            expect(response.status).toBe(200);
-            const day = await readDay(response);
-            expect(day.routineTitle).toBeNull();
-            expect(day.activities).toEqual([]);
-            expect(day.date).toBe(formatDateInTimeZone(new Date(), 'UTC'));
-            // No profile exists yet, so the fallback default applies — same
-            // fallback `handleGetRoutinePreview` already uses.
-            expect(day.timeZone).toBe('UTC');
+            expect(response.status).toBe(409);
+            expect(await readErrorCode(response)).toBe('TDAH_ACTIVATE_REQUIRED');
+            expect(existsSync(join(dataDir, tokenToKey(TOKEN_ALPHA)))).toBe(false);
+        });
+
+        // Same FR-1 gate with the mode explicitly off (deactivation pauses
+        // generation, FR-1) — day GET, manual-Activity POST, and one
+        // transition all refuse; the ungated routines CRUD stays reachable so
+        // Rutina templates survive deactivation by design.
+        test('with mode off, the day GET, manual-Activity POST and activity transitions all return 409 TDAH_ACTIVATE_REQUIRED, while routines CRUD stays reachable', async () => {
+            const activated = await activate({ timeZone: 'UTC', routine: ALL_DAYS_ROUTINE });
+            expect(activated.status).toBe(200);
+            const created = await readActivity(await createManualActivityApi({ title: 'Antes de apagar' }));
+            await putProfile({ mode: 'off' });
+
+            const dayResponse = await getDay();
+            expect(dayResponse.status).toBe(409);
+            expect(await readErrorCode(dayResponse)).toBe('TDAH_ACTIVATE_REQUIRED');
+
+            const manualResponse = await createManualActivityApi({ title: 'Con modo apagado' });
+            expect(manualResponse.status).toBe(409);
+            expect(await readErrorCode(manualResponse)).toBe('TDAH_ACTIVATE_REQUIRED');
+
+            const transitionResponse = await transitionActivityApi(created.id, 'start');
+            expect(transitionResponse.status).toBe(409);
+            expect(await readErrorCode(transitionResponse)).toBe('TDAH_ACTIVATE_REQUIRED');
+
+            const routinesResponse = await listRoutinesApi();
+            expect(routinesResponse.status).toBe(200);
+            const routines = await readRoutines(routinesResponse);
+            expect(routines).toHaveLength(1);
         });
 
         // AD-6: the client must compute "now" and the header date in the
@@ -1526,6 +1647,30 @@ describe('tdah module', () => {
             expect(second).toEqual(first);
         });
 
+        // PRAGMA data_version only increments when ANOTHER connection commits,
+        // so an unchanged value across a request is direct evidence that the
+        // request never opened (let alone committed) a write transaction —
+        // exactly the read-only fast path getTodayDayPlan must take once
+        // today's plan exists, instead of a BEGIN IMMEDIATE on every GET.
+        test("once today's plan exists, GET /day serves it read-only (no write transaction)", async () => {
+            await activate({ timeZone: 'UTC', routine: ALL_DAYS_ROUTINE });
+            await getDay();
+
+            const { Database } = await import('bun:sqlite');
+            const probe = new Database(tdahDatabasePath(dataDir, tokenToKey(TOKEN_ALPHA)), { readonly: true });
+            try {
+                const readDataVersion = (): number => (
+                    (probe.prepare('PRAGMA data_version;').get() as { data_version: number }).data_version
+                );
+                const before = readDataVersion();
+                const response = await getDay();
+                expect(response.status).toBe(200);
+                expect(readDataVersion()).toBe(before);
+            } finally {
+                probe.close();
+            }
+        });
+
         test('no applicable Rutina yields routineTitle:null and an empty activities list (FR-3)', async () => {
             await activate({ timeZone: 'UTC' });
             const day = await readDay(await getDay());
@@ -1536,6 +1681,9 @@ describe('tdah module', () => {
         test("GET /v1/tdah/day for one token never returns another token's Activities/DayPlan (namespace isolation)", async () => {
             await activate({ timeZone: 'America/Mexico_City', routine: ALL_DAYS_ROUTINE }, TOKEN_ALPHA);
             await createManualActivityApi({ title: 'Solo alpha' }, TOKEN_ALPHA);
+            // Beta must be activated too: with the FR-1 mode gate, an
+            // unactivated beta would 409 before any isolation assertion could run.
+            await activate({ timeZone: 'UTC' }, TOKEN_BETA);
 
             const alphaDay = await readDay(await getDay(TOKEN_ALPHA));
             expect(alphaDay.activities.map((activity) => activity.title)).toContain('Solo alpha');
@@ -1544,8 +1692,6 @@ describe('tdah module', () => {
             const betaDay = await readDay(await getDay(TOKEN_BETA));
             expect(betaDay.activities).toEqual([]);
             expect(betaDay.routineTitle).toBeNull();
-            // Beta never activated, so it falls back to the UTC default
-            // instead of inheriting alpha's configured time zone.
             expect(betaDay.timeZone).toBe('UTC');
         });
 
@@ -1562,6 +1708,15 @@ describe('tdah module', () => {
         });
 
         describe('POST /v1/tdah/day/activities', () => {
+            // FR-1 mode gate: every test below now needs an active (mode on)
+            // profile — the endpoint 409s without one. Activated WITHOUT a
+            // routine so tests asserting a day's activity ordering/content
+            // see only their own manual Activities (today's plan bootstraps
+            // empty on first write).
+            beforeEach(async () => {
+                await activate({ timeZone: 'UTC' });
+            });
+
             test('creates a manual Activity with an explicit time/duration', async () => {
                 const response = await createManualActivityApi({ title: 'Llamar al banco', startTime: '09:30', durationMinutes: 15 });
                 expect(response.status).toBe(201);
@@ -1685,6 +1840,12 @@ describe('tdah module', () => {
                 await readActivity(await createManualActivityApi({ title: 'Meditar', startTime: '07:00', durationMinutes: 10 }))
             );
 
+            // FR-1 mode gate: `createTodayActivity` posts through the gated
+            // manual-Activity endpoint, so the profile must be active first.
+            beforeEach(async () => {
+                await activate({ timeZone: 'UTC' });
+            });
+
             test('start on a pending Activity sets state:started and startedAt', async () => {
                 const created = await createTodayActivity();
                 const response = await transitionActivityApi(created.id, 'start');
@@ -1784,6 +1945,10 @@ describe('tdah module', () => {
 
             test("registering an action on another namespace's Activity 404s (namespace isolation)", async () => {
                 const created = await createTodayActivity();
+                // Beta needs its own active profile: the FR-1 mode gate would
+                // otherwise 409 for a never-activated namespace before this
+                // test could assert the activity-level 404 it exists for.
+                await activate({ timeZone: 'UTC' }, TOKEN_BETA);
                 const response = await transitionActivityApi(created.id, 'start', TOKEN_BETA);
                 expect(response.status).toBe(404);
                 expect(await readErrorCode(response)).toBe('TDAH_NOT_FOUND');
@@ -1880,11 +2045,18 @@ describe('tdah module', () => {
                     seedDatabase.close();
                 }
 
-                const response = await getDay();
-                expect(response.status).toBe(200);
-                const day = await readDay(response);
-                expect(day.activities).toHaveLength(1);
-                expect(day.activities[0]?.title).toBe('Vieja');
+            // FR-1 mode gate: GET /day needs an active profile now. Activation
+            // is the write that runs both migration steps here (its single
+            // withWriteTransaction opens the seeded v1 file and runs
+            // ensureSchema), so the assertions below still verify the same
+            // end state as when getDay was the first module touch.
+            await activate({ timeZone: 'UTC' });
+
+            const response = await getDay();
+            expect(response.status).toBe(200);
+            const day = await readDay(response);
+            expect(day.activities).toHaveLength(1);
+            expect(day.activities[0]?.title).toBe('Vieja');
                 // The pre-1.6 row's real (non-null) start_time/duration_minutes
                 // values must survive the create-copy-drop-rename rebuild
                 // untouched — the rebuild widens the column definitions, it
@@ -1996,14 +2168,17 @@ describe('tdah module', () => {
                     seedDatabase.close();
                 }
 
-                // A single request is enough to trigger both migration steps
-                // in sequence — migrateSchemaIfNeeded runs the v0->v1 Rutina
-                // widening first, then the v1->v2 Activity rebuild, inside the
-                // same ensureSchema call.
-                const response = await getDay();
-                expect(response.status).toBe(200);
-                const day = await readDay(response);
-                const legacyActivity = day.activities.find((activity) => activity.title === 'Legado');
+            // A single request is enough to trigger both migration steps
+            // in sequence — activation's withWriteTransaction opens the v0
+            // file and `ensureSchema` runs the v0->v1 Rutina widening first,
+            // then the v1->v2 Activity rebuild, all inside the same call.
+            // (FR-1 mode gate: the profile this creates is also what lets
+            // the getDay below through.)
+            await activate({ timeZone: 'UTC' });
+            const response = await getDay();
+            expect(response.status).toBe(200);
+            const day = await readDay(response);
+            const legacyActivity = day.activities.find((activity) => activity.title === 'Legado');
                 // The pre-1.6 row's real (non-null) start_time/duration_minutes
                 // values must survive the create-copy-drop-rename rebuild
                 // untouched, with started_at/completed_at backfilled to NULL.
@@ -2144,6 +2319,158 @@ describe('tdah module', () => {
             const outgoingRows = await readActivityRows(databasePath, outgoingDate);
             for (const row of outgoingRows) {
                 expect(row.state).toBe('limbo');
+            }
+        });
+
+        // Review FIX 1, scenario (a): POST /activate already generated
+        // tomorrow earlier in the day — the ritual-hour tick that evening
+        // must still close TODAY (the old pre-check skipped the whole tick
+        // because tomorrow existed, so the outgoing day was never limboed).
+        test('activation-day close runs even though tomorrow was already generated at activation', async () => {
+            const activation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            });
+            const activationBody = await readActivateResponse(activation);
+            // The Hoy gap-filler generates TODAY's plan (activation only ever
+            // generates tomorrow's).
+            const today = await readDay(await getDay());
+            expect(today.activities).toHaveLength(WORKDAY_ROUTINE.blocks.length);
+
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const now = localInstant(today.date, '23:30');
+            const nextDate = computeTomorrowDate('America/Mexico_City', now);
+            // Activation happened "earlier today", so tomorrow's plan exists already.
+            expect(nextDate).toBe(activationBody.dayPlan.date);
+
+            const summary = await runNightlyTdahTick(dataDir, now);
+            expect(summary.firedCount).toBe(1);
+            expect(summary.skippedCount).toBe(0);
+            // Sweep-only fire: nothing new generated (tomorrow existed), but
+            // today's pending Actividades were all closed.
+            expect(summary.generatedCount).toBe(0);
+            expect(summary.limboCount).toBe(WORKDAY_ROUTINE.blocks.length);
+
+            const todayRows = await readActivityRows(databasePath, today.date);
+            for (const row of todayRows) {
+                expect(row.state).toBe('limbo');
+            }
+            expect(await countDayPlans(databasePath, nextDate)).toBe(1);
+            const nextRows = await readActivityRows(databasePath, nextDate);
+            expect(nextRows).toHaveLength(WORKDAY_ROUTINE.blocks.length);
+            for (const row of nextRows) {
+                expect(row.state).toBe('pending');
+            }
+        });
+
+        // Review FIX 1, scenario (b): an Actividad added after the ritual
+        // fired (between the fire and midnight) is limboed by the NEXT tick
+        // — the old tick skipped forever once tomorrow existed.
+        test('a late Actividad added after the ritual fire is limboed by the next tick', async () => {
+            const activation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            });
+            const activationBody = await readActivateResponse(activation);
+            const outgoingDate = activationBody.dayPlan.date;
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+
+            const first = await runNightlyTdahTick(dataDir, localInstant(outgoingDate, '23:30'));
+            expect(first.firedCount).toBe(1);
+
+            // A manual add later the same evening, still before midnight —
+            // seeded directly because the real clock (which
+            // createManualActivity would use) is not the simulated one.
+            const { Database } = await import('bun:sqlite');
+            const seedDatabase = new Database(databasePath);
+            try {
+                seedDatabase
+                    .prepare("INSERT INTO tdah_activity (day_plan_date, block_id, title, start_time, duration_minutes, origin, state) VALUES (?, NULL, 'Tardía', '23:45', 10, 'manual', 'pending');")
+                    .run(outgoingDate);
+            } finally {
+                seedDatabase.close();
+            }
+
+            const second = await runNightlyTdahTick(dataDir, localInstant(outgoingDate, '23:50'));
+            expect(second.firedCount).toBe(1);
+            expect(second.generatedCount).toBe(0);
+            expect(second.limboCount).toBe(1);
+
+            const lateRow = (await readActivityRows(databasePath, outgoingDate)).find((row) => row.title === 'Tardía');
+            expect(lateRow?.state).toBe('limbo');
+        });
+
+        // Review FIX 1, scenario (c): a whole ritual window missed (e.g.
+        // deploy downtime 23:00–00:00) leaves a stale past day pending —
+        // the sweep (`day_plan_date <= today`) closes it at the next ritual
+        // tick instead of leaving it pending forever.
+        test('a stale past day (missed ritual window) is swept to limbo at the next ritual tick', async () => {
+            const activation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            });
+            const activationBody = await readActivateResponse(activation);
+            const outgoingDate = activationBody.dayPlan.date;
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+
+            const staleDate = '2000-01-01';
+            const { Database } = await import('bun:sqlite');
+            const seedDatabase = new Database(databasePath);
+            try {
+                seedDatabase.prepare('INSERT INTO tdah_day_plan (date, generated_at) VALUES (?, ?);').run(staleDate, '2000-01-01T00:00:00.000Z');
+                seedDatabase
+                    .prepare("INSERT INTO tdah_activity (day_plan_date, block_id, title, start_time, duration_minutes, origin, state) VALUES (?, NULL, 'Día olvidado', '09:00', 30, 'manual', 'pending');")
+                    .run(staleDate);
+            } finally {
+                seedDatabase.close();
+            }
+
+            const summary = await runNightlyTdahTick(dataDir, localInstant(outgoingDate, '23:30'));
+            expect(summary.firedCount).toBe(1);
+            // The stale day's one Actividad plus the outgoing day's two.
+            expect(summary.limboCount).toBe(WORKDAY_ROUTINE.blocks.length + 1);
+
+            const staleRow = (await readActivityRows(databasePath, staleDate)).find((row) => row.title === 'Día olvidado');
+            expect(staleRow?.state).toBe('limbo');
+        });
+
+        // Same data_version technique as the GET /day read-only test: an
+        // unchanged value across the second tick proves the steady-state
+        // skip never opens (let alone commits) a write transaction.
+        test('a steady-state re-fire stays skipped and takes no write path', async () => {
+            const activation = await activate({
+                timeZone: 'America/Mexico_City',
+                ritualHour: '22:00',
+                routine: WORKDAY_ROUTINE,
+            });
+            const activationBody = await readActivateResponse(activation);
+            const outgoingDate = activationBody.dayPlan.date;
+            const key = tokenToKey(TOKEN_ALPHA);
+            const databasePath = tdahDatabasePath(dataDir, key);
+            const now = localInstant(outgoingDate, '23:30');
+
+            const first = await runNightlyTdahTick(dataDir, now);
+            expect(first.firedCount).toBe(1);
+
+            const { Database } = await import('bun:sqlite');
+            const probe = new Database(databasePath, { readonly: true });
+            try {
+                const readDataVersion = (): number => (
+                    (probe.prepare('PRAGMA data_version;').get() as { data_version: number }).data_version
+                );
+                const before = readDataVersion();
+                const second = await runNightlyTdahTick(dataDir, now);
+                expect(second.firedCount).toBe(0);
+                expect(second.skippedCount).toBe(1);
+                expect(readDataVersion()).toBe(before);
+            } finally {
+                probe.close();
             }
         });
 
@@ -2411,6 +2738,32 @@ describe('tdah module', () => {
             expect(retry.firedCount).toBe(0);
             expect(retry.skippedCount).toBe(1);
             expect(retry.failedCount).toBe(1);
+        });
+    });
+
+    describe('weekdayOfDate (timezone-independent)', () => {
+        // 2026-01-15 is a Thursday. The old noon-UTC-then-format-in-zone
+        // implementation returned Friday for Pacific/Kiritimati (+14) and
+        // Pacific/Apia (+13) — noon UTC is already the next calendar day
+        // there — and was equally wrong for any UTC+12/13/14 zone in DST
+        // (e.g. Pacific/Auckland in summer). The weekday of a calendar date
+        // is the same in every zone, which is exactly what these assert.
+        test('2026-01-15 is Thursday (4) — the date the old code got wrong for Pacific/Kiritimati (+14), Pacific/Apia (+13) and Pacific/Auckland', () => {
+            expect(weekdayOfDate('2026-01-15')).toBe(4);
+        });
+
+        // A July date catches the southern-hemisphere winter side (NZST,
+        // UTC+12, no DST) — 2026-07-16 is also a Thursday.
+        test('a July date (NZ winter, DST off) also resolves by pure calendar math — 2026-07-16 is Thursday', () => {
+            expect(weekdayOfDate('2026-07-16')).toBe(4);
+        });
+
+        test('matches Date.UTC weekday for every day of a full leap year', () => {
+            for (let dayIndex = 0; dayIndex < 366; dayIndex += 1) {
+                const utc = new Date(Date.UTC(2028, 0, 1 + dayIndex));
+                const iso = `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2, '0')}-${String(utc.getUTCDate()).padStart(2, '0')}`;
+                expect(weekdayOfDate(iso)).toBe(utc.getUTCDay());
+            }
         });
     });
 

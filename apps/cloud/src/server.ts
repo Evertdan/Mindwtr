@@ -931,6 +931,38 @@ export function resolveServerMergeTimestamp(..._dataSets: AppData[]): string {
     return new Date().toISOString();
 }
 
+/**
+ * The 60s TDAH interval callback's body, extracted so the audit contract is
+ * directly testable: run one nightly tick against `dataDir` with the real
+ * clock, then log the single `'tdah nightly trigger fired'` audit line with
+ * the tick's summary — or the `'tdah nightly trigger crashed'` backstop if
+ * `runNightlyTdahTick` ever throws despite its own never-throws contract.
+ * The `tdahTickInFlight` overlap guard itself stays in the interval callback
+ * below; this function is exactly one tick, so a manual await of it can never
+ * overlap itself. Log message strings are byte-identical to the pre-extract
+ * inline callback (CLOUD_LOG_MESSAGES ratchet).
+ */
+export async function runTdahNightlyIntervalTick(dataDir: string): Promise<void> {
+    try {
+        const summary = await runNightlyTdahTick(dataDir, new Date());
+        logInfo('tdah nightly trigger fired', {
+            date: summary.date,
+            failedCount: summary.failedCount,
+            firedCount: summary.firedCount,
+            generatedCount: summary.generatedCount,
+            limboCount: summary.limboCount,
+            namespaceCount: summary.namespaceCount,
+            skippedCount: summary.skippedCount,
+        });
+    } catch (error) {
+        logError('tdah nightly trigger crashed', {
+            failureClass: 'runtime',
+            failureCode: 'tdah_nightly_tick_crashed',
+            failureErrno: getFsErrorCode(error),
+        });
+    }
+}
+
 function isProjectPurgePatch(bodyRecord: Record<string, unknown>): boolean {
     return typeof bodyRecord.purgedAt === 'string' && bodyRecord.purgedAt.trim().length > 0;
 }
@@ -1102,17 +1134,8 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
     // The app's first background scheduler (ADR 0026 addendum, story 1.5):
     // once a minute, walk every namespace with an active TDAH profile and
     // fire its nightly ritual (close today, generate tomorrow) once its local
-    // ritual hour arrives. `runNightlyTdahTick` never throws — every
-    // per-namespace failure is caught and logged internally — but the
-    // `.catch` here is a defensive backstop against an unhandled rejection
-    // ever reaching this fire-and-forget interval callback: it logs the
-    // caught error (`.code` only, mirroring `getFsErrorCode`'s use elsewhere
-    // in this file — never the raw `.message` or stack) instead of silently
-    // swallowing what would otherwise be a completely invisible contract
-    // violation. The one audit line for the tick is logged here rather than
-    // inside the scheduler itself, mirroring `pruneOrphanedCalendarFeeds`
-    // below: a pure function returns counts, its caller owns the logging.
-    //
+    // ritual hour arrives. The tick body and its one audit line live in
+    // `runTdahNightlyIntervalTick` above (extracted for direct testing);
     // `tdahTickInFlight` guards against a slow tick (many namespaces, retried
     // write locks) still running when the next 60s interval fires — harmless
     // for correctness (every operation here is idempotent) but wasted work
@@ -1122,28 +1145,9 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
     const tdahNightlyTickTimer = setInterval(() => {
         if (tdahTickInFlight) return;
         tdahTickInFlight = true;
-        void runNightlyTdahTick(dataDir, new Date())
-            .then((summary) => {
-                logInfo('tdah nightly trigger fired', {
-                    date: summary.date,
-                    failedCount: summary.failedCount,
-                    firedCount: summary.firedCount,
-                    generatedCount: summary.generatedCount,
-                    limboCount: summary.limboCount,
-                    namespaceCount: summary.namespaceCount,
-                    skippedCount: summary.skippedCount,
-                });
-            })
-            .catch((error) => {
-                logError('tdah nightly trigger crashed', {
-                    failureClass: 'runtime',
-                    failureCode: 'tdah_nightly_tick_crashed',
-                    failureErrno: getFsErrorCode(error),
-                });
-            })
-            .finally(() => {
-                tdahTickInFlight = false;
-            });
+        void runTdahNightlyIntervalTick(dataDir).finally(() => {
+            tdahTickInFlight = false;
+        });
     }, 60_000);
     if (typeof tdahNightlyTickTimer.unref === 'function') {
         tdahNightlyTickTimer.unref();

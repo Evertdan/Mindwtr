@@ -697,19 +697,20 @@ const selectRoutineWithBlocksById = (database: TdahDatabase, id: number): TdahRo
 };
 
 /**
- * Sunday=0 … Saturday=6, resolved through the same
- * `Intl.DateTimeFormat`-in-time-zone convention `formatDateInTimeZone`
- * establishes rather than raw UTC day math, matching the module's
- * established "never bypass Intl for calendar/time-zone work" rule.
+ * Sunday=0 … Saturday=6. The weekday of a *calendar* date (a plain Y-M-D
+ * string, already resolved to a local day upstream by
+ * `formatDateInTimeZone`) is timezone-independent, so this is pure UTC
+ * calendar math. The former implementation anchored noon UTC and then
+ * formatted in the target zone — wrong for Pacific/Kiritimati (+14) and
+ * Pacific/Apia (+13), where noon UTC is already the *next* calendar day
+ * (e.g. it returned Friday for the Thursday 2026-01-15), and equally wrong
+ * for any UTC+12/13/14 zone while it sits in DST. Exported for direct unit
+ * testing only, the same way `formatDateInTimeZone` is.
  */
-const WEEKDAY_NAME_TO_NUMBER: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-const weekdayOfDate = (date: string, timeZone: string): number => {
+export const weekdayOfDate = (date: string): number => {
     const parts = date.split('-').map(Number);
     const [year, month, day] = parts as [number, number, number];
-    // Noon UTC keeps the same calendar day across every real IANA offset.
-    const noonUtc = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
-    const weekdayName = new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(noonUtc);
-    return WEEKDAY_NAME_TO_NUMBER[weekdayName] ?? noonUtc.getUTCDay();
+    return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
 };
 
 /** True when `date`'s day-of-month is the `ordinal`-th occurrence of its weekday, or the last one when `ordinal === -1`. */
@@ -723,9 +724,9 @@ const isNthWeekdayOccurrence = (date: string, ordinal: number): boolean => {
     return day + 7 > daysInMonth;
 };
 
-/** Does `pattern` match calendar `date` (wall-clock in `timeZone`, AD-6)? */
-const routineMatchesDate = (pattern: TdahRoutinePattern, date: string, timeZone: string): boolean => {
-    const weekday = weekdayOfDate(date, timeZone);
+/** Does `pattern` match calendar `date` (AD-6)? The weekday of a calendar date is timezone-independent (`weekdayOfDate`), so "wall-clock in `timeZone`" is resolved upstream — by whoever computed the Y-M-D string — never here. */
+const routineMatchesDate = (pattern: TdahRoutinePattern, date: string): boolean => {
+    const weekday = weekdayOfDate(date);
     if (pattern.kind === 'weekday') {
         return pattern.weekdays.includes(weekday);
     }
@@ -844,9 +845,9 @@ export async function computeRoutineConflicts(
 }
 
 /** Evaluates every persisted Rutina against `date` and returns the precedence winner (or `null` — the already-supported empty-day case, unchanged from story 1.3). */
-const selectApplicableRoutine = (database: TdahDatabase, date: string, timeZone: string): TdahRoutine | null => {
+const selectApplicableRoutine = (database: TdahDatabase, date: string): TdahRoutine | null => {
     const matching = selectAllRoutinePatternCandidates(database)
-        .filter((candidate) => routineMatchesDate(candidate.pattern, date, timeZone));
+        .filter((candidate) => routineMatchesDate(candidate.pattern, date));
     const winner = pickMostApplicableCandidate(matching);
     return winner ? selectRoutineWithBlocksById(database, winner.id) : null;
 };
@@ -1042,7 +1043,6 @@ const selectApplicabilityPreviewDates = (
     database: TdahDatabase,
     routineId: number,
     monthYYYYMM: string,
-    timeZone: string,
 ): string[] | null => {
     if (!isValidMonthString(monthYYYYMM)) return null;
     const routineRow = database.prepare(SELECT_ROUTINE_BY_ID_SQL).get(routineId) as TdahRoutineRow | undefined | null;
@@ -1057,8 +1057,8 @@ const selectApplicabilityPreviewDates = (
     const dates: string[] = [];
     for (let day = 1; day <= daysInMonth; day += 1) {
         const date = `${monthYYYYMM}-${String(day).padStart(2, '0')}`;
-        if (!routineMatchesDate(targetPattern, date, timeZone)) continue;
-        const matchingOnDate = candidates.filter((candidate) => routineMatchesDate(candidate.pattern, date, timeZone));
+        if (!routineMatchesDate(targetPattern, date)) continue;
+        const matchingOnDate = candidates.filter((candidate) => routineMatchesDate(candidate.pattern, date));
         const winner = pickMostApplicableCandidate(matchingOnDate);
         if (winner?.id === routineId) {
             dates.push(date);
@@ -1078,12 +1078,11 @@ export async function computeApplicabilityPreview(
     key: string,
     routineId: number,
     monthYYYYMM: string,
-    timeZone: string,
 ): Promise<string[] | null> {
     const databasePath = tdahDatabasePath(dataDir, key);
     if (!existsSync(databasePath)) return null;
     return await withReadDatabase(databasePath, (database) => (
-        selectApplicabilityPreviewDates(database, routineId, monthYYYYMM, timeZone)
+        selectApplicabilityPreviewDates(database, routineId, monthYYYYMM)
     ));
 }
 
@@ -1140,15 +1139,16 @@ export type GenerateTomorrowResult = {
  * Day-plan-generation mutation body, factored out for the same reason as the
  * two mutate helpers above. Takes the already-computed `date` rather than a
  * profile, since `activateTdahProfile` computes it from the profile it just
- * upserted inside the same transaction. `timeZone` is threaded through
- * separately (rather than re-reading the profile) because it's also needed
- * by `selectApplicableRoutine`'s weekday resolution (AD-6).
+ * upserted inside the same transaction. `timeZone` was dropped from the
+ * signature along with `selectApplicableRoutine`'s own: the applicable
+ * Rutina is matched against the calendar date alone (`weekdayOfDate` is
+ * timezone-independent).
  *
  * Exported (story 1.5) so `scheduler.ts` can run it inside the same
  * `withWriteTransaction` as `mutateCloseOutgoingDay`, exactly as this file's
  * own `activateTdahProfile` already does.
  */
-export const mutateGenerateTomorrowIfMissing = (database: TdahDatabase, date: string, timeZone: string): GenerateTomorrowResult => {
+export const mutateGenerateTomorrowIfMissing = (database: TdahDatabase, date: string): GenerateTomorrowResult => {
     const existing = database.prepare(SELECT_DAY_PLAN_SQL).get(date) as { date: unknown } | undefined | null;
     if (existing) {
         const countRow = database.prepare(COUNT_ACTIVITIES_FOR_DAY_PLAN_SQL).get(date) as { count: unknown };
@@ -1156,7 +1156,7 @@ export const mutateGenerateTomorrowIfMissing = (database: TdahDatabase, date: st
     }
     const nowIso = new Date().toISOString();
     database.prepare(INSERT_DAY_PLAN_SQL).run(date, nowIso);
-    const routine = selectApplicableRoutine(database, date, timeZone);
+    const routine = selectApplicableRoutine(database, date);
     const blocks = routine?.blocks ?? [];
     for (const block of blocks) {
         database
@@ -1169,9 +1169,17 @@ export const mutateGenerateTomorrowIfMissing = (database: TdahDatabase, date: st
 // --- Nightly scheduler primitives (story 1.5) -------------------------------
 
 const SELECT_DAY_PLAN_EXISTS_SQL = 'SELECT 1 FROM tdah_day_plan WHERE date = ? LIMIT 1;';
+// Sweep close: every Actividad still pending/started on the outgoing local
+// day OR ANY EARLIER DAY (a whole ritual window missed — e.g. the server was
+// down 23:00–00:00 — leaves yesterday's rows pending forever if the close
+// only ever targeted exactly "today"). `tdah_activity.day_plan_date` is a
+// YYYY-MM-DD text key, so lexical `<=` is chronological.
 const CLOSE_OUTGOING_DAY_SQL = `
     UPDATE tdah_activity SET state = 'limbo'
-    WHERE day_plan_date = ? AND state IN ('pending', 'started');
+    WHERE day_plan_date <= ? AND state IN ('pending', 'started');
+`;
+const SELECT_PENDING_OR_STARTED_UP_TO_SQL = `
+    SELECT 1 FROM tdah_activity WHERE day_plan_date <= ? AND state IN ('pending', 'started') LIMIT 1;
 `;
 
 /**
@@ -1187,11 +1195,23 @@ export const hasDayPlan = (database: TdahDatabase, date: string): boolean => (
     Boolean(database.prepare(SELECT_DAY_PLAN_EXISTS_SQL).get(date))
 );
 
+/**
+ * The sweep-close half of the scheduler's pre-transaction skip check: true
+ * when any Actividad is still `pending`/`started` on the outgoing local day
+ * or any earlier day — work only `mutateCloseOutgoingDay` can do, so a
+ * namespace with nothing left to close never opens a write transaction. Same
+ * already-open-handle contract as `hasDayPlan`.
+ */
+export const hasPendingOrStartedUpTo = (database: TdahDatabase, date: string): boolean => (
+    Boolean(database.prepare(SELECT_PENDING_OR_STARTED_UP_TO_SQL).get(date))
+);
+
 export type CloseOutgoingDayResult = { limboCount: number };
 
 /**
  * The limbo transition (AD-5/AD-11): every Actividad still `pending`/`started`
- * for the outgoing local day becomes `limbo`. Only `scheduler.ts` calls this
+ * for the outgoing local day — or any STALE EARLIER day whose ritual window
+ * was missed entirely — becomes `limbo`. Only `scheduler.ts` calls this
  * — no route may bulk-set `limbo` (ADR 0026 addendum, story 1.5). Separately
  * idempotent from `mutateGenerateTomorrowIfMissing`: re-running it against a
  * date whose Actividades are already `limbo` (or `completed`/`missed`/
@@ -1246,7 +1266,7 @@ export async function generateTomorrowIfMissing(
     }
     const date = computeTomorrowDate(profile.timeZone);
     return await withWriteTransaction(databasePath, (database) => (
-        mutateGenerateTomorrowIfMissing(database, date, profile.timeZone)
+        mutateGenerateTomorrowIfMissing(database, date)
     ));
 }
 
@@ -1279,7 +1299,7 @@ export async function activateTdahProfile(
             ? mutateCreateRoutineWithBlocks(database, request.routine)
             : undefined;
         const date = computeTomorrowDate(profile.timeZone);
-        const dayPlan = mutateGenerateTomorrowIfMissing(database, date, profile.timeZone);
+        const dayPlan = mutateGenerateTomorrowIfMissing(database, date);
         return { profile, routineCreated: routineResult?.created ?? false, dayPlan };
     });
 }
@@ -1392,10 +1412,16 @@ const selectDayPlanView = (database: TdahDatabase, date: string, timeZone: strin
  * `mutateGenerateTomorrowIfMissing` with today's date instead of tomorrow's
  * (the design's own gap-filler for a same-day-as-activation "Hoy" view,
  * which the nightly scheduler — story 1.5 — never has a chance to generate
- * itself, since it only ever generates *tomorrow's* plan). Both the
- * generate-if-missing write and the read happen inside the same held
- * transaction, so a concurrent request can never observe a half-generated
- * day.
+ * itself, since it only ever generates *tomorrow's* plan).
+ *
+ * The generate-if-missing write is the RARE path, so it mirrors the
+ * scheduler's own shape rather than paying a `BEGIN IMMEDIATE` on every GET:
+ * a read-only `hasDayPlan` check serves the overwhelming-majority case, and
+ * only a missing plan takes the write transaction (inside which the
+ * generate and the view read still share one held transaction, so a
+ * concurrent request can never observe a half-generated day). The rare
+ * two-first-GETs race is safe because `tdah_day_plan.date`'s PRIMARY KEY
+ * makes the loser's generate a no-op.
  */
 export async function getTodayDayPlan(
     dataDir: string,
@@ -1403,13 +1429,19 @@ export async function getTodayDayPlan(
     timeZone: string,
 ): Promise<TdahDayPlanView> {
     const databasePath = tdahDatabasePath(dataDir, key);
+    const date = formatDateInTimeZone(new Date(), timeZone);
+    if (existsSync(databasePath)) {
+        const existing = await withReadDatabase(databasePath, (database) => (
+            hasDayPlan(database, date) ? selectDayPlanView(database, date, timeZone) : null
+        ));
+        if (existing) return existing;
+    }
     const durableDir = ensureDurableDirectory(dirname(databasePath));
     if (!durableDir) {
         throw new Error('TDAH database directory is unsafe');
     }
-    const date = formatDateInTimeZone(new Date(), timeZone);
     return await withWriteTransaction(databasePath, (database) => {
-        mutateGenerateTomorrowIfMissing(database, date, timeZone);
+        mutateGenerateTomorrowIfMissing(database, date);
         return selectDayPlanView(database, date, timeZone);
     });
 }
@@ -1448,10 +1480,9 @@ export const TDAH_DAY_MAX_ACTIVITIES = 50;
 const mutateCreateManualActivity = (
     database: TdahDatabase,
     date: string,
-    timeZone: string,
     input: TdahCreateManualActivityInput,
 ): TdahActivity | null => {
-    mutateGenerateTomorrowIfMissing(database, date, timeZone);
+    mutateGenerateTomorrowIfMissing(database, date);
     const countRow = database.prepare(COUNT_ACTIVITIES_FOR_DAY_PLAN_SQL).get(date) as { count: unknown };
     if (Number(countRow.count) >= TDAH_DAY_MAX_ACTIVITIES) return null;
     // FR-4/doc 02: time and duration are genuinely optional on a manual
@@ -1488,7 +1519,7 @@ export async function createManualActivity(
         throw new Error('TDAH database directory is unsafe');
     }
     const date = formatDateInTimeZone(new Date(), timeZone);
-    return await withWriteTransaction(databasePath, (database) => mutateCreateManualActivity(database, date, timeZone, input));
+    return await withWriteTransaction(databasePath, (database) => mutateCreateManualActivity(database, date, input));
 }
 
 export type TdahActivityTransitionResult =
