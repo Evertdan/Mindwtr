@@ -11,6 +11,9 @@ import { styles } from './tdah-onboarding.styles';
 // in sync by hand since clients never import the server's types (ADR 0026).
 const IANA_TIME_ZONE_PATTERN = /^[A-Za-z0-9+_/-]{1,64}$/;
 const RITUAL_HOUR_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+// The ritual closes the day — 00:00 would make "tonight" mean "right now,
+// already today", so the server rejects it and the client mirrors that.
+const RITUAL_HOUR_MIDNIGHT = '00:00';
 
 export function isValidTdahTimeZone(value: string): boolean {
     if (!IANA_TIME_ZONE_PATTERN.test(value)) return false;
@@ -23,7 +26,7 @@ export function isValidTdahTimeZone(value: string): boolean {
 }
 
 export function isValidTdahRitualHour(value: string): boolean {
-    return RITUAL_HOUR_PATTERN.test(value);
+    return RITUAL_HOUR_PATTERN.test(value) && value !== RITUAL_HOUR_MIDNIGHT;
 }
 
 /**

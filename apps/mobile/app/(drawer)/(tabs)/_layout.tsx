@@ -10,6 +10,7 @@ import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { MobileAreaSwitcher } from '@/components/mobile-area-switcher';
 import { useTdahModeActive } from '@/components/tdah/today/use-tdah-mode-active';
+import { buildMoreSheetPrimaryItems, MORE_SHEET_ICON_COLORS as iconColors, type MoreDestination } from './more-sheet-items';
 import { useMobileAreaFilter } from '@/hooks/use-mobile-area-filter';
 import { useMobileSyncBadge } from '@/hooks/use-mobile-sync-badge';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
@@ -23,29 +24,13 @@ import { useToastBottomOffset } from '../../../contexts/toast-context';
 import { getDefaultTaskAreaMode, useTaskStore, type MobileQuickAccessView, type SavedSearch, type Task } from '@mindwtr/core';
 import {
   coerceMobileQuickAccessView,
-  MOBILE_QUICK_ACCESS_STACK_ROUTE,
   MOBILE_QUICK_ACCESS_TAB_ROUTE,
 } from '@/lib/mobile-quick-access-view';
 import { COMPACT_NAV_TEXT_MAX_SCALE } from '@/constants/text-scale';
 
-type IconSymbolName = Parameters<typeof IconSymbol>[0]['name'];
 type Translate = (key: string) => string;
 
 const CAPTURE_BUTTON_LIFT = 4;
-
-type MoreDestination = {
-  id: string;
-  label: string;
-  displayLabel?: string;
-  icon: IconSymbolName;
-  iconColor: string;
-  route?: string;
-  onPress?: () => void;
-};
-
-function compactSlashLabel(label: string) {
-  return label.split('/')[0]?.trim() || label;
-}
 
 function MoreSheetTile({
   item,
@@ -165,22 +150,6 @@ function MoreNavigationSheet({
   const sheetTranslateY = useRef(new Animated.Value(Dimensions.get('window').height)).current;
   const lastCloseRequestIdRef = useRef(closeRequestId);
   const hiddenTranslateY = Dimensions.get('window').height;
-  const iconColors = {
-    board: '#4F8CF7',
-    review: '#22C55E',
-    calendar: '#35B8B1',
-    projects: '#10B981',
-    contexts: '#8B5CF6',
-    waiting: '#F2B705',
-    someday: '#6366F1',
-    reference: '#0EA5E9',
-    done: '#22C55E',
-    archived: '#64748B',
-    trash: '#EF4444',
-    settings: '#64748B',
-    saved: '#4F8CF7',
-    tdahToday: '#F97316',
-  };
 
   const animateClosed = useCallback(() => {
     if (reducedMotion) {
@@ -253,37 +222,7 @@ function MoreNavigationSheet({
 
   if (!visible) return null;
 
-  const quickAccessItems: Record<MobileQuickAccessView, MoreDestination> = {
-    review: { id: 'review', label: t('nav.review'), icon: 'clipboard.fill', iconColor: iconColors.review, route: MOBILE_QUICK_ACCESS_STACK_ROUTE.review },
-    projects: { id: 'projects', label: t('nav.projects'), icon: 'folder.fill', iconColor: iconColors.projects, route: MOBILE_QUICK_ACCESS_STACK_ROUTE.projects },
-    calendar: { id: 'calendar', label: t('nav.calendar'), icon: 'calendar', iconColor: iconColors.calendar, route: MOBILE_QUICK_ACCESS_STACK_ROUTE.calendar },
-    contexts: { id: 'contexts', label: t('nav.contexts'), icon: 'circle', iconColor: iconColors.contexts, route: MOBILE_QUICK_ACCESS_STACK_ROUTE.contexts },
-  };
-  const moreQuickAccessItem = (view: Exclude<MobileQuickAccessView, 'review'>) => (
-    quickAccessView === view ? quickAccessItems.review : quickAccessItems[view]
-  );
-  const primaryItems: MoreDestination[] = [
-    { id: 'waiting', label: t('nav.waiting'), icon: 'pause.circle.fill', iconColor: iconColors.waiting, route: '/waiting' },
-    { id: 'board', label: t('nav.board'), icon: 'square.grid.2x2.fill', iconColor: iconColors.board, route: '/board' },
-    moreQuickAccessItem('projects'),
-    {
-      id: 'someday',
-      label: t('nav.someday'),
-      displayLabel: compactSlashLabel(t('nav.someday')),
-      icon: 'arrow.up.circle.fill',
-      iconColor: iconColors.someday,
-      route: '/someday',
-    },
-    moreQuickAccessItem('contexts'),
-    moreQuickAccessItem('calendar'),
-    ...(tdahModeActive ? [{
-      id: 'tdah-today',
-      label: t('nav.tdahToday'),
-      icon: 'house.fill' as IconSymbolName,
-      iconColor: iconColors.tdahToday,
-      route: '/tdah-today',
-    }] : []),
-  ];
+  const primaryItems: MoreDestination[] = buildMoreSheetPrimaryItems({ t, tdahModeActive, quickAccessView });
   const secondaryItems: MoreDestination[] = [
     { id: 'trash', label: t('nav.trash'), icon: 'trash.fill', iconColor: iconColors.trash, route: '/trash' },
     { id: 'archived', label: t('nav.archived'), icon: 'archivebox.fill', iconColor: iconColors.archived, route: '/archived' },

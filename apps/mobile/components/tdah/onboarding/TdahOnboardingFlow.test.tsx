@@ -423,6 +423,34 @@ describe('TdahOnboardingFlow', () => {
         expect(tree.root.findByProps({ testID: 'tdah-onboarding-ritual-next' }).props.accessibilityState.disabled).toBe(false);
     });
 
+    it('rejects 00:00 as a ritual hour client-side too (the server rejects it: the ritual must close the day)', async () => {
+        let tree!: renderer.ReactTestRenderer;
+        await renderer.act(async () => {
+            tree = renderer.create(
+                <TdahOnboardingFlow
+                    cloud={CLOUD}
+                    variant="full"
+                    initialTimeZone="UTC"
+                    onFinished={vi.fn()}
+                    onClose={vi.fn()}
+                />,
+            );
+        });
+
+        await pressByTestId(tree, 'tdah-onboarding-promise-next');
+
+        await renderer.act(async () => {
+            tree.root.findByProps({ testID: 'tdah-onboarding-ritual-hour-input' }).props.onChangeText('00:00');
+        });
+
+        expect(tree.root.findByProps({ testID: 'tdah-onboarding-ritual-next' }).props.accessibilityState.disabled).toBe(true);
+
+        await renderer.act(async () => {
+            tree.root.findByProps({ testID: 'tdah-onboarding-ritual-hour-input' }).props.onChangeText('00:01');
+        });
+        expect(tree.root.findByProps({ testID: 'tdah-onboarding-ritual-next' }).props.accessibilityState.disabled).toBe(false);
+    });
+
     it('exposes every actionable control as an accessible button', async () => {
         let tree!: renderer.ReactTestRenderer;
         await renderer.act(async () => {
