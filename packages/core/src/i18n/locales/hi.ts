@@ -1581,6 +1581,7 @@ export const hiOverrides: Record<string, string> = {
         'tdahActivity.actionMiss': 'पूर्ण नहीं हुई',
         'tdahActivity.alreadyRegistered': 'पहले से दर्ज',
         'tdahActivity.errorGeneric': 'कार्रवाई पूरी नहीं हो सकी। फिर कोशिश करें।',
+        'tdahActivity.actionOfflineMessage': 'इंटरनेट कनेक्शन नहीं है। कार्रवाई दर्ज नहीं हुई।',
         'tdahActivity.routineContext': 'रूटीन {name} का हिस्सा',
         'tdahRoutines.list.sectionTitle': 'रूटीनें',
         'tdahRoutines.list.loading': 'रूटीनें लोड हो रही हैं…',

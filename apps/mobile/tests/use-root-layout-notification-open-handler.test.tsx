@@ -208,7 +208,7 @@ describe('useRootLayoutNotificationOpenHandler', () => {
     expect(router.push).toHaveBeenCalledWith('/tdah-today');
   });
 
-  it("routes story 2.2's 'tdah-activity' kind to T-01 with the Activity id and tapped action, without mutating anything", () => {
+  it("routes story 2.3's 'tdah-activity' start tap straight to T-02 with the action as an autoAction param, without mutating anything itself", () => {
     const router = { push: vi.fn() };
 
     act(() => {
@@ -222,14 +222,14 @@ describe('useRootLayoutNotificationOpenHandler', () => {
     });
 
     expect(router.push).toHaveBeenCalledWith({
-      pathname: '/tdah-today',
-      params: { activityId: '42', tdahAction: 'start' },
+      pathname: '/tdah-activity/42',
+      params: { autoAction: 'start' },
     });
     expect(updateTask).not.toHaveBeenCalled();
     expect(setHighlightTask).not.toHaveBeenCalled();
   });
 
-  it("routes the 'complete' action on a 'tdah-activity' notification to T-01 too, never auto-completing a GTD task", () => {
+  it("routes the 'complete' action on a 'tdah-activity' notification to T-02 too, never auto-completing a GTD task", () => {
     const router = { push: vi.fn() };
 
     act(() => {
@@ -243,9 +243,37 @@ describe('useRootLayoutNotificationOpenHandler', () => {
     });
 
     expect(router.push).toHaveBeenCalledWith({
-      pathname: '/tdah-today',
-      params: { activityId: '7', tdahAction: 'complete' },
+      pathname: '/tdah-activity/7',
+      params: { autoAction: 'complete' },
     });
+    expect(updateTask).not.toHaveBeenCalled();
+  });
+
+  it("falls back to T-01 with no automatic action when the 'tdah-activity' notification's context is missing or not a valid positive integer id", () => {
+    const router = { push: vi.fn() };
+
+    act(() => {
+      create(<TestHarness router={router} />);
+    });
+
+    const handler = setNotificationOpenHandler.mock.calls[0]?.[0];
+
+    act(() => {
+      handler({ kind: 'tdah-activity', actionIdentifier: 'start', notificationId: 'tdah-activity:missing:start' });
+      handler({ kind: 'tdah-activity', actionIdentifier: 'start', context: 'not-a-number', notificationId: 'tdah-activity:nan:start' });
+      handler({ kind: 'tdah-activity', actionIdentifier: 'start', context: '0', notificationId: 'tdah-activity:zero:start' });
+      handler({ kind: 'tdah-activity', actionIdentifier: 'start', context: '-3', notificationId: 'tdah-activity:negative:start' });
+      // A non-integer numeric string (e.g. a float) is not a valid Activity
+      // id either — Number.isFinite alone would wrongly accept it.
+      handler({ kind: 'tdah-activity', actionIdentifier: 'start', context: '42.5', notificationId: 'tdah-activity:float:start' });
+    });
+
+    expect(router.push).toHaveBeenCalledTimes(5);
+    expect(router.push).toHaveBeenNthCalledWith(1, '/tdah-today');
+    expect(router.push).toHaveBeenNthCalledWith(2, '/tdah-today');
+    expect(router.push).toHaveBeenNthCalledWith(3, '/tdah-today');
+    expect(router.push).toHaveBeenNthCalledWith(4, '/tdah-today');
+    expect(router.push).toHaveBeenNthCalledWith(5, '/tdah-today');
     expect(updateTask).not.toHaveBeenCalled();
   });
 

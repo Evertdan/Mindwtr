@@ -3,8 +3,17 @@ import { Text } from 'react-native';
 import { act, create } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { CloudHttpError } from '@mindwtr/core';
+
 import { TdahActivityDetailScreen } from './TdahActivityDetailScreen';
 import type { TdahActivity } from './tdah-today-types';
+
+const { showToast } = vi.hoisted(() => ({
+    showToast: vi.fn(),
+}));
+vi.mock('@/contexts/toast-context', () => ({
+    useToast: () => ({ showToast, dismissToast: vi.fn() }),
+}));
 
 const hookState = vi.hoisted(() => ({
     phase: 'ready' as string,
@@ -149,6 +158,7 @@ describe('TdahActivityDetailScreen — view mode', () => {
         hookState.activities = [activity];
         hookState.reload.mockReset();
         hookState.registerActivityAction.mockReset();
+        showToast.mockReset();
     });
 
     it('shows a not-found fallback when the Activity id is not in today\'s activities', async () => {
@@ -194,6 +204,39 @@ describe('TdahActivityDetailScreen — view mode', () => {
             await tree!.root.findByProps({ testID: 'tdah-activity-action-start' }).props.onPress();
         });
         expect(tree!.root.findByProps({ testID: 'tdah-activity-action-error' })).toBeTruthy();
+    });
+
+    it('shows a visible error-tone toast when a registration action fails offline, from a manual tap (spec Always: never queued silently)', async () => {
+        hookState.registerActivityAction.mockRejectedValue(new Error('network down'));
+        let tree: ReturnType<typeof create> | undefined;
+        await act(async () => { tree = create(<TdahActivityDetailScreen mode="view" activityId={5} />); });
+        await act(async () => {
+            await tree!.root.findByProps({ testID: 'tdah-activity-action-start' }).props.onPress();
+        });
+        expect(showToast).toHaveBeenCalledTimes(1);
+        expect(showToast).toHaveBeenCalledWith(expect.objectContaining({ tone: 'error' }));
+    });
+
+    it('stays fully silent (no toast, no error banner) when the server rejects a redundant action with a 400', async () => {
+        hookState.registerActivityAction.mockRejectedValue(new CloudHttpError('Cloud POST failed (400): Bad Request', 400));
+        let tree: ReturnType<typeof create> | undefined;
+        await act(async () => { tree = create(<TdahActivityDetailScreen mode="view" activityId={5} />); });
+        await act(async () => {
+            await tree!.root.findByProps({ testID: 'tdah-activity-action-start' }).props.onPress();
+        });
+        expect(tree!.root.findAllByProps({ testID: 'tdah-activity-action-error' })).toHaveLength(0);
+        expect(showToast).not.toHaveBeenCalled();
+    });
+
+    it('shows the error banner but no toast when the server rejects with a non-400 status (a real, non-network failure)', async () => {
+        hookState.registerActivityAction.mockRejectedValue(new CloudHttpError('Cloud POST failed (500): Server Error', 500));
+        let tree: ReturnType<typeof create> | undefined;
+        await act(async () => { tree = create(<TdahActivityDetailScreen mode="view" activityId={5} />); });
+        await act(async () => {
+            await tree!.root.findByProps({ testID: 'tdah-activity-action-start' }).props.onPress();
+        });
+        expect(tree!.root.findByProps({ testID: 'tdah-activity-action-error' })).toBeTruthy();
+        expect(showToast).not.toHaveBeenCalled();
     });
 
     it('clears the error banner and reflects the new state after a successful retry of the same action', async () => {
@@ -271,5 +314,110 @@ describe('TdahActivityDetailScreen — view mode', () => {
 
         const texts = tree!.root.findAllByType(Text).map((node) => node.props.children);
         expect(texts.flat()).toContain('Started: not-an-instant');
+    });
+});
+
+describe('TdahActivityDetailScreen — view mode, story 2.3 notification autoAction', () => {
+    beforeEach(() => {
+        hookState.phase = 'ready';
+        hookState.activities = [activity];
+        hookState.reload.mockReset();
+        hookState.registerActivityAction.mockReset();
+        showToast.mockReset();
+    });
+
+    it("fires the notification-tapped 'start' action automatically once the pending Activity resolves on mount", async () => {
+        hookState.registerActivityAction.mockResolvedValue({ ...activity, state: 'started' });
+        await act(async () => {
+            create(<TdahActivityDetailScreen mode="view" activityId={5} autoAction="start" />);
+        });
+        expect(hookState.registerActivityAction).toHaveBeenCalledTimes(1);
+        expect(hookState.registerActivityAction).toHaveBeenCalledWith(5, 'start');
+    });
+
+    it("fires the notification-tapped 'complete' action automatically once the started Activity resolves on mount", async () => {
+        hookState.activities = [{ ...activity, state: 'started', startedAt: '2026-08-26T09:30:00.000Z' }];
+        hookState.registerActivityAction.mockResolvedValue({ ...activity, state: 'completed' });
+        await act(async () => {
+            create(<TdahActivityDetailScreen mode="view" activityId={5} autoAction="complete" />);
+        });
+        expect(hookState.registerActivityAction).toHaveBeenCalledTimes(1);
+        expect(hookState.registerActivityAction).toHaveBeenCalledWith(5, 'complete');
+    });
+
+    it('never fires the automatic action twice in the same mount, even after the Activity re-renders with fresh data', async () => {
+        hookState.registerActivityAction.mockResolvedValue({ ...activity, state: 'started', startedAt: '2026-08-26T09:30:00.000Z' });
+        let tree: ReturnType<typeof create> | undefined;
+        await act(async () => {
+            tree = create(<TdahActivityDetailScreen mode="view" activityId={5} autoAction="start" />);
+        });
+        expect(hookState.registerActivityAction).toHaveBeenCalledTimes(1);
+
+        // Simulate the merged post-mutation state (and a later, unrelated
+        // reload) re-rendering the same mounted screen.
+        hookState.activities = [{ ...activity, state: 'started', startedAt: '2026-08-26T09:30:00.000Z' }];
+        await act(async () => {
+            tree!.update(<TdahActivityDetailScreen mode="view" activityId={5} autoAction="start" />);
+        });
+
+        expect(hookState.registerActivityAction).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not fire the automatic action when the Activity is already past the state the tapped action still allows', async () => {
+        hookState.activities = [{ ...activity, state: 'completed', completedAt: '2026-08-26T10:00:00.000Z' }];
+        await act(async () => {
+            create(<TdahActivityDetailScreen mode="view" activityId={5} autoAction="start" />);
+        });
+        expect(hookState.registerActivityAction).not.toHaveBeenCalled();
+    });
+
+    // Parity with the manual "Completada" button (story 1.6), which already
+    // allows completing a still-pending Activity (never-started) — the
+    // notification-tapped 'complete' action is held to the same guard
+    // (registerDisabled), not a stricter one.
+    it("fires the notification-tapped 'complete' action on a still-pending Activity that was never manually started", async () => {
+        hookState.activities = [{ ...activity, state: 'pending' }];
+        hookState.registerActivityAction.mockResolvedValue({ ...activity, state: 'completed' });
+        await act(async () => {
+            create(<TdahActivityDetailScreen mode="view" activityId={5} autoAction="complete" />);
+        });
+        expect(hookState.registerActivityAction).toHaveBeenCalledTimes(1);
+        expect(hookState.registerActivityAction).toHaveBeenCalledWith(5, 'complete');
+    });
+
+    it('never attempts the automatic action, and renders the not-found fallback, when the Activity id is not in today\'s activities', async () => {
+        hookState.activities = [];
+        let tree: ReturnType<typeof create> | undefined;
+        await act(async () => {
+            tree = create(<TdahActivityDetailScreen mode="view" activityId={5} autoAction="start" />);
+        });
+        expect(hookState.registerActivityAction).not.toHaveBeenCalled();
+        expect(tree!.root.findByProps({ testID: 'tdah-activity-not-found' })).toBeTruthy();
+    });
+
+    it('shows a visible error-tone toast when the automatic action fails offline, never queuing it silently', async () => {
+        hookState.registerActivityAction.mockRejectedValue(new Error('network down'));
+        await act(async () => {
+            create(<TdahActivityDetailScreen mode="view" activityId={5} autoAction="start" />);
+        });
+        expect(showToast).toHaveBeenCalledTimes(1);
+        expect(showToast).toHaveBeenCalledWith(expect.objectContaining({ tone: 'error' }));
+    });
+
+    it('stays fully silent when the automatic action is rejected with a 400 because another device already registered it', async () => {
+        hookState.registerActivityAction.mockRejectedValue(new CloudHttpError('Cloud POST failed (400): Bad Request', 400));
+        let tree: ReturnType<typeof create> | undefined;
+        await act(async () => {
+            tree = create(<TdahActivityDetailScreen mode="view" activityId={5} autoAction="start" />);
+        });
+        expect(tree!.root.findAllByProps({ testID: 'tdah-activity-action-error' })).toHaveLength(0);
+        expect(showToast).not.toHaveBeenCalled();
+    });
+
+    it('never fires an automatic action when no autoAction param is passed (pre-2.3 behavior intact)', async () => {
+        await act(async () => {
+            create(<TdahActivityDetailScreen mode="view" activityId={5} />);
+        });
+        expect(hookState.registerActivityAction).not.toHaveBeenCalled();
     });
 });

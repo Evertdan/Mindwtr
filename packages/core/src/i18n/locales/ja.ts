@@ -1153,6 +1153,7 @@ export const jaOverrides: Record<string, string> = {
         'tdahActivity.actionMiss': '未完了',
         'tdahActivity.alreadyRegistered': '登録済み',
         'tdahActivity.errorGeneric': '操作を完了できませんでした。もう一度お試しください。',
+        'tdahActivity.actionOfflineMessage': 'インターネットに接続していません。操作は登録されませんでした。',
         'tdahActivity.routineContext': 'ルーティン「{name}」の一部',
         'settings.dataSync': 'データと同期',
         'settings.dataDesc': 'データを書き出したり読み込んだりして、他の端末と共有できます。',

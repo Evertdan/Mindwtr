@@ -726,6 +726,7 @@ export const nlOverrides: Record<string, string> = {
         'tdahActivity.actionMiss': 'Niet voltooid',
         'tdahActivity.alreadyRegistered': 'Al geregistreerd',
         'tdahActivity.errorGeneric': 'De actie kon niet worden voltooid. Probeer het opnieuw.',
+        'tdahActivity.actionOfflineMessage': 'Geen internetverbinding. De actie is niet geregistreerd.',
         'tdahActivity.routineContext': 'Onderdeel van Routine {name}',
         'tdahRoutines.list.sectionTitle': 'Je Routines',
         'tdahRoutines.list.loading': 'Routines laden…',

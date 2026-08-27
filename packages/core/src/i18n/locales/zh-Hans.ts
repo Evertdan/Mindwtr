@@ -1090,6 +1090,7 @@ export const zhHans: Record<string, string> = {
         'tdahActivity.actionMiss': '未完成',
         'tdahActivity.alreadyRegistered': '已记录',
         'tdahActivity.errorGeneric': '无法完成该操作，请重试。',
+        'tdahActivity.actionOfflineMessage': '没有网络连接，该操作未被记录。',
         'tdahActivity.routineContext': 'Routine {name} 的一部分',
         'settings.dataSync': '数据与同步',
         'settings.dataDesc': '导入或导出数据以与其他设备同步。',

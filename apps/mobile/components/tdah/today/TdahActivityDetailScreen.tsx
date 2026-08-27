@@ -1,12 +1,13 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 
-import { formatI18nTemplate, tFallback } from '@mindwtr/core';
+import { CloudHttpError, formatI18nTemplate, tFallback } from '@mindwtr/core';
 
 import { useLanguage } from '@/contexts/language-context';
+import { useToast } from '@/contexts/toast-context';
 import { useFilledButtonColors } from '@/hooks/use-filled-button-colors';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 
@@ -24,8 +25,12 @@ const START_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const TITLE_MAX_LENGTH = 80;
 const DURATION_MAX_MINUTES = 1440;
 
+// Story 2.3: the only two actions a notification tap can drive automatically
+// on mount — "No completada" stays app-exclusive (spec Never).
+export type TdahActivityAutoAction = Extract<TdahActivityTransitionAction, 'start' | 'complete'>;
+
 export type TdahActivityDetailScreenProps =
-    | { mode: 'view'; activityId: number }
+    | { mode: 'view'; activityId: number; autoAction?: TdahActivityAutoAction }
     | { mode: 'create' };
 
 /**
@@ -186,6 +191,7 @@ export function TdahActivityDetailScreen(props: TdahActivityDetailScreenProps) {
     return (
         <TdahActivityViewMode
             activityId={props.activityId}
+            autoAction={props.autoAction}
             activities={activities}
             phase={phase}
             reload={reload}
@@ -199,6 +205,8 @@ export function TdahActivityDetailScreen(props: TdahActivityDetailScreenProps) {
 
 type TdahActivityViewModeProps = {
     activityId: number;
+    /** Story 2.3: the notification-tapped action to fire once, automatically, on mount. */
+    autoAction?: TdahActivityAutoAction;
     activities: TdahActivity[];
     phase: ReturnType<typeof useTdahToday>['phase'];
     reload: () => Promise<void>;
@@ -211,6 +219,7 @@ type TdahActivityViewModeProps = {
 
 function TdahActivityViewMode({
     activityId,
+    autoAction,
     activities,
     phase,
     reload,
@@ -222,6 +231,7 @@ function TdahActivityViewMode({
     const tc = useThemeColors();
     const filledButton = useFilledButtonColors();
     const { t } = useLanguage();
+    const { showToast } = useToast();
     const [pendingAction, setPendingAction] = useState<TdahActivityTransitionAction | null>(null);
     const [actionError, setActionError] = useState(false);
 
@@ -230,18 +240,72 @@ function TdahActivityViewMode({
         [activities, activityId],
     );
 
+    // AD-7 / doc 02 T-02 note: a second tap on an already-registered action
+    // is disabled, not merely tolerated — this also collapses a raced
+    // double-tap into "button already disabled" rather than a second POST.
+    // Computed here, ahead of the loading/offline/not-found early returns
+    // below, so the auto-fire effect can read it too without breaking the
+    // rules of hooks by placing a hook after a conditional return. The
+    // buttons' JSX further down reuses these same three consts.
+    const startDisabled = !activity || activity.state !== 'pending' || pendingAction !== null;
+    const alreadyRegistered = !activity || !(activity.state === 'pending' || activity.state === 'started');
+    const registerDisabled = alreadyRegistered || pendingAction !== null;
+
     const runAction = useCallback(async (action: TdahActivityTransitionAction) => {
         if (pendingAction) return;
         setPendingAction(action);
         setActionError(false);
         try {
             await registerActivityAction(activityId, action);
-        } catch {
-            setActionError(true);
+        } catch (error) {
+            // TDAH_ACTIVITY_INVALID (400) from this endpoint only ever fires
+            // when the Activity has already resolved to some other terminal
+            // state server-side (AD-7 storage.ts: `start` never rejects, and
+            // `complete`/`miss` no-op into 200 whenever the current state
+            // already equals the target) — so a 400 here always means "this
+            // tap's outcome is already reflected, one way or another", never
+            // a real failure. Stay fully silent (no banner, no toast) for it.
+            const isRedundantRejection = error instanceof CloudHttpError && error.status === 400;
+            if (!isRedundantRejection) {
+                setActionError(true);
+            }
+            // Real network failure (offline/unreachable) — never an HTTP
+            // response — always surfaces, automatic or manual trigger alike,
+            // and is never silently queued (spec Always/Never). Same
+            // offline-vs-error distinction reload() already uses above.
+            if (!(error instanceof CloudHttpError)) {
+                showToast({
+                    title: tFallback(t, 'common.offline', 'Offline'),
+                    message: tFallback(
+                        t,
+                        'tdahActivity.actionOfflineMessage',
+                        'No internet connection. The action was not registered.',
+                    ),
+                    tone: 'error',
+                });
+            }
         } finally {
             setPendingAction(null);
         }
-    }, [activityId, pendingAction, registerActivityAction]);
+    }, [activityId, pendingAction, registerActivityAction, showToast, t]);
+
+    // Story 2.3: fire the notification-tapped action exactly once per mount,
+    // as soon as the Activity resolves and the same guard its own button
+    // uses still allows it — never a silent retry, never a second POST in
+    // this mount (spec Always). Depends on `activityResolved` (a primitive)
+    // rather than the `activity` object itself, so a re-render that merges a
+    // fresh object with the same "found" outcome doesn't re-run this effect
+    // — any state change that actually matters already flows through
+    // startDisabled/registerDisabled below.
+    const activityResolved = activity !== null;
+    const autoActionFiredRef = useRef(false);
+    useEffect(() => {
+        if (!autoAction || autoActionFiredRef.current || !activityResolved) return;
+        const disabled = autoAction === 'start' ? startDisabled : registerDisabled;
+        if (disabled) return;
+        autoActionFiredRef.current = true;
+        void runAction(autoAction);
+    }, [autoAction, activityResolved, startDisabled, registerDisabled, runAction]);
 
     if (phase === 'loading') {
         return (
@@ -305,18 +369,6 @@ function TdahActivityViewMode({
             time: formatIsoWallClockInTimeZone(activity.completedAt, timeZone),
         })
         : null;
-
-    // AD-7 / doc 02 T-02 note: a second tap on an already-registered action
-    // is disabled, not merely tolerated — this also collapses a raced
-    // double-tap into "button already disabled" rather than a second POST.
-    const startDisabled = activity.state !== 'pending' || pendingAction !== null;
-    // The state-based reason Complete/Not completed are disabled (as opposed
-    // to merely "an action is pending right now") — mirrors Start's own
-    // "ya iniciada" pattern below so a screen reader explains *why* these are
-    // disabled once the Activity is no longer pending/started, not just that
-    // they are.
-    const alreadyRegistered = !(activity.state === 'pending' || activity.state === 'started');
-    const registerDisabled = alreadyRegistered || pendingAction !== null;
 
     return (
         <SafeAreaView style={[styles.detailContainer, { backgroundColor: tc.bg }]} edges={['bottom']}>

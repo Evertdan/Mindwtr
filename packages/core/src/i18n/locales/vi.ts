@@ -2435,6 +2435,7 @@ export const viOverrides: Record<string, string> = {
         'tdahActivity.actionMiss': 'Chưa hoàn thành',
         'tdahActivity.alreadyRegistered': 'Đã ghi nhận',
         'tdahActivity.errorGeneric': 'Không thể hoàn tất thao tác. Hãy thử lại.',
+        'tdahActivity.actionOfflineMessage': 'Không có kết nối internet. Thao tác chưa được ghi nhận.',
         'tdahActivity.routineContext': 'Một phần của Thói quen {name}',
 
         // tdahRoutines.* — T-03/T-04 (spec 1.4): Rutinas CRUD list + editor

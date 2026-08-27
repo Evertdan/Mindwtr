@@ -4,6 +4,7 @@ import { isTaskActionable, useTaskStore } from '@mindwtr/core';
 
 import { logInfo } from '@/lib/app-log';
 import { setNotificationOpenHandler } from '@/lib/notification-service';
+import { parseTdahActivityId } from '@/lib/tdah-activity-id';
 import { consumePendingNotificationOpenPayload } from '@/modules/notification-open-intents';
 
 // Outcome evidence for #1028: a received action that changes nothing must say
@@ -47,9 +48,11 @@ function isTdahConnectionOpen(kind: string | undefined): boolean {
 }
 
 // Story 2.2 ("La vibra en la muñeca"): a tap on the Activity-trigger
-// notification's Iniciar or Completada action (or its body). Spec Always:
-// this is a tap-through only — no mutation happens from the notification
-// handler; the real Iniciar/Completada registration is story 2.3's. The
+// notification's Iniciar or Completada action (or its body). Story 2.3
+// ("El registro en un toque") routes this straight to T-02
+// (TdahActivityDetailScreen, view mode) with the tapped action as an
+// `autoAction` route param — T-02 fires the matching
+// `registerActivityAction` itself once mounted (guarded, single-shot). The
 // Activity id rides in `context` rather than a new field: both the live
 // OnNotificationOpened event and the Android cold-start payload store
 // (apps/mobile/modules/notification-open-intents) only forward a fixed
@@ -157,11 +160,15 @@ export function useRootLayoutNotificationOpenHandler({
             return;
         }
         if (isTdahActivityOpen(kind)) {
+            const activityId = parseTdahActivityId(context);
+            if (activityId === null) {
+                router.push('/tdah-today');
+                return;
+            }
             router.push({
-                pathname: '/tdah-today',
+                pathname: `/tdah-activity/${activityId}`,
                 params: {
-                    ...(context ? { activityId: context } : {}),
-                    ...(normalizedAction ? { tdahAction: normalizedAction } : {}),
+                    ...(normalizedAction ? { autoAction: normalizedAction } : {}),
                 },
             });
             return;

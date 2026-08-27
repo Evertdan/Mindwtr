@@ -1122,6 +1122,7 @@ export const svOverrides: Record<string, string> = {
         'tdahActivity.actionMiss': 'Inte avklarad',
         'tdahActivity.alreadyRegistered': 'Redan registrerad',
         'tdahActivity.errorGeneric': 'Åtgärden kunde inte slutföras. Försök igen.',
+        'tdahActivity.actionOfflineMessage': 'Ingen internetanslutning. Åtgärden registrerades inte.',
         'tdahActivity.routineContext': 'Del av rutinen {name}',
         'settings.dataSync': "Data och synkronisering",
         'settings.dataDesc': 'Importera eller exportera din data för att synka med andra enheter.',

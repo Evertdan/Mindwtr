@@ -1786,6 +1786,7 @@ export const itOverrides: Record<string, string> = {
         'tdahActivity.actionMiss': 'Non completata',
         'tdahActivity.alreadyRegistered': 'Già registrata',
         'tdahActivity.errorGeneric': "Impossibile completare l'azione. Riprova.",
+        'tdahActivity.actionOfflineMessage': "Nessuna connessione a Internet. L'azione non è stata registrata.",
         'tdahActivity.routineContext': 'Parte della routine {name}',
 
         // ADHD mode Routines (Blocks & calendar patterns)

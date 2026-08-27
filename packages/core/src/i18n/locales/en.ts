@@ -1154,6 +1154,7 @@ export const en: Record<string, string> = {
         'tdahActivity.actionMiss': 'Not completed',
         'tdahActivity.alreadyRegistered': 'Already registered',
         'tdahActivity.errorGeneric': 'Could not complete the action. Try again.',
+        'tdahActivity.actionOfflineMessage': 'No internet connection. The action was not registered.',
         'tdahActivity.routineContext': 'Part of Routine {name}',
         'settings.dataSync': "Data & Sync",
         'settings.dataDesc': "Import or export your data to sync with other devices.",

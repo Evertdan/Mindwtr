@@ -1122,6 +1122,7 @@ export const faOverrides: Record<string, string> = {
         'tdahActivity.actionMiss': 'تکمیل نشد',
         'tdahActivity.alreadyRegistered': 'قبلاً ثبت شده',
         'tdahActivity.errorGeneric': 'انجام این کار ممکن نشد. دوباره تلاش کن.',
+        'tdahActivity.actionOfflineMessage': 'اتصال اینترنت نیست. این کار ثبت نشد.',
         'tdahActivity.routineContext': 'بخشی از روتین {name}',
         'settings.dataSync': 'داده و همگام‌سازی',
         'settings.dataDesc': 'داده خود را برای همگام‌سازی با دستگاه‌های دیگر وارد یا صادر کنید.',

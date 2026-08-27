@@ -1672,6 +1672,7 @@ export const ptOverrides: Record<string, string> = {
         'tdahActivity.actionMiss': 'Não concluída',
         'tdahActivity.alreadyRegistered': 'Já registrada',
         'tdahActivity.errorGeneric': 'Não foi possível concluir a ação. Tente novamente.',
+        'tdahActivity.actionOfflineMessage': 'Sem conexão com a internet. A ação não foi registrada.',
         'tdahActivity.routineContext': 'Parte da Rotina {name}',
 
         // tdahRoutines.* — Rotinas: lista CRUD + editor

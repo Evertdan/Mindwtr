@@ -1604,6 +1604,7 @@ export const plOverrides: Record<string, string> = {
         'tdahActivity.actionMiss': 'Nieukończona',
         'tdahActivity.alreadyRegistered': 'Już zarejestrowana',
         'tdahActivity.errorGeneric': 'Nie udało się wykonać akcji. Spróbuj ponownie.',
+        'tdahActivity.actionOfflineMessage': 'Brak połączenia z internetem. Czynność nie została zarejestrowana.',
         'tdahActivity.routineContext': 'Część Rutyny {name}',
         'tdahRoutines.list.sectionTitle': 'Rutyny',
         'tdahRoutines.list.loading': 'Ładowanie Rutyn…',

@@ -1674,6 +1674,7 @@ export const deOverrides: Record<string, string> = {
         'tdahActivity.actionMiss': 'Nicht abgeschlossen',
         'tdahActivity.alreadyRegistered': 'Bereits erfasst',
         'tdahActivity.errorGeneric': 'Aktion konnte nicht abgeschlossen werden. Versuche es erneut.',
+        'tdahActivity.actionOfflineMessage': 'Keine Internetverbindung. Die Aktion wurde nicht gespeichert.',
         'tdahActivity.routineContext': 'Teil der Routine {name}',
 
         // TDAH Routines

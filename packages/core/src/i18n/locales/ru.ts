@@ -1581,6 +1581,7 @@ export const ruOverrides: Record<string, string> = {
         'tdahActivity.actionMiss': 'Не завершена',
         'tdahActivity.alreadyRegistered': 'Уже зарегистрирована',
         'tdahActivity.errorGeneric': 'Не удалось выполнить действие. Повторите попытку.',
+        'tdahActivity.actionOfflineMessage': 'Нет подключения к интернету. Действие не было зарегистрировано.',
         'tdahActivity.routineContext': 'Часть Рутины {name}',
         'tdahRoutines.list.sectionTitle': 'Рутины',
         'tdahRoutines.list.loading': 'Загрузка Рутин…',

@@ -2387,6 +2387,7 @@ export const csOverrides: Record<string, string> = {
         'tdahActivity.actionMiss': 'Nedokončeno',
         'tdahActivity.alreadyRegistered': 'Již zaznamenáno',
         'tdahActivity.errorGeneric': 'Akci se nepodařilo dokončit. Zkuste to znovu.',
+        'tdahActivity.actionOfflineMessage': 'Žádné připojení k internetu. Akce nebyla zaznamenána.',
         'tdahActivity.routineContext': 'Součást Rutiny {name}',
         // tdahRoutines.* — Rutiny: seznam a editor
         'tdahRoutines.list.sectionTitle': 'Rutiny',

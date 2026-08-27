@@ -2196,6 +2196,7 @@ export const frOverrides: Record<string, string> = {
         'tdahActivity.actionMiss': 'Non terminée',
         'tdahActivity.alreadyRegistered': 'Déjà enregistrée',
         'tdahActivity.errorGeneric': 'Impossible d’effectuer l’action. Réessayez.',
+        'tdahActivity.actionOfflineMessage': 'Pas de connexion Internet. L’action n’a pas été enregistrée.',
         'tdahActivity.routineContext': 'Fait partie de la Routine {name}',
 
         // TDAH Routines

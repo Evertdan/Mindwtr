@@ -1609,6 +1609,7 @@ export const arOverrides: Record<string, string> = {
         'tdahActivity.actionMiss': 'لم تكتمل',
         'tdahActivity.alreadyRegistered': 'مسجّلة بالفعل',
         'tdahActivity.errorGeneric': 'تعذّر إتمام الإجراء. حاول مرة أخرى.',
+        'tdahActivity.actionOfflineMessage': 'لا يوجد اتصال بالإنترنت. لم يتم تسجيل الإجراء.',
         'tdahActivity.routineContext': 'جزء من روتين {name}',
         'tdahRoutines.list.sectionTitle': 'الروتينات',
         'tdahRoutines.list.loading': 'جارٍ تحميل الروتينات…',

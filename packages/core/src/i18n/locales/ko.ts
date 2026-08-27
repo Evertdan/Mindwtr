@@ -2460,6 +2460,7 @@ export const koOverrides: Record<string, string> = {
         'tdahActivity.actionMiss': '완료 안 됨',
         'tdahActivity.alreadyRegistered': '이미 등록됨',
         'tdahActivity.errorGeneric': '작업을 완료할 수 없습니다. 다시 시도하세요.',
+        'tdahActivity.actionOfflineMessage': '인터넷에 연결되지 않았습니다. 작업이 등록되지 않았습니다.',
         'tdahActivity.routineContext': '루틴 {name}의 일부',
 
         // tdahRoutines.* — 루틴 목록 및 편집 화면.

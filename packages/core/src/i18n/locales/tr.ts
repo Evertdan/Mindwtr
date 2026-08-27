@@ -1628,6 +1628,7 @@ export const trOverrides: Record<string, string> = {
         'tdahActivity.actionMiss': 'Tamamlanmadı',
         'tdahActivity.alreadyRegistered': 'Zaten kaydedildi',
         'tdahActivity.errorGeneric': 'İşlem tamamlanamadı. Tekrar deneyin.',
+        'tdahActivity.actionOfflineMessage': 'İnternet bağlantısı yok. İşlem kaydedilmedi.',
         'tdahActivity.routineContext': '{name} Rutininin parçası',
 
         'tdahRoutines.list.sectionTitle': 'Rutinler',

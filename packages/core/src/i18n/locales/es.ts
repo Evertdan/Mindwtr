@@ -1525,6 +1525,7 @@ export const esOverrides: Record<string, string> = {
         'tdahActivity.actionMiss': 'No completada',
         'tdahActivity.alreadyRegistered': 'Ya registrada',
         'tdahActivity.errorGeneric': 'No se pudo completar la acción. Intentá de nuevo.',
+        'tdahActivity.actionOfflineMessage': 'No hay conexión a internet. La acción no se registró.',
         'tdahActivity.routineContext': 'Parte de la Rutina {name}',
 
         // tdahRoutines.* — pantallas de lista y editor de Rutinas.
