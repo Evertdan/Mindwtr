@@ -19,6 +19,24 @@ vi.mock('./use-tdah-today', () => ({
     useTdahToday: () => hookState,
 }));
 
+// Story 3.4's limbo-badge count reads a second, independent `useTdahLimbo()`
+// instance (TdahTodayScreen.tsx's own doc comment) — mocked separately from
+// `hookState` above so a badge test never has to also fake the day's own
+// timeline state, and vice versa.
+const limboHookState = vi.hoisted(() => ({
+    activities: [] as TdahActivity[],
+    reload: vi.fn(),
+}));
+
+vi.mock('./use-tdah-limbo', () => ({
+    useTdahLimbo: () => limboHookState,
+}));
+
+const themeTokens = vi.hoisted(() => ({ roles: null as { tertiary: string } | null }));
+vi.mock('@/hooks/use-theme-tokens', () => ({
+    useThemeTokens: () => themeTokens,
+}));
+
 const router = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock('expo-router', () => ({
     useRouter: () => router,
@@ -137,6 +155,9 @@ describe('TdahTodayScreen', () => {
         hookState.routineTitle = null;
         hookState.activities = [];
         hookState.reload.mockReset();
+        limboHookState.activities = [];
+        limboHookState.reload.mockReset();
+        themeTokens.roles = null;
         router.push.mockReset();
         networkListeners.length = 0;
         connection.supported = false;
@@ -505,6 +526,60 @@ describe('TdahTodayScreen', () => {
             await act(async () => { tree = create(<TdahTodayScreen />); });
 
             expect(tree!.root.findByProps({ testID: 'tdah-connection-battery-chip' })).toBeTruthy();
+        });
+    });
+
+    describe('Story 3.4 — T-08\'s limbo-badge (T-01 header entry point)', () => {
+        it('fetches the Limbo count once on mount, independent of the day-fetch phase', async () => {
+            await act(async () => { create(<TdahTodayScreen />); });
+            expect(limboHookState.reload).toHaveBeenCalledTimes(1);
+        });
+
+        it('is hidden entirely when the Limbo is empty (count 0)', async () => {
+            limboHookState.activities = [];
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+            expect(tree!.root.findAllByProps({ testID: 'tdah-today-limbo-badge' })).toHaveLength(0);
+        });
+
+        it('shows "⬤ N" with the accessibility label interpolated with the count when N > 0', async () => {
+            limboHookState.activities = [activity, noTimeActivity];
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+
+            const badge = tree!.root.findByProps({ testID: 'tdah-today-limbo-badge' });
+            expect(badge.props.accessibilityLabel).toBe('2 in Limbo');
+        });
+
+        it('navigates to /tdah-limbo on tap', async () => {
+            limboHookState.activities = [activity];
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+
+            const badge = tree!.root.findByProps({ testID: 'tdah-today-limbo-badge' });
+            await act(async () => { badge.props.onPress(); });
+            expect(router.push).toHaveBeenCalledWith('/tdah-limbo');
+        });
+
+        it('colors the count with the Material 3 tertiary role when the active theme resolves one', async () => {
+            themeTokens.roles = { tertiary: '#705574' };
+            limboHookState.activities = [activity];
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+
+            const label = tree!.root.findByProps({ testID: 'tdah-today-limbo-badge-count' });
+            expect(flattenStyle(label.props.style).color).toBe('#705574');
+        });
+
+        it('falls back to tc.tint (never a danger/red token) for a non-Material theme', async () => {
+            themeTokens.roles = null;
+            limboHookState.activities = [activity];
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+
+            const label = tree!.root.findByProps({ testID: 'tdah-today-limbo-badge-count' });
+            expect(flattenStyle(label.props.style).color).toBe(THEME.tint);
+            expect(flattenStyle(label.props.style).color).not.toBe(THEME.danger);
         });
     });
 });

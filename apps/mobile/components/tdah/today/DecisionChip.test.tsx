@@ -142,6 +142,43 @@ describe('DecisionChip', () => {
         expect(tree!.root.findByProps({ testID: 'tdah-decision-chip-5-move-tomorrow' }).props.disabled).toBe(false);
     });
 
+    describe('variant="limbo" (story 3.4, T-08) — swaps only the 4th chip', () => {
+        it('renders "completar tardíamente" instead of "sin fecha" as the 4th chip, the other 3 unchanged', async () => {
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => {
+                tree = create(<DecisionChip activityId={5} timeZone="America/Mexico_City" onDecide={onDecide} variant="limbo" />);
+            });
+
+            expect(tree!.root.findByProps({ testID: 'tdah-decision-chip-5-move-tomorrow' })).toBeTruthy();
+            expect(tree!.root.findByProps({ testID: 'tdah-decision-chip-5-move-date' })).toBeTruthy();
+            expect(tree!.root.findByProps({ testID: 'tdah-decision-chip-5-discard' })).toBeTruthy();
+            expect(tree!.root.findByProps({ testID: 'tdah-decision-chip-5-complete-late' })).toBeTruthy();
+            expect(tree!.root.findAllByProps({ testID: 'tdah-decision-chip-5-undated' })).toHaveLength(0);
+        });
+
+        it('applies "complete-late" directly on one tap', async () => {
+            onDecide.mockResolvedValue(true);
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => {
+                tree = create(<DecisionChip activityId={5} timeZone="America/Mexico_City" onDecide={onDecide} variant="limbo" />);
+            });
+
+            await act(async () => {
+                tree!.root.findByProps({ testID: 'tdah-decision-chip-5-complete-late' }).props.onPress();
+            });
+
+            expect(onDecide).toHaveBeenCalledWith(5, { decision: 'complete-late' });
+        });
+
+        it('defaults to variant="cierre" when the prop is omitted — every existing T-05 call site keeps its original 4 chips', async () => {
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<DecisionChip activityId={5} timeZone="America/Mexico_City" onDecide={onDecide} />); });
+
+            expect(tree!.root.findByProps({ testID: 'tdah-decision-chip-5-undated' })).toBeTruthy();
+            expect(tree!.root.findAllByProps({ testID: 'tdah-decision-chip-5-complete-late' })).toHaveLength(0);
+        });
+    });
+
     it("derives the date picker's minimum date from the profile time zone (AD-6), not the device/test-runner's local clock", async () => {
         // At this instant, Kiritimati (UTC+14) has already rolled into
         // 2026-08-28, while this test runner's own local zone (whatever it

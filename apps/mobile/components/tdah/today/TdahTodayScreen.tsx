@@ -16,6 +16,7 @@ import {
     subscribeTdahConnectionState,
 } from '@/hooks/root-layout/use-root-layout-tdah-connection';
 import { useThemeColors } from '@/hooks/use-theme-colors';
+import { useThemeTokens } from '@/hooks/use-theme-tokens';
 import {
     isIgnoringBatteryOptimizations,
     isPersistentConnectionSupported,
@@ -36,6 +37,7 @@ import {
 import type { TdahActivity } from './tdah-today-types';
 import { formatDayKeyInTimeZone, getMinutesSinceMidnightInTimeZone } from './tdah-time';
 import { computeActivityLaneOffsets } from './tdah-timeline-layout';
+import { useTdahLimbo } from './use-tdah-limbo';
 import { useTdahNow, TDAH_NOW_TICK_INTERVAL_MS } from './use-tdah-now';
 import { useTdahToday } from './use-tdah-today';
 
@@ -63,6 +65,11 @@ const headerTextColumnStyle = { flexShrink: 1 as const };
 // Ad-hoc like the two styles above, for the same reason.
 const headerActionsStyle = { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 12 as const };
 const ritualButtonStyle = { padding: 4 as const };
+// Story 3.4 (T-08's limbo-badge, spec Code Map: "⬤ N", junto al botón de
+// Moon) — ad-hoc like the four styles above, for the same reason (no
+// counterpart in tdah-today.styles.ts, out of this story's owned files).
+const limboBadgeStyle = { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 4 as const, padding: 4 as const };
+const limboBadgeTextStyle = { fontSize: 13 as const, fontWeight: '700' as const };
 
 /**
  * T-01 — the today timeline (spec Code Map). Every focus is a fresh
@@ -71,11 +78,21 @@ const ritualButtonStyle = { padding: 4 as const };
  */
 export function TdahTodayScreen() {
     const tc = useThemeColors();
+    const tokens = useThemeTokens();
     const filledButton = useFilledButtonColors();
     const { t } = useLanguage();
     const router = useRouter();
     const { phase, date, timeZone, routineTitle, activities, reload } = useTdahToday();
     const now = useTdahNow();
+    // Story 3.4 (T-08's limbo-badge, spec Code Map): a second, independent
+    // `useTdahLimbo()` instance for the live count alone — never merged into
+    // `useTdahToday`'s own fetch lifecycle (AD-1: every screen's data hook
+    // stays fully separate), so a fetch failure here can never affect the
+    // day's own timeline. Reuses the same full hook rather than inventing a
+    // separate "lightweight" one (spec Code Map explicitly allows either),
+    // since one already exists and this screen only ever reads `.length`
+    // from it.
+    const { activities: limboActivities, reload: reloadLimbo } = useTdahLimbo();
     // One-shot latch per offline stint: connectivity events can arrive in a
     // burst and only one recovery reload may start per stint.
     const offlineRecoveryFiredRef = useRef(false);
@@ -83,6 +100,27 @@ export function TdahTodayScreen() {
     useFocusEffect(useCallback(() => {
         void reload();
     }, [reload]));
+
+    // Story 3.4: the limbo-badge count's own mount-only initial fetch, then
+    // a `useFocusEffect` that skips that very first focus (already covered
+    // by the mount effect below) and only refetches on every focus after —
+    // same anti-staleness pattern as T-06's own `syncNewActivities` (spec
+    // Code Map's badge paragraph) — so returning here from a decision made
+    // in T-05 or T-08 always shows the real count, without a manual reload,
+    // and without doubling the request T-01's own mount/first-focus already
+    // fires.
+    useEffect(() => {
+        void reloadLimbo();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    const limboBadgeHasHadFirstFocusRef = useRef(false);
+    useFocusEffect(useCallback(() => {
+        if (!limboBadgeHasHadFirstFocusRef.current) {
+            limboBadgeHasHadFirstFocusRef.current = true;
+            return;
+        }
+        void reloadLimbo();
+    }, [reloadLimbo]));
 
     // A screen focused across the profile zone's midnight would otherwise
     // render yesterday's plan forever (AD-1 has no client cache to expire):
@@ -181,6 +219,25 @@ export function TdahTodayScreen() {
         router.push('/tdah-ritual');
     }, [router]);
 
+    // Story 3.4 (T-08's limbo-badge): tap navigates straight into the Limbo
+    // tray — same always-available, phase-independent affordance as
+    // `openRitual` above.
+    const openLimbo = useCallback(() => {
+        router.push('/tdah-limbo');
+    }, [router]);
+
+    const limboCount = limboActivities.length;
+    // AC: "muestra N en color terciario (nunca rojo)" — Material 3's own
+    // tertiary role when the active theme resolves one (`tokens.roles`,
+    // null for a non-Material theme, use-theme-tokens.ts), falling back to
+    // `tc.tint` rather than any red/danger token so a non-Material theme
+    // still reads as calm/neutral, never an alert.
+    const limboBadgeColor = tokens.roles?.tertiary ?? tc.tint;
+    const limboBadgeLabel = formatI18nTemplate(
+        tFallback(t, 'tdahToday.limboBadgeLabel', '{count} in Limbo'),
+        { count: String(limboCount) },
+    );
+
     // AD-6: the header date is always the server's own `date` field for the
     // profile's configured time zone, verbatim — never the device's local
     // `new Date()`, which can disagree with it (e.g. shortly after local
@@ -233,6 +290,23 @@ export function TdahTodayScreen() {
                         >
                             <Moon size={20} color={tc.secondaryText} />
                         </TouchableOpacity>
+                        {limboCount > 0 ? (
+                            <TouchableOpacity
+                                accessibilityRole="button"
+                                accessibilityLabel={limboBadgeLabel}
+                                onPress={openLimbo}
+                                style={limboBadgeStyle}
+                                hitSlop={8}
+                                testID="tdah-today-limbo-badge"
+                            >
+                                <Text
+                                    style={[limboBadgeTextStyle, { color: limboBadgeColor }]}
+                                    testID="tdah-today-limbo-badge-count"
+                                >
+                                    {`⬤ ${limboCount}`}
+                                </Text>
+                            </TouchableOpacity>
+                        ) : null}
                         {connectionSupported ? (
                             <TdahConnectionDot
                                 status={connectionState.status}

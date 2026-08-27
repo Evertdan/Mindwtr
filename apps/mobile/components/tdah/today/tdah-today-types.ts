@@ -101,15 +101,24 @@ export const TDAH_ACTIVITY_INVALID_CODE = 'TDAH_ACTIVITY_INVALID';
  * `dayPlanDate` never change) — it still round-trips through
  * `POST .../decide` so the row collapses only after a real 200, never
  * optimistically.
+ *
+ * `'complete-late'` (story 3.4, T-08's Limbo): the 5th decision, exclusive
+ * to a `limbo` Activity's DecisionChip `variant='limbo'` (never offered by
+ * `variant='cierre'`, since T-05 keeps its original 4). Server-side it
+ * reuses the same completion SQL a normal `complete` uses (spec Code Map),
+ * through this same `/decide` endpoint — never the
+ * `POST /v1/tdah/activities/:id/complete` endpoint, which rejects a
+ * `limbo` origin state outright (spec Never).
  */
-export const TDAH_ACTIVITY_DECISIONS = ['move-tomorrow', 'move-date', 'discard', 'undated'] as const;
+export const TDAH_ACTIVITY_DECISIONS = ['move-tomorrow', 'move-date', 'discard', 'undated', 'complete-late'] as const;
 export type TdahActivityDecision = (typeof TDAH_ACTIVITY_DECISIONS)[number];
 
 export type TdahActivityDecideRequest =
     | { decision: 'move-tomorrow' }
     | { decision: 'move-date'; date: string }
     | { decision: 'discard' }
-    | { decision: 'undated' };
+    | { decision: 'undated' }
+    | { decision: 'complete-late' };
 
 /**
  * `POST /v1/tdah/day/tomorrow/confirm` body (story 3.3, T-06). A full
@@ -124,4 +133,34 @@ export type TdahActivityDecideRequest =
 export type TdahConfirmMorningRequest = {
     activities: { id: number; startTime: string | null; durationMinutes: number | null }[];
     deletedActivityIds: number[];
+};
+
+/**
+ * `GET /v1/tdah/limbo` response (story 3.4, T-08). Every Activity currently
+ * `state='limbo'`, across every `dayPlanDate` — deliberately no date/zone
+ * scoping (spec Always: "no hay 'hoy'/'mañana' en esta pantalla"), ordered
+ * oldest-first by the server (`day_plan_date ASC, id ASC`).
+ */
+export type TdahLimboResponse = {
+    activities: TdahActivity[];
+};
+
+/**
+ * `POST /v1/tdah/limbo/decide` body (story 3.4, T-08's batch bar). One
+ * decision applied to every id in `activityIds` atomically — the server
+ * validates the whole set is 1:1 with Activities actually in `limbo` (no
+ * missing/foreign id) before writing anything; a single ineligible id
+ * rejects the entire batch (spec Always, same "todo o nada" contract as
+ * `TdahConfirmMorningRequest`/`mutateConfirmMorning`, story 3.3's
+ * precedent). `'undated'` is excluded — the Limbo never offers "sin fecha"
+ * (spec Never: already undated, a no-op there).
+ */
+export type TdahLimboDecideBatchRequest = {
+    activityIds: number[];
+    decision: Exclude<TdahActivityDecideRequest, { decision: 'undated' }>;
+};
+
+/** `POST /v1/tdah/limbo/decide` response — only the post-mutation rows for exactly the ids in the batch request (a subset of a full `TdahLimboResponse` listing), same shape as `TdahActivityResponse` scaled up to many rows. */
+export type TdahLimboDecideBatchResponse = {
+    activities: TdahActivity[];
 };

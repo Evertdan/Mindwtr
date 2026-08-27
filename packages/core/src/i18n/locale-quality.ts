@@ -47,10 +47,22 @@ export const allowedEnglishMirrorKeysByLocale: Record<string, readonly string[]>
         // as English), used consistently across the tdahRoutines.* copy.
         'tdahToday.routineLabel',
         'tdahActivity.origin.routine',
+        // "Limbo" is the ordinary German noun for the concept (same spelling as
+        // English), matching tdahToday.scoreboardLimbo ('Im Limbo') and
+        // tdahActivity.state.limbo — same reasoning for both the T-08 in-screen
+        // title and the nav/tile label (story 3.4).
+        'tdahToday.limboTitle',
+        'nav.tdahLimbo',
     ],
     es: [
         // "Manual" is the ordinary Spanish adjective/noun, identical to English.
         'tdahActivity.origin.manual',
+        // "Limbo" is the ordinary Spanish noun for the concept (same spelling as
+        // English), matching tdahToday.scoreboardLimbo/tdahActivity.state.limbo —
+        // same reasoning for both the T-08 in-screen title and the nav/tile
+        // label (story 3.4).
+        'tdahToday.limboTitle',
+        'nav.tdahLimbo',
     ],
     it: [
         'keybindings.style.standard',
@@ -58,6 +70,12 @@ export const allowedEnglishMirrorKeysByLocale: Record<string, readonly string[]>
         // matching the lowercase usage in 'Nessuna routine oggi'.
         'tdahToday.routineLabel',
         'tdahActivity.origin.routine',
+        // "Limbo" is the ordinary Italian noun for the concept (same spelling as
+        // English), matching tdahToday.scoreboardLimbo ('In Limbo') and
+        // tdahActivity.state.limbo — same reasoning for both the T-08 in-screen
+        // title and the nav/tile label (story 3.4).
+        'tdahToday.limboTitle',
+        'nav.tdahLimbo',
     ],
     ko: [
         // Korean UI writes the e-ink theme in Latin.
@@ -74,10 +92,55 @@ export const allowedEnglishMirrorKeysByLocale: Record<string, readonly string[]>
         // matching 'Geen Routine vandaag' and tdahRoutines.* copy.
         'tdahToday.routineLabel',
         'tdahActivity.origin.routine',
+        // "Limbo" is the ordinary Dutch noun for the concept (same spelling as
+        // English), matching tdahToday.scoreboardLimbo ('In Limbo') and
+        // tdahActivity.state.limbo — same reasoning for both the T-08 in-screen
+        // title and the nav/tile label (story 3.4).
+        'tdahToday.limboTitle',
+        'nav.tdahLimbo',
     ],
     pt: [
         // "Manual" is the ordinary Portuguese adjective, identical to English.
         'tdahActivity.origin.manual',
+        // "Limbo" is the ordinary Portuguese noun for the concept (same spelling
+        // as English), matching tdahToday.scoreboardLimbo ('Em Limbo') and
+        // tdahActivity.state.limbo — same reasoning for both the T-08 in-screen
+        // title and the nav/tile label (story 3.4).
+        'tdahToday.limboTitle',
+        'nav.tdahLimbo',
+    ],
+    vi: [
+        // "Limbo" is kept as the ordinary Vietnamese loanword for the concept
+        // (same spelling as English), matching tdahToday.scoreboardLimbo
+        // ('Trong Limbo') and tdahActivity.state.limbo — same reasoning for
+        // both the T-08 in-screen title and the nav/tile label (story 3.4).
+        'tdahToday.limboTitle',
+        'nav.tdahLimbo',
+    ],
+    pl: [
+        // "Limbo" is kept as the ordinary Polish loanword for the concept (same
+        // spelling as English), matching tdahToday.scoreboardLimbo ('W Limbo')
+        // and tdahActivity.state.limbo — same reasoning for both the T-08
+        // in-screen title and the nav/tile label (story 3.4).
+        'tdahToday.limboTitle',
+        'nav.tdahLimbo',
+    ],
+    tr: [
+        // "Limbo" is kept as the ordinary Turkish loanword for the concept (same
+        // spelling as English), matching tdahToday.scoreboardLimbo ('Limbo'da')
+        // and tdahActivity.state.limbo — same reasoning for both the T-08
+        // in-screen title and the nav/tile label (story 3.4).
+        'tdahToday.limboTitle',
+        'nav.tdahLimbo',
+    ],
+    cs: [
+        // "Limbo" is the nominative form of the same Czech loanword used
+        // (declined) in tdahToday.scoreboardLimbo ('V Limbu') and
+        // tdahActivity.state.limbo — identical to the English spelling in the
+        // nominative case, used for both the T-08 in-screen title and the
+        // nav/tile label (story 3.4).
+        'tdahToday.limboTitle',
+        'nav.tdahLimbo',
     ],
     sv: [
         // Swedish shares these words with English identically (loanwords or
@@ -140,6 +203,12 @@ export const allowedEnglishMirrorKeysByLocale: Record<string, readonly string[]>
         // matching the capitalization of 'Aucune Routine aujourd'hui'.
         'tdahToday.routineLabel',
         'tdahActivity.origin.routine',
+        // "Limbo" is the ordinary French noun for the concept (same spelling as
+        // English), matching tdahToday.scoreboardLimbo ('En Limbo') and
+        // tdahActivity.state.limbo — same reasoning for both the T-08
+        // in-screen title and the nav/tile label (story 3.4).
+        'tdahToday.limboTitle',
+        'nav.tdahLimbo',
     ],
 };
 

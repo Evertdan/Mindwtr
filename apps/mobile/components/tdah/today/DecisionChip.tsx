@@ -29,6 +29,18 @@ export type DecisionChipProps = {
      * this row (spec Error Handling: "chip vuelve a habilitarse").
      */
     onDecide: (activityId: number, request: TdahActivityDecideRequest) => Promise<boolean>;
+    /**
+     * Story 3.4 (T-08's Limbo, spec Code Map): `'limbo'` swaps the 4th chip
+     * from "sin fecha" (a no-op there — the Limbo's own I/O Matrix never
+     * offers it, since a Limbo Activity is already undated) for "completar
+     * tardíamente" (`decision:'complete-late'`). Defaults to `'cierre'` so
+     * every existing T-05 call site (and this component's own pre-3.4
+     * tests) keeps its original 4 chips untouched. Deliberately the
+     * smallest change over duplicating this ~200-line component (Design
+     * Notes) — the other 3 chips are byte-for-byte identical between both
+     * variants.
+     */
+    variant?: 'cierre' | 'limbo';
 };
 
 const pad = (value: number): string => value.toString().padStart(2, '0');
@@ -83,8 +95,10 @@ const tomorrowFloor = (timeZone: string): Date => {
  * step. "Mañana" is drawn preselected (an outlined, non-filled border) to
  * read as the recommended default, but every chip commits immediately on
  * tap; the preselection is purely visual, never a staged/pending choice.
+ * Story 3.4: also reused by T-08 (the Limbo) via `variant='limbo'`, which
+ * swaps only the 4th chip (see `variant` prop doc).
  */
-export function DecisionChip({ activityId, timeZone, onDecide }: DecisionChipProps) {
+export function DecisionChip({ activityId, timeZone, onDecide, variant = 'cierre' }: DecisionChipProps) {
     const tc = useThemeColors();
     const { t } = useLanguage();
     const [pending, setPending] = useState<TdahActivityDecision | null>(null);
@@ -124,6 +138,10 @@ export function DecisionChip({ activityId, timeZone, onDecide }: DecisionChipPro
         void applyDecision('undated', { decision: 'undated' });
     }, [applyDecision]);
 
+    const handleCompleteLate = useCallback(() => {
+        void applyDecision('complete-late', { decision: 'complete-late' });
+    }, [applyDecision]);
+
     const openDatePicker = useCallback(() => {
         if (disabled) return;
         setShowDatePicker(true);
@@ -139,6 +157,8 @@ export function DecisionChip({ activityId, timeZone, onDecide }: DecisionChipPro
     const dateLabel = tFallback(t, 'tdahToday.decisionDate', 'Date');
     const discardLabel = tFallback(t, 'common.discard', 'Discard');
     const noDateLabel = tFallback(t, 'quickDate.noDate', 'No date');
+    const completeLateLabel = tFallback(t, 'tdahToday.decisionCompleteLate', 'Complete (late)');
+    const fourthChipLabel = variant === 'limbo' ? completeLateLabel : noDateLabel;
 
     return (
         <View style={chipStyles.row} testID={`tdah-decision-chip-${activityId}`}>
@@ -180,14 +200,16 @@ export function DecisionChip({ activityId, timeZone, onDecide }: DecisionChipPro
             </Pressable>
             <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={noDateLabel}
+                accessibilityLabel={fourthChipLabel}
                 accessibilityState={{ disabled }}
                 disabled={disabled}
-                onPress={handleUndated}
+                onPress={variant === 'limbo' ? handleCompleteLate : handleUndated}
                 style={[chipStyles.chip, { backgroundColor: tc.filterBg, opacity: disabled ? 0.5 : 1 }]}
-                testID={`tdah-decision-chip-${activityId}-undated`}
+                testID={variant === 'limbo'
+                    ? `tdah-decision-chip-${activityId}-complete-late`
+                    : `tdah-decision-chip-${activityId}-undated`}
             >
-                <Text style={[chipStyles.chipText, { color: tc.text }]}>{noDateLabel}</Text>
+                <Text style={[chipStyles.chipText, { color: tc.text }]}>{fourthChipLabel}</Text>
             </Pressable>
             {showDatePicker ? (
                 <DateTimePicker

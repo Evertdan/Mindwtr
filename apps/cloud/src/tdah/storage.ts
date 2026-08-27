@@ -27,6 +27,7 @@ import type {
     TdahActivityState,
     TdahActivityTransitionAction,
     TdahConfirmMorningRequest,
+    TdahLimboDecideBatchRequest,
     TdahMode,
     TdahProfile,
     TdahProfileUpsertRequest,
@@ -1715,6 +1716,17 @@ const SELECT_ACTIVITIES_FOR_DAY_SQL = `
 // the same Rutina (so there's exactly one candidate title in practice), but
 // the query itself should never depend on SQLite's unspecified row order for
 // the theoretical case where more than one candidate exists.
+// Story 3.4 — El Limbo (T-08): every Actividad currently `state = 'limbo'`,
+// across every `day_plan_date`, oldest first. Deliberately no `WHERE
+// day_plan_date = ?` — unlike SELECT_ACTIVITIES_FOR_DAY_SQL above, this
+// screen has no "today"/"tomorrow" scoping at all (FR-9: nothing here ever
+// disappears by age, so nothing here is ever date-filtered either).
+const SELECT_LIMBO_ACTIVITIES_SQL = `
+    SELECT id, day_plan_date, block_id, title, start_time, duration_minutes, origin, state, started_at, completed_at, moved_at
+    FROM tdah_activity
+    WHERE state = 'limbo'
+    ORDER BY day_plan_date ASC, id ASC;
+`;
 const SELECT_ROUTINE_TITLE_FOR_DAY_SQL = `
     SELECT tdah_routine.title AS title
     FROM tdah_activity
@@ -1885,6 +1897,23 @@ export async function getTomorrowDayPlan(
         mutateGenerateTomorrowIfMissing(database, date);
         return selectDayPlanView(database, date, timeZone);
     });
+}
+
+/**
+ * GET /v1/tdah/limbo — story 3.4, T-08. Every Actividad in `state = 'limbo'`
+ * across every day, oldest first (`SELECT_LIMBO_ACTIVITIES_SQL` above). Never
+ * auto-generates anything (unlike `getTodayDayPlan`/`getTomorrowDayPlan`) —
+ * there is nothing to materialize here, only a query — and a read must never
+ * plant the namespace's tdah directory on disk (same rule
+ * `listRoutinesWithBlocks` already follows), so a namespace with no database
+ * yet simply has an empty Limbo.
+ */
+export async function getLimboActivities(dataDir: string, key: string): Promise<TdahActivity[]> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    if (!existsSync(databasePath)) return [];
+    return await withReadDatabase(databasePath, (database) => (
+        prepareAll<TdahActivityRow>(database, SELECT_LIMBO_ACTIVITIES_SQL).all().map(rowToActivity)
+    ));
 }
 
 export type TdahCreateManualActivityInput = {
@@ -2106,6 +2135,24 @@ const mutateDecideActivity = (
         return { kind: 'ok', activity: updated };
     }
 
+    // Story 3.4 — T-08's "completar tardíamente": reuses
+    // UPDATE_ACTIVITY_COMPLETE_SQL verbatim (the same write
+    // `mutateTransitionActivityState`'s `complete` action uses), just gated
+    // by the missed/limbo eligibility every decision here shares, rather than
+    // the pending/started gate the plain `complete` action enforces — that
+    // action explicitly rejects a `limbo` origin, which is exactly why this
+    // decision exists as its own path instead of reusing it. Idempotent the
+    // same way `discard` is above: a retry that already landed on
+    // `state:'completed'` is a 200 no-op, never a rewrite.
+    if (request.decision === 'complete-late') {
+        if (activity.state === 'completed') return { kind: 'ok', activity };
+        if (activity.state !== 'missed' && activity.state !== 'limbo') return { kind: 'rejected' };
+        database.prepare(UPDATE_ACTIVITY_COMPLETE_SQL).run(new Date().toISOString(), activityId);
+        const updated = selectActivityById(database, activityId);
+        if (!updated) throw new Error('TDAH activity readback failed after complete-late');
+        return { kind: 'ok', activity: updated };
+    }
+
     // move-tomorrow / move-date: destination day must be strictly after
     // "today" in the caller's own profile time zone (AD-6) — `computeTomorrowDate`
     // always satisfies this by construction, so the check only ever actually
@@ -2181,6 +2228,112 @@ export async function decideActivity(
         throw new Error('TDAH database directory is unsafe');
     }
     return await withWriteTransaction(databasePath, (database) => mutateDecideActivity(database, activityId, request, timeZone));
+}
+
+export type TdahLimboDecideBatchResult =
+    | { kind: 'rejected' }
+    | { kind: 'ok'; activities: TdahActivity[] };
+
+/**
+ * POST /v1/tdah/limbo/decide — story 3.4, T-08's batch decision bar.
+ * Precedent: `mutateConfirmMorning` below — validate the whole requested set
+ * before writing anything, never a loop of `mutateDecideActivity` calls with
+ * a partial-failure midway.
+ *
+ * `activityIds.length` is already bounded at `TDAH_DAY_MAX_ACTIVITIES` by
+ * `parseLimboDecideBatchBody` (routes.ts, review fix) before this ever runs —
+ * this function trusts that cap rather than re-checking it, the same
+ * division of responsibility `mutateConfirmMorning`'s own doc comment
+ * describes for its `startTime`/`durationMinutes` shape validation. Without
+ * that upstream cap, the `WHERE id IN (?, ?, …)` placeholder list below is
+ * sized directly off the request and would risk SQLite's own
+ * bound-parameter limit on an oversized batch — the Limbo tray has no
+ * natural ceiling of its own (FR-9: nothing is ever evicted by age).
+ *
+ * 1. Dedup `activityIds`, then `SELECT` which of those ids are currently
+ *    `state = 'limbo'`. If that resulting set doesn't cover every deduped id
+ *    (one never existed, already got decided from T-05/another T-08 tap,
+ *    etc.), the whole batch is `rejected` — nothing is written.
+ * 2. `discard`/`complete-late` have no further eligibility to check (every id
+ *    already confirmed `limbo` above), so they just apply their write to
+ *    every id in the batch.
+ * 3. `move-tomorrow`/`move-date` re-resolve the destination date exactly like
+ *    `mutateDecideActivity` (rejecting a target on-or-before "today"), then
+ *    check the destination day has enough cap headroom for the *whole* batch
+ *    at once (`current count + batch size <= TDAH_DAY_MAX_ACTIVITIES`) before
+ *    writing a single row — the same "exceeds cupo a mitad" scenario the I/O
+ *    Matrix calls out is caught here, ahead of any write, rather than letting
+ *    some ids succeed and others fail partway through.
+ */
+const mutateDecideLimboBatch = (
+    database: TdahDatabase,
+    activityIds: number[],
+    decision: TdahLimboDecideBatchRequest['decision'],
+    timeZone: string,
+): TdahLimboDecideBatchResult => {
+    const uniqueIds = [...new Set(activityIds)];
+    if (uniqueIds.length === 0) return { kind: 'rejected' };
+
+    const placeholders = uniqueIds.map(() => '?').join(', ');
+    const limboRows = prepareAll<{ id: unknown }>(
+        database,
+        `SELECT id FROM tdah_activity WHERE state = 'limbo' AND id IN (${placeholders});`,
+    ).all(...uniqueIds);
+    // `limboRows` is a subset of `uniqueIds` by construction (the `IN`
+    // clause), so a matching count is sufficient proof every deduped id is
+    // covered — no need to diff the two sets member-by-member.
+    if (limboRows.length !== uniqueIds.length) return { kind: 'rejected' };
+
+    if (decision.decision === 'discard') {
+        for (const id of uniqueIds) {
+            database.prepare(UPDATE_ACTIVITY_DECIDE_DISCARD_SQL).run(id);
+        }
+    } else if (decision.decision === 'complete-late') {
+        const completedAt = new Date().toISOString();
+        for (const id of uniqueIds) {
+            database.prepare(UPDATE_ACTIVITY_COMPLETE_SQL).run(completedAt, id);
+        }
+    } else {
+        const today = formatDateInTimeZone(new Date(), timeZone);
+        const targetDate = decision.decision === 'move-tomorrow' ? computeTomorrowDate(timeZone) : decision.date;
+        if (targetDate <= today) return { kind: 'rejected' };
+        mutateGenerateTomorrowIfMissing(database, targetDate);
+        const countRow = database.prepare(COUNT_ACTIVITIES_FOR_DAY_PLAN_SQL).get(targetDate) as { count: unknown };
+        if (Number(countRow.count) + uniqueIds.length > TDAH_DAY_MAX_ACTIVITIES) return { kind: 'rejected' };
+        const movedAt = new Date().toISOString();
+        for (const id of uniqueIds) {
+            database.prepare(UPDATE_ACTIVITY_DECIDE_MOVE_SQL).run(targetDate, movedAt, id);
+        }
+    }
+
+    const activities = uniqueIds.map((id) => {
+        const activity = selectActivityById(database, id);
+        if (!activity) throw new Error('TDAH activity readback failed after limbo batch decide');
+        return activity;
+    });
+    return { kind: 'ok', activities };
+};
+
+/** POST /v1/tdah/limbo/decide — see `mutateDecideLimboBatch` for the atomicity/eligibility rules `result.kind` encodes. */
+export async function decideLimboBatch(
+    dataDir: string,
+    key: string,
+    request: TdahLimboDecideBatchRequest,
+    timeZone: string,
+): Promise<TdahLimboDecideBatchResult> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    // No database yet means no Actividad has ever reached `limbo` in this
+    // namespace — every requested id necessarily fails the eligibility check
+    // `mutateDecideLimboBatch` would otherwise run, so this short-circuits to
+    // the same `rejected` outcome without planting the tdah directory on disk.
+    if (!existsSync(databasePath)) return { kind: 'rejected' };
+    const durableDir = ensureDurableDirectory(dirname(databasePath));
+    if (!durableDir) {
+        throw new Error('TDAH database directory is unsafe');
+    }
+    return await withWriteTransaction(databasePath, (database) => (
+        mutateDecideLimboBatch(database, request.activityIds, request.decision, timeZone)
+    ));
 }
 
 // --- Morning editor / confirm (story 3.3, T-06/T-07) ------------------------

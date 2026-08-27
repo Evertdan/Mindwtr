@@ -38,7 +38,8 @@ describe('buildMoreSheetPrimaryItems — E-05 tdah-today tile', () => {
         const withTile = usePrimaryItemsForSheet().map((item) => item.id);
         tdahMode.value = false;
         const withoutTile = usePrimaryItemsForSheet().map((item) => item.id);
-        expect(withoutTile).toEqual(withTile.filter((id) => id !== 'tdah-today' && id !== 'tdah-ritual'));
+        const tdahGatedIds = new Set(['tdah-today', 'tdah-ritual', 'tdah-limbo']);
+        expect(withoutTile).toEqual(withTile.filter((id) => !tdahGatedIds.has(id)));
     });
 });
 
@@ -52,5 +53,18 @@ describe('buildMoreSheetPrimaryItems — Story 3.1 tdah-ritual tile', () => {
     it('omits the tdah-ritual tile entirely when the mode is inactive — same gate as tdah-today', () => {
         tdahMode.value = false;
         expect(usePrimaryItemsForSheet().some((item) => item.id === 'tdah-ritual')).toBe(false);
+    });
+});
+
+describe('buildMoreSheetPrimaryItems — Story 3.4 tdah-limbo tile', () => {
+    it('includes the tdah-limbo tile (route /tdah-limbo) when the mode hook reports active', () => {
+        tdahMode.value = true;
+        const tile = usePrimaryItemsForSheet().find((item) => item.id === 'tdah-limbo');
+        expect(tile).toMatchObject({ id: 'tdah-limbo', label: 'nav.tdahLimbo', route: '/tdah-limbo' });
+    });
+
+    it('omits the tdah-limbo tile entirely when the mode is inactive — same gate as tdah-today/tdah-ritual', () => {
+        tdahMode.value = false;
+        expect(usePrimaryItemsForSheet().some((item) => item.id === 'tdah-limbo')).toBe(false);
     });
 });

@@ -1177,6 +1177,23 @@ export const en: Record<string, string> = {
         'tdahToday.confirmationChanges': 'Changes to tomorrow: {count}',
         'tdahToday.confirmationSuccess': 'Tomorrow is ready.',
         'tdahToday.confirmationDone': 'Done',
+        // Story 3.4 — T-08 (El Limbo): a persistent tray over every
+        // `state:'limbo'` Activity across every day (FR-9: never auto-cleans
+        // by age), reached from T-01's own limbo-badge (tertiary color,
+        // never red — reuses this same badge-label template for its
+        // accessibilityLabel) and the More sheet's tdah-limbo tile.
+        // `complete-late` is the only genuinely new decision (the other 3
+        // chips reuse T-05's own DecisionChip); the batch bar applies one
+        // decision to every selected row atomically (mutateConfirmMorning's
+        // own all-or-nothing contract, story 3.3's precedent).
+        'nav.tdahLimbo': 'Limbo',
+        'tdahToday.limboBadgeLabel': '{count} in Limbo',
+        'tdahToday.limboTitle': 'Limbo',
+        'tdahToday.limboEmpty': 'Nothing pending a decision — clean',
+        'tdahToday.limboTimeInLimboDays': '{count} days in Limbo',
+        'tdahToday.decisionCompleteLate': 'Complete (late)',
+        'tdahToday.limboSelectionCount': '{count} selected',
+        'tdahToday.limboBatchApply': 'Apply to selection',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Routine',

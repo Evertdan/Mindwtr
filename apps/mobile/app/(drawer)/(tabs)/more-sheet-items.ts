@@ -35,6 +35,7 @@ export const MORE_SHEET_ICON_COLORS = {
   saved: '#4F8CF7',
   tdahToday: '#F97316',
   tdahRitual: '#8B5CF6',
+  tdahLimbo: '#EAB308',
 };
 
 export function compactSlashLabel(label: string) {
@@ -89,6 +90,22 @@ export function buildMoreSheetPrimaryItems(options: {
       icon: 'moon.fill' as IconSymbolName,
       iconColor: MORE_SHEET_ICON_COLORS.tdahRitual,
       route: '/tdah-ritual',
+    }] : []),
+    // Story 3.4 (T-08, "El Limbo"): a guaranteed manual entry point into the
+    // Limbo tray, same tdahModeActive gate as the two tiles above — the
+    // other entry point is T-01's own limbo-badge (TdahTodayScreen.tsx).
+    // `'circle'` (icon-symbol.tsx's own closed MAPPING, out of this story's
+    // owned files — no 'circle.dashed' entry exists there to add without
+    // touching it): the same plain-outline-circle concept
+    // TdahStatusGlyph.tsx's lucide `CircleDashed` reads as for `limbo`, one
+    // icon library removed (moon.fill's own doc comment above notes this is
+    // an established convention here, not a literal shared asset).
+    ...(tdahModeActive ? [{
+      id: 'tdah-limbo',
+      label: t('nav.tdahLimbo'),
+      icon: 'circle' as IconSymbolName,
+      iconColor: MORE_SHEET_ICON_COLORS.tdahLimbo,
+      route: '/tdah-limbo',
     }] : []),
   ];
 }

@@ -1552,6 +1552,24 @@ export const esOverrides: Record<string, string> = {
         'tdahToday.confirmationChanges': 'Cambios en mañana: {count}',
         'tdahToday.confirmationSuccess': 'Mañana está lista.',
         'tdahToday.confirmationDone': 'Listo',
+        // Story 3.4 — T-08 (El Limbo): una bandeja persistente sobre toda
+        // Actividad `state:'limbo'` de cualquier día (FR-9: nunca se limpia
+        // sola por antigüedad), a la que se llega desde el limbo-badge de
+        // T-01 (color terciario, nunca rojo — reutiliza esta misma
+        // plantilla como su accessibilityLabel) y el tile "Limbo" del menú.
+        // "Completar tarde" es la única decisión genuinamente nueva (los
+        // otros 3 chips reutilizan el DecisionChip de T-05); la barra de
+        // lote aplica una decisión a todas las filas seleccionadas de forma
+        // atómica (mismo contrato todo-o-nada de mutateConfirmMorning,
+        // precedente de la story 3.3).
+        'nav.tdahLimbo': 'Limbo',
+        'tdahToday.limboBadgeLabel': '{count} en Limbo',
+        'tdahToday.limboTitle': 'Limbo',
+        'tdahToday.limboEmpty': 'Nada pendiente de decisión — limpio',
+        'tdahToday.limboTimeInLimboDays': '{count} días en Limbo',
+        'tdahToday.decisionCompleteLate': 'Completar tarde',
+        'tdahToday.limboSelectionCount': '{count} seleccionadas',
+        'tdahToday.limboBatchApply': 'Aplicar a la selección',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Rutina',

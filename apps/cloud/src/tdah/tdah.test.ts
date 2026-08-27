@@ -11,6 +11,7 @@ import {
     isValidMonthString,
     listActiveTdahNamespaces,
     readTdahProfile,
+    TDAH_DAY_MAX_ACTIVITIES,
     tdahDatabasePath,
     weekdayOfDate,
     withWriteTransaction,
@@ -162,6 +163,15 @@ describe('tdah module', () => {
         authedFetch('/v1/tdah/day/tomorrow/confirm', { method: 'POST', body: JSON.stringify(body), token })
     );
 
+    // Story 3.4 — T-08's El Limbo tray.
+    const getLimboApi = (token?: string): Promise<Response> => (
+        authedFetch('/v1/tdah/limbo', { method: 'GET', token })
+    );
+
+    const decideLimboBatchApi = (body: unknown, token?: string): Promise<Response> => (
+        authedFetch('/v1/tdah/limbo/decide', { method: 'POST', body: JSON.stringify(body), token })
+    );
+
     // Story 3.2's decide endpoint only ever accepts a `missed`/`limbo`
     // Activity. There's no HTTP path to `limbo` a Activity outside the
     // nightly scheduler (story 1.5), so this reaches straight into the
@@ -206,6 +216,10 @@ describe('tdah module', () => {
 
     const readActivity = async (response: Response): Promise<TdahTestActivity> => (
         (await response.json() as { activity: TdahTestActivity }).activity
+    );
+
+    const readLimbo = async (response: Response): Promise<{ activities: TdahTestActivity[] }> => (
+        await response.json() as { activities: TdahTestActivity[] }
     );
 
     // Story 1.4 widened `TdahRoutineInput.pattern` from an implicit
@@ -2298,6 +2312,60 @@ describe('tdah module', () => {
                 expect(activity.dayPlanDate).toBe(created.dayPlanDate);
             });
 
+            // Story 3.4 — T-08's "completar tardíamente", the 5th decision.
+            // Reuses UPDATE_ACTIVITY_COMPLETE_SQL (storage.ts) but only ever
+            // through this endpoint — the Boundaries' own "Never" clause is
+            // asserted below (POST .../complete rejects a limbo origin).
+            test('complete-late on a limbo Activity sets state:completed and stamps completedAt (story 3.4, T-08)', async () => {
+                const created = await createTodayActivity();
+                await forceActivityLimbo(created.id);
+                const response = await decideActivityApi(created.id, { decision: 'complete-late' });
+                expect(response.status).toBe(200);
+                const activity = await readActivity(response);
+                expect(activity.state).toBe('completed');
+                expect(typeof activity.completedAt).toBe('string');
+                expect(activity.completedAt).not.toBeNull();
+            });
+
+            test('complete-late on a missed Activity behaves the same as on limbo', async () => {
+                const created = await createTodayActivity();
+                await transitionActivityApi(created.id, 'miss');
+                const response = await decideActivityApi(created.id, { decision: 'complete-late' });
+                expect(response.status).toBe(200);
+                const activity = await readActivity(response);
+                expect(activity.state).toBe('completed');
+                expect(activity.completedAt).not.toBeNull();
+            });
+
+            test('a repeated complete-late is a 200 no-op — same completedAt, never a rewrite', async () => {
+                const created = await createTodayActivity();
+                await forceActivityLimbo(created.id);
+                const first = await readActivity(await decideActivityApi(created.id, { decision: 'complete-late' }));
+                const second = await readActivity(await decideActivityApi(created.id, { decision: 'complete-late' }));
+                expect(second.state).toBe('completed');
+                expect(second.completedAt).toBe(first.completedAt);
+            });
+
+            test('complete-late on an already-discarded Activity is rejected with 400 TDAH_ACTIVITY_INVALID', async () => {
+                const created = await createTodayActivity();
+                await transitionActivityApi(created.id, 'miss');
+                await decideActivityApi(created.id, { decision: 'discard' });
+                const response = await decideActivityApi(created.id, { decision: 'complete-late' });
+                expect(response.status).toBe(400);
+                expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+            });
+
+            // Boundaries: "Nunca reutilizar el endpoint POST .../complete para
+            // complete-late — ese endpoint rechaza explícitamente el estado
+            // limbo como origen (solo acepta pending/started)."
+            test('POST /v1/tdah/activities/:id/complete rejects a limbo Activity with 400 TDAH_ACTIVITY_INVALID — complete-late is the only path off limbo into completed', async () => {
+                const created = await createTodayActivity();
+                await forceActivityLimbo(created.id);
+                const response = await transitionActivityApi(created.id, 'complete');
+                expect(response.status).toBe(400);
+                expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+            });
+
             test('deciding on an already-completed Activity is rejected with 400 TDAH_ACTIVITY_INVALID', async () => {
                 const created = await createTodayActivity();
                 await transitionActivityApi(created.id, 'complete');
@@ -2319,7 +2387,7 @@ describe('tdah module', () => {
             // the same "only missed/limbo is decidable" invariant.
             test('deciding on a still-pending Activity (never missed/limbo) is rejected with 400 TDAH_ACTIVITY_INVALID', async () => {
                 const created = await createTodayActivity();
-                for (const decision of [{ decision: 'discard' }, { decision: 'undated' }]) {
+                for (const decision of [{ decision: 'discard' }, { decision: 'undated' }, { decision: 'complete-late' }]) {
                     const response = await decideActivityApi(created.id, decision);
                     expect(response.status).toBe(400);
                     expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
@@ -2720,6 +2788,323 @@ describe('tdah module', () => {
                 test('rejected with 409 TDAH_ACTIVATE_REQUIRED when the mode is off', async () => {
                     await putProfile({ mode: 'off' });
                     const response = await confirmMorningApi({ activities: [], deletedActivityIds: [] });
+                    expect(response.status).toBe(409);
+                    expect(await readErrorCode(response)).toBe('TDAH_ACTIVATE_REQUIRED');
+                });
+            });
+        });
+
+        describe('GET /v1/tdah/limbo, POST /v1/tdah/limbo/decide (story 3.4, T-08: El Limbo — la bandeja que nunca desaparece)', () => {
+            // Same YYYY-MM-DD shift technique the decide describe above uses,
+            // kept local here for its own move-date fixtures.
+            const addDaysToDateString = (date: string, days: number): string => {
+                const parts = date.split('-').map(Number);
+                const [year, month, day] = parts as [number, number, number];
+                return formatDateInTimeZone(new Date(Date.UTC(year, month - 1, day + days)), 'UTC');
+            };
+
+            // There's no HTTP path to `limbo` an Activity outside the nightly
+            // scheduler (story 1.5) — same direct-SQL fixture technique
+            // `forceActivityLimbo` (outer scope) already uses, just paired
+            // here with creating the row first.
+            const createLimboActivity = async (title: string, token: string = TOKEN_ALPHA): Promise<TdahTestActivity> => {
+                const created = await readActivity(await createManualActivityApi({ title }, token));
+                await forceActivityLimbo(created.id, token);
+                return created;
+            };
+
+            const createTomorrowLimboActivity = async (title: string, token: string = TOKEN_ALPHA): Promise<TdahTestActivity> => {
+                const created = await readActivity(await createManualActivityForTomorrowApi({ title }, token));
+                await forceActivityLimbo(created.id, token);
+                return created;
+            };
+
+            beforeEach(async () => {
+                await activate({ timeZone: 'UTC' });
+            });
+
+            test('GET without any profile returns 409 TDAH_ACTIVATE_REQUIRED and plants nothing on disk', async () => {
+                const response = await getLimboApi(TOKEN_BETA);
+                expect(response.status).toBe(409);
+                expect(await readErrorCode(response)).toBe('TDAH_ACTIVATE_REQUIRED');
+                expect(existsSync(join(dataDir, tokenToKey(TOKEN_BETA)))).toBe(false);
+            });
+
+            test('GET on an empty Limbo returns 200 {activities: []} — "Nada pendiente de decisión"', async () => {
+                const response = await getLimboApi();
+                expect(response.status).toBe(200);
+                expect((await readLimbo(response)).activities).toEqual([]);
+            });
+
+            test('GET lists every Actividad in state=limbo across days, ordered day_plan_date ASC then id ASC (oldest first)', async () => {
+                const first = await createLimboActivity('Primera de hoy');
+                const second = await createLimboActivity('Segunda de hoy');
+                const third = await createTomorrowLimboActivity('De mañana');
+
+                const limbo = await readLimbo(await getLimboApi());
+                expect(limbo.activities.map((entry) => entry.id)).toEqual([first.id, second.id, third.id]);
+                expect(limbo.activities.every((entry) => entry.state === 'limbo')).toBe(true);
+            });
+
+            test('GET never includes an Actividad outside state=limbo (pending/started/missed/completed/discarded all excluded)', async () => {
+                const pending = await readActivity(await createManualActivityApi({ title: 'Pendiente' }));
+                const missed = await readActivity(await createManualActivityApi({ title: 'Perdida' }));
+                await transitionActivityApi(missed.id, 'miss');
+                const limboOne = await createLimboActivity('En Limbo');
+
+                const limbo = await readLimbo(await getLimboApi());
+                expect(limbo.activities.map((entry) => entry.id)).toEqual([limboOne.id]);
+                expect(limbo.activities.map((entry) => entry.id)).not.toContain(pending.id);
+                expect(limbo.activities.map((entry) => entry.id)).not.toContain(missed.id);
+            });
+
+            test("GET never includes another namespace's Actividades (isolation)", async () => {
+                await activate({ timeZone: 'UTC' }, TOKEN_BETA);
+                await createLimboActivity('De alpha');
+                await createLimboActivity('De beta', TOKEN_BETA);
+
+                const alphaLimbo = await readLimbo(await getLimboApi());
+                expect(alphaLimbo.activities).toHaveLength(1);
+                expect(alphaLimbo.activities[0]?.title).toBe('De alpha');
+            });
+
+            test('POST on /v1/tdah/limbo returns 405 TDAH_METHOD_NOT_ALLOWED', async () => {
+                const response = await authedFetch('/v1/tdah/limbo', { method: 'POST' });
+                expect(response.status).toBe(405);
+                expect(await readErrorCode(response)).toBe('TDAH_METHOD_NOT_ALLOWED');
+            });
+
+            test('rejected with 409 TDAH_ACTIVATE_REQUIRED when the mode is off', async () => {
+                await putProfile({ mode: 'off' });
+                const response = await getLimboApi();
+                expect(response.status).toBe(409);
+                expect(await readErrorCode(response)).toBe('TDAH_ACTIVATE_REQUIRED');
+            });
+
+            describe('POST /v1/tdah/limbo/decide (batch, "todo o nada" — I/O Matrix)', () => {
+                test('a valid discard batch applies to every listed id atomically, returns their post-mutation state, and removes them from Limbo', async () => {
+                    const a = await createLimboActivity('A');
+                    const b = await createLimboActivity('B');
+
+                    const response = await decideLimboBatchApi({ activityIds: [a.id, b.id], decision: { decision: 'discard' } });
+                    expect(response.status).toBe(200);
+                    const body = await readLimbo(response);
+                    expect(body.activities).toHaveLength(2);
+                    expect(body.activities.every((entry) => entry.state === 'discarded')).toBe(true);
+
+                    const limbo = await readLimbo(await getLimboApi());
+                    expect(limbo.activities).toEqual([]);
+                });
+
+                test('a valid move-tomorrow batch moves every listed id to tomorrow, clears started/completedAt, stamps movedAt, and removes them from Limbo', async () => {
+                    const a = await createLimboActivity('A');
+                    const b = await createLimboActivity('B');
+
+                    const response = await decideLimboBatchApi({ activityIds: [a.id, b.id], decision: { decision: 'move-tomorrow' } });
+                    expect(response.status).toBe(200);
+                    const body = await readLimbo(response);
+                    expect(body.activities).toHaveLength(2);
+                    for (const activity of body.activities) {
+                        expect(activity.state).toBe('pending');
+                        expect(activity.dayPlanDate).toBe(computeTomorrowDate('UTC'));
+                        expect(activity.startedAt).toBeNull();
+                        expect(activity.completedAt).toBeNull();
+                        expect(activity.movedAt).not.toBeNull();
+                    }
+
+                    const limbo = await readLimbo(await getLimboApi());
+                    expect(limbo.activities).toEqual([]);
+                });
+
+                test('a valid move-date batch moves every listed id to the given future date', async () => {
+                    const a = await createLimboActivity('A');
+                    const b = await createLimboActivity('B');
+                    const futureDate = addDaysToDateString(computeTomorrowDate('UTC'), 5);
+
+                    const response = await decideLimboBatchApi({
+                        activityIds: [a.id, b.id],
+                        decision: { decision: 'move-date', date: futureDate },
+                    });
+                    expect(response.status).toBe(200);
+                    const body = await readLimbo(response);
+                    expect(body.activities.every((entry) => entry.dayPlanDate === futureDate && entry.state === 'pending')).toBe(true);
+                });
+
+                test('a valid complete-late batch completes every listed id and stamps completedAt', async () => {
+                    const a = await createLimboActivity('A');
+                    const b = await createLimboActivity('B');
+
+                    const response = await decideLimboBatchApi({ activityIds: [a.id, b.id], decision: { decision: 'complete-late' } });
+                    expect(response.status).toBe(200);
+                    const body = await readLimbo(response);
+                    expect(body.activities).toHaveLength(2);
+                    for (const activity of body.activities) {
+                        expect(activity.state).toBe('completed');
+                        expect(activity.completedAt).not.toBeNull();
+                    }
+                });
+
+                test('duplicate ids inside the same batch are deduped rather than applied twice', async () => {
+                    const a = await createLimboActivity('A');
+                    const response = await decideLimboBatchApi({ activityIds: [a.id, a.id], decision: { decision: 'discard' } });
+                    expect(response.status).toBe(200);
+                    const body = await readLimbo(response);
+                    expect(body.activities).toHaveLength(1);
+                    expect(body.activities[0]?.id).toBe(a.id);
+                });
+
+                test('a batch containing an id that is not in limbo (e.g. missed) is rejected with 400 TDAH_ACTIVITY_INVALID, and nothing is written', async () => {
+                    const inLimbo = await createLimboActivity('En Limbo');
+                    const missed = await readActivity(await createManualActivityApi({ title: 'Perdida' }));
+                    await transitionActivityApi(missed.id, 'miss');
+
+                    const response = await decideLimboBatchApi({
+                        activityIds: [inLimbo.id, missed.id],
+                        decision: { decision: 'discard' },
+                    });
+                    expect(response.status).toBe(400);
+                    expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+
+                    const limbo = await readLimbo(await getLimboApi());
+                    expect(limbo.activities.map((entry) => entry.id)).toEqual([inLimbo.id]);
+                    const day = await readDay(await getDay());
+                    expect(day.activities.find((entry) => entry.id === missed.id)?.state).toBe('missed');
+                });
+
+                test('a batch containing an id that does not exist is rejected with 400 TDAH_ACTIVITY_INVALID, selection stays intact (nothing written)', async () => {
+                    const inLimbo = await createLimboActivity('En Limbo');
+
+                    const response = await decideLimboBatchApi({
+                        activityIds: [inLimbo.id, 999999],
+                        decision: { decision: 'discard' },
+                    });
+                    expect(response.status).toBe(400);
+                    expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+
+                    const limbo = await readLimbo(await getLimboApi());
+                    expect(limbo.activities.map((entry) => entry.id)).toEqual([inLimbo.id]);
+                });
+
+                test('a move-tomorrow batch that would exceed TDAH_DAY_MAX_ACTIVITIES (50) together is rejected in full — no partial application', async () => {
+                    const a = await createLimboActivity('A');
+                    const b = await createLimboActivity('B');
+                    const tomorrow = computeTomorrowDate('UTC');
+                    const databasePath = tdahDatabasePath(dataDir, tokenToKey(TOKEN_ALPHA));
+                    await withWriteTransaction(databasePath, (database) => {
+                        // `activate` (beforeEach) already generated tomorrow's
+                        // (empty) tdah_day_plan row. 49 pre-seeded + this
+                        // batch's 2 ids = 51 > 50 — over cap only once both
+                        // are counted together, never with either alone.
+                        for (let i = 0; i < 49; i += 1) {
+                            database
+                                .prepare("INSERT INTO tdah_activity (day_plan_date, block_id, title, start_time, duration_minutes, origin, state) VALUES (?, NULL, ?, NULL, NULL, 'manual', 'pending');")
+                                .run(tomorrow, `Full ${i}`);
+                        }
+                    });
+
+                    const response = await decideLimboBatchApi({ activityIds: [a.id, b.id], decision: { decision: 'move-tomorrow' } });
+                    expect(response.status).toBe(400);
+                    expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+
+                    const limbo = await readLimbo(await getLimboApi());
+                    expect(limbo.activities.map((entry) => entry.id)).toEqual([a.id, b.id]);
+                });
+
+                test('a move-date batch to a date <= today is rejected in full', async () => {
+                    const a = await createLimboActivity('A');
+                    const today = formatDateInTimeZone(new Date(), 'UTC');
+
+                    const response = await decideLimboBatchApi({
+                        activityIds: [a.id],
+                        decision: { decision: 'move-date', date: today },
+                    });
+                    expect(response.status).toBe(400);
+                    expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+                });
+
+                test('an empty activityIds array is rejected with 400 TDAH_ACTIVITY_INVALID', async () => {
+                    const response = await decideLimboBatchApi({ activityIds: [], decision: { decision: 'discard' } });
+                    expect(response.status).toBe(400);
+                    expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+                });
+
+                // Review fix — the Limbo tray has no natural size ceiling of
+                // its own (FR-9: nothing is ever evicted by age, unlike a
+                // single day's own TDAH_DAY_MAX_ACTIVITIES cap), so an
+                // unbounded activityIds array previously reached
+                // mutateDecideLimboBatch's `WHERE id IN (?, ?, …)` untested —
+                // risking SQLite's own bound-parameter limit as an opaque 500
+                // instead of a controlled 400. parseLimboDecideBatchBody now
+                // rejects an oversized batch outright, reusing
+                // TDAH_DAY_MAX_ACTIVITIES as the ceiling.
+                test('a batch of TDAH_DAY_MAX_ACTIVITIES + 1 ids is rejected with 400 TDAH_ACTIVITY_INVALID, and nothing is written', async () => {
+                    const inLimbo = await createLimboActivity('En Limbo');
+                    const oversizedIds = Array.from({ length: TDAH_DAY_MAX_ACTIVITIES + 1 }, (_, index) => index + 1);
+
+                    const response = await decideLimboBatchApi({ activityIds: oversizedIds, decision: { decision: 'discard' } });
+                    expect(response.status).toBe(400);
+                    expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+
+                    const limbo = await readLimbo(await getLimboApi());
+                    expect(limbo.activities.map((entry) => entry.id)).toEqual([inLimbo.id]);
+                });
+
+                // Boundaries: "Nunca ofrecer la opción 'sin fecha' en el
+                // Limbo" — the batch endpoint's own parser rejects it outright.
+                test("a batch decision of 'undated' is rejected with 400 TDAH_ACTIVITY_INVALID (the Limbo screen never offers 'sin fecha')", async () => {
+                    const a = await createLimboActivity('A');
+                    const response = await decideLimboBatchApi({ activityIds: [a.id], decision: { decision: 'undated' } });
+                    expect(response.status).toBe(400);
+                    expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+                });
+
+                test('an unrecognized decision value in the batch returns 400 TDAH_ACTIVITY_INVALID', async () => {
+                    const a = await createLimboActivity('A');
+                    const response = await decideLimboBatchApi({ activityIds: [a.id], decision: { decision: 'later' } });
+                    expect(response.status).toBe(400);
+                    expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+                });
+
+                test('a malformed activityIds shape (non-numeric or non-positive entries) returns 400 TDAH_ACTIVITY_INVALID', async () => {
+                    for (const activityIds of [['x'], [-1], [0], [1.5]]) {
+                        const response = await decideLimboBatchApi({ activityIds, decision: { decision: 'discard' } });
+                        expect(response.status).toBe(400);
+                        expect(await readErrorCode(response)).toBe('TDAH_ACTIVITY_INVALID');
+                    }
+                });
+
+                // Both namespaces get their own independent per-namespace
+                // sqlite file (ADR 0026), so their id sequences can
+                // coincidentally collide (e.g. both namespaces' first
+                // Activity being id 1) — the point of this test is that a
+                // batch decide only ever reads/writes the *caller's own*
+                // namespace database, so a coincidentally-matching id in
+                // another namespace's own db is never touched, regardless of
+                // whether the ids happen to collide.
+                test("a batch decide only ever affects the caller's own namespace, never another one's (isolation)", async () => {
+                    await activate({ timeZone: 'UTC' }, TOKEN_BETA);
+                    const betaActivity = await createLimboActivity('De beta', TOKEN_BETA);
+                    const alphaActivity = await createLimboActivity('De alpha');
+
+                    const response = await decideLimboBatchApi({ activityIds: [alphaActivity.id], decision: { decision: 'discard' } });
+                    expect(response.status).toBe(200);
+
+                    const betaLimbo = await readLimbo(await getLimboApi(TOKEN_BETA));
+                    expect(betaLimbo.activities.map((entry) => entry.id)).toEqual([betaActivity.id]);
+                    const alphaLimbo = await readLimbo(await getLimboApi());
+                    expect(alphaLimbo.activities).toEqual([]);
+                });
+
+                test('GET on the limbo decide path returns 405 TDAH_METHOD_NOT_ALLOWED', async () => {
+                    const response = await authedFetch('/v1/tdah/limbo/decide', { method: 'GET' });
+                    expect(response.status).toBe(405);
+                    expect(await readErrorCode(response)).toBe('TDAH_METHOD_NOT_ALLOWED');
+                });
+
+                test('rejected with 409 TDAH_ACTIVATE_REQUIRED when the mode is off', async () => {
+                    const a = await createLimboActivity('A');
+                    await putProfile({ mode: 'off' });
+                    const response = await decideLimboBatchApi({ activityIds: [a.id], decision: { decision: 'discard' } });
                     expect(response.status).toBe(409);
                     expect(await readErrorCode(response)).toBe('TDAH_ACTIVATE_REQUIRED');
                 });

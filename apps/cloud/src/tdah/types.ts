@@ -253,6 +253,15 @@ export type TdahActivityTransitionAction = 'start' | 'complete' | 'miss';
  * decisions, so calling it on, say, an already-`completed` Activity is
  * rejected exactly like the others.
  *
+ * `complete-late` (story 3.4, T-08's Limbo tray) sets `state:'completed'` and
+ * stamps `completedAt`, reusing the exact same write `start`/`complete`/`miss`'s
+ * `complete` action already uses — the *only* thing that differs is which
+ * current states are eligible to reach it (this decision, same as every other
+ * one here, only ever transitions a `missed`/`limbo` Activity, where the plain
+ * `complete` action above only ever transitions a `pending`/`started` one).
+ * Never reachable through `POST .../complete` itself, which explicitly
+ * rejects a `limbo` origin state.
+ *
  * Every decision only ever transitions a `missed`/`limbo` Activity; any other
  * current state is `rejected` → 400 `TDAH_ACTIVITY_INVALID` (same contract as
  * start/complete/miss), UNLESS the request is an AD-7 idempotent retry whose
@@ -260,17 +269,63 @@ export type TdahActivityTransitionAction = 'start' | 'complete' | 'miss';
  * move-tomorrow/move-date a `dayPlanDate` on or after "today" — not a strict
  * equality against the freshly recomputed target, so a retry that lands
  * after local midnight has rolled over between calls still matches;
- * `state:'discarded'` already for discard) — that responds 200 without
- * rewriting, never 400.
+ * `state:'discarded'` already for discard; `state:'completed'` already for
+ * complete-late) — that responds 200 without rewriting, never 400.
  */
-export const TDAH_ACTIVITY_DECISIONS = ['move-tomorrow', 'move-date', 'discard', 'undated'] as const;
+export const TDAH_ACTIVITY_DECISIONS = ['move-tomorrow', 'move-date', 'discard', 'undated', 'complete-late'] as const;
 export type TdahActivityDecision = (typeof TDAH_ACTIVITY_DECISIONS)[number];
 
 export type TdahActivityDecideRequest =
     | { decision: 'move-tomorrow' }
     | { decision: 'move-date'; date: string }
     | { decision: 'discard' }
-    | { decision: 'undated' };
+    | { decision: 'undated' }
+    | { decision: 'complete-late' };
+
+/**
+ * GET /v1/tdah/limbo — story 3.4, T-08's Limbo tray. Every Actividad whose
+ * `state === 'limbo'`, across every `dayPlanDate`, ordered oldest-first
+ * (`day_plan_date ASC, id ASC` — see `SELECT_LIMBO_ACTIVITIES_SQL` in
+ * storage.ts). Deliberately no date/timeZone scoping unlike
+ * `TdahDayResponse`: FR-9 requires this list to never shrink by age alone, so
+ * there is no "today"/"tomorrow" concept on this screen at all, only how long
+ * each row has been waiting (computed client-side from `dayPlanDate`/
+ * `movedAt`). Always 200 — an empty `activities` array is the "nothing to
+ * decide" state, never a 404.
+ */
+export type TdahLimboResponse = {
+    activities: TdahActivity[];
+};
+
+/**
+ * POST /v1/tdah/limbo/decide — story 3.4, T-08's batch decision bar: the same
+ * four decisions `TdahActivityDecideRequest` offers on a single Activity,
+ * minus `'undated'` (the Limbo screen never offers "sin fecha" — everything
+ * listed there is already without a date, so it would be a meaningless
+ * no-op), applied to every id in `activityIds` at once.
+ *
+ * Atomic, "todo o nada" — same contract as `TdahConfirmMorningRequest`
+ * above, not a loop of individual `decideActivity` calls: every id in
+ * `activityIds` must exist and currently be `state === 'limbo'` (deduped,
+ * none missing), and — for `move-tomorrow`/`move-date` — the destination day
+ * must have enough cap headroom for the *whole* batch at once, or the entire
+ * request is rejected with `TDAH_ACTIVITY_INVALID` and nothing is written
+ * (see `mutateDecideLimboBatch` in storage.ts).
+ */
+export type TdahLimboDecideBatchRequest = {
+    activityIds: number[];
+    decision: Exclude<TdahActivityDecideRequest, { decision: 'undated' }>;
+};
+
+/**
+ * Response shape for `POST /v1/tdah/limbo/decide` — the post-mutation
+ * `TdahActivity` rows for exactly the ids in the request's `activityIds`
+ * (same shape as `TdahLimboResponse.activities` above, just a subset rather
+ * than the full Limbo list).
+ */
+export type TdahLimboDecideBatchResponse = {
+    activities: TdahActivity[];
+};
 
 /**
  * POST /v1/tdah/day/tomorrow/confirm body — story 3.3, T-06's single

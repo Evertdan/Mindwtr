@@ -23,6 +23,11 @@ const TDAH_DAY_ACTIVITIES_PATH = '/tdah/day/activities';
 const TDAH_DAY_TOMORROW_PATH = `${TDAH_DAY_PATH}/tomorrow`;
 const TDAH_DAY_TOMORROW_ACTIVITIES_PATH = `${TDAH_DAY_TOMORROW_PATH}/activities`;
 const TDAH_DAY_TOMORROW_CONFIRM_PATH = `${TDAH_DAY_TOMORROW_PATH}/confirm`;
+// Story 3.4 (T-08): the Limbo's own read/decide surface, entirely separate
+// from both TDAH_DAY_PATH ("hoy") and TDAH_DAY_TOMORROW_PATH ("mañana") —
+// the Limbo has no date/zone scoping at all (spec Always).
+const TDAH_LIMBO_PATH = '/tdah/limbo';
+const TDAH_LIMBO_DECIDE_PATH = `${TDAH_LIMBO_PATH}/decide`;
 
 /**
  * Same cloud-sync-config load shape as tdah-settings-screen.tsx's `reload()`
@@ -87,4 +92,14 @@ export function buildTdahTomorrowActivitiesUrl(cloudUrl: string): string {
 /** T-06's grouped confirm endpoint (spec Code Map): `POST /v1/tdah/day/tomorrow/confirm`. */
 export function buildTdahTomorrowConfirmUrl(cloudUrl: string): string {
     return `${getCloudBaseUrl(cloudUrl)}${TDAH_DAY_TOMORROW_CONFIRM_PATH}`;
+}
+
+/** T-08's read endpoint (spec Code Map): `GET /v1/tdah/limbo`. */
+export function buildTdahLimboUrl(cloudUrl: string): string {
+    return `${getCloudBaseUrl(cloudUrl)}${TDAH_LIMBO_PATH}`;
+}
+
+/** T-08's batch-decide endpoint (spec Code Map): `POST /v1/tdah/limbo/decide`. */
+export function buildTdahLimboDecideBatchUrl(cloudUrl: string): string {
+    return `${getCloudBaseUrl(cloudUrl)}${TDAH_LIMBO_DECIDE_PATH}`;
 }

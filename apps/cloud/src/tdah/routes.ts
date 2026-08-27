@@ -6,7 +6,10 @@
  * — and the "Hoy" surface (story 1.6): GET `/v1/tdah/day`,
  * POST `/v1/tdah/day/activities`,
  * POST `/v1/tdah/activities/:id/{start|complete|miss}`, and (story 3.2, T-05)
- * POST `/v1/tdah/activities/:id/decide`. PUT `/tdah/profile`
+ * POST `/v1/tdah/activities/:id/decide` — plus (story 3.4, T-08) El Limbo:
+ * GET `/v1/tdah/limbo` and POST `/v1/tdah/limbo/decide` (the same decisions
+ * as `/activities/:id/decide`, minus `'undated'`, applied to a whole set of
+ * ids atomically). PUT `/tdah/profile`
  * only ever sets `mode:'off'` or updates timeZone/ritualHour on an existing
  * profile — POST /activate is the only way to set `mode:'on'`, and PUT
  * rejects a `mode:'on'` body outright with `TDAH_ACTIVATE_REQUIRED`.
@@ -28,7 +31,9 @@ import {
     createManualActivityForTomorrow,
     createRoutine,
     decideActivity,
+    decideLimboBatch,
     deleteRoutine,
+    getLimboActivities,
     getRoutineWithBlocks,
     getTodayDayPlan,
     getTomorrowDayPlan,
@@ -37,6 +42,7 @@ import {
     listRoutinesWithBlocks,
     readTdahProfile,
     TDAH_BLOCK_DURATION_MAX_MINUTES,
+    TDAH_DAY_MAX_ACTIVITIES,
     TDAH_ROUTINE_TITLE_MAX_LENGTH,
     transitionActivityState,
     type TdahCreateManualActivityInput,
@@ -53,6 +59,9 @@ import {
     type TdahConfirmMorningRequest,
     type TdahDayResponse,
     type TdahErrorCode,
+    type TdahLimboDecideBatchRequest,
+    type TdahLimboDecideBatchResponse,
+    type TdahLimboResponse,
     type TdahMode,
     type TdahProfileResponse,
     type TdahRoutinePattern,
@@ -77,6 +86,14 @@ const TDAH_ACTIVITY_ACTION_PATTERN = /^\/v1\/tdah\/activities\/([^/]+)\/(start|c
 // widening TDAH_ACTIVITY_ACTION_PATTERN's alternation) since `decide` takes a
 // body while start/complete/miss never do.
 const TDAH_ACTIVITY_DECIDE_PATTERN = /^\/v1\/tdah\/activities\/([^/]+)\/decide$/;
+// Story 3.4 — El Limbo (T-08): a persistent tray over every Actividad in
+// `state='limbo'`, queried with no date/timeZone scoping (FR-9: nothing here
+// ever disappears by age). Exact-string dispatch, so `TDAH_LIMBO_DECIDE_PATH`
+// never collides with `TDAH_ACTIVITY_DECIDE_PATTERN` above in practice, but
+// both are still checked ahead of it in `handleTdahRequest` for the same
+// clarity every other sub-path in this dispatcher already follows.
+const TDAH_LIMBO_PATH = `${TDAH_PATH_PREFIX}/limbo`;
+const TDAH_LIMBO_DECIDE_PATH = `${TDAH_LIMBO_PATH}/decide`;
 // Story 3.3 — T-06's morning editor / T-07's confirm. `TDAH_DAY_TOMORROW_PATH`
 // never collides with `TDAH_DAY_PATH` (exact-string dispatch), but the three
 // are still matched ahead of it in handleTdahRequest for the same clarity
@@ -358,7 +375,12 @@ type TdahActivityDecideBody = {
 const parseDecideRequestBody = (value: unknown): TdahActivityDecideRequest | null => {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
     const raw = value as TdahActivityDecideBody;
-    if (raw.decision === 'move-tomorrow' || raw.decision === 'discard' || raw.decision === 'undated') {
+    if (
+        raw.decision === 'move-tomorrow'
+        || raw.decision === 'discard'
+        || raw.decision === 'undated'
+        || raw.decision === 'complete-late'
+    ) {
         return { decision: raw.decision };
     }
     if (raw.decision === 'move-date') {
@@ -366,6 +388,52 @@ const parseDecideRequestBody = (value: unknown): TdahActivityDecideRequest | nul
         return { decision: 'move-date', date: raw.date };
     }
     return null;
+};
+
+type TdahLimboDecideBatchBody = {
+    activityIds?: unknown;
+    decision?: unknown;
+};
+
+/**
+ * POST /v1/tdah/limbo/decide body (story 3.4). `decision` reuses
+ * `parseDecideRequestBody` for its own nested `{decision, date}` shape, then
+ * rejects the one variant it parses that the Limbo screen never offers
+ * (`'undated'` — see `TdahLimboDecideBatchRequest`'s doc comment in
+ * types.ts). `activityIds` must be a non-empty array of positive safe
+ * integers — the same rule `parseConfirmMorningRequestBody` above already
+ * applies to `deletedActivityIds`; duplicates are tolerated here and deduped
+ * by `mutateDecideLimboBatch` (storage.ts) rather than rejected at this
+ * parsing stage.
+ *
+ * `activityIds.length` is capped at `TDAH_DAY_MAX_ACTIVITIES` (review fix):
+ * unlike `mutateConfirmMorning`'s target set — naturally bounded by a single
+ * day's own `TDAH_DAY_MAX_ACTIVITIES` cap — the Limbo tray has no such
+ * ceiling by construction (FR-9: nothing is ever evicted by age, so it can
+ * accumulate indefinitely). `mutateDecideLimboBatch`'s `WHERE id IN (?, ?, …)`
+ * placeholder list is sized directly off this array, so an unbounded request
+ * body risks hitting SQLite's own bound-parameter limit as an opaque 500
+ * instead of a controlled 400 — reusing this module's existing batch-size
+ * precedent here rejects it as a clean body-validation failure instead.
+ *
+ * Per-id eligibility (must exist AND currently be `limbo`) and the
+ * "no partial batch" atomicity are semantic checks left to
+ * `decideLimboBatch`/`mutateDecideLimboBatch`, which need the caller's own
+ * namespace database to resolve them, not available at this parsing stage.
+ */
+const parseLimboDecideBatchBody = (value: unknown): TdahLimboDecideBatchRequest | null => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+    const raw = value as TdahLimboDecideBatchBody;
+    if (!Array.isArray(raw.activityIds) || raw.activityIds.length === 0) return null;
+    if (raw.activityIds.length > TDAH_DAY_MAX_ACTIVITIES) return null;
+    const activityIds: number[] = [];
+    for (const rawId of raw.activityIds) {
+        if (typeof rawId !== 'number' || !Number.isSafeInteger(rawId) || rawId <= 0) return null;
+        activityIds.push(rawId);
+    }
+    const decision = parseDecideRequestBody(raw.decision);
+    if (!decision || decision.decision === 'undated') return null;
+    return { activityIds, decision };
 };
 
 type TdahConfirmMorningActivityBody = {
@@ -932,6 +1000,71 @@ const handleConfirmMorning = async (
     }
 };
 
+/**
+ * GET /v1/tdah/limbo — story 3.4, T-08. Every Actividad currently
+ * `state='limbo'` across every day, oldest first (`getLimboActivities`,
+ * storage.ts) — no date/timeZone scoping, unlike `handleGetDay`/
+ * `handleGetTomorrowDay` above (FR-9: nothing here ever disappears by age).
+ * Same FR-1 gate: 409 TDAH_ACTIVATE_REQUIRED unless the mode is on.
+ */
+const handleGetLimbo = async (ctx: TdahRequestContext, options: TdahRequestOptions): Promise<Response> => {
+    try {
+        const profile = await readTdahProfile(options.dataDir, ctx.key);
+        if (!profile || profile.mode !== 'on') {
+            return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
+        }
+        const activities = await getLimboActivities(options.dataDir, ctx.key);
+        const responseBody: TdahLimboResponse = { activities };
+        return jsonResponse(responseBody);
+    } catch (error) {
+        logError('request failed', {
+            failureClass: 'filesystem',
+            failureCode: 'request_failed',
+            failureErrno: getFsErrorCode(error),
+        });
+        return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
+    }
+};
+
+/**
+ * POST /v1/tdah/limbo/decide — story 3.4, T-08's batch decision bar. Same
+ * FR-1 mode gate + rejected→400/500 shape as `handleConfirmMorning` above;
+ * see `mutateDecideLimboBatch` (storage.ts) for the exact atomicity/
+ * eligibility rules `result.kind` encodes. No `notFound` branch (like
+ * `handleConfirmMorning`) — an unknown or non-`limbo` id inside the batch is
+ * a `rejected` 400 for the whole request, not a per-id 404, since this
+ * targets a set, not a single resource.
+ */
+const handleDecideLimboBatch = async (
+    req: Request,
+    ctx: TdahRequestContext,
+    options: TdahRequestOptions,
+): Promise<Response> => {
+    const body = await readJsonBody(req, options.maxBodyBytes, options.signal);
+    if (isBodyReadError(body)) {
+        return tdahErrorResponse(TDAH_ERRORS.invalidBody, body.__mindwtrError.status);
+    }
+    const batchRequest = parseLimboDecideBatchBody(body);
+    if (!batchRequest) return tdahErrorResponse(TDAH_ERRORS.activityInvalid, 400);
+    try {
+        const profile = await readTdahProfile(options.dataDir, ctx.key);
+        if (!profile || profile.mode !== 'on') {
+            return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
+        }
+        const result = await decideLimboBatch(options.dataDir, ctx.key, batchRequest, profile.timeZone);
+        if (result.kind === 'rejected') return tdahErrorResponse(TDAH_ERRORS.activityInvalid, 400);
+        const responseBody: TdahLimboDecideBatchResponse = { activities: result.activities };
+        return jsonResponse(responseBody);
+    } catch (error) {
+        logError('request failed', {
+            failureClass: 'filesystem',
+            failureCode: 'request_failed',
+            failureErrno: getFsErrorCode(error),
+        });
+        return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
+    }
+};
+
 export async function handleTdahRequest(
     req: Request,
     pathname: string,
@@ -1016,6 +1149,23 @@ export async function handleTdahRequest(
         if (req.method !== 'POST') return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
         const action = activityActionMatch[2] as TdahActivityTransitionAction;
         return handleTransitionActivity(activityId, action, ctx, options);
+    }
+
+    // Story 3.4 — El Limbo (T-08). Must be checked ahead of
+    // TDAH_ACTIVITY_DECIDE_PATTERN below (so `/v1/tdah/limbo/decide` is never
+    // shadowed by the single-id `/activities/:id/decide` pattern) and ahead
+    // of TDAH_PROFILE_PATH's catch-all fallback, same as every other sub-path
+    // above. The more specific `.../decide` path is checked first, same
+    // ordering `TDAH_DAY_TOMORROW_CONFIRM_PATH` uses ahead of
+    // `TDAH_DAY_TOMORROW_PATH` above.
+    if (pathname === TDAH_LIMBO_DECIDE_PATH) {
+        if (req.method !== 'POST') return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
+        return handleDecideLimboBatch(req, ctx, options);
+    }
+
+    if (pathname === TDAH_LIMBO_PATH) {
+        if (req.method !== 'GET') return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
+        return handleGetLimbo(ctx, options);
     }
 
     // Story 3.2 — must be checked ahead of TDAH_PROFILE_PATH's catch-all
