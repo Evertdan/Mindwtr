@@ -94,6 +94,23 @@ describe('TdahActivityRow', () => {
         expect(texts.flat()).toContain('Manual');
     });
 
+    // Story 4.1: the server materializes the grouped work band as an ordinary
+    // Actividad with `origin: 'jira'`. A stale hand-mirrored origin union here
+    // made both label lookups `undefined`, blanking the badge and truncating
+    // the composed accessibility label — assert both are actually filled.
+    it('renders the origin badge text (Jira) for the work-band Activity', () => {
+        const tree = renderRow({ ...baseActivity, origin: 'jira' }, () => undefined);
+        const texts = tree.root.findAll((node) => node.type === Text).map((node) => node.props.children);
+        expect(texts.flat()).toContain('Jira');
+    });
+
+    it('names the jira origin in the composed accessibility label instead of leaving it blank', () => {
+        const activity: TdahActivity = { ...baseActivity, title: 'Trabajo', origin: 'jira' };
+        const tree = renderRow(activity, () => undefined);
+        const pressable = tree.root.findByType(Pressable);
+        expect(pressable.props.accessibilityLabel).toBe('09:30, Trabajo, Pending, Jira');
+    });
+
     it('shows the duration label when durationMinutes is above zero', () => {
         const tree = renderRow(baseActivity, () => undefined);
         const texts = tree.root.findAll((node) => node.type === Text).map((node) => node.props.children);

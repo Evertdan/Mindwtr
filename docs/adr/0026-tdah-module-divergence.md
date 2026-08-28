@@ -222,3 +222,66 @@ genérico ya existente `'request failed'` y su `.code` de fs/sqlite —
 nunca la clave del namespace ni el título de una Actividad — y ese namespace
 simplemente se reintenta en el siguiente tick sin abortar ni demorar a los
 demás namespaces del mismo tick.
+
+## Adenda (historia 4.1): las credenciales del Origen como clase de activo distinta
+
+La historia 4.1 (Origen Jira) mete en el módulo el primer **secreto de un
+tercero** que el servidor debe poder usar sin que el usuario esté presente: un
+token de API de Jira Cloud con el que el VPS consulta, cada dos horas en
+horario laboral, el sprint activo asignado. Eso obliga a fijar una postura
+frente al ADR 0025 ("sin encriptación de la carga útil de sincronización
+combinada por el servidor"), y la postura es una **divergencia consciente y
+acotada** — la que la espina de arquitectura llama AD-9/AR-4.
+
+**Una credencial no es un documento fusionable.** El ADR 0025 rechaza el
+cifrado first-party para el payload de sync por dos razones, y ninguna de las
+dos aplica aquí. La primera es que un servidor que solo ve ciphertext no puede
+correr `mergeAppDataWithStats` entidad por entidad y degrada a
+last-write-wins — pero el token del Origen no se fusiona nunca: se escribe
+entero o no se escribe. La segunda es que una clave gestionada por la app que
+vive en el mismo disco que los datos que protege no protege de nada que el
+cifrado de disco de la plataforma no cubra ya. Esa crítica sigue siendo válida,
+y por eso **este módulo no autogenera su clave**: la aporta el operador del
+VPS vía `MINDWTR_CLOUD_TDAH_ORIGIN_KEY` (32 bytes en hex) o su hermano
+`..._KEY_FILE`, siguiendo la convención `X`/`X_FILE` que
+`MINDWTR_CLOUD_AUTH_TOKENS` ya estableció. La regla de rigor del propio ADR
+0025 — *una afirmación de cifrado solo vale si nombra a quién sostiene la
+clave* — se cumple literalmente: la sostiene quien opera la instancia, y puede
+mantenerla fuera del volumen de datos.
+
+**Falla cerrado, nunca en claro.** Sin clave configurada, `PUT
+/v1/tdah/origin` responde `503 TDAH_ORIGIN_KEY_UNAVAILABLE` y el tick de pull
+salta ese namespace registrando el código de error. Persistir el token en
+claro "mientras tanto" habría convertido una garantía de la historia en una
+opción de despliegue, que es exactamente la clase de degradación silenciosa
+que NFR-2 prohíbe. El coste es que el Origen queda apagado por defecto en toda
+instancia existente hasta que su operador configure la clave — aceptable,
+porque el Origen es opt-in y nada del modo personal depende de él.
+
+**Formato del sellado: contenedor versionado con AAD ligada al namespace.**
+`apps/cloud/src/tdah/origin-crypto.ts` guarda una sola columna TEXT con la
+forma `v1.<nonce b64url>.<ciphertext+tag b64url>` (AES-256-GCM, nonce de 12
+bytes recién sorteado en cada escritura), y usa como AAD la cadena
+`mindwtr-tdah-origin:v1:<namespaceKey>`. Esa AAD es lo que convierte el
+"aislamiento estricto por usuario" de AD-9 en un hecho verificable en vez de
+una promesa: una fila copiada al SQLite de otro namespace no abre. El prefijo
+`v1.` deja abierta la rotación de formato sin migración destructiva. No se
+reutiliza el contenedor MWENC1 de `packages/core/src/sync-crypto.ts` porque
+aquel deriva su clave de una passphrase que el usuario teclea, y aquí nadie
+teclea nada: el pull corre de fondo.
+
+**El secreto no sale del módulo.** Ninguna respuesta de ninguna ruta TDAH
+incluye el token ni un prefijo suyo — `readWorkOriginStatus` devuelve la forma
+pública y ni siquiera lee la columna sellada; solo el tick de pull la abre, y
+solo para construir el header `Authorization` de una llamada `GET` a
+`https://<sitio>/rest/api/3/...` con `redirect: 'manual'`, para que un 3xx no
+pueda reenviar ese header a otro host. Los `logError` del Origen llevan
+`failureCode`/`failureErrno` y nada más: ni cuerpo de respuesta de Atlassian,
+ni URL de sitio, ni correo, ni fragmento de credencial — la regla `.code`-only
+de `apps/cloud/AGENTS.md` extendida a la clase de activo nueva.
+
+**El Origen es genérico; Jira es el primer proveedor.** La tabla se llama
+`tdah_work_origin` y lleva una columna `provider`; la interfaz vive en
+`work-origin.ts` y la implementación de Atlassian en `jira-origin.ts`. Azure
+DevOps, GitHub y Jira Server son Non-Goal de la v1, pero la ruta
+(`/v1/tdah/origin`), el esquema y el tick no quedan acoplados a Atlassian.

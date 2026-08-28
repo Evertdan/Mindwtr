@@ -44,7 +44,10 @@ import {
  * server uses — and renders the dedicated `inactive` phase.
  */
 
-export type TdahHistoryOrigin = 'routine' | 'manual';
+// The third origin (`jira`, spec 4.1) is the grouped work band the server
+// materializes from the connected Jira Origin — same Actividad table, same
+// history semantics, just a third `origin` literal.
+export type TdahHistoryOrigin = 'routine' | 'manual' | 'jira';
 
 export type TdahHistoryActivity = {
     id: number;
@@ -99,6 +102,18 @@ const buildHistoryUrl = (
 };
 
 const isActivateRequiredError = (error: unknown): boolean => error instanceof CloudHttpError && error.status === 409;
+
+/**
+ * The one place an Actividad's `origin` becomes a label. Shared with
+ * `TdahMetricsView`'s breakdown so a third origin can never end up named
+ * "Manual" on one screen and "Jira" on the other (spec 4.1: "el desglose por
+ * origen tiene que nombrar la franja Jira, no caer en la etiqueta de manual").
+ */
+export const originLabelKey = (origin: TdahHistoryOrigin): string => {
+    if (origin === 'routine') return 'tdahHistory.filters.originRoutine';
+    if (origin === 'jira') return 'tdahHistory.filters.originJira';
+    return 'tdahHistory.filters.originManual';
+};
 
 /**
  * "Completada tarde" comes off the server's own `completedLate` flag, never
@@ -317,6 +332,7 @@ export function TdahHistoryView() {
                                         <option value="all">{t('tdahHistory.filters.originAll')}</option>
                                         <option value="routine">{t('tdahHistory.filters.originRoutine')}</option>
                                         <option value="manual">{t('tdahHistory.filters.originManual')}</option>
+                                        <option value="jira">{t('tdahHistory.filters.originJira')}</option>
                                     </select>
                                 </label>
                                 <label className="flex flex-col gap-1">
@@ -362,7 +378,7 @@ export function TdahHistoryView() {
                                                 ? (entry.routineTitle
                                                     ? formatI18nTemplate(t('tdahHistory.entry.fromRoutine'), { title: entry.routineTitle })
                                                     : t('tdahHistory.filters.originRoutine'))
-                                                : t('tdahHistory.filters.originManual')}
+                                                : t(originLabelKey(entry.activity.origin))}
                                         </div>
                                     </div>
                                     <div className="flex flex-col items-end gap-1 shrink-0">

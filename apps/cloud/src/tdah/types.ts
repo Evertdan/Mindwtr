@@ -127,7 +127,19 @@ export type TdahDayPlan = {
     generatedAt: string;
 };
 
-export const TDAH_ACTIVITY_ORIGINS = ['routine', 'manual'] as const;
+/**
+ * Story 4.1 adds a third origin, `'jira'` — the single grouped work band
+ * (`mutateSyncWorkOriginBand`, storage.ts) the Origen de trabajo materializes
+ * once per local day. It is deliberately part of the SAME enum rather than a
+ * parallel concept: the band is an ordinary Actividad for every downstream
+ * consumer (Hoy, Historial, Métricas' `byOrigin`), it just happens to be
+ * created by the pull tick instead of a Rutina or the user.
+ *
+ * Widening this list widens `tdah_activity`'s own `CHECK (origin IN (...))`,
+ * which SQLite cannot relax via `ALTER TABLE` — see
+ * `migrateActivityJiraOriginIfNeeded` (schema v5 -> v6) in storage.ts.
+ */
+export const TDAH_ACTIVITY_ORIGINS = ['routine', 'manual', 'jira'] as const;
 export type TdahActivityOrigin = (typeof TDAH_ACTIVITY_ORIGINS)[number];
 
 export const TDAH_ACTIVITY_STATES = ['pending', 'started', 'completed', 'missed', 'limbo', 'discarded'] as const;
@@ -427,6 +439,126 @@ export type TdahMetricsResponse = {
     trend: TdahMetricsTrendPoint[];
 };
 
+// --- Origen de trabajo (story 4.1, T-13) ------------------------------------
+
+/**
+ * The generic Origen registry's provider ids. v1 ships exactly one (`'jira'`,
+ * Jira Cloud), but the seam is real rather than notional: `work-origin.ts`
+ * holds the provider-agnostic contract and `jira-origin.ts` the only
+ * implementation, so adding Azure DevOps/GitHub later never means unpicking
+ * Jira specifics out of storage/routes/tick code (epic Non-Goal v1, but
+ * explicitly "no acoplado").
+ */
+export const TDAH_WORK_ORIGIN_PROVIDERS = ['jira'] as const;
+export type TdahWorkOriginProvider = (typeof TDAH_WORK_ORIGIN_PROVIDERS)[number];
+
+export const isTdahWorkOriginProvider = (value: unknown): value is TdahWorkOriginProvider => (
+    typeof value === 'string' && (TDAH_WORK_ORIGIN_PROVIDERS as readonly string[]).includes(value)
+);
+
+/**
+ * One row of the snapshot the last successful pull left behind — the issues
+ * the grouped band stands for. Story 4.2 renders these as the band's
+ * expandable sub-rows; this story only persists and returns them.
+ *
+ * Deliberately NOT an Actividad: no hour is ever invented per task (Never),
+ * so these carry no `startTime`/`durationMinutes`/`state` of their own.
+ */
+export type TdahWorkOriginItem = {
+    externalKey: string;
+    summary: string;
+    status: string;
+    sprintName: string | null;
+};
+
+/**
+ * The Origen's public state — everything `GET /v1/tdah/origin` returns.
+ *
+ * There is NO token field at any level, by construction: the sealed secret
+ * lives only in `tdah_work_origin.secret_sealed` and is read exclusively by
+ * the pull tick (`readSealedWorkOriginSecret`, storage.ts). A response shape
+ * that cannot name the token cannot leak it (AD-9; doc 06: "esta pantalla
+ * NUNCA lo muestra de vuelta").
+ *
+ * `jql` is the effective query as plain, selectable text (doc 06 zone 4 —
+ * "dejar visible como texto consultable"), so the user can audit exactly what
+ * the server asks Jira for.
+ */
+export type TdahWorkOriginStatus = {
+    connected: boolean;
+    provider: TdahWorkOriginProvider | null;
+    siteUrl: string | null;
+    email: string | null;
+    jql: string | null;
+    workStart: string | null;
+    workEnd: string | null;
+    pullIntervalMinutes: number | null;
+    connectedAt: string | null;
+    lastSyncAt: string | null;
+    /** The last failure's stable `TDAH_…` code, or `null` when the last pull succeeded. Never a raw fs/http/sqlite message. */
+    lastErrorCode: TdahErrorCode | null;
+    issues: TdahWorkOriginItem[];
+};
+
+export type TdahWorkOriginResponse = TdahWorkOriginStatus;
+
+/**
+ * PUT /v1/tdah/origin body. `token` travels here and ONLY here — it is never
+ * echoed back, never logged, never re-rendered (AD-9).
+ *
+ * `token` itself is optional: omitting it keeps the stored credential, so a
+ * settings-only edit (moving the working hours, changing the cadence) does not
+ * force the user to mint a fresh Atlassian API token just to change a time.
+ * It is mandatory on a FIRST connection, where there is nothing to keep —
+ * `handlePutWorkOrigin` enforces that, since only it can see whether a row
+ * already exists.
+ *
+ * `workStart`/`workEnd`/`pullIntervalMinutes` are optional and resolve as
+ * body → currently persisted value → module default
+ * (`TDAH_WORK_ORIGIN_DEFAULT_*`, storage.ts). Falling straight back to the
+ * default on a re-connection would silently reset a customised 07:30–15:45
+ * window every time the user rotated their token.
+ */
+export type TdahWorkOriginUpsertRequest = {
+    provider: TdahWorkOriginProvider;
+    siteUrl: string;
+    email: string;
+    token?: string;
+    workStart?: string;
+    workEnd?: string;
+    pullIntervalMinutes?: number;
+};
+
+/**
+ * Story 4.1 — per-tick aggregate stats across every namespace scanned by
+ * `runWorkOriginPullTick` (origin-pull.ts). Same counts-only, never-a-
+ * namespace-key discipline as `TdahNightlyTickSummary`/
+ * `TdahActivityTriggerTickSummary` above (AGENTS.md's `.code`-only rule).
+ */
+export type TdahOriginPullTickSummary = {
+    /** The tick's own reference date (UTC calendar day of `now`) — not any single namespace's local date. */
+    date: string;
+    /** Namespaces with an existing TDAH database, scanned this tick. */
+    namespaceCount: number;
+    /** Namespaces that actually pulled and re-materialized their band this tick. */
+    syncedCount: number;
+    /**
+     * Namespaces skipped this tick — mode off, no Origen connected, outside
+     * the configured working hours (no network call is ever made in that
+     * case), or the pull interval has not elapsed since `last_pull_at`.
+     */
+    skippedCount: number;
+    /**
+     * Namespaces whose pull failed this tick — bad credentials, unreachable
+     * site, missing master key, or a storage error. Each one persisted its own
+     * `last_error_code` and is retried on the next eligible tick; personal
+     * Actividades are untouched either way (graceful degradation).
+     */
+    failedCount: number;
+    /** Total issues materialized into snapshots across every namespace that synced this tick. */
+    itemCount: number;
+};
+
 /**
  * POST /v1/tdah/activate body. Always turns the mode on (first activation or
  * reactivation) — `PUT /tdah/profile` remains the only way to turn it off.
@@ -523,6 +655,35 @@ const TDAH_ERROR_CODES = {
     // `.code`-only rule applies to the channel exactly like every HTTP
     // TDAH route).
     wsUnauthorized: 'TDAH_WS_UNAUTHORIZED',
+    // Story 4.1 — the Origen de trabajo (T-13). Four codes, one per genuinely
+    // distinct failure the user can act on differently (doc 06: "el estado de
+    // sincronización es el dato que el usuario vendrá a mirar cuando algo
+    // falle — priorizar claridad del estado degradado"):
+    // - `originInvalid`: the request itself is malformed — a non-`https:`
+    //   site URL, one carrying userinfo/path/query, an unknown provider, a
+    //   bad work window. Rejected BEFORE any outbound network call.
+    // - `originCredentialsInvalid`: Atlassian itself answered 401/403 — the
+    //   email/token pair is wrong or revoked. Also reused by the pull tick
+    //   when a persisted sealed secret cannot be opened (a row copied into
+    //   another namespace's SQLite fails its AAD check, see origin-crypto.ts).
+    // - `originUnreachable`: the outbound GET threw, timed out, redirected,
+    //   or answered anything else non-2xx — a degraded network, never a
+    //   credential problem.
+    // - `originKeyUnavailable`: the operator has not configured
+    //   `MINDWTR_CLOUD_TDAH_ORIGIN_KEY(_FILE)`. The Origen fails closed: a
+    //   token is NEVER persisted in clear as a fallback.
+    originInvalid: 'TDAH_ORIGIN_INVALID',
+    originCredentialsInvalid: 'TDAH_ORIGIN_CREDENTIALS_INVALID',
+    originUnreachable: 'TDAH_ORIGIN_UNREACHABLE',
+    originKeyUnavailable: 'TDAH_ORIGIN_KEY_UNAVAILABLE',
+    // The pull itself succeeded but the day is already at
+    // `TDAH_DAY_MAX_ACTIVITIES`, so the grouped band could not be inserted.
+    // It gets its own code rather than being swallowed: silently reporting a
+    // fresh "última sincronización" while no band appears is exactly the kind
+    // of unexplained absence the mode is supposed to never produce. The user
+    // resolves it by removing something from the day, so it is actionable —
+    // which is what earns it a code of its own.
+    originDayFull: 'TDAH_ORIGIN_DAY_FULL',
 } as const;
 
 export type TdahErrorCode = (typeof TDAH_ERROR_CODES)[keyof typeof TDAH_ERROR_CODES];

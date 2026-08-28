@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync 
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { tokenToKey } from '../server-auth';
-import { startCloudServer, runTdahActivityTriggerIntervalTick } from '../server';
+import { startCloudServer, runTdahActivityTriggerIntervalTick, runTdahOriginPullIntervalTick } from '../server';
 import {
     activateTdahProfile,
     computeTomorrowDate,
@@ -19,6 +19,11 @@ import {
 import { handleTdahRequest } from './routes';
 import { runNightlyTdahTick } from './scheduler';
 import { runActivityTriggerTick } from './activity-trigger';
+import { openOriginSecret, resolveOriginEncryptionKey, sealOriginSecret, TDAH_ORIGIN_KEY_ENV_VAR } from './origin-crypto';
+import { jiraWorkOriginProvider, parseJiraSiteUrl, TDAH_JIRA_JQL, TDAH_JIRA_MAX_RESPONSE_BYTES } from './jira-origin';
+import { runNamespaceWorkOriginPull, runWorkOriginPullTick } from './origin-pull';
+import { deleteWorkOrigin, readWorkOriginStatus } from './storage';
+import type { WorkOriginFetch } from './work-origin';
 import { createTdahWsConnectionRegistry, resolveTdahWsAuth, TDAH_WS_PATH } from './ws-channel';
 import { createAllowedAuthTokens } from '../server-auth';
 import type { TdahWsActivityTriggerEvent, TdahWsRitualInvitationEvent } from './types';
@@ -1510,7 +1515,7 @@ describe('tdah module', () => {
         // confirmed_at, SCHEMA_VERSION_MORNING_EDIT = 5), so a fresh
         // database — which gets all five widened/added shapes directly from
         // their CREATE TABLE statements — now lands at v5, not v1.
-        test('a fresh database starts directly at schema v5 (no migration needed)', async () => {
+        test('a fresh database starts directly at schema v6 (no migration needed)', async () => {
             await activate({ timeZone: 'UTC' });
             const key = tokenToKey(TOKEN_ALPHA);
             const databasePath = tdahDatabasePath(dataDir, key);
@@ -1518,7 +1523,7 @@ describe('tdah module', () => {
             const database = new Database(databasePath, { readonly: true });
             try {
                 const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: number };
-                expect(versionRow.user_version).toBe(5);
+                expect(versionRow.user_version).toBe(6);
                 const columns = (database.prepare("PRAGMA table_info('tdah_routine');") as unknown as {
                     all(): { name: string }[];
                 }).all();
@@ -1577,7 +1582,8 @@ describe('tdah module', () => {
             expect(routines[0]?.blocks).toHaveLength(1);
 
             // Story 1.6's v1->v2 step, story 2.2's v2->v3 step, story 3.1's
-            // v3->v4 step, and story 3.3's v4->v5 step also run here: this
+            // v3->v4 step, story 3.3's v4->v5 step and story 4.1's v5->v6
+            // step also run here: this
             // seed never creates `tdah_activity` at all, so `ensureSchema`'s
             // `CREATE TABLE IF NOT EXISTS` plants it already widened
             // (started_at/completed_at, start_notified_at/end_notified_at,
@@ -1585,12 +1591,12 @@ describe('tdah module', () => {
             // TABLE already includes `ritual_notified_date`, the
             // `tdah_day_plan` CREATE TABLE already includes `confirmed_at`,
             // and every migration step sees its own columns already present
-            // and stamps v5 directly — same as the "fresh database" case
+            // and stamps v6 directly — same as the "fresh database" case
             // above.
             const verifyDatabase = new Database(databasePath, { readonly: true });
             try {
                 const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
-                expect(versionRow.user_version).toBe(5);
+                expect(versionRow.user_version).toBe(6);
             } finally {
                 verifyDatabase.close();
             }
@@ -1655,13 +1661,14 @@ describe('tdah module', () => {
             expect(routines[0]?.title).toBe('Día laboral');
             expect(routines[0]?.pattern).toEqual({ kind: 'weekday', weekdays: [1, 2, 3, 4, 5] });
 
-            // Same story 1.6 v1->v2, story 2.2 v2->v3, story 3.1 v3->v4, and
-            // story 3.3 v4->v5 cascade as the test above: this seed never
-            // creates `tdah_activity` either, so it lands on v5 too.
+            // Same story 1.6 v1->v2, story 2.2 v2->v3, story 3.1 v3->v4,
+            // story 3.3 v4->v5 and story 4.1 v5->v6 cascade as the test
+            // above: this seed never creates `tdah_activity` either, so it
+            // lands on v6 too.
             const verifyDatabase = new Database(databasePath, { readonly: true });
             try {
                 const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
-                expect(versionRow.user_version).toBe(5);
+                expect(versionRow.user_version).toBe(6);
                 const tableNames = (verifyDatabase.prepare("SELECT name FROM sqlite_master WHERE type = 'table';") as unknown as {
                     all(): { name: string }[];
                 }).all().map((row) => row.name);
@@ -3112,7 +3119,7 @@ describe('tdah module', () => {
         });
 
         describe('schema migration v1 -> v2 (started_at/completed_at)', () => {
-            test('a fresh database starts directly at schema v5 (story 3.3 bump) with started_at/completed_at present and start_time/duration_minutes nullable', async () => {
+            test('a fresh database starts directly at schema v6 (story 4.1 bump) with started_at/completed_at present and start_time/duration_minutes nullable', async () => {
                 await activate({ timeZone: 'UTC' });
                 const key = tokenToKey(TOKEN_ALPHA);
                 const databasePath = tdahDatabasePath(dataDir, key);
@@ -3120,7 +3127,7 @@ describe('tdah module', () => {
                 const database = new Database(databasePath, { readonly: true });
                 try {
                     const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: number };
-                    expect(versionRow.user_version).toBe(5);
+                    expect(versionRow.user_version).toBe(6);
                     const columns = (database.prepare("PRAGMA table_info('tdah_activity');") as unknown as {
                         all(): { name: string; notnull: number }[];
                     }).all();
@@ -3229,9 +3236,10 @@ describe('tdah module', () => {
                 try {
                     const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
                     // v1 -> v2 (this describe's own migration), v2 -> v3
-                    // (story 2.2's), v3 -> v4 (story 3.1's), and v4 -> v5
-                    // (story 3.3's) all run in sequence on this seeded v1 file.
-                    expect(versionRow.user_version).toBe(5);
+                    // (story 2.2's), v3 -> v4 (story 3.1's), v4 -> v5 (story
+                    // 3.3's) and v5 -> v6 (story 4.1's) all run in sequence
+                    // on this seeded v1 file.
+                    expect(versionRow.user_version).toBe(6);
                     const columns = (verifyDatabase.prepare("PRAGMA table_info('tdah_activity');") as unknown as {
                         all(): { name: string; notnull: number }[];
                     }).all();
@@ -3350,9 +3358,9 @@ describe('tdah module', () => {
                 const verifyDatabase = new Database(databasePath, { readonly: true });
                 try {
                     const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
-                    // All five migration steps (v0->v1, v1->v2, v2->v3,
-                    // v3->v4, v4->v5) run in sequence on this seeded v0 file.
-                    expect(versionRow.user_version).toBe(5);
+                    // All six migration steps (v0->v1, v1->v2, v2->v3, v3->v4,
+                    // v4->v5, v5->v6) run in sequence on this seeded v0 file.
+                    expect(versionRow.user_version).toBe(6);
                 } finally {
                     verifyDatabase.close();
                 }
@@ -3605,7 +3613,11 @@ describe('tdah module', () => {
             });
 
             test('an invalid origin or a non-positive-integer routineId is rejected with 400 TDAH_INVALID_BODY', async () => {
-                expect((await getHistoryApi('?origin=jira')).status).toBe(400);
+                // 'jira' became a real origin in story 4.1 (the Origen's
+                // grouped band), so the unknown-value case needs a value that
+                // is still genuinely unknown.
+                expect((await getHistoryApi('?origin=azure')).status).toBe(400);
+                expect((await getHistoryApi('?origin=jira')).status).toBe(200);
                 expect((await getHistoryApi('?routineId=abc')).status).toBe(400);
                 expect((await getHistoryApi('?routineId=0')).status).toBe(400);
             });
@@ -3693,7 +3705,8 @@ describe('tdah module', () => {
                 expect(body.completedOnTime).toBe(0);
                 expect(body.total).toBe(0);
                 expect(body.rate).toBeNull();
-                expect(body.byOrigin).toHaveLength(2);
+                // Three origins since story 4.1 added the Origen's own band.
+                expect(body.byOrigin).toHaveLength(3);
                 expect(body.byOrigin.every((entry) => entry.total === 0 && entry.completedOnTime === 0)).toBe(true);
                 expect(body.trend).toHaveLength(8);
                 expect(body.trend.every((point) => point.total === 0 && point.completedOnTime === 0 && point.rate === null)).toBe(true);
@@ -3733,7 +3746,7 @@ describe('tdah module', () => {
                 expect(body.rate).toBe(0.5);
             });
 
-            test('byOrigin breaks down completedOnTime/total separately for routine vs manual, and never a Jira/atendidas split (Never)', async () => {
+            test('byOrigin breaks down completedOnTime/total separately per origin (routine/manual/jira), and never an "atendidas" split (Never)', async () => {
                 const routine = await readRoutine(await createRoutineApi(WORKDAY_ROUTINE));
                 await insertHistoryFixtureActivity({
                     dayPlanDate: today(),
@@ -3756,6 +3769,7 @@ describe('tdah module', () => {
                 expect(body.byOrigin).toEqual([
                     { origin: 'routine', completedOnTime: 1, total: 2 },
                     { origin: 'manual', completedOnTime: 0, total: 1 },
+                    { origin: 'jira', completedOnTime: 0, total: 0 },
                 ]);
                 expect(body.total).toBe(3);
                 expect(body.completedOnTime).toBe(1);
@@ -4832,7 +4846,7 @@ describe('tdah module', () => {
     });
 
     describe('schema migration v2 -> v3 (start_notified_at/end_notified_at, story 2.2)', () => {
-        test('a fresh database starts directly at schema v3 with start_notified_at/end_notified_at present', async () => {
+        test('a fresh database starts directly at schema v6 with start_notified_at/end_notified_at present', async () => {
             await activate({ timeZone: 'UTC' });
             const key = tokenToKey(TOKEN_ALPHA);
             const databasePath = tdahDatabasePath(dataDir, key);
@@ -4845,7 +4859,7 @@ describe('tdah module', () => {
                 // migrates straight through v3 to v5, so this is no longer
                 // the final version, just a column-presence check for the
                 // v2->v3 step.
-                expect(versionRow.user_version).toBe(5);
+                expect(versionRow.user_version).toBe(6);
                 const columns = (database.prepare("PRAGMA table_info('tdah_activity');") as unknown as {
                     all(): { name: string }[];
                 }).all();
@@ -4915,7 +4929,7 @@ describe('tdah module', () => {
                 const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
                 // Migrates straight through to the current shared target (v5,
                 // story 3.3) in the same pass, not just to v3.
-                expect(versionRow.user_version).toBe(5);
+                expect(versionRow.user_version).toBe(6);
                 const row = verifyDatabase.prepare(
                     'SELECT start_notified_at, end_notified_at FROM tdah_activity WHERE day_plan_date = ?;',
                 ).get(today) as { start_notified_at: string | null; end_notified_at: string | null };
@@ -4928,7 +4942,7 @@ describe('tdah module', () => {
     });
 
     describe('schema migration v3 -> v4 (ritual_notified_date, story 3.1)', () => {
-        test('a fresh database starts directly at schema v4 with ritual_notified_date present and NULL', async () => {
+        test('a fresh database starts directly at schema v6 with ritual_notified_date present and NULL', async () => {
             await activate({ timeZone: 'UTC' });
             const key = tokenToKey(TOKEN_ALPHA);
             const databasePath = tdahDatabasePath(dataDir, key);
@@ -4938,7 +4952,7 @@ describe('tdah module', () => {
                 const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: number };
                 // Story 3.3 bumped the shared schema target to v5 — a fresh
                 // database now migrates straight through v4 to v5.
-                expect(versionRow.user_version).toBe(5);
+                expect(versionRow.user_version).toBe(6);
                 const columns = (database.prepare("PRAGMA table_info('tdah_profile');") as unknown as {
                     all(): { name: string }[];
                 }).all();
@@ -4997,7 +5011,7 @@ describe('tdah module', () => {
                 const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
                 // Migrates straight through to the current shared target (v5,
                 // story 3.3) in the same pass, not just to v4.
-                expect(versionRow.user_version).toBe(5);
+                expect(versionRow.user_version).toBe(6);
                 const row = verifyDatabase.prepare('SELECT ritual_notified_date FROM tdah_profile WHERE id = 1;').get() as {
                     ritual_notified_date: string | null;
                 };
@@ -5009,7 +5023,7 @@ describe('tdah module', () => {
     });
 
     describe('schema migration v4 -> v5 (sort_order/moved_at/confirmed_at, story 3.3)', () => {
-        test('a fresh database starts directly at schema v5 with sort_order/moved_at/confirmed_at present', async () => {
+        test('a fresh database starts directly at schema v6 with sort_order/moved_at/confirmed_at present', async () => {
             await activate({ timeZone: 'UTC' });
             const key = tokenToKey(TOKEN_ALPHA);
             const databasePath = tdahDatabasePath(dataDir, key);
@@ -5017,7 +5031,7 @@ describe('tdah module', () => {
             const database = new Database(databasePath, { readonly: true });
             try {
                 const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: number };
-                expect(versionRow.user_version).toBe(5);
+                expect(versionRow.user_version).toBe(6);
                 const activityColumns = (database.prepare("PRAGMA table_info('tdah_activity');") as unknown as {
                     all(): { name: string }[];
                 }).all();
@@ -5106,7 +5120,7 @@ describe('tdah module', () => {
             const verifyDatabase = new Database(databasePath, { readonly: true });
             try {
                 const versionRow = verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number };
-                expect(versionRow.user_version).toBe(5);
+                expect(versionRow.user_version).toBe(6);
                 const row = verifyDatabase.prepare('SELECT sort_order, moved_at FROM tdah_activity WHERE day_plan_date = ?;').get(today) as {
                     sort_order: number;
                     moved_at: string | null;
@@ -5507,6 +5521,1512 @@ describe('tdah module', () => {
                 ),
             ).resolves.toBeUndefined();
             expect(onFireCalls).toBe(0);
+        });
+    });
+
+    describe('Origen de trabajo (story 4.1: T-13, credencial sellada y franja agrupada)', () => {
+        // A real 32-byte key, fixed so a test can assert the exact ciphertext
+        // round trip. Never a production value.
+        const TEST_ORIGIN_KEY_HEX = '0'.repeat(63) + '1';
+        const JIRA_TOKEN = 'ATATT-super-secret-jira-token-value';
+        const JIRA_SITE = 'https://acme.atlassian.net';
+        const JIRA_EMAIL = 'persona@acme.com';
+
+        let previousOriginKey: string | undefined;
+
+        beforeEach(() => {
+            previousOriginKey = process.env[TDAH_ORIGIN_KEY_ENV_VAR];
+            process.env[TDAH_ORIGIN_KEY_ENV_VAR] = TEST_ORIGIN_KEY_HEX;
+        });
+
+        afterEach(() => {
+            if (previousOriginKey === undefined) {
+                delete process.env[TDAH_ORIGIN_KEY_ENV_VAR];
+            } else {
+                process.env[TDAH_ORIGIN_KEY_ENV_VAR] = previousOriginKey;
+            }
+        });
+
+        type RecordedCall = { url: string; method: string; redirect: string | undefined; authorization: string | undefined };
+
+        type FakeJira = { calls: RecordedCall[]; fetchImpl: WorkOriginFetch };
+
+        /**
+         * Records every outbound call the provider makes and answers with
+         * whatever `respond` returns (or throws). This is what makes the
+         * "solo GET / nunca sigue un 3xx / nada de red fuera de horario"
+         * assertions possible without a network.
+         */
+        const createFakeJira = (respond: (url: string) => Response | Promise<Response>): FakeJira => {
+            const calls: RecordedCall[] = [];
+            return {
+                calls,
+                fetchImpl: async (input, init) => {
+                    const headers = new Headers(init?.headers ?? {});
+                    calls.push({
+                        url: input,
+                        method: init?.method ?? 'GET',
+                        redirect: init?.redirect,
+                        authorization: headers.get('Authorization') ?? undefined,
+                    });
+                    return await respond(input);
+                },
+            };
+        };
+
+        const jsonOk = (body: unknown): Response => (
+            new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+        );
+
+        const issuesPayload = (issues: Array<{ key: string; summary: string; status: string }>): unknown => ({
+            issues: issues.map((issue) => ({
+                key: issue.key,
+                fields: { summary: issue.summary, status: { name: issue.status } },
+            })),
+        });
+
+        /** Answers `/myself` with 200 and `/search/jql` with `issues`. The happy path for both calls. */
+        const healthyJira = (issues: Array<{ key: string; summary: string; status: string }>): FakeJira => (
+            createFakeJira((url) => (
+                url.includes('/rest/api/3/myself') ? jsonOk({ accountId: 'x' }) : jsonOk(issuesPayload(issues))
+            ))
+        );
+
+        const originRequest = async (
+            method: string,
+            options: { body?: unknown; token?: string; fetchImpl?: WorkOriginFetch; path?: string } = {},
+        ): Promise<Response> => {
+            const path = options.path ?? '/v1/tdah/origin';
+            const token = options.token ?? TOKEN_ALPHA;
+            const req = new Request(`http://localhost${path}`, {
+                method,
+                ...(options.body !== undefined
+                    ? { body: JSON.stringify(options.body), headers: { 'Content-Type': 'application/json' } }
+                    : {}),
+            });
+            const response = await handleTdahRequest(req, path, { key: tokenToKey(token) }, {
+                dataDir,
+                maxBodyBytes: 200_000,
+                ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+            });
+            expect(response).not.toBeNull();
+            return response as Response;
+        };
+
+        type TdahTestOriginStatus = {
+            connected: boolean;
+            provider: string | null;
+            siteUrl: string | null;
+            email: string | null;
+            jql: string | null;
+            workStart: string | null;
+            workEnd: string | null;
+            pullIntervalMinutes: number | null;
+            connectedAt: string | null;
+            lastSyncAt: string | null;
+            lastErrorCode: string | null;
+            issues: Array<{ externalKey: string; summary: string; status: string; sprintName: string | null }>;
+        };
+
+        const readOriginStatus = async (response: Response): Promise<TdahTestOriginStatus> => (
+            await response.json() as TdahTestOriginStatus
+        );
+
+        const VALID_ORIGIN_BODY = {
+            provider: 'jira',
+            siteUrl: JIRA_SITE,
+            email: JIRA_EMAIL,
+            token: JIRA_TOKEN,
+            workStart: '09:00',
+            workEnd: '18:00',
+            pullIntervalMinutes: 120,
+        };
+
+        /** Activates the mode and connects a healthy Origen. Returns the fake so the caller can inspect its calls. */
+        const connectOrigin = async (
+            token: string = TOKEN_ALPHA,
+            body: Record<string, unknown> = VALID_ORIGIN_BODY,
+        ): Promise<Response> => {
+            await activate({ timeZone: 'UTC' }, token);
+            const fake = healthyJira([]);
+            return await originRequest('PUT', { body, token, fetchImpl: fake.fetchImpl });
+        };
+
+        // The raw persisted shapes, read straight out of the namespace's own
+        // sqlite — the only way to prove what is actually ON DISK (a sealed
+        // container, never the plaintext) rather than what an API happens to
+        // return.
+        type TdahTestOriginRow = {
+            provider: string;
+            site_url: string;
+            account_email: string;
+            secret_sealed: string;
+            jql: string;
+            work_start: string;
+            work_end: string;
+            pull_interval_minutes: number;
+            connected_at: string;
+            last_pull_at: string | null;
+            last_sync_at: string | null;
+            last_error_code: string | null;
+            updated_at: string;
+        };
+
+        type TdahTestActivityRow = {
+            id: number;
+            day_plan_date: string;
+            title: string;
+            start_time: string | null;
+            duration_minutes: number | null;
+            origin: string;
+            state: string;
+        };
+
+        const readOriginRow = async (token: string = TOKEN_ALPHA): Promise<TdahTestOriginRow | null> => {
+            const databasePath = tdahDatabasePath(dataDir, tokenToKey(token));
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(databasePath, { readonly: true });
+            try {
+                return (database.prepare('SELECT * FROM tdah_work_origin WHERE id = 1;').get() ?? null) as TdahTestOriginRow | null;
+            } finally {
+                database.close();
+            }
+        };
+
+        const readActivityRows = async (token: string = TOKEN_ALPHA): Promise<TdahTestActivityRow[]> => {
+            const databasePath = tdahDatabasePath(dataDir, tokenToKey(token));
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(databasePath, { readonly: true });
+            try {
+                return (database.prepare('SELECT id, day_plan_date, title, start_time, duration_minutes, origin, state FROM tdah_activity ORDER BY id;') as unknown as {
+                    all(): TdahTestActivityRow[];
+                }).all();
+            } finally {
+                database.close();
+            }
+        };
+
+        /** An exact UTC instant on the REAL current calendar day, so it lands on the same `tdah_day_plan.date` every other fixture uses. */
+        const utcInstant = (hhmm: string): Date => (
+            new Date(`${formatDateInTimeZone(new Date(), 'UTC')}T${hhmm}:00.000Z`)
+        );
+
+        describe('PUT /v1/tdah/origin (conexión)', () => {
+            test('valida contra Atlassian con un solo GET y persiste el secreto SELLADO, nunca en claro', async () => {
+                await activate({ timeZone: 'UTC' });
+                const fake = healthyJira([]);
+                const response = await originRequest('PUT', { body: VALID_ORIGIN_BODY, fetchImpl: fake.fetchImpl });
+                expect(response.status).toBe(200);
+
+                // Exactly one outbound call, a GET at /myself, with manual
+                // redirect handling — the whole "solo GET, jamás sigue un 3xx"
+                // contract, asserted against the real wiring.
+                expect(fake.calls).toHaveLength(1);
+                expect(fake.calls[0]?.method).toBe('GET');
+                expect(fake.calls[0]?.url).toBe(`${JIRA_SITE}/rest/api/3/myself`);
+                expect(fake.calls[0]?.redirect).toBe('manual');
+
+                const status = await readOriginStatus(response);
+                expect(status.connected).toBe(true);
+                expect(status.provider).toBe('jira');
+                expect(status.siteUrl).toBe(JIRA_SITE);
+                expect(status.email).toBe(JIRA_EMAIL);
+                expect(status.jql).toBe(TDAH_JIRA_JQL);
+                expect(status.workStart).toBe('09:00');
+                expect(status.workEnd).toBe('18:00');
+                expect(status.pullIntervalMinutes).toBe(120);
+                expect(status.lastSyncAt).toBeNull();
+                expect(status.lastErrorCode).toBeNull();
+
+                // (b) The stored column is a v1 container, and the plaintext
+                // token appears nowhere in the row.
+                const row = await readOriginRow();
+                const sealed = String(row?.secret_sealed);
+                expect(sealed.startsWith('v1.')).toBe(true);
+                expect(sealed).not.toContain(JIRA_TOKEN);
+                expect(JSON.stringify(row)).not.toContain(JIRA_TOKEN);
+
+                // And it really is the token — sealed, not mangled.
+                const key = resolveOriginEncryptionKey(process.env) as Buffer;
+                expect(openOriginSecret(key, tokenToKey(TOKEN_ALPHA), sealed)).toBe(JIRA_TOKEN);
+            });
+
+            test('un token inválido (401) responde 400 TDAH_ORIGIN_CREDENTIALS_INVALID y no persiste nada', async () => {
+                await activate({ timeZone: 'UTC' });
+                const fake = createFakeJira(() => new Response('nope', { status: 401 }));
+                const response = await originRequest('PUT', { body: VALID_ORIGIN_BODY, fetchImpl: fake.fetchImpl });
+                expect(response.status).toBe(400);
+                expect(await readErrorCode(response)).toBe('TDAH_ORIGIN_CREDENTIALS_INVALID');
+                expect(await readOriginRow()).toBeNull();
+            });
+
+            test('un intento fallido deja intacto el token anterior (reconexión con credenciales malas)', async () => {
+                await connectOrigin();
+                const before = await readOriginRow();
+
+                const fake = createFakeJira(() => new Response('nope', { status: 403 }));
+                const response = await originRequest('PUT', {
+                    body: { ...VALID_ORIGIN_BODY, token: 'otro-token-que-no-sirve' },
+                    fetchImpl: fake.fetchImpl,
+                });
+                expect(response.status).toBe(400);
+
+                const after = await readOriginRow();
+                expect(after?.secret_sealed).toBe(before?.secret_sealed);
+            });
+
+            test('la red caída responde 502 TDAH_ORIGIN_UNREACHABLE y no persiste nada', async () => {
+                await activate({ timeZone: 'UTC' });
+                const fake = createFakeJira(() => {
+                    throw new Error(`ENOTFOUND ${JIRA_SITE}`);
+                });
+                const response = await originRequest('PUT', { body: VALID_ORIGIN_BODY, fetchImpl: fake.fetchImpl });
+                expect(response.status).toBe(502);
+                expect(await readErrorCode(response)).toBe('TDAH_ORIGIN_UNREACHABLE');
+                expect(await readOriginRow()).toBeNull();
+            });
+
+            test('sin clave maestra falla CERRADO: 503 y jamás un token en claro de respaldo', async () => {
+                await activate({ timeZone: 'UTC' });
+                delete process.env[TDAH_ORIGIN_KEY_ENV_VAR];
+                const fake = healthyJira([]);
+                const response = await originRequest('PUT', { body: VALID_ORIGIN_BODY, fetchImpl: fake.fetchImpl });
+                expect(response.status).toBe(503);
+                expect(await readErrorCode(response)).toBe('TDAH_ORIGIN_KEY_UNAVAILABLE');
+                expect(await readOriginRow()).toBeNull();
+                // The key gate runs BEFORE the outbound call: no credential is
+                // ever sent for a connection that could not be persisted.
+                expect(fake.calls).toHaveLength(0);
+            });
+
+            test('una clave maestra mal formada cuenta como ausente (no arranca a medias)', async () => {
+                await activate({ timeZone: 'UTC' });
+                process.env[TDAH_ORIGIN_KEY_ENV_VAR] = 'no-es-hex';
+                const response = await originRequest('PUT', { body: VALID_ORIGIN_BODY, fetchImpl: healthyJira([]).fetchImpl });
+                expect(response.status).toBe(503);
+            });
+
+            test('toda URL de sitio ilegítima se rechaza ANTES de cualquier salida de red', async () => {
+                await activate({ timeZone: 'UTC' });
+                const rejected = [
+                    'http://acme.atlassian.net',
+                    'https://user:pass@acme.atlassian.net',
+                    'https://acme.atlassian.net/wiki',
+                    'https://acme.atlassian.net/?jql=x',
+                    'https://acme.atlassian.net:8443',
+                    'https://localhost',
+                    'not-a-url',
+                    '',
+                    // SSRF: every one of these would otherwise have carried a
+                    // Basic-auth header to something on the operator's own
+                    // network. The link-local metadata address is the headline
+                    // case — a server fetching its own cloud credentials.
+                    'https://169.254.169.254',
+                    'https://10.0.0.5',
+                    'https://192.168.1.1',
+                    'https://127.0.0.1',
+                    'https://[::1]',
+                    'https://[fd00::1]',
+                    // Integer/hex notations for 127.0.0.1, which `URL` accepts.
+                    'https://2130706433',
+                    'https://0x7f000001',
+                    // Split-horizon internal names.
+                    'https://jira.internal',
+                    'https://jira.local',
+                    'https://printer.home.arpa',
+                    'https://box.lan',
+                    'https://app.corp',
+                    'https://foo.localhost',
+                ];
+                for (const siteUrl of rejected) {
+                    const fake = createFakeJira(() => jsonOk({}));
+                    const response = await originRequest('PUT', {
+                        body: { ...VALID_ORIGIN_BODY, siteUrl },
+                        fetchImpl: fake.fetchImpl,
+                    });
+                    expect(response.status).toBe(400);
+                    expect(await readErrorCode(response)).toBe('TDAH_ORIGIN_INVALID');
+                    expect(fake.calls).toHaveLength(0);
+                }
+            });
+
+            test('una ventana laboral que no avanza, un intervalo fuera de rango o un proveedor desconocido son 400', async () => {
+                await activate({ timeZone: 'UTC' });
+                const invalidBodies: Array<Record<string, unknown>> = [
+                    { ...VALID_ORIGIN_BODY, workStart: '18:00', workEnd: '09:00' },
+                    { ...VALID_ORIGIN_BODY, workStart: '09:00', workEnd: '09:00' },
+                    { ...VALID_ORIGIN_BODY, pullIntervalMinutes: 1 },
+                    { ...VALID_ORIGIN_BODY, pullIntervalMinutes: 100_000 },
+                    { ...VALID_ORIGIN_BODY, provider: 'azure-devops' },
+                    { ...VALID_ORIGIN_BODY, token: '   ' },
+                    { ...VALID_ORIGIN_BODY, email: '' },
+                ];
+                for (const body of invalidBodies) {
+                    const fake = createFakeJira(() => jsonOk({}));
+                    const response = await originRequest('PUT', { body, fetchImpl: fake.fetchImpl });
+                    expect(response.status).toBe(400);
+                    expect(fake.calls).toHaveLength(0);
+                }
+            });
+
+            test('con el modo apagado responde 409 TDAH_ACTIVATE_REQUIRED sin salir a la red', async () => {
+                const fake = healthyJira([]);
+                const response = await originRequest('PUT', { body: VALID_ORIGIN_BODY, fetchImpl: fake.fetchImpl });
+                expect(response.status).toBe(409);
+                expect(await readErrorCode(response)).toBe('TDAH_ACTIVATE_REQUIRED');
+                expect(fake.calls).toHaveLength(0);
+            });
+
+            test('un email o un token desmesurados se rechazan con 400 sin salir a la red', async () => {
+                await activate({ timeZone: 'UTC' });
+                const oversized: Array<Record<string, unknown>> = [
+                    { ...VALID_ORIGIN_BODY, email: `${'a'.repeat(250)}@acme.com` },
+                    { ...VALID_ORIGIN_BODY, token: 'x'.repeat(4097) },
+                ];
+                for (const body of oversized) {
+                    const fake = createFakeJira(() => jsonOk({}));
+                    const response = await originRequest('PUT', { body, fetchImpl: fake.fetchImpl });
+                    expect(response.status).toBe(400);
+                    expect(await readErrorCode(response)).toBe('TDAH_ORIGIN_INVALID');
+                    expect(fake.calls).toHaveLength(0);
+                }
+            });
+
+            test('una reconexión con token nuevo CONSERVA la ventana laboral personalizada', async () => {
+                await activate({ timeZone: 'UTC' });
+                const first = healthyJira([]);
+                await originRequest('PUT', {
+                    body: { ...VALID_ORIGIN_BODY, workStart: '07:30', workEnd: '15:45', pullIntervalMinutes: 45 },
+                    fetchImpl: first.fetchImpl,
+                });
+
+                // Rotating the token must not silently drag the window back to
+                // the 09:00-18:00 default.
+                const second = healthyJira([]);
+                const response = await originRequest('PUT', {
+                    body: { provider: 'jira', siteUrl: JIRA_SITE, email: JIRA_EMAIL, token: 'token-rotado' },
+                    fetchImpl: second.fetchImpl,
+                });
+                expect(response.status).toBe(200);
+                const status = await readOriginStatus(response);
+                expect(status.workStart).toBe('07:30');
+                expect(status.workEnd).toBe('15:45');
+                expect(status.pullIntervalMinutes).toBe(45);
+            });
+
+            test('un PUT solo-de-ajustes (sin token) guarda el horario SIN re-sellar ni borrar el secreto, y sin salir a la red', async () => {
+                await connectOrigin();
+                const before = await readOriginRow();
+
+                const fake = createFakeJira(() => jsonOk({}));
+                const response = await originRequest('PUT', {
+                    body: { provider: 'jira', siteUrl: JIRA_SITE, email: JIRA_EMAIL, workStart: '07:30', workEnd: '15:45' },
+                    fetchImpl: fake.fetchImpl,
+                });
+                expect(response.status).toBe(200);
+                const status = await readOriginStatus(response);
+                expect(status.workStart).toBe('07:30');
+                expect(status.workEnd).toBe('15:45');
+                // Changing a time must not cost the user a fresh Atlassian
+                // token — so no credential round trip happens at all...
+                expect(fake.calls).toHaveLength(0);
+                // ...and the stored sealed secret is carried forward byte for
+                // byte (not re-sealed, which would change the nonce).
+                const after = await readOriginRow();
+                expect(after?.secret_sealed).toBe(before?.secret_sealed as string);
+                expect(status.connected).toBe(true);
+            });
+
+            test('una PRIMERA conexión sin token es 400: no hay credencial que conservar', async () => {
+                await activate({ timeZone: 'UTC' });
+                const fake = createFakeJira(() => jsonOk({}));
+                const response = await originRequest('PUT', {
+                    body: { provider: 'jira', siteUrl: JIRA_SITE, email: JIRA_EMAIL },
+                    fetchImpl: fake.fetchImpl,
+                });
+                expect(response.status).toBe(400);
+                expect(await readErrorCode(response)).toBe('TDAH_ORIGIN_INVALID');
+                expect(await readOriginRow()).toBeNull();
+                expect(fake.calls).toHaveLength(0);
+            });
+
+            test('una ventana inválida se detecta sobre el par YA fusionado con lo persistido', async () => {
+                await connectOrigin();
+                // Stored window is 09:00-18:00; moving only the start past the
+                // stored end must be rejected, not silently accepted because
+                // the body alone looks fine.
+                const fake = createFakeJira(() => jsonOk({}));
+                const response = await originRequest('PUT', {
+                    body: { provider: 'jira', siteUrl: JIRA_SITE, email: JIRA_EMAIL, workStart: '19:00' },
+                    fetchImpl: fake.fetchImpl,
+                });
+                expect(response.status).toBe(400);
+                expect(await readErrorCode(response)).toBe('TDAH_ORIGIN_INVALID');
+                expect(fake.calls).toHaveLength(0);
+            });
+
+            test('reconectar limpia last_pull_at, así que un token reparado sincroniza en el siguiente tick', async () => {
+                await connectOrigin();
+                // A revoked token: the failed attempt still advances
+                // last_pull_at, which is what used to strand the user for a
+                // whole interval after fixing it.
+                const revoked = createFakeJira((url) => (
+                    url.includes('/myself') ? jsonOk({}) : new Response('revoked', { status: 401 })
+                ));
+                await runWorkOriginPullTick(dataDir, utcInstant('10:00'), revoked.fetchImpl);
+                expect((await readOriginRow())?.last_pull_at).not.toBeNull();
+
+                const repaired = healthyJira([]);
+                await originRequest('PUT', {
+                    body: { ...VALID_ORIGIN_BODY, token: 'token-nuevo' },
+                    fetchImpl: repaired.fetchImpl,
+                });
+                expect((await readOriginRow())?.last_pull_at).toBeNull();
+
+                // Only one minute later — far inside the 120-minute interval —
+                // and it pulls anyway, because the reconnection reset the gate.
+                const next = healthyJira([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+                expect((await runWorkOriginPullTick(dataDir, utcInstant('10:01'), next.fetchImpl)).syncedCount).toBe(1);
+            });
+
+            test('reconectar contra OTRO sitio o con OTRA cuenta descarta el snapshot del inquilino anterior', async () => {
+                await connectOrigin();
+                const seeded = healthyJira([{ key: 'OLD-1', summary: 'del inquilino anterior', status: 'To Do' }]);
+                await runWorkOriginPullTick(dataDir, utcInstant('10:00'), seeded.fetchImpl);
+                expect((await readOriginStatus(await authedFetch('/v1/tdah/origin', { method: 'GET' }))).issues).toHaveLength(1);
+
+                const moved = healthyJira([]);
+                const response = await originRequest('PUT', {
+                    body: { ...VALID_ORIGIN_BODY, siteUrl: 'https://otra-empresa.atlassian.net' },
+                    fetchImpl: moved.fetchImpl,
+                });
+                const status = await readOriginStatus(response);
+                expect(status.siteUrl).toBe('https://otra-empresa.atlassian.net');
+                // OLD-1 belongs to a different Jira account entirely — serving
+                // it under the new connection would show one tenant's work
+                // under another's.
+                expect(status.issues).toEqual([]);
+                expect(status.lastSyncAt).toBeNull();
+            });
+
+            test('reconectar con el MISMO sitio y cuenta conserva snapshot y lastSyncAt', async () => {
+                await connectOrigin();
+                const seeded = healthyJira([{ key: 'ACME-1', summary: 'sigue siendo mía', status: 'To Do' }]);
+                await runWorkOriginPullTick(dataDir, utcInstant('10:00'), seeded.fetchImpl);
+
+                const rotated = healthyJira([]);
+                const response = await originRequest('PUT', {
+                    body: { ...VALID_ORIGIN_BODY, token: 'token-rotado' },
+                    fetchImpl: rotated.fetchImpl,
+                });
+                const status = await readOriginStatus(response);
+                expect(status.issues.map((issue) => issue.externalKey)).toEqual(['ACME-1']);
+                expect(status.lastSyncAt).not.toBeNull();
+            });
+        });
+
+        describe('GET / DELETE /v1/tdah/origin', () => {
+            test('el estado público no tiene campo de token en NINGÚN nivel, ni conectado ni desconectado', async () => {
+                await activate({ timeZone: 'UTC' });
+                const emptyResponse = await authedFetch('/v1/tdah/origin', { method: 'GET' });
+                expect(emptyResponse.status).toBe(200);
+                const empty = await readOriginStatus(emptyResponse);
+                expect(empty.connected).toBe(false);
+                expect(empty.issues).toEqual([]);
+
+                await connectOrigin();
+                const response = await authedFetch('/v1/tdah/origin', { method: 'GET' });
+                const serialized = await response.text();
+                expect(serialized).not.toContain(JIRA_TOKEN);
+                expect(serialized).not.toContain('secret');
+                expect(serialized).not.toContain('token');
+            });
+
+            test('(a) NINGUNA respuesta de NINGUNA ruta TDAH contiene el token en su JSON serializado', async () => {
+                await connectOrigin();
+                const fake = healthyJira([{ key: 'ACME-1', summary: 'Arreglar el login', status: 'In Progress' }]);
+                await runNamespaceWorkOriginPull(dataDir, tokenToKey(TOKEN_ALPHA), utcInstant('10:00'), fake.fetchImpl);
+
+                const paths = [
+                    '/v1/tdah/profile',
+                    '/v1/tdah/origin',
+                    '/v1/tdah/day',
+                    '/v1/tdah/day/tomorrow',
+                    '/v1/tdah/limbo',
+                    '/v1/tdah/routines',
+                    '/v1/tdah/history?period=month',
+                    '/v1/tdah/metrics?period=month',
+                ];
+                for (const path of paths) {
+                    const response = await authedFetch(path, { method: 'GET' });
+                    const serialized = await response.text();
+                    expect(serialized).not.toContain(JIRA_TOKEN);
+                }
+
+                const syncResponse = await originRequest('POST', { path: '/v1/tdah/origin/sync', fetchImpl: fake.fetchImpl });
+                expect(await syncResponse.text()).not.toContain(JIRA_TOKEN);
+            });
+
+            test('(h) desconectar borra credencial y snapshot pero deja intacta la Actividad ya materializada', async () => {
+                await connectOrigin();
+                const fake = healthyJira([{ key: 'ACME-1', summary: 'Arreglar el login', status: 'In Progress' }]);
+                await runNamespaceWorkOriginPull(dataDir, tokenToKey(TOKEN_ALPHA), utcInstant('10:00'), fake.fetchImpl);
+
+                const before = (await readActivityRows()).filter((row) => row.origin === 'jira');
+                expect(before).toHaveLength(1);
+
+                const deleteResponse = await authedFetch('/v1/tdah/origin', { method: 'DELETE' });
+                expect(deleteResponse.status).toBe(200);
+
+                expect(await readOriginRow()).toBeNull();
+                const status = await readOriginStatus(await authedFetch('/v1/tdah/origin', { method: 'GET' }));
+                expect(status.connected).toBe(false);
+                expect(status.issues).toEqual([]);
+
+                // The band itself survives, untouched, and stays queryable.
+                const after = (await readActivityRows()).filter((row) => row.origin === 'jira');
+                expect(after).toEqual(before);
+            });
+
+            test('desconectar es idempotente aunque nunca hubiera conexión, y no planta base de datos', async () => {
+                const response = await authedFetch('/v1/tdah/origin', { method: 'DELETE' });
+                expect(response.status).toBe(200);
+                expect(existsSync(tdahDatabasePath(dataDir, tokenToKey(TOKEN_ALPHA)))).toBe(false);
+
+                await connectOrigin();
+                expect((await authedFetch('/v1/tdah/origin', { method: 'DELETE' })).status).toBe(200);
+                expect((await authedFetch('/v1/tdah/origin', { method: 'DELETE' })).status).toBe(200);
+            });
+
+            test('GET con el modo apagado responde 409 TDAH_ACTIVATE_REQUIRED', async () => {
+                await activate({ timeZone: 'UTC' });
+                await putProfile({ mode: 'off' });
+                const response = await authedFetch('/v1/tdah/origin', { method: 'GET' });
+                expect(response.status).toBe(409);
+                expect(await readErrorCode(response)).toBe('TDAH_ACTIVATE_REQUIRED');
+            });
+
+            test('un método no soportado responde 405', async () => {
+                const response = await authedFetch('/v1/tdah/origin', { method: 'PATCH' });
+                expect(response.status).toBe(405);
+                expect(await readErrorCode(response)).toBe('TDAH_METHOD_NOT_ALLOWED');
+            });
+
+            test('DELETE sigue funcionando con el modo APAGADO: apagar el modo nunca atrapa una credencial en el servidor', async () => {
+                await connectOrigin();
+                await putProfile({ mode: 'off' });
+                // GET is gated (409) but revocation deliberately is not — the
+                // alternative is a mode toggle that strands a live Jira token.
+                expect((await authedFetch('/v1/tdah/origin', { method: 'GET' })).status).toBe(409);
+
+                const response = await authedFetch('/v1/tdah/origin', { method: 'DELETE' });
+                expect(response.status).toBe(200);
+                expect(await readOriginRow()).toBeNull();
+            });
+
+            test('el estado desconectado es un objeto FRESCO por llamada, nunca uno compartido entre namespaces', async () => {
+                const first = await readWorkOriginStatus(dataDir, tokenToKey(TOKEN_ALPHA));
+                const second = await readWorkOriginStatus(dataDir, tokenToKey(TOKEN_BETA));
+                expect(first).not.toBe(second);
+                expect(first.issues).not.toBe(second.issues);
+
+                // A single stray mutation must not bleed into every other
+                // namespace's disconnected response.
+                first.issues.push({ externalKey: 'LEAK-1', summary: 'x', status: 'y', sprintName: null });
+                expect((await readWorkOriginStatus(dataDir, tokenToKey(TOKEN_BETA))).issues).toEqual([]);
+            });
+        });
+
+        describe('runWorkOriginPullTick (el tick del Origen)', () => {
+            test('dentro del horario laboral reemplaza el snapshot, sella last_sync_at y materializa UNA franja agrupada', async () => {
+                await connectOrigin();
+                const fake = healthyJira([
+                    { key: 'ACME-1', summary: 'Arreglar el login', status: 'In Progress' },
+                    { key: 'ACME-2', summary: 'Revisar el PR', status: 'To Do' },
+                ]);
+                const summary = await runWorkOriginPullTick(dataDir, utcInstant('10:00'), fake.fetchImpl);
+
+                expect(summary.namespaceCount).toBe(1);
+                expect(summary.syncedCount).toBe(1);
+                expect(summary.failedCount).toBe(0);
+                expect(summary.itemCount).toBe(2);
+
+                const status = await readOriginStatus(await authedFetch('/v1/tdah/origin', { method: 'GET' }));
+                expect(status.lastSyncAt).not.toBeNull();
+                expect(status.lastErrorCode).toBeNull();
+                expect(status.issues.map((issue) => issue.externalKey)).toEqual(['ACME-1', 'ACME-2']);
+                expect(status.issues[0]?.summary).toBe('Arreglar el login');
+                expect(status.issues[0]?.status).toBe('In Progress');
+
+                // Exactly one Actividad, at the start of the band, lasting the
+                // whole window — never one per issue, never an invented hour.
+                const bands = (await readActivityRows()).filter((row) => row.origin === 'jira');
+                expect(bands).toHaveLength(1);
+                expect(bands[0]?.start_time).toBe('09:00');
+                expect(bands[0]?.duration_minutes).toBe(540);
+                expect(bands[0]?.state).toBe('pending');
+                expect(bands[0]?.day_plan_date).toBe(formatDateInTimeZone(new Date(), 'UTC'));
+                // The title is DATA: it is written into tdah_activity.title and
+                // rendered verbatim in Hoy/Historial/Métricas for all 20
+                // locales, so it must be language-neutral rather than a word in
+                // any one of them.
+                expect(bands[0]?.title).toBe('Sprint');
+            });
+
+            test('(f) fuera del horario laboral no hay NI salida de red NI escritura', async () => {
+                await connectOrigin();
+                const fake = healthyJira([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+                const summary = await runWorkOriginPullTick(dataDir, utcInstant('07:00'), fake.fetchImpl);
+
+                expect(summary.skippedCount).toBe(1);
+                expect(summary.syncedCount).toBe(0);
+                expect(fake.calls).toHaveLength(0);
+                const row = await readOriginRow();
+                expect(row?.last_pull_at).toBeNull();
+                expect(row?.last_sync_at).toBeNull();
+                expect((await readActivityRows()).filter((activity) => activity.origin === 'jira')).toHaveLength(0);
+            });
+
+            test('workEnd es exclusivo: 18:00 exacto ya está fuera de la ventana 09:00-18:00', async () => {
+                await connectOrigin();
+                const fake = healthyJira([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+                expect((await runWorkOriginPullTick(dataDir, utcInstant('18:00'), fake.fetchImpl)).skippedCount).toBe(1);
+                expect((await runWorkOriginPullTick(dataDir, utcInstant('17:59'), fake.fetchImpl)).syncedCount).toBe(1);
+            });
+
+            test('la compuerta de intervalo se mide en milisegundos UTC transcurridos, no en reloj de pared', async () => {
+                await connectOrigin();
+                const first = healthyJira([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+                expect((await runWorkOriginPullTick(dataDir, utcInstant('10:00'), first.fetchImpl)).syncedCount).toBe(1);
+
+                // 119 minutes later: the 120-minute interval has not elapsed,
+                // so nothing is even attempted.
+                const tooSoon = healthyJira([{ key: 'ACME-9', summary: 'y', status: 'To Do' }]);
+                expect((await runWorkOriginPullTick(dataDir, utcInstant('11:59'), tooSoon.fetchImpl)).skippedCount).toBe(1);
+                expect(tooSoon.calls).toHaveLength(0);
+
+                // 120 minutes later: due again.
+                const due = healthyJira([{ key: 'ACME-9', summary: 'y', status: 'To Do' }]);
+                expect((await runWorkOriginPullTick(dataDir, utcInstant('12:00'), due.fetchImpl)).syncedCount).toBe(1);
+                const status = await readOriginStatus(await authedFetch('/v1/tdah/origin', { method: 'GET' }));
+                expect(status.issues.map((issue) => issue.externalKey)).toEqual(['ACME-9']);
+            });
+
+            test('(g) el mismo tick, con Pacific/Kiritimati y UTC, materializa la franja en días LOCALES distintos', async () => {
+                // 2026-06-15T12:00Z is still 2026-06-15 in UTC but already
+                // 2026-06-16 in Pacific/Kiritimati (+14) — the exact instant a
+                // process-local `new Date()` would get wrong.
+                const now = new Date('2026-06-15T12:00:00.000Z');
+                await activate({ timeZone: 'UTC' }, TOKEN_ALPHA);
+                await activate({ timeZone: 'Pacific/Kiritimati' }, TOKEN_BETA);
+                const connectFake = healthyJira([]);
+                // Kiritimati's local clock at that instant is 02:00, so beta
+                // needs a window that actually contains it.
+                await originRequest('PUT', { body: VALID_ORIGIN_BODY, token: TOKEN_ALPHA, fetchImpl: connectFake.fetchImpl });
+                await originRequest('PUT', {
+                    body: { ...VALID_ORIGIN_BODY, workStart: '00:00', workEnd: '23:59' },
+                    token: TOKEN_BETA,
+                    fetchImpl: connectFake.fetchImpl,
+                });
+
+                const fake = healthyJira([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+                const summary = await runWorkOriginPullTick(dataDir, now, fake.fetchImpl);
+                expect(summary.syncedCount).toBe(2);
+
+                const alphaBand = (await readActivityRows(TOKEN_ALPHA)).filter((row) => row.origin === 'jira');
+                const betaBand = (await readActivityRows(TOKEN_BETA)).filter((row) => row.origin === 'jira');
+                expect(alphaBand[0]?.day_plan_date).toBe('2026-06-15');
+                expect(betaBand[0]?.day_plan_date).toBe('2026-06-16');
+            });
+
+            test('la franja es idempotente: un segundo pull el mismo día la actualiza en sitio, jamás la duplica', async () => {
+                await connectOrigin();
+                const first = healthyJira([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+                await runWorkOriginPullTick(dataDir, utcInstant('10:00'), first.fetchImpl);
+                const afterFirst = (await readActivityRows()).filter((row) => row.origin === 'jira');
+                expect(afterFirst).toHaveLength(1);
+
+                const second = healthyJira([
+                    { key: 'ACME-1', summary: 'x', status: 'To Do' },
+                    { key: 'ACME-2', summary: 'y', status: 'To Do' },
+                ]);
+                await runWorkOriginPullTick(dataDir, utcInstant('12:00'), second.fetchImpl);
+                const afterSecond = (await readActivityRows()).filter((row) => row.origin === 'jira');
+                expect(afterSecond).toHaveLength(1);
+                expect(afterSecond[0]?.id).toBe(afterFirst[0]?.id as number);
+            });
+
+            test('una franja ya iniciada por el usuario NUNCA es pisada por un pull posterior', async () => {
+                await connectOrigin();
+                const first = healthyJira([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+                await runWorkOriginPullTick(dataDir, utcInstant('10:00'), first.fetchImpl);
+                const band = (await readActivityRows()).find((row) => row.origin === 'jira');
+                const bandId = Number(band?.id);
+
+                expect((await transitionActivityApi(bandId, 'start')).status).toBe(200);
+
+                const second = healthyJira([
+                    { key: 'ACME-1', summary: 'x', status: 'To Do' },
+                    { key: 'ACME-2', summary: 'y', status: 'To Do' },
+                ]);
+                await runWorkOriginPullTick(dataDir, utcInstant('12:00'), second.fetchImpl);
+
+                const after = (await readActivityRows()).filter((row) => row.origin === 'jira');
+                expect(after).toHaveLength(1);
+                expect(after[0]?.state).toBe('started');
+                // The snapshot still refreshed — only the Actividad the user
+                // already acted on is off limits.
+                const status = await readOriginStatus(await authedFetch('/v1/tdah/origin', { method: 'GET' }));
+                expect(status.issues).toHaveLength(2);
+            });
+
+            test('cuando el sprint se vacía, la franja pending del día se RETIRA en el siguiente pull', async () => {
+                await connectOrigin();
+                const withIssues = healthyJira([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+                await runWorkOriginPullTick(dataDir, utcInstant('10:00'), withIssues.fetchImpl);
+                expect((await readActivityRows()).filter((row) => row.origin === 'jira')).toHaveLength(1);
+
+                // Same local day, sprint now empty: the band stands for work
+                // that no longer exists, so it must not linger on Hoy.
+                const emptied = healthyJira([]);
+                expect((await runWorkOriginPullTick(dataDir, utcInstant('12:00'), emptied.fetchImpl)).syncedCount).toBe(1);
+                expect((await readActivityRows()).filter((row) => row.origin === 'jira')).toHaveLength(0);
+
+                const status = await readOriginStatus(await authedFetch('/v1/tdah/origin', { method: 'GET' }));
+                expect(status.issues).toEqual([]);
+                expect(status.lastErrorCode).toBeNull();
+            });
+
+            test('una franja ya iniciada NO se retira aunque el sprint se vacíe', async () => {
+                await connectOrigin();
+                const withIssues = healthyJira([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+                await runWorkOriginPullTick(dataDir, utcInstant('10:00'), withIssues.fetchImpl);
+                const band = (await readActivityRows()).find((row) => row.origin === 'jira');
+                expect((await transitionActivityApi(Number(band?.id), 'start')).status).toBe(200);
+
+                const emptied = healthyJira([]);
+                await runWorkOriginPullTick(dataDir, utcInstant('12:00'), emptied.fetchImpl);
+
+                // The user already put time against it; a background tick must
+                // never delete a record of work that happened.
+                const after = (await readActivityRows()).filter((row) => row.origin === 'jira');
+                expect(after).toHaveLength(1);
+                expect(after[0]?.state).toBe('started');
+            });
+
+            test('un DELETE que aterriza mientras el pull está en vuelo GANA: nada se resucita', async () => {
+                await connectOrigin();
+                const key = tokenToKey(TOKEN_ALPHA);
+
+                // The disconnect happens *between* the plan read and the
+                // commit — exactly the window a real 10s Jira round trip opens.
+                const racing = createFakeJira(async (url) => {
+                    if (url.includes('/myself')) return jsonOk({});
+                    await deleteWorkOrigin(dataDir, key);
+                    return jsonOk(issuesPayload([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]));
+                });
+                const outcome = await runNamespaceWorkOriginPull(dataDir, key, utcInstant('10:00'), racing.fetchImpl);
+                expect(outcome).toEqual({ kind: 'skipped' });
+
+                // Neither the credential row, nor the snapshot, nor a band for
+                // a namespace that no longer has an Origen at all.
+                expect(await readOriginRow()).toBeNull();
+                const status = await readOriginStatus(await authedFetch('/v1/tdah/origin', { method: 'GET' }));
+                expect(status.connected).toBe(false);
+                expect(status.issues).toEqual([]);
+                expect((await readActivityRows()).filter((row) => row.origin === 'jira')).toHaveLength(0);
+            });
+
+            test('un día ya lleno reporta TDAH_ORIGIN_DAY_FULL en vez de tragarse la franja en silencio', async () => {
+                await connectOrigin();
+                const today = formatDateInTimeZone(new Date(), 'UTC');
+                // Fill the day right up to the cap, directly (50 HTTP calls
+                // would only make this slower, not truer).
+                await withWriteTransaction(tdahDatabasePath(dataDir, tokenToKey(TOKEN_ALPHA)), (database) => {
+                    database.prepare('INSERT OR IGNORE INTO tdah_day_plan (date, generated_at) VALUES (?, ?);').run(today, new Date().toISOString());
+                    for (let index = 0; index < TDAH_DAY_MAX_ACTIVITIES; index += 1) {
+                        database
+                            .prepare("INSERT INTO tdah_activity (day_plan_date, block_id, title, start_time, duration_minutes, origin, state) VALUES (?, NULL, ?, NULL, NULL, 'manual', 'pending');")
+                            .run(today, `Relleno ${index}`);
+                    }
+                });
+
+                const fake = healthyJira([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+                const summary = await runWorkOriginPullTick(dataDir, utcInstant('10:00'), fake.fetchImpl);
+                expect(summary.failedCount).toBe(1);
+                expect(summary.syncedCount).toBe(0);
+
+                const status = await readOriginStatus(await authedFetch('/v1/tdah/origin', { method: 'GET' }));
+                // The snapshot DID refresh (the pull worked) — what failed is
+                // only the band, and the user can act on that by freeing a slot.
+                expect(status.issues).toHaveLength(1);
+                expect(status.lastErrorCode).toBe('TDAH_ORIGIN_DAY_FULL');
+                expect((await readActivityRows()).filter((row) => row.origin === 'jira')).toHaveLength(0);
+            });
+
+            test('un last_pull_at en el FUTURO (reloj corregido hacia atrás) no congela el Origen', async () => {
+                await connectOrigin();
+                await withWriteTransaction(tdahDatabasePath(dataDir, tokenToKey(TOKEN_ALPHA)), (database) => {
+                    database
+                        .prepare('UPDATE tdah_work_origin SET last_pull_at = ? WHERE id = 1;')
+                        .run(new Date(utcInstant('10:00').getTime() + 86_400_000).toISOString());
+                });
+
+                const fake = healthyJira([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+                // A naive `elapsed >= interval` would leave this namespace
+                // silently stalled for a whole day.
+                expect((await runWorkOriginPullTick(dataDir, utcInstant('10:00'), fake.fetchImpl)).syncedCount).toBe(1);
+            });
+
+            test('TODO fallo emite su propia línea de auditoría de namespace, no solo el fallo de storage', async () => {
+                await connectOrigin();
+
+                const readFailureLines = async (run: () => Promise<unknown>): Promise<string[]> => {
+                    const captured: string[] = [];
+                    const spy = spyOn(process.stderr, 'write').mockImplementation((chunk: unknown) => {
+                        captured.push(String(chunk));
+                        return true;
+                    });
+                    try {
+                        await run();
+                    } finally {
+                        spy.mockRestore();
+                    }
+                    return captured.join('').split('\n').filter((line) => line.includes('tdah origin pull namespace failed'));
+                };
+
+                // Bad credentials.
+                const revoked = createFakeJira((url) => (
+                    url.includes('/myself') ? jsonOk({}) : new Response('revoked', { status: 401 })
+                ));
+                expect(await readFailureLines(() => runWorkOriginPullTick(dataDir, utcInstant('10:00'), revoked.fetchImpl))).toHaveLength(1);
+
+                // Unreachable.
+                const down = createFakeJira(() => {
+                    throw new Error('ECONNRESET');
+                });
+                expect(await readFailureLines(() => runWorkOriginPullTick(dataDir, utcInstant('12:00'), down.fetchImpl))).toHaveLength(1);
+
+                // Missing master key.
+                delete process.env[TDAH_ORIGIN_KEY_ENV_VAR];
+                const lines = await readFailureLines(() => runWorkOriginPullTick(dataDir, utcInstant('14:00'), healthyJira([]).fetchImpl));
+                expect(lines).toHaveLength(1);
+                expect(lines[0]).toContain('"failureCode":"tdah_origin_pull_failed"');
+                expect(lines[0]).toContain('"failureErrno":"TDAH_ORIGIN_KEY_UNAVAILABLE"');
+            });
+
+            test('sin sprint activo: snapshot vacío, sin franja y SIN error (estado limpio)', async () => {
+                await connectOrigin();
+                const fake = healthyJira([]);
+                const summary = await runWorkOriginPullTick(dataDir, utcInstant('10:00'), fake.fetchImpl);
+                expect(summary.syncedCount).toBe(1);
+                expect(summary.itemCount).toBe(0);
+
+                const status = await readOriginStatus(await authedFetch('/v1/tdah/origin', { method: 'GET' }));
+                expect(status.issues).toEqual([]);
+                expect(status.lastErrorCode).toBeNull();
+                expect(status.lastSyncAt).not.toBeNull();
+                expect((await readActivityRows()).filter((row) => row.origin === 'jira')).toHaveLength(0);
+            });
+
+            test('un token revocado entre pulls persiste lastErrorCode, NO borra el token y deja la franja previa', async () => {
+                await connectOrigin();
+                const healthy = healthyJira([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+                await runWorkOriginPullTick(dataDir, utcInstant('10:00'), healthy.fetchImpl);
+                const sealedBefore = (await readOriginRow())?.secret_sealed;
+                const bandBefore = (await readActivityRows()).filter((row) => row.origin === 'jira');
+
+                const revoked = createFakeJira((url) => (
+                    url.includes('/myself') ? jsonOk({}) : new Response('revoked', { status: 401 })
+                ));
+                const summary = await runWorkOriginPullTick(dataDir, utcInstant('12:00'), revoked.fetchImpl);
+                expect(summary.failedCount).toBe(1);
+
+                const status = await readOriginStatus(await authedFetch('/v1/tdah/origin', { method: 'GET' }));
+                expect(status.lastErrorCode).toBe('TDAH_ORIGIN_CREDENTIALS_INVALID');
+                // The previous successful sync timestamp and snapshot survive
+                // the failure — T-13 shows both the error and "última
+                // sincronización".
+                expect(status.lastSyncAt).not.toBeNull();
+                expect(status.issues).toHaveLength(1);
+                expect((await readOriginRow())?.secret_sealed).toBe(sealedBefore);
+                expect((await readActivityRows()).filter((row) => row.origin === 'jira')).toEqual(bandBefore);
+            });
+
+            test('la red caída durante el tick degrada: lastErrorCode accionable y ninguna Actividad personal cambia de estado', async () => {
+                await connectOrigin();
+                const manual = await readActivity(await createManualActivityApi({ title: 'Personal', startTime: '10:00', durationMinutes: 30 }));
+
+                const down = createFakeJira(() => {
+                    throw new Error(`ECONNREFUSED ${JIRA_SITE}`);
+                });
+                const summary = await runWorkOriginPullTick(dataDir, utcInstant('10:00'), down.fetchImpl);
+                expect(summary.failedCount).toBe(1);
+
+                const status = await readOriginStatus(await authedFetch('/v1/tdah/origin', { method: 'GET' }));
+                expect(status.lastErrorCode).toBe('TDAH_ORIGIN_UNREACHABLE');
+
+                const personal = (await readActivityRows()).find((row) => Number(row.id) === manual.id);
+                expect(personal?.state).toBe('pending');
+                expect(personal?.title).toBe('Personal');
+            });
+
+            test('un cuerpo ilegible de Jira es "unreachable", nunca un snapshot vacío que retire la franja del usuario', async () => {
+                await connectOrigin();
+                const healthy = healthyJira([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+                await runWorkOriginPullTick(dataDir, utcInstant('10:00'), healthy.fetchImpl);
+
+                const garbage = createFakeJira((url) => (
+                    url.includes('/myself') ? jsonOk({}) : new Response('<html>proxy error</html>', { status: 200 })
+                ));
+                expect((await runWorkOriginPullTick(dataDir, utcInstant('12:00'), garbage.fetchImpl)).failedCount).toBe(1);
+
+                const status = await readOriginStatus(await authedFetch('/v1/tdah/origin', { method: 'GET' }));
+                expect(status.lastErrorCode).toBe('TDAH_ORIGIN_UNREACHABLE');
+                expect(status.issues).toHaveLength(1);
+                expect((await readActivityRows()).filter((row) => row.origin === 'jira')).toHaveLength(1);
+            });
+
+            test('sin clave maestra el tick salta el namespace con last_error_code, sin salida de red', async () => {
+                await connectOrigin();
+                delete process.env[TDAH_ORIGIN_KEY_ENV_VAR];
+                const fake = healthyJira([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+                const summary = await runWorkOriginPullTick(dataDir, utcInstant('10:00'), fake.fetchImpl);
+                expect(summary.failedCount).toBe(1);
+                expect(fake.calls).toHaveLength(0);
+                expect(String((await readOriginRow())?.last_error_code)).toBe('TDAH_ORIGIN_KEY_UNAVAILABLE');
+            });
+
+            test('un namespace sin Origen conectado, o con el modo apagado, simplemente se salta', async () => {
+                await activate({ timeZone: 'UTC' }, TOKEN_ALPHA);
+                await connectOrigin(TOKEN_BETA);
+                await putProfile({ mode: 'off' }, TOKEN_BETA);
+
+                const fake = healthyJira([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+                const summary = await runWorkOriginPullTick(dataDir, utcInstant('10:00'), fake.fetchImpl);
+                expect(summary.namespaceCount).toBe(2);
+                expect(summary.skippedCount).toBe(2);
+                expect(fake.calls).toHaveLength(0);
+            });
+
+            test('el fallo de un namespace queda aislado: el otro sincroniza normalmente en el mismo tick', async () => {
+                await connectOrigin(TOKEN_ALPHA);
+                await connectOrigin(TOKEN_BETA);
+
+                const perNamespace = createFakeJira((url) => {
+                    if (url.includes('/myself')) return jsonOk({});
+                    return jsonOk(issuesPayload([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]));
+                });
+                // Alpha's credential is corrupted on disk, so only alpha fails.
+                await withWriteTransaction(tdahDatabasePath(dataDir, tokenToKey(TOKEN_ALPHA)), (database) => {
+                    database.prepare("UPDATE tdah_work_origin SET secret_sealed = 'v1.aaaa.bbbb' WHERE id = 1;").run();
+                });
+
+                const summary = await runWorkOriginPullTick(dataDir, utcInstant('10:00'), perNamespace.fetchImpl);
+                expect(summary.failedCount).toBe(1);
+                expect(summary.syncedCount).toBe(1);
+                expect((await readActivityRows(TOKEN_BETA)).filter((row) => row.origin === 'jira')).toHaveLength(1);
+                expect((await readActivityRows(TOKEN_ALPHA)).filter((row) => row.origin === 'jira')).toHaveLength(0);
+            });
+        });
+
+        describe('sellado AES-256-GCM (origin-crypto.ts)', () => {
+            test('(c) un sellado con la AAD de otro namespace NO abre — el aislamiento por usuario es verificable', () => {
+                const key = resolveOriginEncryptionKey(process.env) as Buffer;
+                const sealed = sealOriginSecret(key, 'namespace-a', JIRA_TOKEN);
+                expect(openOriginSecret(key, 'namespace-a', sealed)).toBe(JIRA_TOKEN);
+                expect(openOriginSecret(key, 'namespace-b', sealed)).toBeNull();
+            });
+
+            test('cada escritura usa un nonce aleatorio distinto, y una clave distinta nunca abre', () => {
+                const key = resolveOriginEncryptionKey(process.env) as Buffer;
+                const otherKey = Buffer.alloc(32, 7);
+                const first = sealOriginSecret(key, 'ns', JIRA_TOKEN);
+                const second = sealOriginSecret(key, 'ns', JIRA_TOKEN);
+                expect(first).not.toBe(second);
+                expect(openOriginSecret(otherKey, 'ns', first)).toBeNull();
+            });
+
+            test('un contenedor truncado, con versión desconocida o manipulado devuelve null en vez de lanzar', () => {
+                const key = resolveOriginEncryptionKey(process.env) as Buffer;
+                const sealed = sealOriginSecret(key, 'ns', JIRA_TOKEN);
+                const [, nonce, payload] = sealed.split('.') as [string, string, string];
+                expect(openOriginSecret(key, 'ns', 'nonsense')).toBeNull();
+                expect(openOriginSecret(key, 'ns', `v2.${nonce}.${payload}`)).toBeNull();
+                expect(openOriginSecret(key, 'ns', `v1.${nonce}.${payload.slice(0, 4)}`)).toBeNull();
+                expect(openOriginSecret(key, 'ns', `v1.${nonce}.${payload.slice(0, -2)}AA`)).toBeNull();
+            });
+
+            test('una fila copiada al SQLite de OTRO usuario falla por AAD y persiste last_error_code, jamás plaintext', async () => {
+                await connectOrigin(TOKEN_ALPHA);
+                await connectOrigin(TOKEN_BETA);
+                const alphaRow = await readOriginRow(TOKEN_ALPHA);
+
+                // Physically transplant alpha's ciphertext into beta's own
+                // database — the "fila copiada al SQLite del namespace B" case.
+                await withWriteTransaction(tdahDatabasePath(dataDir, tokenToKey(TOKEN_BETA)), (database) => {
+                    database.prepare('UPDATE tdah_work_origin SET secret_sealed = ? WHERE id = 1;').run(String(alphaRow?.secret_sealed));
+                });
+
+                const fake = healthyJira([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+                const outcome = await runNamespaceWorkOriginPull(dataDir, tokenToKey(TOKEN_BETA), utcInstant('10:00'), fake.fetchImpl);
+                expect(outcome).toEqual({ kind: 'failed', errorCode: 'TDAH_ORIGIN_CREDENTIALS_INVALID' });
+                // It never even tried: an unopenable credential is not a
+                // request Atlassian should ever see.
+                expect(fake.calls).toHaveLength(0);
+                expect(String((await readOriginRow(TOKEN_BETA))?.last_error_code)).toBe('TDAH_ORIGIN_CREDENTIALS_INVALID');
+            });
+
+            test('resolveOriginEncryptionKey acepta hex de 32 bytes y rechaza todo lo demás', () => {
+                expect(resolveOriginEncryptionKey({})).toBeNull();
+                expect(resolveOriginEncryptionKey({ [TDAH_ORIGIN_KEY_ENV_VAR]: '' })).toBeNull();
+                expect(resolveOriginEncryptionKey({ [TDAH_ORIGIN_KEY_ENV_VAR]: 'ab'.repeat(16) })).toBeNull();
+                expect(resolveOriginEncryptionKey({ [TDAH_ORIGIN_KEY_ENV_VAR]: 'zz'.repeat(32) })).toBeNull();
+                expect(resolveOriginEncryptionKey({ [TDAH_ORIGIN_KEY_ENV_VAR]: TEST_ORIGIN_KEY_HEX })?.length).toBe(32);
+            });
+
+            test('la clave también se lee desde el archivo _FILE, y un archivo ilegible cuenta como ausente', () => {
+                const keyFile = join(sandbox, 'origin.key');
+                writeFileSync(keyFile, `${TEST_ORIGIN_KEY_HEX}\n`, 'utf8');
+                expect(resolveOriginEncryptionKey({ [`${TDAH_ORIGIN_KEY_ENV_VAR}_FILE`]: keyFile })?.length).toBe(32);
+                expect(resolveOriginEncryptionKey({ [`${TDAH_ORIGIN_KEY_ENV_VAR}_FILE`]: join(sandbox, 'nope.key') })).toBeNull();
+            });
+        });
+
+        describe('proveedor Jira (solo GET, jamás sigue un 3xx)', () => {
+            test('(e) toda llamada saliente es GET con redirect manual, y un 3xx nunca reenvía Authorization', async () => {
+                const redirecting = createFakeJira(() => new Response(null, {
+                    status: 302,
+                    headers: { Location: 'https://attacker.example/collect' },
+                }));
+                const credentials = { siteUrl: JIRA_SITE, email: JIRA_EMAIL, token: JIRA_TOKEN };
+
+                expect(await jiraWorkOriginProvider.validateCredentials(credentials, redirecting.fetchImpl))
+                    .toEqual({ kind: 'unreachable' });
+                expect(await jiraWorkOriginProvider.fetchWorkItems(credentials, redirecting.fetchImpl))
+                    .toEqual({ kind: 'unreachable' });
+
+                expect(redirecting.calls).toHaveLength(2);
+                for (const call of redirecting.calls) {
+                    expect(call.method).toBe('GET');
+                    expect(call.redirect).toBe('manual');
+                    // Every request went to the configured site, never to the
+                    // host the 3xx named.
+                    expect(call.url.startsWith(`${JIRA_SITE}/`)).toBe(true);
+                    expect(call.url).not.toContain('attacker.example');
+                }
+            });
+
+            test('el JQL efectivo es exactamente el texto exportado, y la búsqueda pide solo summary/status', async () => {
+                const fake = healthyJira([]);
+                await jiraWorkOriginProvider.fetchWorkItems(
+                    { siteUrl: JIRA_SITE, email: JIRA_EMAIL, token: JIRA_TOKEN },
+                    fake.fetchImpl,
+                );
+                const searchUrl = new URL(fake.calls[0]?.url as string);
+                expect(searchUrl.pathname).toBe('/rest/api/3/search/jql');
+                expect(searchUrl.searchParams.get('jql')).toBe(TDAH_JIRA_JQL);
+                expect(searchUrl.searchParams.get('fields')).toBe('summary,status');
+                expect(jiraWorkOriginProvider.describeQuery()).toBe(TDAH_JIRA_JQL);
+            });
+
+            test('parseJiraSiteUrl normaliza a https://host y rechaza todo lo inseguro', () => {
+                expect(parseJiraSiteUrl('https://ACME.atlassian.net/')).toBe('https://acme.atlassian.net');
+                expect(parseJiraSiteUrl('  https://acme.atlassian.net  ')).toBe('https://acme.atlassian.net');
+                expect(parseJiraSiteUrl('https://sub.domain.atlassian.net')).toBe('https://sub.domain.atlassian.net');
+                expect(parseJiraSiteUrl('http://acme.atlassian.net')).toBeNull();
+                expect(parseJiraSiteUrl('https://u:p@acme.atlassian.net')).toBeNull();
+                expect(parseJiraSiteUrl('https://acme.atlassian.net/wiki')).toBeNull();
+                expect(parseJiraSiteUrl('https://acme.atlassian.net#x')).toBeNull();
+                expect(parseJiraSiteUrl('https://acme.atlassian.net:8443')).toBeNull();
+                expect(parseJiraSiteUrl('https://localhost')).toBeNull();
+                expect(parseJiraSiteUrl('javascript:alert(1)')).toBeNull();
+            });
+
+            test('parseJiraSiteUrl es la frontera SSRF: ninguna dirección IP ni nombre interno la cruza', () => {
+                // Dotted-quad, in every range that matters.
+                expect(parseJiraSiteUrl('https://169.254.169.254')).toBeNull();
+                expect(parseJiraSiteUrl('https://127.0.0.1')).toBeNull();
+                expect(parseJiraSiteUrl('https://10.0.0.5')).toBeNull();
+                expect(parseJiraSiteUrl('https://172.16.0.1')).toBeNull();
+                expect(parseJiraSiteUrl('https://192.168.1.1')).toBeNull();
+                expect(parseJiraSiteUrl('https://8.8.8.8')).toBeNull();
+                // IPv6 literals, which `URL` renders bracketed.
+                expect(parseJiraSiteUrl('https://[::1]')).toBeNull();
+                expect(parseJiraSiteUrl('https://[fd00::1]')).toBeNull();
+                // The integer/hex notations `URL` also resolves to 127.0.0.1.
+                expect(parseJiraSiteUrl('https://2130706433')).toBeNull();
+                expect(parseJiraSiteUrl('https://0x7f000001')).toBeNull();
+                // Split-horizon / mDNS internal suffixes.
+                for (const host of ['jira.internal', 'jira.local', 'printer.home.arpa', 'box.lan', 'app.corp', 'db.private', 'x.intranet', 'foo.localhost']) {
+                    expect(parseJiraSiteUrl(`https://${host}`)).toBeNull();
+                }
+                // Single-label and malformed labels.
+                expect(parseJiraSiteUrl('https://intranet')).toBeNull();
+                expect(parseJiraSiteUrl('https://acme.atlassian.net.')).toBeNull();
+                expect(parseJiraSiteUrl('https://-bad.atlassian.net')).toBeNull();
+                expect(parseJiraSiteUrl('https://bad_label.atlassian.net')).toBeNull();
+            });
+
+            test('un cuerpo por encima del tope de bytes es "unreachable", nunca se bufferiza entero', async () => {
+                const oversized = createFakeJira(() => new Response(
+                    'a'.repeat(TDAH_JIRA_MAX_RESPONSE_BYTES + 1024),
+                    { status: 200, headers: { 'Content-Type': 'application/json' } },
+                ));
+                expect(await jiraWorkOriginProvider.fetchWorkItems(
+                    { siteUrl: JIRA_SITE, email: JIRA_EMAIL, token: JIRA_TOKEN },
+                    oversized.fetchImpl,
+                )).toEqual({ kind: 'unreachable' });
+
+                // A body that lies small but streams large is caught by the
+                // streaming accumulator, not just the content-length header.
+                const lying = createFakeJira(() => new Response(
+                    new ReadableStream({
+                        start(controller) {
+                            const chunk = new TextEncoder().encode('a'.repeat(64_000));
+                            for (let i = 0; i < 20; i += 1) controller.enqueue(chunk);
+                            controller.close();
+                        },
+                    }),
+                    { status: 200, headers: { 'Content-Length': '10' } },
+                ));
+                expect(await jiraWorkOriginProvider.fetchWorkItems(
+                    { siteUrl: JIRA_SITE, email: JIRA_EMAIL, token: JIRA_TOKEN },
+                    lying.fetchImpl,
+                )).toEqual({ kind: 'unreachable' });
+            });
+
+            test('una key repetida jamás produce dos filas de snapshot, y el tope se aplica tras deduplicar', async () => {
+                const repeated = createFakeJira(() => jsonOk({
+                    issues: [
+                        { key: 'ACME-1', fields: { summary: 'primera', status: { name: 'To Do' } } },
+                        { key: 'ACME-1', fields: { summary: 'repetida', status: { name: 'Done' } } },
+                        { key: 'ACME-2', fields: { summary: 'segunda', status: { name: 'To Do' } } },
+                    ],
+                }));
+                const outcome = await jiraWorkOriginProvider.fetchWorkItems(
+                    { siteUrl: JIRA_SITE, email: JIRA_EMAIL, token: JIRA_TOKEN },
+                    repeated.fetchImpl,
+                );
+                expect(outcome.kind).toBe('ok');
+                const items = (outcome as { kind: 'ok'; items: Array<{ externalKey: string; summary: string }> }).items;
+                expect(items.map((item) => item.externalKey)).toEqual(['ACME-1', 'ACME-2']);
+                // First occurrence wins, so the provider's own
+                // `ORDER BY updated ASC` survives deduplication.
+                expect(items[0]?.summary).toBe('primera');
+            });
+
+            test('una issue sin nombre de estado persiste un estado vacío definido, nunca undefined', async () => {
+                const noStatus = createFakeJira(() => jsonOk({
+                    issues: [{ key: 'ACME-1', fields: { summary: 'sin estado', status: null } }],
+                }));
+                const outcome = await jiraWorkOriginProvider.fetchWorkItems(
+                    { siteUrl: JIRA_SITE, email: JIRA_EMAIL, token: JIRA_TOKEN },
+                    noStatus.fetchImpl,
+                );
+                expect(outcome).toEqual({
+                    kind: 'ok',
+                    items: [{ externalKey: 'ACME-1', summary: 'sin estado', status: '', sprintName: null }],
+                });
+            });
+
+            test('una respuesta con issues sin key se descarta, y summary cae al key cuando falta', async () => {
+                const fake = createFakeJira(() => jsonOk({
+                    issues: [
+                        { key: 'ACME-1', fields: { status: { name: 'To Do' } } },
+                        { fields: { summary: 'sin key' } },
+                        'basura',
+                    ],
+                }));
+                const outcome = await jiraWorkOriginProvider.fetchWorkItems(
+                    { siteUrl: JIRA_SITE, email: JIRA_EMAIL, token: JIRA_TOKEN },
+                    fake.fetchImpl,
+                );
+                expect(outcome).toEqual({ kind: 'ok', items: [{ externalKey: 'ACME-1', summary: 'ACME-1', status: 'To Do', sprintName: null }] });
+            });
+        });
+
+        describe('POST /v1/tdah/origin/sync (reintento manual desde T-13)', () => {
+            test('ignora ambas compuertas y devuelve el estado fresco', async () => {
+                await connectOrigin();
+                // 07:00 is outside the 09:00-18:00 window, and no interval has
+                // elapsed — the scheduled tick would skip both times.
+                const fake = healthyJira([{ key: 'ACME-1', summary: 'Arreglar el login', status: 'To Do' }]);
+                const response = await originRequest('POST', { path: '/v1/tdah/origin/sync', fetchImpl: fake.fetchImpl });
+                expect(response.status).toBe(200);
+                const status = await readOriginStatus(response);
+                expect(status.issues.map((issue) => issue.externalKey)).toEqual(['ACME-1']);
+                expect(status.lastErrorCode).toBeNull();
+            });
+
+            test('un fallo devuelve 200 con el lastErrorCode accionable, no un error HTTP opaco', async () => {
+                await connectOrigin();
+                const down = createFakeJira(() => {
+                    throw new Error('ETIMEDOUT');
+                });
+                const response = await originRequest('POST', { path: '/v1/tdah/origin/sync', fetchImpl: down.fetchImpl });
+                expect(response.status).toBe(200);
+                expect((await readOriginStatus(response)).lastErrorCode).toBe('TDAH_ORIGIN_UNREACHABLE');
+            });
+
+            test('sin Origen conectado responde 404, y con el modo apagado 409', async () => {
+                await activate({ timeZone: 'UTC' });
+                expect((await originRequest('POST', { path: '/v1/tdah/origin/sync' })).status).toBe(404);
+                await putProfile({ mode: 'off' });
+                expect((await originRequest('POST', { path: '/v1/tdah/origin/sync' })).status).toBe(409);
+            });
+
+            test('un método no soportado en /sync responde 405', async () => {
+                expect((await authedFetch('/v1/tdah/origin/sync', { method: 'GET' })).status).toBe(405);
+            });
+
+            test('un fallo de STORAGE es un 500 real, no un 200 con un estado sano y obsoleto', async () => {
+                await connectOrigin();
+                const databasePath = tdahDatabasePath(dataDir, tokenToKey(TOKEN_ALPHA));
+
+                // The commit is made to fail AFTER the route's own reads
+                // already succeeded — the only way to reach the branch under
+                // test rather than the handler's outer catch. Replacing the
+                // database file with a DIRECTORY is a deterministic open
+                // failure (unlike overwriting it with junk, which SQLite can
+                // sometimes still serve from a leftover -wal).
+                const breakStorage = (): void => {
+                    for (const suffix of ['', '-wal', '-shm']) {
+                        rmSync(`${databasePath}${suffix}`, { force: true });
+                    }
+                    mkdirSync(databasePath, { recursive: true });
+                };
+                const breaking = createFakeJira((url) => {
+                    if (url.includes('/myself')) return jsonOk({});
+                    breakStorage();
+                    return jsonOk(issuesPayload([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]));
+                });
+
+                const spy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+                let response: Response;
+                try {
+                    response = await originRequest('POST', { path: '/v1/tdah/origin/sync', fetchImpl: breaking.fetchImpl });
+                } finally {
+                    spy.mockRestore();
+                }
+                // Nothing was persisted, so `lastErrorCode` still reports the
+                // previous healthy state — a 200 here would tell the user the
+                // retry they just asked for worked when it never ran.
+                expect(response.status).toBe(500);
+                expect(await readErrorCode(response)).toBe('TDAH_STORAGE_FAILED');
+            });
+        });
+
+        describe('runTdahOriginPullIntervalTick (story 4.1: cableado del intervalo en server.ts)', () => {
+            test('corre un tick real contra un namespace conectado y emite su línea de auditoría', async () => {
+                await activate({ timeZone: 'UTC' });
+                const connectFake = healthyJira([]);
+                // A window that spans the whole day, since this wrapper uses
+                // the real clock rather than an injected instant.
+                await originRequest('PUT', {
+                    body: { ...VALID_ORIGIN_BODY, workStart: '00:00', workEnd: '23:59' },
+                    fetchImpl: connectFake.fetchImpl,
+                });
+
+                const fake = healthyJira([{ key: 'ACME-1', summary: 'Arreglar el login', status: 'To Do' }]);
+                const captured: string[] = [];
+                const spy = spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+                    captured.push(String(chunk));
+                    return true;
+                });
+                try {
+                    await expect(runTdahOriginPullIntervalTick(dataDir, fake.fetchImpl)).resolves.toBeUndefined();
+                } finally {
+                    spy.mockRestore();
+                }
+
+                // Real work happened, so the band exists and the audit line was
+                // written — a wrapper whose body was replaced with `return;`
+                // would fail both halves.
+                expect((await readActivityRows()).filter((row) => row.origin === 'jira')).toHaveLength(1);
+                const serialized = captured.join('');
+                expect(serialized).toContain('"message":"tdah origin pull fired"');
+                expect(serialized).toContain('"syncedCount":1');
+                // Counts only — never a namespace key, a site host or an issue key.
+                expect(serialized).not.toContain('acme.atlassian.net');
+                expect(serialized).not.toContain('ACME-1');
+                expect(serialized).not.toContain(tokenToKey(TOKEN_ALPHA));
+            });
+
+            test('un dataDir inexistente es un no-op silencioso, sin línea de auditoría y sin lanzar', async () => {
+                const captured: string[] = [];
+                const spy = spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+                    captured.push(String(chunk));
+                    return true;
+                });
+                try {
+                    await expect(
+                        runTdahOriginPullIntervalTick(join(dataDir, 'does-not-exist'), healthyJira([]).fetchImpl),
+                    ).resolves.toBeUndefined();
+                } finally {
+                    spy.mockRestore();
+                }
+                // Zero namespaces means zero work, so the noise discipline
+                // holds: no audit line for an empty sweep.
+                expect(captured.join('')).not.toContain('tdah origin pull fired');
+            });
+        });
+
+        describe('(d) no-filtración en logs', () => {
+            test('ni una conexión fallida ni un pull fallido escriben el token o la URL del sitio en ningún log', async () => {
+                await connectOrigin();
+
+                const captured: string[] = [];
+                const stdoutSpy = spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+                    captured.push(String(chunk));
+                    return true;
+                });
+                const stderrSpy = spyOn(process.stderr, 'write').mockImplementation((chunk: unknown) => {
+                    captured.push(String(chunk));
+                    return true;
+                });
+                try {
+                    // A failed connection attempt...
+                    const badConnect = createFakeJira(() => {
+                        throw new Error(`getaddrinfo ENOTFOUND acme.atlassian.net for ${JIRA_SITE} with ${JIRA_TOKEN}`);
+                    });
+                    await originRequest('PUT', { body: VALID_ORIGIN_BODY, fetchImpl: badConnect.fetchImpl });
+
+                    // ...and a failed pull, both classes of failure.
+                    const badPull = createFakeJira(() => {
+                        throw new Error(`ECONNRESET ${JIRA_SITE} ${JIRA_TOKEN}`);
+                    });
+                    await runWorkOriginPullTick(dataDir, utcInstant('10:00'), badPull.fetchImpl);
+
+                    const revoked = createFakeJira(() => new Response(JIRA_TOKEN, { status: 401 }));
+                    await runWorkOriginPullTick(dataDir, utcInstant('12:00'), revoked.fetchImpl);
+                } finally {
+                    stdoutSpy.mockRestore();
+                    stderrSpy.mockRestore();
+                }
+
+                const serialized = captured.join('');
+                expect(serialized).not.toContain(JIRA_TOKEN);
+                expect(serialized).not.toContain('acme.atlassian.net');
+                expect(serialized).not.toContain(JIRA_EMAIL);
+            });
+        });
+
+        describe('schema migration v5 -> v6 (origin IN (routine, manual, jira), story 4.1)', () => {
+            test('una base fresca nace con el CHECK ya ensanchado y las dos tablas del Origen', async () => {
+                await activate({ timeZone: 'UTC' });
+                const databasePath = tdahDatabasePath(dataDir, tokenToKey(TOKEN_ALPHA));
+                const { Database } = await import('bun:sqlite');
+                const database = new Database(databasePath, { readonly: true });
+                try {
+                    expect((database.prepare('PRAGMA user_version;').get() as { user_version: number }).user_version).toBe(6);
+                    const tableNames = (database.prepare("SELECT name FROM sqlite_master WHERE type = 'table';") as unknown as {
+                        all(): { name: string }[];
+                    }).all().map((row) => row.name);
+                    expect(tableNames).toContain('tdah_work_origin');
+                    expect(tableNames).toContain('tdah_work_origin_item');
+                    const ddl = database
+                        .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tdah_activity';")
+                        .get() as { sql: string };
+                    expect(ddl.sql).toContain("'jira'");
+                } finally {
+                    database.close();
+                }
+            });
+
+            test('una base pre-4.1 (v5) reconstruye tdah_activity conservando toda fila y admite la franja jira', async () => {
+                const key = tokenToKey(TOKEN_ALPHA);
+                const databasePath = tdahDatabasePath(dataDir, key);
+                mkdirSync(join(dataDir, key, 'tdah'), { recursive: true });
+
+                const today = formatDateInTimeZone(new Date(), 'UTC');
+                const { Database } = await import('bun:sqlite');
+                const seedDatabase = new Database(databasePath);
+                try {
+                    // The exact story 3.3 shape (schema v5): the narrow
+                    // two-literal origin CHECK.
+                    seedDatabase.exec(`
+                        CREATE TABLE tdah_profile (
+                            id INTEGER PRIMARY KEY CHECK (id = 1),
+                            mode TEXT NOT NULL CHECK (mode IN ('on', 'off')),
+                            time_zone TEXT NOT NULL,
+                            ritual_hour TEXT NOT NULL,
+                            created_at TEXT NOT NULL,
+                            updated_at TEXT NOT NULL,
+                            ritual_notified_date TEXT
+                        );
+                    `);
+                    seedDatabase.exec(`
+                        CREATE TABLE tdah_day_plan (
+                            date TEXT PRIMARY KEY,
+                            generated_at TEXT NOT NULL,
+                            confirmed_at TEXT
+                        );
+                    `);
+                    seedDatabase.exec(`
+                        CREATE TABLE tdah_activity (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            day_plan_date TEXT NOT NULL REFERENCES tdah_day_plan(date),
+                            block_id INTEGER,
+                            title TEXT NOT NULL,
+                            start_time TEXT,
+                            duration_minutes INTEGER,
+                            origin TEXT NOT NULL CHECK (origin IN ('routine', 'manual')),
+                            state TEXT NOT NULL CHECK (state IN ('pending', 'started', 'completed', 'missed', 'limbo', 'discarded')) DEFAULT 'pending',
+                            started_at TEXT,
+                            completed_at TEXT,
+                            start_notified_at TEXT,
+                            end_notified_at TEXT,
+                            sort_order INTEGER NOT NULL DEFAULT 0,
+                            moved_at TEXT
+                        );
+                    `);
+                    seedDatabase
+                        .prepare('INSERT INTO tdah_profile (id, mode, time_zone, ritual_hour, created_at, updated_at) VALUES (1, ?, ?, ?, ?, ?);')
+                        .run('on', 'UTC', '23:00', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+                    seedDatabase.prepare('INSERT INTO tdah_day_plan (date, generated_at) VALUES (?, ?);').run(today, '2026-01-01T00:00:00.000Z');
+                    seedDatabase
+                        .prepare("INSERT INTO tdah_activity (day_plan_date, block_id, title, start_time, duration_minutes, origin, state, sort_order, moved_at) VALUES (?, NULL, 'Vieja', '08:00', 30, 'manual', 'completed', 3, '2026-01-01T00:00:00.000Z');")
+                        .run(today);
+                    seedDatabase.exec('PRAGMA user_version = 5;');
+                } finally {
+                    seedDatabase.close();
+                }
+
+                // Any request touching the module migrates transparently first.
+                const dayResponse = await getDay();
+                expect(dayResponse.status).toBe(200);
+                const day = await readDay(dayResponse);
+                expect(day.activities).toHaveLength(1);
+                expect(day.activities[0]?.title).toBe('Vieja');
+                expect(day.activities[0]?.state).toBe('completed');
+                expect(day.activities[0]?.movedAt).toBe('2026-01-01T00:00:00.000Z');
+
+                const verifyDatabase = new Database(databasePath, { readonly: true });
+                try {
+                    expect((verifyDatabase.prepare('PRAGMA user_version;').get() as { user_version: number }).user_version).toBe(6);
+                    const ddl = verifyDatabase
+                        .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tdah_activity';")
+                        .get() as { sql: string };
+                    expect(ddl.sql).toContain("'jira'");
+                    // No stray staging table left behind.
+                    const stray = verifyDatabase
+                        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'tdah_activity_v2';")
+                        .get();
+                    expect(stray ?? null).toBeNull();
+                    const row = verifyDatabase.prepare('SELECT sort_order FROM tdah_activity WHERE day_plan_date = ?;').get(today) as { sort_order: number };
+                    expect(row.sort_order).toBe(3);
+                } finally {
+                    verifyDatabase.close();
+                }
+
+                // The whole point of the rebuild: a jira band can now insert.
+                const fake = healthyJira([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+                await originRequest('PUT', { body: VALID_ORIGIN_BODY, fetchImpl: fake.fetchImpl });
+                const pullFake = healthyJira([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+                expect((await runWorkOriginPullTick(dataDir, utcInstant('10:00'), pullFake.fetchImpl)).syncedCount).toBe(1);
+                expect((await readActivityRows()).filter((activity) => activity.origin === 'jira')).toHaveLength(1);
+            });
         });
     });
 

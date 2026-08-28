@@ -10,6 +10,7 @@ import { Switch } from '../../ui/Switch';
 import { SettingRow, SettingsCard, SettingsSectionHeader } from './SettingRow';
 import { TdahActivationSection } from './TdahActivationSection';
 import { TdahHistoryView } from './TdahHistoryView';
+import { TdahJiraView } from './TdahJiraView';
 import { TdahMetricsView } from './TdahMetricsView';
 import { TdahRoutinesListView } from './TdahRoutinesListView';
 
@@ -464,6 +465,12 @@ export function SettingsMainPage({
                 own 409 `TDAH_ACTIVATE_REQUIRED` response. */}
             <TdahHistoryView />
             <TdahMetricsView />
+
+            {/* Origen Jira (T-13, spec 4.1) — same self-contained convention;
+                gates on `profile.mode === 'on'` through its own 409 as well.
+                No `settingsKey` anywhere inside it, like every TDAH view: they
+                stay out of the settings-search roster. */}
+            <TdahJiraView />
 
             {/* Window Behavior */}
             {hasWindowSection && (

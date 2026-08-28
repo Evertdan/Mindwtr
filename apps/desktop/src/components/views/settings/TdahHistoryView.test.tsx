@@ -21,6 +21,7 @@ const LABELS: Record<string, string> = {
     'tdahHistory.filters.originAll': 'All',
     'tdahHistory.filters.originRoutine': 'Routine',
     'tdahHistory.filters.originManual': 'Manual',
+    'tdahHistory.filters.originJira': 'Jira',
     'tdahHistory.filters.routine': 'Routine',
     'tdahHistory.filters.routineAll': 'All Routines',
     'tdahHistory.filters.customRangeInvalid': 'Pick a valid range (from ≤ to, 366 days max).',
@@ -319,6 +320,38 @@ describe('TdahHistoryView', () => {
         // never as this entry's origin line (which is what the bug produced).
         expect(screen.getAllByText('Manual')).toHaveLength(1);
         expect(screen.getAllByText('Manual')[0]?.tagName).toBe('OPTION');
+    });
+
+    it('labels a jira-origin band as Jira, never falling back to the Manual label (spec 4.1)', async () => {
+        configureCloudSync();
+        mockHistoryAndRoutines([{
+            ...missedEntry,
+            activity: { ...missedEntry.activity, id: 77, title: 'Jira · 4 tasks', origin: 'jira' },
+        }]);
+        render(<TdahHistoryView />);
+
+        await screen.findByText('Jira · 4 tasks');
+        // "Jira" appears twice: the filter <option> and this entry's origin
+        // line. "Manual" stays confined to its own <option>.
+        expect(screen.getAllByText('Jira')).toHaveLength(2);
+        expect(screen.getAllByText('Manual')).toHaveLength(1);
+        expect(screen.getAllByText('Manual')[0]?.tagName).toBe('OPTION');
+    });
+
+    it('can filter the History down to the jira origin', async () => {
+        configureCloudSync();
+        mockHistoryAndRoutines([]);
+        render(<TdahHistoryView />);
+        await screen.findByText('Sin incompletas en este rango');
+
+        fireEvent.change(screen.getByLabelText('Origin'), { target: { value: 'jira' } });
+
+        await waitFor(() => {
+            expect(cloudGetJson).toHaveBeenCalledWith(
+                'https://sync.example.com/v1/tdah/history?period=day&origin=jira',
+                expect.objectContaining({ token: CLOUD_TOKEN }),
+            );
+        });
     });
 
     it('clears the previous range results when the custom range becomes invalid', async () => {

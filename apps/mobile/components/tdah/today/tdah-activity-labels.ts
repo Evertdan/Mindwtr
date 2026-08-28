@@ -20,14 +20,20 @@ const STATE_FALLBACKS: Record<TdahActivity['state'], string> = {
     discarded: 'Discarded',
 };
 
+// Exhaustive over the origin union on purpose: widening
+// TDAH_ACTIVITY_ORIGINS (tdah-today-types.ts) to match the server breaks
+// these two Records at compile time rather than silently resolving to
+// `undefined` and rendering a blank badge.
 const ORIGIN_KEYS: Record<TdahActivity['origin'], string> = {
     routine: 'tdahActivity.origin.routine',
     manual: 'tdahActivity.origin.manual',
+    jira: 'tdahActivity.origin.jira',
 };
 
 const ORIGIN_FALLBACKS: Record<TdahActivity['origin'], string> = {
     routine: 'Routine',
     manual: 'Manual',
+    jira: 'Jira',
 };
 
 export function tdahActivityStateLabel(t: TranslateFn, state: TdahActivity['state']): string {

@@ -26,6 +26,7 @@ const LABELS: Record<string, string> = {
     'tdahHistory.filters.customRangeInvalid': 'Pick a valid range (from ≤ to, 366 days max).',
     'tdahHistory.filters.originRoutine': 'Routine',
     'tdahHistory.filters.originManual': 'Manual',
+    'tdahHistory.filters.originJira': 'Jira',
     'tdahPeriod.day': 'Day',
     'tdahPeriod.week': 'Week',
     'tdahPeriod.month': 'Month',
@@ -186,6 +187,26 @@ describe('TdahMetricsView', () => {
         const routineBar = screen.getByTestId('tdah-metrics-origin-bar-routine');
         const manualBar = screen.getByTestId('tdah-metrics-origin-bar-manual');
         expect(routineBar.className).toBe(manualBar.className);
+    });
+
+    it('names the jira band in the origin breakdown instead of mislabelling it Manual (spec 4.1)', async () => {
+        configureCloudSync();
+        mockMetrics({
+            ...baseMetrics,
+            byOrigin: [
+                { origin: 'routine', completedOnTime: 4, total: 10 },
+                { origin: 'manual', completedOnTime: 2, total: 10 },
+                { origin: 'jira', completedOnTime: 3, total: 5 },
+            ],
+        });
+        render(<TdahMetricsView />);
+
+        await screen.findByText('By origin');
+        expect(screen.getByText('Jira')).toBeInTheDocument();
+        expect(screen.getByText('3/5')).toBeInTheDocument();
+        // Same fixed-color rule (SM-C2) applies to the third bar too.
+        expect(screen.getByTestId('tdah-metrics-origin-bar-jira').className)
+            .toBe(screen.getByTestId('tdah-metrics-origin-bar-manual').className);
     });
 
     it('renders all 8 trend weeks, including a null-rate week rendered distinctly from a 0% week', async () => {

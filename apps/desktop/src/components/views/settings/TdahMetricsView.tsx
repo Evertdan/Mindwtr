@@ -12,6 +12,7 @@ import { getCurrentUiLanguage } from '../../../contexts/language-context';
 import { getTauriHttpFetch } from '../../../lib/tauri-http';
 import { SyncService } from '../../../lib/sync-service';
 import { SettingsCard, SettingsSectionHeader } from './SettingRow';
+import { originLabelKey } from './TdahHistoryView';
 import { TDAH_REQUEST_TIMEOUT_MS, type CloudConnection } from './TdahRoutinesListView';
 import {
     formatIsoDate,
@@ -41,7 +42,10 @@ import {
  * SM-C2 spirit (never reward/punish a number with color).
  */
 
-export type TdahMetricsOrigin = 'routine' | 'manual';
+// Mirrors the server's `TDAH_ACTIVITY_ORIGINS`; `jira` (spec 4.1) is the
+// grouped work band, and `getMetrics` derives `byOrigin` from that same list,
+// so the breakdown gains a third row the moment an Origin is connected.
+export type TdahMetricsOrigin = 'routine' | 'manual' | 'jira';
 
 export type TdahMetricsOriginBreakdown = {
     origin: TdahMetricsOrigin;
@@ -102,10 +106,6 @@ const formatRatePercent = (rate: number | null): string => {
     const percent = Math.floor(rate * 100);
     return `${rate > 0 && percent === 0 ? 1 : percent}%`;
 };
-
-const originLabelKey = (origin: TdahMetricsOrigin): string => (
-    origin === 'routine' ? 'tdahHistory.filters.originRoutine' : 'tdahHistory.filters.originManual'
-);
 
 // Trend chart geometry — a plain inline SVG polyline, no charting library
 // (none exists in apps/desktop; spec-3-5's Code Map is explicit about this).

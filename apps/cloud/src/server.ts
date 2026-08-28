@@ -105,7 +105,7 @@ import {
     rotateCalendarFeed,
     type CalendarFeedRecord,
 } from './server-calendar-feed';
-import { TDAH_PATH_PREFIX, handleTdahRequest, runNightlyTdahTick } from './tdah';
+import { TDAH_PATH_PREFIX, handleTdahRequest, runNightlyTdahTick, runWorkOriginPullTick, type WorkOriginFetch } from './tdah';
 import { runActivityTriggerTick } from './tdah/activity-trigger';
 import { TDAH_ERRORS, type TdahWsActivityTriggerEvent, type TdahWsRitualInvitationEvent } from './tdah/types';
 import {
@@ -168,6 +168,8 @@ const STATIC_CLOUD_ROUTES = new Set([
     '/v1/tdah/routines/conflicts',
     '/v1/tdah/day',
     '/v1/tdah/day/activities',
+    '/v1/tdah/origin',
+    '/v1/tdah/origin/sync',
     '/v1/tdah/ws',
 ]);
 
@@ -1074,6 +1076,52 @@ export async function runTdahActivityTriggerIntervalTick(
     }
 }
 
+/**
+ * Story 4.1 — the Origen de trabajo pull interval's callback body, extracted
+ * for the same directly-testable reason as the two tick wrappers above.
+ *
+ * Logs the single `'tdah origin pull fired'` audit line only when the tick
+ * actually did something (synced or failed at least one namespace) — the same
+ * noise discipline `runTdahActivityTriggerIntervalTick` uses, since this tick
+ * also runs once a minute and the overwhelming majority of them are pure
+ * no-ops (outside working hours, or the 2h interval not yet elapsed). The
+ * context is counts plus the tick's own UTC reference date: never a namespace
+ * key, never a site host, never an issue key. The
+ * `'tdah origin pull crashed'` backstop covers `runWorkOriginPullTick`
+ * throwing despite its own never-throws contract.
+ *
+ * `fetchImpl` defaults to `runWorkOriginPullTick`'s own global `fetch`, so the
+ * real interval registration below passes nothing. It exists so tests can
+ * exercise this wrapper — the audit line and the backstop included — against a
+ * fake provider instead of making a real outbound request to whatever site a
+ * fixture happens to name, the same dependency injection every other tick in
+ * this module already uses.
+ */
+export async function runTdahOriginPullIntervalTick(
+    dataDir: string,
+    fetchImpl?: WorkOriginFetch,
+): Promise<void> {
+    try {
+        const summary = await runWorkOriginPullTick(dataDir, new Date(), fetchImpl);
+        if (summary.syncedCount > 0 || summary.failedCount > 0) {
+            logInfo('tdah origin pull fired', {
+                date: summary.date,
+                namespaceCount: summary.namespaceCount,
+                syncedCount: summary.syncedCount,
+                skippedCount: summary.skippedCount,
+                failedCount: summary.failedCount,
+                itemCount: summary.itemCount,
+            });
+        }
+    } catch (error) {
+        logError('tdah origin pull crashed', {
+            failureClass: 'runtime',
+            failureCode: 'tdah_origin_pull_tick_crashed',
+            failureErrno: getFsErrorCode(error),
+        });
+    }
+}
+
 function isProjectPurgePatch(bodyRecord: Record<string, unknown>): boolean {
     return typeof bodyRecord.purgedAt === 'string' && bodyRecord.purgedAt.trim().length > 0;
 }
@@ -1349,6 +1397,28 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
     }, TDAH_ACTIVITY_TRIGGER_TICK_INTERVAL_MS);
     if (typeof tdahActivityTriggerTickTimer.unref === 'function') {
         tdahActivityTriggerTickTimer.unref();
+    }
+
+    // Story 4.1 — the Origen de trabajo's own sibling `setInterval`. Same 60s
+    // cadence and same shape as the nightly tick above, for the same reason:
+    // the timer only sweeps, while the real decision ("is it inside this
+    // user's working hours, and has their configured interval elapsed?") is
+    // taken per namespace against persisted state, re-read fresh every tick
+    // (`origin-pull.ts`). A namespace outside its window costs one profile
+    // read and nothing else — no outbound request is ever made from a sweep
+    // that will not pull. `tdahOriginPullTickInFlight` guards against overlap
+    // exactly like the two timers above; here it matters more than usual,
+    // since a pull genuinely blocks on a remote HTTP round trip.
+    let tdahOriginPullTickInFlight = false;
+    const tdahOriginPullTickTimer = setInterval(() => {
+        if (tdahOriginPullTickInFlight) return;
+        tdahOriginPullTickInFlight = true;
+        void runTdahOriginPullIntervalTick(dataDir).finally(() => {
+            tdahOriginPullTickInFlight = false;
+        });
+    }, 60_000);
+    if (typeof tdahOriginPullTickTimer.unref === 'function') {
+        tdahOriginPullTickTimer.unref();
     }
 
     const usingLegacyTokenVar = options.allowedAuthTokens === undefined

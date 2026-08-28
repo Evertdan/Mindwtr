@@ -7,6 +7,11 @@ export const allowedEnglishMirrorTerms = [
     'iCloud',
     'CloudKit',
     'GitHub',
+    // Atlassian's product name and its query language's acronym: both are proper
+    // nouns every locale keeps in Latin, exactly like 'GTD' and 'ICS' below
+    // (story 4.1's tdahJira.* copy).
+    'Jira',
+    'JQL',
     'OpenAI',
     'Gemini',
     'Anthropic',

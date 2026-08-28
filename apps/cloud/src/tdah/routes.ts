@@ -12,7 +12,12 @@
  * ids atomically) — plus (story 3.5, T-09/T-10) GET `/v1/tdah/history` and
  * GET `/v1/tdah/metrics`, both computed fresh at request time over the same
  * `missed`/`limbo`/`completed` candidate set (AD-13: no precomputed
- * aggregate). PUT `/tdah/profile`
+ * aggregate) — plus (story 4.1, T-13) the Origen de trabajo:
+ * GET/PUT/DELETE `/v1/tdah/origin` and POST `/v1/tdah/origin/sync`, the only
+ * routes in this module that talk to a third party (read-only, GET-only, see
+ * `jira-origin.ts`) and the only ones that ever receive a secret — which is
+ * sealed at rest and never appears in any response, log or subsequent read.
+ * PUT `/tdah/profile`
  * only ever sets `mode:'off'` or updates timeZone/ritualHour on an existing
  * profile — POST /activate is the only way to set `mode:'on'`, and PUT
  * rejects a `mode:'on'` body outright with `TDAH_ACTIVATE_REQUIRED`.
@@ -54,7 +59,20 @@ import {
     type TdahCreateManualActivityInput,
     updateRoutine,
     upsertTdahProfile,
+    deleteWorkOrigin,
+    readWorkOriginStatus,
+    upsertWorkOrigin,
+    TDAH_WORK_ORIGIN_DEFAULT_PULL_INTERVAL_MINUTES,
+    TDAH_WORK_ORIGIN_DEFAULT_WORK_END,
+    TDAH_WORK_ORIGIN_DEFAULT_WORK_START,
+    TDAH_WORK_ORIGIN_MAX_EMAIL_LENGTH,
+    TDAH_WORK_ORIGIN_MAX_PULL_INTERVAL_MINUTES,
+    TDAH_WORK_ORIGIN_MAX_TOKEN_LENGTH,
+    TDAH_WORK_ORIGIN_MIN_PULL_INTERVAL_MINUTES,
 } from './storage';
+import { resolveOriginEncryptionKey, sealOriginSecret } from './origin-crypto';
+import { resolveWorkOriginProvider, type WorkOriginFetch } from './work-origin';
+import { runNamespaceWorkOriginPull } from './origin-pull';
 import {
     isTdahMode,
     TDAH_ACTIVITY_ORIGINS,
@@ -77,6 +95,9 @@ import {
     type TdahRoutinePattern,
     type TdahRoutineBlockInput,
     type TdahRoutineInput,
+    isTdahWorkOriginProvider,
+    type TdahWorkOriginResponse,
+    type TdahWorkOriginUpsertRequest,
 } from './types';
 
 export const TDAH_PATH_PREFIX = '/v1/tdah';
@@ -116,6 +137,12 @@ const TDAH_DAY_TOMORROW_CONFIRM_PATH = `${TDAH_DAY_TOMORROW_PATH}/confirm`;
 // sub-path above.
 const TDAH_HISTORY_PATH = `${TDAH_PATH_PREFIX}/history`;
 const TDAH_METRICS_PATH = `${TDAH_PATH_PREFIX}/metrics`;
+// Story 4.1 — T-13's Origen de trabajo. `.../origin/sync` is dispatched ahead
+// of `.../origin` for the same clarity ordering `TDAH_LIMBO_DECIDE_PATH`
+// already follows over `TDAH_LIMBO_PATH`, and both ahead of
+// `TDAH_PROFILE_PATH`'s catch-all fallback.
+const TDAH_ORIGIN_PATH = `${TDAH_PATH_PREFIX}/origin`;
+const TDAH_ORIGIN_SYNC_PATH = `${TDAH_ORIGIN_PATH}/sync`;
 
 const IANA_TIME_ZONE_PATTERN = /^[A-Za-z0-9+_/-]{1,64}$/;
 const RITUAL_HOUR_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -229,6 +256,15 @@ export type TdahRequestOptions = {
     dataDir: string;
     maxBodyBytes: number;
     signal?: AbortSignal;
+    /**
+     * Story 4.1 — the outbound `fetch` the Origen's provider uses. Injected
+     * (defaulting to the global) for the same reason `activity-trigger.ts`
+     * injects `hasOpenConnection`: `PUT /v1/tdah/origin` and
+     * `POST /v1/tdah/origin/sync` are the only routes in this module that
+     * talk to a third party, and they must be testable against a fake without
+     * a network or a mutated global. `server.ts` never passes it.
+     */
+    fetchImpl?: WorkOriginFetch;
 };
 
 type TdahProfilePutBody = {
@@ -1242,6 +1278,313 @@ const handleGetMetrics = async (
     }
 };
 
+// --- Origen de trabajo (story 4.1, T-13) ------------------------------------
+
+type TdahWorkOriginPutBody = {
+    provider?: unknown;
+    siteUrl?: unknown;
+    email?: unknown;
+    token?: unknown;
+    workStart?: unknown;
+    workEnd?: unknown;
+    pullIntervalMinutes?: unknown;
+};
+
+/**
+ * PUT /v1/tdah/origin body. Everything is validated BEFORE the handler makes
+ * any outbound request — a malformed site URL must cost a 400, never a
+ * connection attempt (I/O Matrix: "rechazo antes de cualquier salida de red").
+ *
+ * `siteUrl` is normalized by the PROVIDER (`parseSiteUrl`), not by a regex
+ * here: what counts as a legitimate site is provider-specific, and the
+ * rejected shapes (userinfo, path, non-https, IP literals, internal suffixes)
+ * are the module's SSRF boundary, so they live next to the code that actually
+ * sends the credential — see `parseJiraSiteUrl`'s own doc comment.
+ *
+ * `token` is OPTIONAL. Omitting it means "keep the stored credential", which
+ * is what makes doc 06 zone 3's pull settings independently adjustable: moving
+ * your working hours must not require minting a fresh Atlassian API token.
+ * Whether an omitted token is actually acceptable depends on an existing row,
+ * which this parser cannot see — `handlePutWorkOrigin` enforces it. When
+ * present it is length-bounded but otherwise opaque: only Atlassian can say
+ * whether a token works, and a client-side format guess would just reject
+ * valid future formats.
+ *
+ * `workStart`/`workEnd`/`pullIntervalMinutes` are shape-validated here but
+ * NOT cross-validated: the effective window is the merge of body over stored
+ * over defaults, and only the handler (which reads the stored row) can compute
+ * it. `handlePutWorkOrigin` checks `workStart < workEnd` on that merged pair,
+ * still before any outbound call.
+ */
+const parseWorkOriginPutBody = (value: unknown): TdahWorkOriginUpsertRequest | null => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+    const raw = value as TdahWorkOriginPutBody;
+
+    if (!isTdahWorkOriginProvider(raw.provider)) return null;
+    const provider = resolveWorkOriginProvider(raw.provider);
+    if (!provider) return null;
+
+    if (typeof raw.siteUrl !== 'string') return null;
+    const siteUrl = provider.parseSiteUrl(raw.siteUrl);
+    if (!siteUrl) return null;
+
+    if (typeof raw.email !== 'string') return null;
+    const email = raw.email.trim();
+    if (email.length === 0 || email.length > TDAH_WORK_ORIGIN_MAX_EMAIL_LENGTH) return null;
+
+    const parsed: TdahWorkOriginUpsertRequest = { provider: raw.provider, siteUrl, email };
+
+    if (raw.token !== undefined) {
+        if (typeof raw.token !== 'string') return null;
+        const token = raw.token.trim();
+        if (token.length === 0 || token.length > TDAH_WORK_ORIGIN_MAX_TOKEN_LENGTH) return null;
+        parsed.token = token;
+    }
+
+    if (raw.workStart !== undefined) {
+        if (typeof raw.workStart !== 'string' || !RITUAL_HOUR_PATTERN.test(raw.workStart)) return null;
+        parsed.workStart = raw.workStart;
+    }
+    if (raw.workEnd !== undefined) {
+        if (typeof raw.workEnd !== 'string' || !RITUAL_HOUR_PATTERN.test(raw.workEnd)) return null;
+        parsed.workEnd = raw.workEnd;
+    }
+
+    if (raw.pullIntervalMinutes !== undefined) {
+        if (
+            typeof raw.pullIntervalMinutes !== 'number'
+            || !Number.isInteger(raw.pullIntervalMinutes)
+            || raw.pullIntervalMinutes < TDAH_WORK_ORIGIN_MIN_PULL_INTERVAL_MINUTES
+            || raw.pullIntervalMinutes > TDAH_WORK_ORIGIN_MAX_PULL_INTERVAL_MINUTES
+        ) {
+            return null;
+        }
+        parsed.pullIntervalMinutes = raw.pullIntervalMinutes;
+    }
+
+    return parsed;
+};
+
+/**
+ * GET /v1/tdah/origin — T-13's whole read (doc 06 zones 1, 3 and 4: the
+ * connection state, the pull settings, and the effective JQL as selectable
+ * text). Same FR-1 mode gate as every other TDAH route: 409
+ * TDAH_ACTIVATE_REQUIRED unless the mode is on.
+ *
+ * A namespace with no Origen answers 200 `{connected: false, …}` — the
+ * "nunca conectado" onboarding state, never a 404: T-13 is a settings screen
+ * that must render before anything exists.
+ *
+ * The response can hold no token at any level, by construction — see
+ * `TdahWorkOriginStatus` and `readWorkOriginStatus`.
+ */
+const handleGetWorkOrigin = async (ctx: TdahRequestContext, options: TdahRequestOptions): Promise<Response> => {
+    try {
+        const profile = await readTdahProfile(options.dataDir, ctx.key);
+        if (!profile || profile.mode !== 'on') {
+            return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
+        }
+        const responseBody: TdahWorkOriginResponse = await readWorkOriginStatus(options.dataDir, ctx.key);
+        return jsonResponse(responseBody);
+    } catch (error) {
+        logError('request failed', {
+            failureClass: 'filesystem',
+            failureCode: 'request_failed',
+            failureErrno: getFsErrorCode(error),
+        });
+        return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
+    }
+};
+
+/**
+ * PUT /v1/tdah/origin — the one-time write of the credential (doc 06 zone 2).
+ *
+ * Order of operations is the security contract, not an implementation detail:
+ *
+ * 1. Parse (no I/O at all) — a bad site URL never reaches the network.
+ * 2. Mode gate — 409, same as every other route.
+ * 3. Resolve the effective settings against what is already stored: body →
+ *    persisted → default, then validate the merged work window. Still before
+ *    any outbound call, so an impossible window is a 400, never a connection.
+ * 4. Master key — 503 `TDAH_ORIGIN_KEY_UNAVAILABLE` when a token needs
+ *    sealing and the operator has not configured one. The Origen fails
+ *    CLOSED: there is no branch that persists a token in clear.
+ * 5. Validate against the live API — a 401/403 is a 400
+ *    `TDAH_ORIGIN_CREDENTIALS_INVALID` and NOTHING is written, so a failed
+ *    re-connection attempt leaves a previously working credential intact.
+ * 6. Seal, then persist. The plaintext exists only as a local in this
+ *    function and inside the provider call; it is never assigned to a stored
+ *    object, never returned, never logged.
+ *
+ * A settings-only PUT (no `token`, against an already-connected Origen) skips
+ * steps 4 and 5 entirely: there is no new credential to prove and no reason to
+ * spend an Atlassian round trip — the stored sealed secret is carried forward
+ * untouched (`secretSealed: undefined`, see `upsertWorkOrigin`). A first
+ * connection with no `token` is a 400: there is nothing to keep.
+ *
+ * The response is the same public status `GET` returns — the client learns
+ * that the write landed without the server ever echoing back what it wrote.
+ */
+const handlePutWorkOrigin = async (
+    req: Request,
+    ctx: TdahRequestContext,
+    options: TdahRequestOptions,
+): Promise<Response> => {
+    const body = await readJsonBody(req, options.maxBodyBytes, options.signal);
+    if (isBodyReadError(body)) {
+        return tdahErrorResponse(TDAH_ERRORS.invalidBody, body.__mindwtrError.status);
+    }
+    const input = parseWorkOriginPutBody(body);
+    if (!input) return tdahErrorResponse(TDAH_ERRORS.originInvalid, 400);
+    const provider = resolveWorkOriginProvider(input.provider);
+    if (!provider) return tdahErrorResponse(TDAH_ERRORS.originInvalid, 400);
+
+    try {
+        const profile = await readTdahProfile(options.dataDir, ctx.key);
+        if (!profile || profile.mode !== 'on') {
+            return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
+        }
+
+        const existing = await readWorkOriginStatus(options.dataDir, ctx.key);
+        // A first connection MUST carry a token; a re-save of an existing one
+        // may omit it to keep the stored credential.
+        if (input.token === undefined && !existing.connected) {
+            return tdahErrorResponse(TDAH_ERRORS.originInvalid, 400);
+        }
+
+        // body → persisted → default. Falling straight to the default on a
+        // re-save is what used to silently reset a customised window.
+        const workStart = input.workStart ?? existing.workStart ?? TDAH_WORK_ORIGIN_DEFAULT_WORK_START;
+        const workEnd = input.workEnd ?? existing.workEnd ?? TDAH_WORK_ORIGIN_DEFAULT_WORK_END;
+        const pullIntervalMinutes = input.pullIntervalMinutes
+            ?? existing.pullIntervalMinutes
+            ?? TDAH_WORK_ORIGIN_DEFAULT_PULL_INTERVAL_MINUTES;
+        // Lexically comparable because both are zero-padded `HH:mm`. A window
+        // that does not run forward would make the pull gate never open (and
+        // the band's duration negative), so it is rejected rather than clamped.
+        if (workStart >= workEnd) return tdahErrorResponse(TDAH_ERRORS.originInvalid, 400);
+
+        let secretSealed: string | undefined;
+        if (input.token !== undefined) {
+            const encryptionKey = resolveOriginEncryptionKey(process.env);
+            if (!encryptionKey) {
+                return tdahErrorResponse(TDAH_ERRORS.originKeyUnavailable, 503);
+            }
+            const credentials = { siteUrl: input.siteUrl, email: input.email, token: input.token };
+            const validation = await provider.validateCredentials(credentials, options.fetchImpl ?? fetch);
+            if (validation.kind === 'invalid-credentials') {
+                return tdahErrorResponse(TDAH_ERRORS.originCredentialsInvalid, 400);
+            }
+            if (validation.kind === 'unreachable') {
+                return tdahErrorResponse(TDAH_ERRORS.originUnreachable, 502);
+            }
+            secretSealed = sealOriginSecret(encryptionKey, ctx.key, input.token);
+        }
+
+        const status = await upsertWorkOrigin(options.dataDir, ctx.key, {
+            provider: input.provider,
+            siteUrl: input.siteUrl,
+            email: input.email,
+            ...(secretSealed !== undefined ? { secretSealed } : {}),
+            jql: provider.describeQuery(),
+            workStart,
+            workEnd,
+            pullIntervalMinutes,
+        });
+        const responseBody: TdahWorkOriginResponse = status;
+        return jsonResponse(responseBody);
+    } catch (error) {
+        // `.code` only — never the caught error's message, which for a failed
+        // outbound request embeds the site URL.
+        logError('request failed', {
+            failureClass: 'filesystem',
+            failureCode: 'request_failed',
+            failureErrno: getFsErrorCode(error),
+        });
+        return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
+    }
+};
+
+/**
+ * DELETE /v1/tdah/origin — doc 06 zone 5's "Desconectar". Removes the
+ * credential and the snapshot; every band already materialized keeps existing
+ * and stays visible in the Historial (see `deleteWorkOrigin`, storage.ts).
+ *
+ * Idempotent: 200 even when nothing was connected. Deliberately NOT gated on
+ * `profile.mode === 'on'`, unlike GET/PUT/sync — a user who turned the mode
+ * off must still be able to revoke a stored credential, and refusing that
+ * would be the one place where the mode toggle traps a secret on the server.
+ * The confirmation dialog the UX asks for is a client concern (T-13), not a
+ * second server-side gate.
+ */
+const handleDeleteWorkOrigin = async (ctx: TdahRequestContext, options: TdahRequestOptions): Promise<Response> => {
+    try {
+        await deleteWorkOrigin(options.dataDir, ctx.key);
+        return jsonResponse({ deleted: true });
+    } catch (error) {
+        logError('request failed', {
+            failureClass: 'filesystem',
+            failureCode: 'request_failed',
+            failureErrno: getFsErrorCode(error),
+        });
+        return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
+    }
+};
+
+/**
+ * POST /v1/tdah/origin/sync — T-13's manual "reintentar" (doc 06: the sync
+ * state is what the user comes to look at when something breaks, so they need
+ * a way to act on it without waiting out the interval).
+ *
+ * Runs exactly the tick's own per-namespace logic (`runNamespaceWorkOriginPull`)
+ * with both scheduling gates bypassed — a person tapping retry has already
+ * decided that now is the moment. Everything else is identical, so there is
+ * no second code path where the credential could be handled differently.
+ *
+ * A pull failure that PERSISTED its reason (bad credentials, unreachable
+ * site, missing key, full day) answers 200 with the refreshed status: the
+ * failure is already in `lastErrorCode`, which is precisely the field T-13
+ * renders, and an HTTP error would repeat what the body already says while
+ * losing the rest of the state the screen needs.
+ *
+ * `storageFailed` is the exception, and is a 500. Nothing was persisted in
+ * that case — writing an error code would have needed the storage that just
+ * failed — so a 200 there would hand the client a stale, healthy-looking
+ * status and no indication at all that the retry it just asked for never
+ * happened.
+ */
+const handleSyncWorkOrigin = async (ctx: TdahRequestContext, options: TdahRequestOptions): Promise<Response> => {
+    try {
+        const profile = await readTdahProfile(options.dataDir, ctx.key);
+        if (!profile || profile.mode !== 'on') {
+            return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
+        }
+        const status = await readWorkOriginStatus(options.dataDir, ctx.key);
+        if (!status.connected) {
+            return tdahErrorResponse(TDAH_ERRORS.notFound, 404);
+        }
+        const outcome = await runNamespaceWorkOriginPull(
+            options.dataDir,
+            ctx.key,
+            new Date(),
+            options.fetchImpl ?? fetch,
+            { ignoreSchedule: true },
+        );
+        if (outcome.kind === 'failed' && outcome.errorCode === TDAH_ERRORS.storageFailed) {
+            return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
+        }
+        const responseBody: TdahWorkOriginResponse = await readWorkOriginStatus(options.dataDir, ctx.key);
+        return jsonResponse(responseBody);
+    } catch (error) {
+        logError('request failed', {
+            failureClass: 'filesystem',
+            failureCode: 'request_failed',
+            failureErrno: getFsErrorCode(error),
+        });
+        return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
+    }
+};
+
 export async function handleTdahRequest(
     req: Request,
     pathname: string,
@@ -1366,6 +1709,22 @@ export async function handleTdahRequest(
     if (pathname === TDAH_METRICS_PATH) {
         if (req.method !== 'GET') return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
         return handleGetMetrics(req, ctx, options);
+    }
+
+    // Story 4.1 — T-13's Origen de trabajo. The more specific `.../origin/sync`
+    // is matched first (same ordering `TDAH_LIMBO_DECIDE_PATH` uses ahead of
+    // `TDAH_LIMBO_PATH`), and both ahead of `TDAH_PROFILE_PATH`'s catch-all
+    // fallback below, same as every other sub-path above.
+    if (pathname === TDAH_ORIGIN_SYNC_PATH) {
+        if (req.method !== 'POST') return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
+        return handleSyncWorkOrigin(ctx, options);
+    }
+
+    if (pathname === TDAH_ORIGIN_PATH) {
+        if (req.method === 'GET') return handleGetWorkOrigin(ctx, options);
+        if (req.method === 'PUT') return handlePutWorkOrigin(req, ctx, options);
+        if (req.method === 'DELETE') return handleDeleteWorkOrigin(ctx, options);
+        return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
     }
 
     if (pathname !== TDAH_PROFILE_PATH) {

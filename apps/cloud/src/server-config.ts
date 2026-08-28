@@ -43,7 +43,19 @@ export type CloudFailureContext = {
         // Distinct from 'tdah_nightly_tick_failed' (a genuine namespace
         // read/write failure) the same way 'tdah_activity_trigger_onfire_failed'
         // is distinct from 'tdah_activity_trigger_tick_failed' above.
-        | 'tdah_ritual_invitation_push_failed';
+        | 'tdah_ritual_invitation_push_failed'
+        // Story 4.1: one namespace's Origen pull failed this tick — a storage
+        // throw, a missing at-rest key, bad credentials, or an unreachable
+        // site. Deliberately its own code rather than the generic
+        // 'request_failed': no inbound request is involved, exactly the
+        // background-job/inbound-request split 'tdah_nightly_tick_failed'
+        // already draws. Never carries the token, the site host or the
+        // account email — only `.code`, like every other failure context here.
+        | 'tdah_origin_pull_failed'
+        // Story 4.1: `runWorkOriginPullTick` itself threw despite its own
+        // never-throws contract — the backstop, mirroring
+        // 'tdah_activity_trigger_tick_crashed'.
+        | 'tdah_origin_pull_tick_crashed';
     // S10: ONLY ever assign a bare fs/sqlite error code here (e.g. 'ENOENT', 'EACCES',
     // 'SQLITE_BUSY') — never error.message or a path. Privacy ratchet 9e1cd93b7 covers
     // this field too: logError does not sanitize it, the caller must.
@@ -75,6 +87,9 @@ export const CLOUD_LOG_MESSAGES = [
     'tdah nightly trigger crashed',
     'tdah nightly trigger fired',
     'tdah nightly trigger namespace failed',
+    'tdah origin pull crashed',
+    'tdah origin pull fired',
+    'tdah origin pull namespace failed',
     'token auth allowlist enabled',
     'token namespace mode enabled by explicit opt-in',
     'trusting proxy IP headers for auth failure rate limiting',
@@ -102,6 +117,12 @@ type CloudOperationalLogContext = Partial<Record<
     | 'firedEventCount'
     | 'generatedCount'
     | 'hint'
+    // Story 4.1 (tdah Origen pull tick): 'itemCount' and 'syncedCount' back
+    // the 'tdah origin pull fired' audit line's context
+    // (TdahOriginPullTickSummary), alongside the shared 'date'/'namespaceCount'/
+    // 'skippedCount'/'failedCount' above. Counts only — never a namespace key,
+    // never a site host, never an issue key or summary.
+    | 'itemCount'
     | 'limboCount'
     | 'maxNamespaces'
     | 'method'
@@ -117,6 +138,7 @@ type CloudOperationalLogContext = Partial<Record<
     | 'signal'
     | 'skippedCount'
     | 'status'
+    | 'syncedCount'
     | 'trustedProxyIps',
     string | number
 >>;

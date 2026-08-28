@@ -7,7 +7,21 @@
  * same convention as tdah-onboarding-types.ts).
  */
 
-export const TDAH_ACTIVITY_ORIGINS = ['routine', 'manual'] as const;
+/**
+ * Mirrors `TDAH_ACTIVITY_ORIGINS` in apps/cloud/src/tdah/types.ts by hand
+ * (ADR 0026, same as the shapes below).
+ *
+ * `'jira'` (story 4.1) is the single grouped, read-only "banda de trabajo"
+ * the Origen de trabajo materializes once per local day — server-created by
+ * the pull tick rather than by a Rutina (`'routine'`) or by the user
+ * (`'manual'`). It is deliberately part of the SAME union rather than a
+ * parallel concept: `GET /v1/tdah/day` returns it as an ordinary
+ * `TdahActivity`, so every consumer here (T-01's timeline, the origin badge,
+ * the accessibility label) must already handle it. Keep this list in sync
+ * with the server's — a stale mirror silently blanks the badge for the
+ * origins it is missing.
+ */
+export const TDAH_ACTIVITY_ORIGINS = ['routine', 'manual', 'jira'] as const;
 export type TdahActivityOrigin = (typeof TDAH_ACTIVITY_ORIGINS)[number];
 
 export const TDAH_ACTIVITY_STATES = ['pending', 'started', 'completed', 'missed', 'limbo', 'discarded'] as const;

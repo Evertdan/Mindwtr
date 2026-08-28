@@ -20,7 +20,7 @@
 import { existsSync, readdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { ensureDurableDirectory } from '../server-storage';
-import { TDAH_ACTIVITY_ORIGINS } from './types';
+import { TDAH_ACTIVITY_ORIGINS, TDAH_ERRORS } from './types';
 import type {
     TdahActivity,
     TdahActivityDecideRequest,
@@ -28,6 +28,7 @@ import type {
     TdahActivityState,
     TdahActivityTransitionAction,
     TdahConfirmMorningRequest,
+    TdahErrorCode,
     TdahHistoryEntry,
     TdahLimboDecideBatchRequest,
     TdahMetricsOriginBreakdown,
@@ -45,6 +46,9 @@ import type {
     TdahRoutinePattern,
     TdahRoutinePatternKind,
     TdahRoutineWeekdayPattern,
+    TdahWorkOriginItem,
+    TdahWorkOriginProvider,
+    TdahWorkOriginStatus,
 } from './types';
 
 const TDAH_DIR_NAME = 'tdah';
@@ -207,7 +211,7 @@ const CREATE_ACTIVITY_TABLE_SQL = `
         title TEXT NOT NULL,
         start_time TEXT,
         duration_minutes INTEGER,
-        origin TEXT NOT NULL CHECK (origin IN ('routine', 'manual')),
+        origin TEXT NOT NULL CHECK (origin IN ('routine', 'manual', 'jira')),
         state TEXT NOT NULL CHECK (state IN ('pending', 'started', 'completed', 'missed', 'limbo', 'discarded')) DEFAULT 'pending',
         started_at TEXT,
         completed_at TEXT,
@@ -215,6 +219,62 @@ const CREATE_ACTIVITY_TABLE_SQL = `
         end_notified_at TEXT,
         sort_order INTEGER NOT NULL DEFAULT 0,
         moved_at TEXT
+    );
+`;
+
+// --- Origen de trabajo (story 4.1) -----------------------------------------
+//
+// One row, `id = 1`, exactly like `tdah_profile`: a namespace has at most one
+// connected Origen in v1, so the singleton PRIMARY KEY makes "connect twice"
+// an UPSERT rather than something the application has to police.
+//
+// `secret_sealed` holds ONLY the `v1.<nonce>.<ciphertext>` container from
+// `origin-crypto.ts`. There is deliberately no companion plaintext column and
+// no "unsealed" fallback — the Origen fails closed when no master key is
+// configured (see `TDAH_ERRORS.originKeyUnavailable`), and a schema with
+// nowhere to put a clear token cannot be talked into storing one.
+//
+// `last_pull_at` vs `last_sync_at` are two different facts and both are
+// needed: the first is *attempted* (advanced on every pull, success or not,
+// so a failing Origen backs off on its own schedule instead of hammering
+// Atlassian every tick), the second is *succeeded* (what T-13 renders as
+// "última sincronización"). Collapsing them would either hammer or lie.
+//
+// `last_error_code` stores a stable `TDAH_…` code, never a raw HTTP/fs
+// message — the same `.code`-only rule the rest of the module follows.
+const CREATE_WORK_ORIGIN_TABLE_SQL = `
+    CREATE TABLE IF NOT EXISTS tdah_work_origin (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        provider TEXT NOT NULL,
+        site_url TEXT NOT NULL,
+        account_email TEXT NOT NULL,
+        secret_sealed TEXT NOT NULL,
+        jql TEXT NOT NULL,
+        work_start TEXT NOT NULL,
+        work_end TEXT NOT NULL,
+        pull_interval_minutes INTEGER NOT NULL,
+        connected_at TEXT NOT NULL,
+        last_pull_at TEXT,
+        last_sync_at TEXT,
+        last_error_code TEXT,
+        updated_at TEXT NOT NULL
+    );
+`;
+
+// The snapshot the last successful pull left behind — wholesale replaced on
+// every sync (`replaceWorkOriginItems`), never merged, so a closed issue
+// simply stops existing rather than needing a tombstone. No foreign key to
+// `tdah_work_origin`: `deleteWorkOrigin` clears both tables in one
+// transaction, and a FK would only add a constraint failure mode to a
+// relationship that is already 1:N-by-construction (one singleton row).
+const CREATE_WORK_ORIGIN_ITEM_SQL = `
+    CREATE TABLE IF NOT EXISTS tdah_work_origin_item (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        external_key TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        status TEXT NOT NULL,
+        sprint_name TEXT,
+        sort_order INTEGER NOT NULL
     );
 `;
 
@@ -287,7 +347,13 @@ const SCHEMA_VERSION_RITUAL_NOTIFICATION = 4;
 // Story 3.3 — adds `tdah_activity.sort_order`/`moved_at` and
 // `tdah_day_plan.confirmed_at` (T-06's morning editor + T-07's confirm).
 const SCHEMA_VERSION_MORNING_EDIT = 5;
-const SCHEMA_TARGET_VERSION = SCHEMA_VERSION_MORNING_EDIT;
+// Story 4.1 — widens `tdah_activity.origin`'s CHECK to admit the Origen's
+// grouped band (`'jira'`). The two new Origen tables need no version of their
+// own (`CREATE TABLE IF NOT EXISTS` creates them on any database, new or old);
+// only the CHECK relaxation needs a real migration, since SQLite cannot alter
+// an existing constraint in place.
+const SCHEMA_VERSION_JIRA_ORIGIN = 6;
+const SCHEMA_TARGET_VERSION = SCHEMA_VERSION_JIRA_ORIGIN;
 
 /**
  * v0 -> v1: a pre-1.4 database's `tdah_routine` still has the old
@@ -539,6 +605,91 @@ const migrateMorningEditColumnsIfNeeded = (database: TdahDatabase): void => {
     database.exec(`PRAGMA user_version = ${SCHEMA_VERSION_MORNING_EDIT};`);
 };
 
+/**
+ * v5 -> v6 (story 4.1): every database created before this story carries
+ * `CHECK (origin IN ('routine', 'manual'))` on `tdah_activity`. The Origen's
+ * grouped band is `origin = 'jira'`, so without this step the very first pull
+ * would fail its INSERT with a constraint violation — the same permanent
+ * `CREATE TABLE IF NOT EXISTS` no-op trap DW-9 documented for the Rutina
+ * pattern widening.
+ *
+ * A CHECK constraint cannot be relaxed by `ALTER TABLE` in SQLite, so this is
+ * the full create-copy-drop-rename rebuild, following
+ * `migrateActivityTimestampColumnsIfNeeded`'s pattern exactly (including the
+ * `_v2` staging name, the `DROP TABLE IF EXISTS` defense against an
+ * interrupted earlier attempt, and its own explicit transaction so a crash
+ * mid-rebuild rolls back cleanly instead of stranding a `tdah_activity_v2`
+ * that would make every later attempt throw "table already exists").
+ *
+ * Detection reads the stored DDL (`sqlite_master.sql`) rather than
+ * `PRAGMA table_info`, because unlike every previous migration in this file
+ * the change is to a *constraint*, not to the column set — `table_info` cannot
+ * see it. A fresh database already gets the widened CHECK from
+ * `CREATE_ACTIVITY_TABLE_SQL`, so it is recognised as current and only needs
+ * its version stamped, never a rebuild.
+ */
+const migrateActivityJiraOriginIfNeeded = (database: TdahDatabase): void => {
+    const tableRow = database
+        .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tdah_activity';")
+        .get() as { sql: unknown } | undefined | null;
+    const ddl = tableRow ? String(tableRow.sql ?? '') : '';
+    const hasWidenedOriginCheck = ddl.includes("'jira'");
+
+    if (!hasWidenedOriginCheck) {
+        database.exec('BEGIN IMMEDIATE;');
+        try {
+            database.exec('DROP TABLE IF EXISTS tdah_activity_v2;');
+            database.exec(`
+                CREATE TABLE tdah_activity_v2 (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    day_plan_date TEXT NOT NULL REFERENCES tdah_day_plan(date),
+                    block_id INTEGER REFERENCES tdah_routine_block(id),
+                    title TEXT NOT NULL,
+                    start_time TEXT,
+                    duration_minutes INTEGER,
+                    origin TEXT NOT NULL CHECK (origin IN ('routine', 'manual', 'jira')),
+                    state TEXT NOT NULL CHECK (state IN ('pending', 'started', 'completed', 'missed', 'limbo', 'discarded')) DEFAULT 'pending',
+                    started_at TEXT,
+                    completed_at TEXT,
+                    start_notified_at TEXT,
+                    end_notified_at TEXT,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    moved_at TEXT
+                );
+            `);
+            // Straight copy of every column: this step only relaxes a
+            // constraint, it never reinterprets or backfills existing data.
+            // By the time it runs, the v1->v5 steps above have already brought
+            // every column into existence, so the explicit column list is
+            // safe against any starting version.
+            database.exec(`
+                INSERT INTO tdah_activity_v2 (
+                    id, day_plan_date, block_id, title, start_time, duration_minutes, origin, state,
+                    started_at, completed_at, start_notified_at, end_notified_at, sort_order, moved_at
+                )
+                SELECT
+                    id, day_plan_date, block_id, title, start_time, duration_minutes, origin, state,
+                    started_at, completed_at, start_notified_at, end_notified_at, sort_order, moved_at
+                FROM tdah_activity;
+            `);
+            database.exec('DROP TABLE tdah_activity;');
+            database.exec('ALTER TABLE tdah_activity_v2 RENAME TO tdah_activity;');
+            database.exec(`PRAGMA user_version = ${SCHEMA_VERSION_JIRA_ORIGIN};`);
+            database.exec('COMMIT;');
+        } catch (error) {
+            try {
+                database.exec('ROLLBACK;');
+            } catch {
+                // Closing the handle in the caller releases the lock either way.
+            }
+            throw error;
+        }
+        return;
+    }
+
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION_JIRA_ORIGIN};`);
+};
+
 const migrateSchemaIfNeeded = (database: TdahDatabase): void => {
     const versionRow = database.prepare('PRAGMA user_version;').get() as { user_version: unknown };
     let currentVersion = Number(versionRow.user_version ?? 0);
@@ -568,15 +719,22 @@ const migrateSchemaIfNeeded = (database: TdahDatabase): void => {
         migrateMorningEditColumnsIfNeeded(database);
         currentVersion = SCHEMA_VERSION_MORNING_EDIT;
     }
+
+    if (currentVersion < SCHEMA_VERSION_JIRA_ORIGIN) {
+        migrateActivityJiraOriginIfNeeded(database);
+        currentVersion = SCHEMA_VERSION_JIRA_ORIGIN;
+    }
 };
 
-/** Schema init (`CREATE TABLE IF NOT EXISTS` x5) plus the migration step above, run on every open. */
+/** Schema init (`CREATE TABLE IF NOT EXISTS` x7) plus the migration step above, run on every open. */
 const ensureSchema = (database: TdahDatabase): void => {
     database.exec(CREATE_PROFILE_TABLE_SQL);
     database.exec(CREATE_ROUTINE_TABLE_SQL);
     database.exec(CREATE_ROUTINE_BLOCK_TABLE_SQL);
     database.exec(CREATE_DAY_PLAN_TABLE_SQL);
     database.exec(CREATE_ACTIVITY_TABLE_SQL);
+    database.exec(CREATE_WORK_ORIGIN_TABLE_SQL);
+    database.exec(CREATE_WORK_ORIGIN_ITEM_SQL);
     migrateSchemaIfNeeded(database);
 };
 
@@ -2708,4 +2866,573 @@ export async function confirmMorning(
     }
     const date = computeTomorrowDate(timeZone);
     return await withWriteTransaction(databasePath, (database) => mutateConfirmMorning(database, date, request, timeZone));
+}
+
+// --- Origen de trabajo (story 4.1, T-13) ------------------------------------
+
+/** Default work window and cadence when a first connection omits them (doc 06 zone 3: "cada 2h en horario laboral"). */
+export const TDAH_WORK_ORIGIN_DEFAULT_WORK_START = '09:00';
+export const TDAH_WORK_ORIGIN_DEFAULT_WORK_END = '18:00';
+export const TDAH_WORK_ORIGIN_DEFAULT_PULL_INTERVAL_MINUTES = 120;
+/** Bounded on both ends: below 5 minutes this would hammer Atlassian, above a day it would never fire inside one work window. */
+export const TDAH_WORK_ORIGIN_MIN_PULL_INTERVAL_MINUTES = 5;
+export const TDAH_WORK_ORIGIN_MAX_PULL_INTERVAL_MINUTES = 1440;
+/** Same DW-2 bounding discipline the Rutina/Actividad inputs already follow — remote and user input alike land in our own SQLite. */
+export const TDAH_WORK_ORIGIN_MAX_EMAIL_LENGTH = 254;
+export const TDAH_WORK_ORIGIN_MAX_TOKEN_LENGTH = 4096;
+/** Cap on the persisted snapshot, mirroring the provider's own per-request ceiling. */
+export const TDAH_WORK_ORIGIN_MAX_ITEMS = 50;
+/**
+ * The band's title — count-free (the count lives in the snapshot the UI
+ * renders separately) and, importantly, LANGUAGE-NEUTRAL.
+ *
+ * This string is written verbatim into `tdah_activity.title` and rendered as-is
+ * in Hoy, Historial and Métricas for all 20 locales — the title column is user
+ * data, not a translatable key, so whatever goes in here is what every user
+ * sees regardless of their language. "Sprint" is the term the epic's own band
+ * copy already uses and reads the same in every locale the product ships;
+ * a Spanish word here would have been untranslatable copy smuggled in through
+ * a data column.
+ */
+export const TDAH_WORK_ORIGIN_BAND_TITLE = 'Sprint';
+
+const SELECT_WORK_ORIGIN_SQL = `
+    SELECT provider, site_url, account_email, jql, work_start, work_end, pull_interval_minutes,
+           connected_at, last_pull_at, last_sync_at, last_error_code
+    FROM tdah_work_origin WHERE id = 1;
+`;
+// Deliberately its own statement, selecting the sealed column and nothing
+// else. `SELECT_WORK_ORIGIN_SQL` above — the one every response path uses —
+// cannot name `secret_sealed` at all, so no read that feeds a Response can
+// carry it even by accident (AD-9).
+const SELECT_WORK_ORIGIN_SECRET_SQL = 'SELECT secret_sealed FROM tdah_work_origin WHERE id = 1;';
+const UPSERT_WORK_ORIGIN_SQL = `
+    INSERT INTO tdah_work_origin (
+        id, provider, site_url, account_email, secret_sealed, jql, work_start, work_end,
+        pull_interval_minutes, connected_at, last_pull_at, last_sync_at, last_error_code, updated_at
+    )
+    VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?)
+    ON CONFLICT(id) DO UPDATE SET
+        provider = excluded.provider,
+        site_url = excluded.site_url,
+        account_email = excluded.account_email,
+        secret_sealed = excluded.secret_sealed,
+        jql = excluded.jql,
+        work_start = excluded.work_start,
+        work_end = excluded.work_end,
+        pull_interval_minutes = excluded.pull_interval_minutes,
+        -- last_pull_at is the interval gate's left-hand side and is advanced
+        -- on every ATTEMPT, failed ones included. Preserving it across a
+        -- reconnection would mean that fixing a revoked token still leaves the
+        -- user waiting out the whole (up to 24 h) interval before anything
+        -- happens -- the exact opposite of what pressing "connect" promises.
+        -- Clearing it makes a fresh or repaired connection due on the next
+        -- eligible tick, which is what isPullIntervalElapsed's own
+        -- "never pulled -> always due" rule already says.
+        last_pull_at = NULL,
+        -- Preserved when the identity is unchanged (the previous successful
+        -- sync really did happen), reset by the caller when the tenant/account
+        -- changes and the snapshot it described is discarded with it.
+        last_sync_at = excluded.last_sync_at,
+        -- A re-connection clears the previous failure: the user just proved a
+        -- working credential against the live API, so leaving a stale
+        -- "token inválido" banner on T-13 would be actively misleading.
+        last_error_code = NULL,
+        updated_at = excluded.updated_at;
+`;
+const SELECT_WORK_ORIGIN_EXISTS_SQL = 'SELECT 1 FROM tdah_work_origin WHERE id = 1 LIMIT 1;';
+const DELETE_WORK_ORIGIN_SQL = 'DELETE FROM tdah_work_origin WHERE id = 1;';
+const DELETE_WORK_ORIGIN_ITEMS_SQL = 'DELETE FROM tdah_work_origin_item;';
+const SELECT_WORK_ORIGIN_ITEMS_SQL = 'SELECT external_key, summary, status, sprint_name FROM tdah_work_origin_item ORDER BY sort_order ASC, id ASC;';
+const INSERT_WORK_ORIGIN_ITEM_SQL = 'INSERT INTO tdah_work_origin_item (external_key, summary, status, sprint_name, sort_order) VALUES (?, ?, ?, ?, ?);';
+const UPDATE_WORK_ORIGIN_PULL_RESULT_SQL = `
+    UPDATE tdah_work_origin
+    SET last_pull_at = ?, last_sync_at = COALESCE(?, last_sync_at), last_error_code = ?, updated_at = ?
+    WHERE id = 1;
+`;
+// The band is identified by (day, origin) alone — there is exactly one per
+// local day by construction (Never: "una sola Actividad-franja por día").
+const SELECT_WORK_ORIGIN_BAND_SQL = "SELECT id, state FROM tdah_activity WHERE day_plan_date = ? AND origin = 'jira' ORDER BY id ASC LIMIT 1;";
+const UPDATE_WORK_ORIGIN_BAND_SQL = "UPDATE tdah_activity SET title = ?, start_time = ?, duration_minutes = ? WHERE id = ? AND state = 'pending';";
+const DELETE_WORK_ORIGIN_BAND_SQL = "DELETE FROM tdah_activity WHERE id = ? AND state = 'pending';";
+const INSERT_WORK_ORIGIN_BAND_SQL = `
+    INSERT INTO tdah_activity (day_plan_date, block_id, title, start_time, duration_minutes, origin, state)
+    VALUES (?, NULL, ?, ?, ?, 'jira', 'pending');
+`;
+
+type TdahWorkOriginRow = {
+    provider: unknown;
+    site_url: unknown;
+    account_email: unknown;
+    jql: unknown;
+    work_start: unknown;
+    work_end: unknown;
+    pull_interval_minutes: unknown;
+    connected_at: unknown;
+    last_pull_at: unknown;
+    last_sync_at: unknown;
+    last_error_code: unknown;
+};
+
+type TdahWorkOriginItemRow = {
+    external_key: unknown;
+    summary: unknown;
+    status: unknown;
+    sprint_name: unknown;
+};
+
+/**
+ * The disconnected state, shared by "no database yet", "no row", and "row
+ * unreadable" so every one of them looks identical to the client.
+ *
+ * A FACTORY, never a shared constant: the returned object (and its `issues`
+ * array) is serialized straight into a response and handed to callers across
+ * every namespace. One shared instance would mean a single accidental mutation
+ * anywhere leaking into every other user's disconnected response — a
+ * cross-namespace bug waiting for its first careless `push`.
+ */
+const disconnectedWorkOriginStatus = (): TdahWorkOriginStatus => ({
+    connected: false,
+    provider: null,
+    siteUrl: null,
+    email: null,
+    jql: null,
+    workStart: null,
+    workEnd: null,
+    pullIntervalMinutes: null,
+    connectedAt: null,
+    lastSyncAt: null,
+    lastErrorCode: null,
+    issues: [],
+});
+
+const rowToWorkOriginItem = (row: TdahWorkOriginItemRow): TdahWorkOriginItem => ({
+    externalKey: String(row.external_key),
+    summary: String(row.summary),
+    status: String(row.status),
+    sprintName: asString(row.sprint_name),
+});
+
+const selectWorkOriginItems = (database: TdahDatabase): TdahWorkOriginItem[] => (
+    prepareAll<TdahWorkOriginItemRow>(database, SELECT_WORK_ORIGIN_ITEMS_SQL).all().map(rowToWorkOriginItem)
+);
+
+const selectWorkOriginStatus = (database: TdahDatabase): TdahWorkOriginStatus => {
+    const row = database.prepare(SELECT_WORK_ORIGIN_SQL).get() as TdahWorkOriginRow | undefined | null;
+    if (!row) return disconnectedWorkOriginStatus();
+    return {
+        connected: true,
+        provider: String(row.provider) as TdahWorkOriginProvider,
+        siteUrl: String(row.site_url),
+        email: String(row.account_email),
+        jql: String(row.jql),
+        workStart: String(row.work_start),
+        workEnd: String(row.work_end),
+        pullIntervalMinutes: Number(row.pull_interval_minutes),
+        connectedAt: String(row.connected_at),
+        lastSyncAt: asString(row.last_sync_at),
+        lastErrorCode: asString(row.last_error_code) as TdahErrorCode | null,
+        issues: selectWorkOriginItems(database),
+    };
+};
+
+/**
+ * GET /v1/tdah/origin's read. Returns the PUBLIC status only — the return type
+ * itself has no token field, and the query behind it
+ * (`SELECT_WORK_ORIGIN_SQL`) does not select `secret_sealed`, so this function
+ * physically cannot carry the credential into a response.
+ *
+ * Never plants the namespace's tdah directory on disk for a namespace with no
+ * database yet — the same read-only contract `getLimboActivities`/`getHistory`
+ * already follow.
+ */
+export async function readWorkOriginStatus(dataDir: string, key: string): Promise<TdahWorkOriginStatus> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    if (!existsSync(databasePath)) return disconnectedWorkOriginStatus();
+    return await withReadDatabase(databasePath, (database) => selectWorkOriginStatus(database));
+}
+
+/**
+ * Everything the pull tick needs to decide whether to run and where to send
+ * the request — and nothing else. In particular `lastPullAt` lives here
+ * rather than on `TdahWorkOriginStatus`: it is scheduler bookkeeping (the
+ * interval gate's left-hand side), not user-facing state, and T-13 renders
+ * `lastSyncAt` — what actually succeeded — instead.
+ *
+ * `null` when nothing is connected, which the tick treats as `skipped`.
+ */
+export type TdahWorkOriginPullPlan = {
+    provider: TdahWorkOriginProvider;
+    siteUrl: string;
+    email: string;
+    workStart: string;
+    workEnd: string;
+    pullIntervalMinutes: number;
+    lastPullAt: string | null;
+};
+
+export async function readWorkOriginPullPlan(dataDir: string, key: string): Promise<TdahWorkOriginPullPlan | null> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    if (!existsSync(databasePath)) return null;
+    return await withReadDatabase(databasePath, (database) => {
+        const row = database.prepare(SELECT_WORK_ORIGIN_SQL).get() as TdahWorkOriginRow | undefined | null;
+        if (!row) return null;
+        return {
+            provider: String(row.provider) as TdahWorkOriginProvider,
+            siteUrl: String(row.site_url),
+            email: String(row.account_email),
+            workStart: String(row.work_start),
+            workEnd: String(row.work_end),
+            pullIntervalMinutes: Number(row.pull_interval_minutes),
+            lastPullAt: asString(row.last_pull_at),
+        };
+    });
+}
+
+/**
+ * The sealed container, for the pull tick alone (`origin-pull.ts`). Returns
+ * the ciphertext, NOT the token: opening it needs the operator's master key,
+ * which this module never touches. `null` when nothing is connected.
+ *
+ * Kept as a separate exported function rather than a field on
+ * `readWorkOriginStatus`'s result precisely so that "who can reach the
+ * credential" is a one-line grep with exactly one production caller.
+ */
+export async function readSealedWorkOriginSecret(dataDir: string, key: string): Promise<string | null> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    if (!existsSync(databasePath)) return null;
+    return await withReadDatabase(databasePath, (database) => {
+        const row = database.prepare(SELECT_WORK_ORIGIN_SECRET_SQL).get() as { secret_sealed: unknown } | undefined | null;
+        return row ? asString(row.secret_sealed) : null;
+    });
+}
+
+export type TdahUpsertWorkOriginInput = {
+    provider: TdahWorkOriginProvider;
+    siteUrl: string;
+    email: string;
+    /**
+     * Already sealed by the caller (`sealOriginSecret`) — this module never
+     * sees the plaintext token.
+     *
+     * `undefined` means "keep whatever is stored": a settings-only PUT (the
+     * user moved their working hours, nothing else) must not require them to
+     * mint a fresh Atlassian API token just to change a time. Requires an
+     * existing row, which the route guarantees before calling.
+     */
+    secretSealed?: string;
+    jql: string;
+    workStart: string;
+    workEnd: string;
+    pullIntervalMinutes: number;
+};
+
+/**
+ * PUT /v1/tdah/origin's write. Takes the ALREADY-SEALED container: sealing
+ * happens in the route, right where the plaintext arrives and dies, so no
+ * storage function ever has a token in scope.
+ *
+ * `connected_at` is preserved across a re-connection — the Origen has been
+ * connected since then, only the credential or the settings changed.
+ *
+ * `last_pull_at` is always cleared, so a repaired connection pulls on the next
+ * eligible tick instead of waiting out the interval that the failed attempts
+ * themselves advanced (see `UPSERT_WORK_ORIGIN_SQL`).
+ *
+ * Changing the tenant (`site_url`) or the account (`account_email`) discards
+ * the snapshot and `last_sync_at` with it: those issue keys, summaries and
+ * that timestamp describe a DIFFERENT Jira account, and continuing to serve
+ * them from `GET /v1/tdah/origin` would show one tenant's work under another
+ * tenant's connection. Re-pointing at the same site with the same account
+ * (the ordinary "my token was revoked" case) keeps both.
+ */
+export async function upsertWorkOrigin(
+    dataDir: string,
+    key: string,
+    input: TdahUpsertWorkOriginInput,
+): Promise<TdahWorkOriginStatus> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    const durableDir = ensureDurableDirectory(dirname(databasePath));
+    if (!durableDir) {
+        throw new Error('TDAH database directory is unsafe');
+    }
+    const nowIso = new Date().toISOString();
+    return await withWriteTransaction(databasePath, (database) => {
+        const existingRow = database.prepare(SELECT_WORK_ORIGIN_SQL).get() as TdahWorkOriginRow | undefined | null;
+        const existingSecretRow = database.prepare(SELECT_WORK_ORIGIN_SECRET_SQL).get() as { secret_sealed: unknown } | undefined | null;
+        const existingSealed = existingSecretRow ? asString(existingSecretRow.secret_sealed) : null;
+
+        const secretSealed = input.secretSealed ?? existingSealed;
+        if (secretSealed === null) {
+            // Unreachable through the route (it requires a token whenever no
+            // row exists) — a guard so a future caller cannot create a
+            // credential-less Origen row that the tick could never open.
+            throw new Error('TDAH work origin upsert requires a sealed secret on first connection');
+        }
+
+        const identityChanged = existingRow !== null && existingRow !== undefined
+            && (String(existingRow.site_url) !== input.siteUrl || String(existingRow.account_email) !== input.email);
+        if (identityChanged) {
+            database.prepare(DELETE_WORK_ORIGIN_ITEMS_SQL).run();
+        }
+        const lastSyncAt = existingRow && !identityChanged ? asString(existingRow.last_sync_at) : null;
+        const connectedAt = existingRow ? String(existingRow.connected_at) : nowIso;
+
+        database.prepare(UPSERT_WORK_ORIGIN_SQL).run(
+            input.provider,
+            input.siteUrl,
+            input.email,
+            secretSealed,
+            input.jql,
+            input.workStart,
+            input.workEnd,
+            input.pullIntervalMinutes,
+            connectedAt,
+            lastSyncAt,
+            nowIso,
+        );
+        return selectWorkOriginStatus(database);
+    });
+}
+
+/**
+ * DELETE /v1/tdah/origin. Removes the credential and the snapshot, and
+ * NOTHING else — in particular it never touches `tdah_activity`, so every
+ * band already materialized stays exactly where it is and remains queryable
+ * from the Historial (I/O Matrix; doc 06 zone 5: "las pasadas quedan en
+ * Historial").
+ *
+ * Idempotent by construction: both DELETEs match zero rows on a namespace
+ * that was never connected, which is why the route can answer 200 either way
+ * without a pre-check.
+ */
+export async function deleteWorkOrigin(dataDir: string, key: string): Promise<void> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    // Nothing to delete, and a disconnect must never be the thing that plants
+    // a database on disk.
+    if (!existsSync(databasePath)) return;
+    const durableDir = ensureDurableDirectory(dirname(databasePath));
+    if (!durableDir) {
+        throw new Error('TDAH database directory is unsafe');
+    }
+    await withWriteTransaction(databasePath, (database) => {
+        database.prepare(DELETE_WORK_ORIGIN_ITEMS_SQL).run();
+        database.prepare(DELETE_WORK_ORIGIN_SQL).run();
+    });
+}
+
+/**
+ * Wholesale replacement of the snapshot — delete-all then insert, never a
+ * merge. The remote sprint is the source of truth; an issue that dropped out
+ * of the JQL simply stops existing here, with no tombstone to reason about.
+ * `sortOrder` is the array index, so the provider's own `ORDER BY updated ASC`
+ * survives into the rendered sub-rows.
+ *
+ * Takes an already-open handle (like `mutateGenerateTomorrowIfMissing`) so the
+ * pull tick can run this, the pull-result stamp and the band materialization
+ * inside ONE transaction — a crash between them must never leave a snapshot
+ * that disagrees with `last_sync_at`.
+ */
+export const mutateReplaceWorkOriginItems = (database: TdahDatabase, items: TdahWorkOriginItem[]): void => {
+    database.prepare(DELETE_WORK_ORIGIN_ITEMS_SQL).run();
+    items.slice(0, TDAH_WORK_ORIGIN_MAX_ITEMS).forEach((item, index) => {
+        database.prepare(INSERT_WORK_ORIGIN_ITEM_SQL).run(item.externalKey, item.summary, item.status, item.sprintName, index);
+    });
+};
+
+/**
+ * Stamps the outcome of one pull attempt.
+ *
+ * `pulledAt` advances on EVERY attempt, success or failure — that is what
+ * makes a broken Origen back off to its configured interval instead of
+ * retrying on every 60s tick. `syncedAt` is `null` on failure and, thanks to
+ * the `COALESCE` in the SQL, leaves the previous successful timestamp intact
+ * rather than erasing it: T-13 must still be able to say "última
+ * sincronización hace 3h" while showing today's error.
+ *
+ * `errorCode` is `null` on success, which is how a recovered Origen clears
+ * its own banner without any separate "clear error" call.
+ */
+export const mutateMarkWorkOriginPullResult = (
+    database: TdahDatabase,
+    pulledAtIso: string,
+    syncedAtIso: string | null,
+    errorCode: TdahErrorCode | null,
+): void => {
+    database.prepare(UPDATE_WORK_ORIGIN_PULL_RESULT_SQL).run(pulledAtIso, syncedAtIso, errorCode, pulledAtIso);
+};
+
+/**
+ * The grouped band (AC 3; Design Notes "Franja agrupada"): ONE Actividad per
+ * local day standing for the whole imported sprint load, starting at
+ * `workStart` and lasting until `workEnd`, with `block_id NULL`. No hour is
+ * ever invented per task — the per-issue detail lives in the snapshot, which
+ * story 4.2 renders as expandable sub-rows.
+ *
+ * Idempotency is the hard part, and it is resolved by state rather than by a
+ * marker column:
+ *
+ * - No band yet -> insert one (respecting `TDAH_DAY_MAX_ACTIVITIES`, the same
+ *   cap every other Activity-creating path honours).
+ * - A band exists and is still `pending` -> update it in place. A changed work
+ *   window on a later pull moves it; a second pull the same day never
+ *   duplicates it.
+ * - A band exists in ANY other state (`started`/`completed`/`missed`/`limbo`/
+ *   `discarded`) -> left completely untouched. The user has already acted on
+ *   it, and a background tick must never undo a person's decision (Block If:
+ *   "materializar la franja obligara a romper el estado de una Actividad ya
+ *   registrada").
+ *
+ * With `itemCount === 0` there is nothing to represent, so no band is created
+ * (I/O Matrix: "sin sprint activo -> snapshot vacío, sin franja, sin error").
+ * A band left over from an earlier pull that same day is removed, but only if
+ * it is still `pending` — the same "never touch a decided Actividad" rule.
+ *
+ * The day plan itself is materialized on demand via
+ * `mutateGenerateTomorrowIfMissing`, exactly as `mutateCreateManualActivity`
+ * does, so the first pull of a day still applies that day's Rutina instead of
+ * planting an empty plan that would block it forever.
+ */
+export type TdahWorkOriginBandOutcome =
+    /** A band was inserted for this day. */
+    | 'created'
+    /** An existing still-`pending` band was refreshed in place. */
+    | 'updated'
+    /** The sprint emptied and this day's still-`pending` band was retired. */
+    | 'removed'
+    /** Nothing to do: no issues and no band to retire, or a band the user already acted on. */
+    | 'none'
+    /** The day is already at `TDAH_DAY_MAX_ACTIVITIES` — the band could NOT be created. */
+    | 'capped';
+
+export const mutateSyncWorkOriginBand = (
+    database: TdahDatabase,
+    date: string,
+    itemCount: number,
+    workStart: string,
+    workEnd: string,
+    title: string,
+): TdahWorkOriginBandOutcome => {
+    const existing = database.prepare(SELECT_WORK_ORIGIN_BAND_SQL).get(date) as { id: unknown; state: unknown } | undefined | null;
+
+    if (itemCount <= 0) {
+        if (existing && existing.state === 'pending') {
+            database.prepare(DELETE_WORK_ORIGIN_BAND_SQL).run(Number(existing.id));
+            return 'removed';
+        }
+        return 'none';
+    }
+
+    const durationMinutes = Math.max(0, startTimeToMinutes(workEnd) - startTimeToMinutes(workStart));
+
+    if (existing) {
+        if (existing.state !== 'pending') return 'none';
+        // The `AND state = 'pending'` guard lives in the SQL too, so even a
+        // read/write race cannot overwrite a band the user just started.
+        database.prepare(UPDATE_WORK_ORIGIN_BAND_SQL).run(title, workStart, durationMinutes, Number(existing.id));
+        return 'updated';
+    }
+
+    mutateGenerateTomorrowIfMissing(database, date);
+    const countRow = database.prepare(COUNT_ACTIVITIES_FOR_DAY_PLAN_SQL).get(date) as { count: unknown };
+    // Reported rather than swallowed: a silently dropped band leaves the user
+    // with a fresh "última sincronización" and nothing on the day, and no way
+    // to tell that from "the sprint is empty". The caller turns this into a
+    // persisted `TDAH_ORIGIN_DAY_FULL`, which T-13 can act on.
+    if (Number(countRow.count) >= TDAH_DAY_MAX_ACTIVITIES) return 'capped';
+    database.prepare(INSERT_WORK_ORIGIN_BAND_SQL).run(date, title, workStart, durationMinutes);
+    return 'created';
+};
+
+export type TdahCommitWorkOriginPullResult =
+    /** The Origen was disconnected while this pull was in flight — nothing was written. */
+    | { kind: 'disconnected' }
+    | { kind: 'committed'; band: TdahWorkOriginBandOutcome };
+
+/**
+ * The pull tick's single held transaction: snapshot replacement, pull stamp
+ * and band materialization together, so a crash can never commit one without
+ * the others. Exported as one function (rather than three) precisely to make
+ * that atomicity impossible to forget at the call site.
+ *
+ * It re-checks that the Origen row still exists INSIDE the transaction, and
+ * writes nothing when it does not. That check is not defensive padding: a pull
+ * blocks on the network for up to `TDAH_JIRA_REQUEST_TIMEOUT_MS`, and a
+ * `DELETE /v1/tdah/origin` landing in that window would otherwise be undone by
+ * the response that was already in flight — resurrecting the snapshot the user
+ * just revoked and materializing a `jira` band for a namespace with no Origen
+ * at all. Disconnect has to win that race; the read that decided to pull is
+ * simply stale by the time it returns.
+ *
+ * `band === 'capped'` is committed as a SUCCESSFUL sync (the snapshot really
+ * did refresh) that also carries `TDAH_ORIGIN_DAY_FULL`, so T-13 shows both
+ * facts rather than pretending the day is fine.
+ */
+export async function commitWorkOriginPull(
+    dataDir: string,
+    key: string,
+    options: {
+        date: string;
+        items: TdahWorkOriginItem[];
+        pulledAtIso: string;
+        workStart: string;
+        workEnd: string;
+        bandTitle: string;
+    },
+): Promise<TdahCommitWorkOriginPullResult> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    // A pull must never be the thing that plants a database on disk: no
+    // database means no Origen row, which means the disconnect already won.
+    if (!existsSync(databasePath)) return { kind: 'disconnected' };
+    const durableDir = ensureDurableDirectory(dirname(databasePath));
+    if (!durableDir) {
+        throw new Error('TDAH database directory is unsafe');
+    }
+    return await withWriteTransaction(databasePath, (database) => {
+        if (!database.prepare(SELECT_WORK_ORIGIN_EXISTS_SQL).get()) {
+            return { kind: 'disconnected' } as TdahCommitWorkOriginPullResult;
+        }
+        mutateReplaceWorkOriginItems(database, options.items);
+        const band = mutateSyncWorkOriginBand(
+            database,
+            options.date,
+            options.items.length,
+            options.workStart,
+            options.workEnd,
+            options.bandTitle,
+        );
+        mutateMarkWorkOriginPullResult(
+            database,
+            options.pulledAtIso,
+            options.pulledAtIso,
+            band === 'capped' ? TDAH_ERRORS.originDayFull : null,
+        );
+        return { kind: 'committed', band } as TdahCommitWorkOriginPullResult;
+    });
+}
+
+/**
+ * The failure counterpart of `commitWorkOriginPull`: records that an attempt
+ * happened and why it failed, and touches nothing else. The credential is
+ * NOT deleted (I/O Matrix: "el token no se borra" — a revoked token is
+ * usually re-issued, and silently discarding it would force the user to
+ * retype a site URL and email they never changed), the snapshot is NOT
+ * cleared, and no Actividad changes state — the previous days' bands stay
+ * exactly as they were.
+ */
+export async function markWorkOriginPullFailure(
+    dataDir: string,
+    key: string,
+    pulledAtIso: string,
+    errorCode: TdahErrorCode,
+): Promise<void> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    if (!existsSync(databasePath)) return;
+    const durableDir = ensureDurableDirectory(dirname(databasePath));
+    if (!durableDir) {
+        throw new Error('TDAH database directory is unsafe');
+    }
+    await withWriteTransaction(databasePath, (database) => {
+        mutateMarkWorkOriginPullResult(database, pulledAtIso, null, errorCode);
+    });
 }
