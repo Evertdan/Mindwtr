@@ -3360,6 +3360,482 @@ describe('tdah module', () => {
         });
     });
 
+    describe('GET /v1/tdah/history, GET /v1/tdah/metrics (story 3.5: Historial y Métricas — el termómetro personal)', () => {
+        type TdahTestHistoryEntry = {
+            activity: TdahTestActivity;
+            routineTitle: string | null;
+            completedLate: boolean;
+        };
+        type TdahTestHistoryResponse = { range: { from: string; to: string }; entries: TdahTestHistoryEntry[] };
+        type TdahTestMetricsOriginBreakdown = { origin: string; completedOnTime: number; total: number };
+        type TdahTestMetricsTrendPoint = { weekStart: string; completedOnTime: number; total: number; rate: number | null };
+        type TdahTestMetricsResponse = {
+            period: { from: string; to: string };
+            completedOnTime: number;
+            total: number;
+            rate: number | null;
+            byOrigin: TdahTestMetricsOriginBreakdown[];
+            trend: TdahTestMetricsTrendPoint[];
+        };
+
+        const getHistoryApi = (query: string = '', token?: string): Promise<Response> => (
+            authedFetch(`/v1/tdah/history${query}`, { method: 'GET', token })
+        );
+
+        const getMetricsApi = (query: string = '', token?: string): Promise<Response> => (
+            authedFetch(`/v1/tdah/metrics${query}`, { method: 'GET', token })
+        );
+
+        const readHistory = async (response: Response): Promise<TdahTestHistoryResponse> => (
+            await response.json() as TdahTestHistoryResponse
+        );
+
+        const readMetrics = async (response: Response): Promise<TdahTestMetricsResponse> => (
+            await response.json() as TdahTestMetricsResponse
+        );
+
+        // Same YYYY-MM-DD shift technique the Limbo/decide describes above use.
+        const addDaysToDateString = (date: string, days: number): string => {
+            const parts = date.split('-').map(Number);
+            const [year, month, day] = parts as [number, number, number];
+            return formatDateInTimeZone(new Date(Date.UTC(year, month - 1, day + days)), 'UTC');
+        };
+
+        const today = (): string => formatDateInTimeZone(new Date(), 'UTC');
+
+        // There's no HTTP path to plant an arbitrary past-dated
+        // missed/limbo/completed Actividad — same direct-SQL fixture
+        // technique `forceActivityLimbo`/the schema-migration describes
+        // above already use, extended to cover every column History/Metrics
+        // read (`state`, `completed_at`, `origin`, `block_id`, `moved_at`).
+        // `INSERT OR IGNORE` on `tdah_day_plan` mirrors the stale-day
+        // scheduler fixture's own defensive habit of seeding the parent row
+        // first, even though FK enforcement is off.
+        const insertHistoryFixtureActivity = async (
+            input: {
+                dayPlanDate: string;
+                title: string;
+                state: 'pending' | 'started' | 'completed' | 'missed' | 'limbo' | 'discarded';
+                origin?: 'manual' | 'routine';
+                blockId?: number | null;
+                completedAt?: string | null;
+                movedAt?: string | null;
+            },
+            token: string = TOKEN_ALPHA,
+        ): Promise<number> => {
+            const databasePath = tdahDatabasePath(dataDir, tokenToKey(token));
+            return await withWriteTransaction(databasePath, (database) => {
+                database
+                    .prepare('INSERT OR IGNORE INTO tdah_day_plan (date, generated_at) VALUES (?, ?);')
+                    .run(input.dayPlanDate, `${input.dayPlanDate}T00:00:00.000Z`);
+                database
+                    .prepare(`
+                        INSERT INTO tdah_activity (day_plan_date, block_id, title, start_time, duration_minutes, origin, state, completed_at, moved_at)
+                        VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, ?);
+                    `)
+                    .run(
+                        input.dayPlanDate,
+                        input.blockId ?? null,
+                        input.title,
+                        input.origin ?? 'manual',
+                        input.state,
+                        input.completedAt ?? null,
+                        input.movedAt ?? null,
+                    );
+                const row = database
+                    .prepare('SELECT id FROM tdah_activity WHERE title = ? AND day_plan_date = ? ORDER BY id DESC LIMIT 1;')
+                    .get(input.title, input.dayPlanDate) as { id: unknown };
+                return Number(row.id);
+            });
+        };
+
+        beforeEach(async () => {
+            await activate({ timeZone: 'UTC' });
+        });
+
+        describe('gate + method (shared FR-1 contract with the rest of the module)', () => {
+            test('GET /v1/tdah/history without any profile returns 409 TDAH_ACTIVATE_REQUIRED and plants nothing on disk', async () => {
+                const response = await getHistoryApi('', TOKEN_BETA);
+                expect(response.status).toBe(409);
+                expect(await readErrorCode(response)).toBe('TDAH_ACTIVATE_REQUIRED');
+                expect(existsSync(join(dataDir, tokenToKey(TOKEN_BETA)))).toBe(false);
+            });
+
+            test('GET /v1/tdah/metrics without any profile returns 409 TDAH_ACTIVATE_REQUIRED and plants nothing on disk', async () => {
+                const response = await getMetricsApi('', TOKEN_BETA);
+                expect(response.status).toBe(409);
+                expect(await readErrorCode(response)).toBe('TDAH_ACTIVATE_REQUIRED');
+                expect(existsSync(join(dataDir, tokenToKey(TOKEN_BETA)))).toBe(false);
+            });
+
+            test('both routes are rejected with 409 TDAH_ACTIVATE_REQUIRED when the mode is off', async () => {
+                await putProfile({ mode: 'off' });
+                expect((await getHistoryApi()).status).toBe(409);
+                expect((await getMetricsApi()).status).toBe(409);
+            });
+
+            test('POST on either route returns 405 TDAH_METHOD_NOT_ALLOWED', async () => {
+                const historyResponse = await authedFetch('/v1/tdah/history', { method: 'POST' });
+                expect(historyResponse.status).toBe(405);
+                expect(await readErrorCode(historyResponse)).toBe('TDAH_METHOD_NOT_ALLOWED');
+
+                const metricsResponse = await authedFetch('/v1/tdah/metrics', { method: 'POST' });
+                expect(metricsResponse.status).toBe(405);
+                expect(await readErrorCode(metricsResponse)).toBe('TDAH_METHOD_NOT_ALLOWED');
+            });
+
+            test('an invalid period value is rejected with 400 TDAH_INVALID_BODY on both routes', async () => {
+                expect((await getHistoryApi('?period=year')).status).toBe(400);
+                expect(await readErrorCode(await getHistoryApi('?period=year'))).toBe('TDAH_INVALID_BODY');
+                expect((await getMetricsApi('?period=year')).status).toBe(400);
+            });
+
+            test('period=custom without from/to, or with a malformed date, is rejected with 400 TDAH_INVALID_BODY', async () => {
+                expect((await getHistoryApi('?period=custom')).status).toBe(400);
+                expect((await getHistoryApi('?period=custom&from=2026-02-30&to=2026-03-01')).status).toBe(400);
+            });
+
+            test('period=custom with from > to is rejected with 400 TDAH_INVALID_BODY without executing the query (I/O Matrix)', async () => {
+                const response = await getHistoryApi('?period=custom&from=2026-09-01&to=2026-08-01');
+                expect(response.status).toBe(400);
+                expect(await readErrorCode(response)).toBe('TDAH_INVALID_BODY');
+            });
+
+            test('period=custom with a span greater than 366 days is rejected with 400 TDAH_INVALID_BODY (I/O Matrix)', async () => {
+                // 2024 is a leap year (366 days), so 2024-01-01 -> 2025-01-01 is
+                // exactly a 366-day span — the boundary itself, still accepted.
+                const boundary = await getHistoryApi('?period=custom&from=2024-01-01&to=2025-01-01');
+                expect(boundary.status).toBe(200);
+
+                // One day further (367) crosses the max span and is rejected.
+                const response = await getHistoryApi('?period=custom&from=2024-01-01&to=2025-01-02');
+                expect(response.status).toBe(400);
+                expect(await readErrorCode(response)).toBe('TDAH_INVALID_BODY');
+            });
+        });
+
+        describe('GET /v1/tdah/history (T-09)', () => {
+            test('an empty range returns 200 {entries: []} — "Sin incompletas en este rango"', async () => {
+                const response = await getHistoryApi('?period=week');
+                expect(response.status).toBe(200);
+                const body = await readHistory(response);
+                expect(body.entries).toEqual([]);
+                expect(body.range).toEqual({ from: addDaysToDateString(today(), -6), to: today() });
+            });
+
+            test('period=week lists missed/limbo/completed-late Actividades in the rolling 7-day window, most-recent-first, and excludes pending/started/discarded/on-time-completed', async () => {
+                const missed = await insertHistoryFixtureActivity({
+                    dayPlanDate: addDaysToDateString(today(), -2),
+                    title: 'Perdida',
+                    state: 'missed',
+                });
+                const limbo = await insertHistoryFixtureActivity({
+                    dayPlanDate: addDaysToDateString(today(), -5),
+                    title: 'En Limbo',
+                    state: 'limbo',
+                });
+                const lateDay = addDaysToDateString(today(), -3);
+                const late = await insertHistoryFixtureActivity({
+                    dayPlanDate: lateDay,
+                    title: 'Completada tarde',
+                    state: 'completed',
+                    completedAt: `${addDaysToDateString(lateDay, 1)}T09:00:00.000Z`,
+                });
+                await insertHistoryFixtureActivity({
+                    dayPlanDate: today(),
+                    title: 'Completada a tiempo',
+                    state: 'completed',
+                    completedAt: `${today()}T09:00:00.000Z`,
+                });
+                await insertHistoryFixtureActivity({ dayPlanDate: today(), title: 'Pendiente', state: 'pending' });
+                await insertHistoryFixtureActivity({ dayPlanDate: today(), title: 'Empezada', state: 'started' });
+                await insertHistoryFixtureActivity({
+                    dayPlanDate: addDaysToDateString(today(), -1),
+                    title: 'Descartada',
+                    state: 'discarded',
+                });
+                await insertHistoryFixtureActivity({
+                    dayPlanDate: addDaysToDateString(today(), -10),
+                    title: 'Fuera de rango',
+                    state: 'missed',
+                });
+
+                const response = await getHistoryApi('?period=week');
+                expect(response.status).toBe(200);
+                const body = await readHistory(response);
+                // Most-recent-first: missed(-2) before late(-3) before limbo(-5).
+                expect(body.entries.map((entry) => entry.activity.id)).toEqual([missed, late, limbo]);
+                const lateEntry = body.entries.find((entry) => entry.activity.id === late);
+                expect(lateEntry?.completedLate).toBe(true);
+                expect(body.entries.find((entry) => entry.activity.id === missed)?.completedLate).toBe(false);
+                expect(body.entries.every((entry) => entry.routineTitle === null)).toBe(true);
+            });
+
+            test('filters by origin and routineId, reusing GET /v1/tdah/routines\' own ids — I/O Matrix', async () => {
+                const routine = await readRoutine(await createRoutineApi(WORKDAY_ROUTINE));
+                const otherRoutine = await readRoutine(await createRoutineApi({ ...WORKDAY_ROUTINE, title: 'Otra rutina' }));
+
+                const routineEntry = await insertHistoryFixtureActivity({
+                    dayPlanDate: today(),
+                    title: 'De la rutina',
+                    state: 'missed',
+                    origin: 'routine',
+                    blockId: routine.blocks[0]?.id,
+                });
+                await insertHistoryFixtureActivity({
+                    dayPlanDate: today(),
+                    title: 'De otra rutina',
+                    state: 'missed',
+                    origin: 'routine',
+                    blockId: otherRoutine.blocks[0]?.id,
+                });
+                await insertHistoryFixtureActivity({ dayPlanDate: today(), title: 'Manual', state: 'missed', origin: 'manual' });
+
+                const byOrigin = await readHistory(await getHistoryApi('?period=day&origin=routine'));
+                expect(byOrigin.entries).toHaveLength(2);
+                expect(byOrigin.entries.every((entry) => entry.activity.origin === 'routine')).toBe(true);
+
+                const byRoutine = await readHistory(await getHistoryApi(`?period=day&origin=routine&routineId=${routine.id}`));
+                expect(byRoutine.entries.map((entry) => entry.activity.id)).toEqual([routineEntry]);
+                expect(byRoutine.entries[0]?.routineTitle).toBe(routine.title);
+
+                const byManual = await readHistory(await getHistoryApi('?period=day&origin=manual'));
+                expect(byManual.entries).toHaveLength(1);
+                expect(byManual.entries[0]?.activity.title).toBe('Manual');
+            });
+
+            test('an invalid origin or a non-positive-integer routineId is rejected with 400 TDAH_INVALID_BODY', async () => {
+                expect((await getHistoryApi('?origin=jira')).status).toBe(400);
+                expect((await getHistoryApi('?routineId=abc')).status).toBe(400);
+                expect((await getHistoryApi('?routineId=0')).status).toBe(400);
+            });
+
+            test('a moved-then-decided Actividad keeps its current position and surfaces movedAt (no trail, per Design Notes)', async () => {
+                const id = await insertHistoryFixtureActivity({
+                    dayPlanDate: today(),
+                    title: 'Movida',
+                    state: 'missed',
+                    movedAt: `${today()}T08:00:00.000Z`,
+                });
+                const body = await readHistory(await getHistoryApi('?period=day'));
+                const entry = body.entries.find((candidate) => candidate.activity.id === id);
+                expect(entry?.activity.movedAt).not.toBeNull();
+                expect(entry?.activity.dayPlanDate).toBe(today());
+            });
+
+            test('a custom range scopes entries to exactly [from, to] inclusive, both boundaries included', async () => {
+                const from = addDaysToDateString(today(), -4);
+                const to = addDaysToDateString(today(), -2);
+                const inRangeStart = await insertHistoryFixtureActivity({ dayPlanDate: from, title: 'Inicio del rango', state: 'missed' });
+                const inRangeEnd = await insertHistoryFixtureActivity({ dayPlanDate: to, title: 'Fin del rango', state: 'missed' });
+                await insertHistoryFixtureActivity({ dayPlanDate: addDaysToDateString(from, -1), title: 'Antes del rango', state: 'missed' });
+                await insertHistoryFixtureActivity({ dayPlanDate: addDaysToDateString(to, 1), title: 'Después del rango', state: 'missed' });
+
+                const body = await readHistory(await getHistoryApi(`?period=custom&from=${from}&to=${to}`));
+                expect(body.range).toEqual({ from, to });
+                expect(body.entries.map((entry) => entry.activity.id).sort()).toEqual([inRangeStart, inRangeEnd].sort());
+            });
+
+            // Boundaries & Constraints: "esta comparación se hace en JS
+            // reutilizando formatDateInTimeZone... nunca con date()/strftime
+            // de SQLite, que solo maneja UTC u offsets fijos." America/
+            // Mexico_City no longer observes DST (fixed UTC-6), so this is a
+            // stable, non-flaky offset — deliberately picked so the UTC
+            // calendar date and the local calendar date of `completedAt`
+            // disagree, which a naive SQLite `date()`/UTC-string comparison
+            // would get wrong.
+            test('timezone-correctness: an Actividad completed near local midnight classifies by the LOCAL date, not the UTC date of completedAt', async () => {
+                await putProfile({ timeZone: 'America/Mexico_City' });
+                const dayPlanDate = '2026-03-10';
+                // 2026-03-11T04:30:00Z is 2026-03-10 22:30 in America/Mexico_City
+                // (UTC-6) — same calendar day as dayPlanDate, so this is ON TIME
+                // locally even though its own UTC date string ("2026-03-11")
+                // differs from dayPlanDate.
+                const onTimeId = await insertHistoryFixtureActivity({
+                    dayPlanDate,
+                    title: 'A tiempo en hora local',
+                    state: 'completed',
+                    completedAt: '2026-03-11T04:30:00.000Z',
+                });
+                // 2026-03-12T04:30:00Z is 2026-03-11 22:30 local — genuinely a
+                // different local day than dayPlanDate, so this one IS late.
+                const lateId = await insertHistoryFixtureActivity({
+                    dayPlanDate,
+                    title: 'Tarde en hora local',
+                    state: 'completed',
+                    completedAt: '2026-03-12T04:30:00.000Z',
+                });
+
+                const history = await readHistory(await getHistoryApi(`?period=custom&from=${dayPlanDate}&to=${dayPlanDate}`));
+                expect(history.entries.map((entry) => entry.activity.id)).toEqual([lateId]);
+                expect(history.entries.find((entry) => entry.activity.id === onTimeId)).toBeUndefined();
+
+                const metrics = await readMetrics(await getMetricsApi(`?period=custom&from=${dayPlanDate}&to=${dayPlanDate}`));
+                expect(metrics.total).toBe(2);
+                expect(metrics.completedOnTime).toBe(1);
+                expect(metrics.rate).toBe(0.5);
+            });
+
+            test("never includes another namespace's Actividades (isolation)", async () => {
+                await activate({ timeZone: 'UTC' }, TOKEN_BETA);
+                await insertHistoryFixtureActivity({ dayPlanDate: today(), title: 'De alpha', state: 'missed' });
+                await insertHistoryFixtureActivity({ dayPlanDate: today(), title: 'De beta', state: 'missed' }, TOKEN_BETA);
+
+                const alphaHistory = await readHistory(await getHistoryApi('?period=day'));
+                expect(alphaHistory.entries).toHaveLength(1);
+                expect(alphaHistory.entries[0]?.activity.title).toBe('De alpha');
+            });
+        });
+
+        describe('GET /v1/tdah/metrics (T-10)', () => {
+            test('with no data in range, rate is null and the trend is still 8 zeroed points — "Aún no hay historia"', async () => {
+                const body = await readMetrics(await getMetricsApi('?period=month'));
+                expect(body.completedOnTime).toBe(0);
+                expect(body.total).toBe(0);
+                expect(body.rate).toBeNull();
+                expect(body.byOrigin).toHaveLength(2);
+                expect(body.byOrigin.every((entry) => entry.total === 0 && entry.completedOnTime === 0)).toBe(true);
+                expect(body.trend).toHaveLength(8);
+                expect(body.trend.every((point) => point.total === 0 && point.completedOnTime === 0 && point.rate === null)).toBe(true);
+            });
+
+            test('the denominator excludes pending/started/discarded — only missed/limbo/completed count (Boundaries & Constraints)', async () => {
+                await insertHistoryFixtureActivity({ dayPlanDate: today(), title: 'Pendiente', state: 'pending' });
+                await insertHistoryFixtureActivity({ dayPlanDate: today(), title: 'Empezada', state: 'started' });
+                await insertHistoryFixtureActivity({ dayPlanDate: today(), title: 'Descartada', state: 'discarded' });
+                await insertHistoryFixtureActivity({ dayPlanDate: today(), title: 'Perdida', state: 'missed' });
+                await insertHistoryFixtureActivity({ dayPlanDate: today(), title: 'Limbo', state: 'limbo' });
+                await insertHistoryFixtureActivity({
+                    dayPlanDate: today(),
+                    title: 'Completada',
+                    state: 'completed',
+                    completedAt: `${today()}T09:00:00.000Z`,
+                });
+
+                const body = await readMetrics(await getMetricsApi('?period=day'));
+                expect(body.total).toBe(3);
+                expect(body.completedOnTime).toBe(1);
+                expect(body.rate).toBe(1 / 3);
+            });
+
+            test('rate is a fraction in [0, 1], never a pre-multiplied percentage, and the KPI is well-defined with mixed on-time/late/missed data', async () => {
+                await insertHistoryFixtureActivity({
+                    dayPlanDate: today(),
+                    title: 'A tiempo',
+                    state: 'completed',
+                    completedAt: `${today()}T09:00:00.000Z`,
+                });
+                await insertHistoryFixtureActivity({ dayPlanDate: today(), title: 'Perdida', state: 'missed' });
+
+                const body = await readMetrics(await getMetricsApi('?period=day'));
+                expect(body.total).toBe(2);
+                expect(body.completedOnTime).toBe(1);
+                expect(body.rate).toBe(0.5);
+            });
+
+            test('byOrigin breaks down completedOnTime/total separately for routine vs manual, and never a Jira/atendidas split (Never)', async () => {
+                const routine = await readRoutine(await createRoutineApi(WORKDAY_ROUTINE));
+                await insertHistoryFixtureActivity({
+                    dayPlanDate: today(),
+                    title: 'Rutina a tiempo',
+                    state: 'completed',
+                    origin: 'routine',
+                    blockId: routine.blocks[0]?.id,
+                    completedAt: `${today()}T09:00:00.000Z`,
+                });
+                await insertHistoryFixtureActivity({
+                    dayPlanDate: today(),
+                    title: 'Rutina perdida',
+                    state: 'missed',
+                    origin: 'routine',
+                    blockId: routine.blocks[0]?.id,
+                });
+                await insertHistoryFixtureActivity({ dayPlanDate: today(), title: 'Manual perdida', state: 'missed', origin: 'manual' });
+
+                const body = await readMetrics(await getMetricsApi('?period=day'));
+                expect(body.byOrigin).toEqual([
+                    { origin: 'routine', completedOnTime: 1, total: 2 },
+                    { origin: 'manual', completedOnTime: 0, total: 1 },
+                ]);
+                expect(body.total).toBe(3);
+                expect(body.completedOnTime).toBe(1);
+            });
+
+            test('the trend is always an 8-week (56-day) rolling window ending today, independent of the requested period', async () => {
+                // Deep inside the 56-day trend window but outside period=day's
+                // own 1-day window — must appear in `trend`, never in the
+                // top-level KPI.
+                const trendOnlyDate = addDaysToDateString(today(), -30);
+                await insertHistoryFixtureActivity({ dayPlanDate: trendOnlyDate, title: 'Solo en tendencia', state: 'missed' });
+
+                const body = await readMetrics(await getMetricsApi('?period=day'));
+                expect(body.total).toBe(0);
+                expect(body.trend).toHaveLength(8);
+
+                const trendStart = addDaysToDateString(today(), -55);
+                expect(body.trend[0]?.weekStart).toBe(trendStart);
+                for (let week = 1; week < 8; week += 1) {
+                    expect(body.trend[week]?.weekStart).toBe(addDaysToDateString(trendStart, week * 7));
+                }
+                const lastWeekEnd = addDaysToDateString(body.trend[7]?.weekStart as string, 6);
+                expect(lastWeekEnd).toBe(today());
+
+                const owningWeek = body.trend.find((point) => {
+                    const weekEnd = addDaysToDateString(point.weekStart, 6);
+                    return trendOnlyDate >= point.weekStart && trendOnlyDate <= weekEnd;
+                });
+                expect(owningWeek?.total).toBe(1);
+                expect(owningWeek?.completedOnTime).toBe(0);
+            });
+
+            test('period=custom with from > to or span > 366 days is rejected with 400 TDAH_INVALID_BODY (shared with History)', async () => {
+                expect((await getMetricsApi('?period=custom&from=2026-09-01&to=2026-08-01')).status).toBe(400);
+                // 2024-01-01 -> 2025-01-02 is 367 days, one past the 366-day max.
+                expect((await getMetricsApi('?period=custom&from=2024-01-01&to=2025-01-02')).status).toBe(400);
+            });
+
+            test("never includes another namespace's Actividades in either the KPI or the trend (isolation)", async () => {
+                await activate({ timeZone: 'UTC' }, TOKEN_BETA);
+                await insertHistoryFixtureActivity({ dayPlanDate: today(), title: 'De alpha', state: 'missed' });
+                await insertHistoryFixtureActivity({ dayPlanDate: today(), title: 'De beta', state: 'missed' }, TOKEN_BETA);
+
+                const alphaMetrics = await readMetrics(await getMetricsApi('?period=day'));
+                expect(alphaMetrics.total).toBe(1);
+            });
+
+            // The KPI period and the 8-week trend are two independent windows,
+            // and a `custom` period may sit entirely in the past — far from
+            // the trend window. They are queried as two explicit ranges, never
+            // as the hull between them: the hull would scan every day from the
+            // old period up to today, re-creating the unscoped read this story
+            // exists to fix. Nothing in the gap may reach either aggregate.
+            test('a far-past custom period keeps the KPI and the trend as two disjoint windows, ignoring everything in between', async () => {
+                const customFrom = addDaysToDateString(today(), -500);
+                const customTo = addDaysToDateString(today(), -480);
+                const gapDate = addDaysToDateString(today(), -200);
+
+                await insertHistoryFixtureActivity({ dayPlanDate: customFrom, title: 'Dentro del período custom', state: 'missed' });
+                await insertHistoryFixtureActivity({ dayPlanDate: gapDate, title: 'En el hueco entre ventanas', state: 'missed' });
+                await insertHistoryFixtureActivity({ dayPlanDate: today(), title: 'Dentro de la tendencia', state: 'missed' });
+
+                const body = await readMetrics(await getMetricsApi(`?period=custom&from=${customFrom}&to=${customTo}`));
+
+                // KPI counts only the custom period.
+                expect(body.period).toEqual({ from: customFrom, to: customTo });
+                expect(body.total).toBe(1);
+                expect(body.rate).toBe(0);
+
+                // The trend is still its own rolling 8 weeks ending today, and
+                // holds only the recent Actividad — never the custom-period one
+                // and never the one sitting in the gap.
+                expect(body.trend).toHaveLength(8);
+                const trendTotal = body.trend.reduce((sum, point) => sum + point.total, 0);
+                expect(trendTotal).toBe(1);
+                expect(addDaysToDateString(body.trend[7]?.weekStart as string, 6)).toBe(today());
+            });
+        });
+    });
+
     describe('WS channel (story 2.1: persistent connection)', () => {
         test('a valid token upgrades the connection and receives a "connected" event', async () => {
             const { ws, connectedEvent } = await openTdahWs();

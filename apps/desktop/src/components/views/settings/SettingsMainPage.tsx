@@ -9,6 +9,8 @@ import type { DesktopThemeMode } from '../../../lib/theme';
 import { Switch } from '../../ui/Switch';
 import { SettingRow, SettingsCard, SettingsSectionHeader } from './SettingRow';
 import { TdahActivationSection } from './TdahActivationSection';
+import { TdahHistoryView } from './TdahHistoryView';
+import { TdahMetricsView } from './TdahMetricsView';
 import { TdahRoutinesListView } from './TdahRoutinesListView';
 
 const FLATPAK_QUICK_ADD_COMMAND = 'flatpak run tech.dongdongbh.mindwtr --quick-add';
@@ -455,6 +457,13 @@ export function SettingsMainPage({
                 navigation internally (no drill-in precedent exists elsewhere
                 in apps/desktop to follow instead). */}
             <TdahRoutinesListView />
+
+            {/* Historial + Métricas (T-09/T-10, spec 3.5) — same
+                self-contained convention; unlike Routines, both gate on
+                `profile.mode === 'on'` and read that gate straight off their
+                own 409 `TDAH_ACTIVATE_REQUIRED` response. */}
+            <TdahHistoryView />
+            <TdahMetricsView />
 
             {/* Window Behavior */}
             {hasWindowSection && (

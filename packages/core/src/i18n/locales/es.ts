@@ -1669,4 +1669,64 @@ export const esOverrides: Record<string, string> = {
         'tdahRoutines.editor.saveError': 'No se pudo guardar esta Rutina. Inténtalo de nuevo.',
         'tdahRoutines.editor.saveInvalid': 'Corrige los campos resaltados antes de guardar.',
         'tdahRoutines.editor.saveNotFound': 'Esta Rutina ya no existe: puede haberse eliminado en otro lugar.',
+
+        // tdahPeriod.* / tdahHistory.* / tdahMetrics.* — T-09/T-10 (spec 3.5):
+        // pantallas de reporting de solo lectura sobre el historial de
+        // `tdah_activity`, solo desktop PWA. tdahPeriod.* es el vocabulario
+        // compartido del selector de período (ventanas rodantes día/semana/
+        // mes/custom) usado por el helper puro `tdah-period-range.ts` en
+        // ambas pantallas; su etiqueta de rango resuelta es presentación
+        // formateada con Intl, no una plantilla de i18n. El color del KPI
+        // de tdahMetrics es fijo, nunca un semáforo (SM-C2: un 100%
+        // sostenido se lee como sobre-planificación, no como logro — sin
+        // celebración, sin rachas).
+        //
+        // tdahHistory.* / tdahMetrics.* están verificados clave por clave
+        // contra `TdahHistoryView.tsx` / `TdahMetricsView.tsx` (escritos en
+        // paralelo por otro agente desde la misma spec, convención
+        // "sincronizado a mano" de ADR 0026) — tdahMetrics reutiliza varias
+        // claves de filtro de tdahHistory (period/from/to/
+        // customRangeInvalid/originRoutine/originManual) en vez de
+        // duplicarlas, igual que ese archivo.
+        'tdahPeriod.day': 'Día',
+        'tdahPeriod.week': 'Semana',
+        'tdahPeriod.month': 'Mes',
+        'tdahPeriod.custom': 'Personalizado',
+        'tdahHistory.title': 'Historial',
+        'tdahHistory.loading': 'Cargando Historial…',
+        'tdahHistory.needsSync': 'Configura la sincronización en la nube autoalojada para ver tu Historial.',
+        'tdahHistory.inactive': 'El modo TDAH está apagado — actívalo para empezar a construir tu Historial.',
+        'tdahHistory.loadError': 'No se pudo cargar tu Historial desde tu servidor.',
+        'tdahHistory.retry': 'Reintentar',
+        'tdahHistory.offlineBanner': 'Sin conexión — mostrando el último Historial cargado.',
+        'tdahHistory.filters.period': 'Período',
+        'tdahHistory.filters.from': 'Desde',
+        'tdahHistory.filters.to': 'Hasta',
+        'tdahHistory.filters.origin': 'Origen',
+        'tdahHistory.filters.originAll': 'Todos los orígenes',
+        'tdahHistory.filters.originRoutine': 'Rutina',
+        'tdahHistory.filters.originManual': 'Manual',
+        'tdahHistory.filters.routine': 'Rutina',
+        'tdahHistory.filters.routineAll': 'Todas las Rutinas',
+        'tdahHistory.filters.customRangeInvalid': 'Elige una fecha de inicio anterior o igual a la fecha final, dentro de un rango de 366 días.',
+        'tdahHistory.entry.fromRoutine': 'Parte de la Rutina {title}',
+        'tdahHistory.entry.moved': 'Movida',
+        'tdahHistory.result.completedLate': 'Completada tarde',
+        'tdahHistory.result.limbo': 'En limbo',
+        'tdahHistory.result.missed': 'No completada',
+        'tdahHistory.empty': 'Sin incompletas en este rango',
+        'tdahMetrics.title': 'Métricas',
+        'tdahMetrics.loading': 'Cargando Métricas…',
+        'tdahMetrics.needsSync': 'Configura la sincronización en la nube autoalojada para ver tus Métricas.',
+        'tdahMetrics.inactive': 'El modo TDAH está apagado — actívalo para empezar a construir tus Métricas.',
+        'tdahMetrics.loadError': 'No se pudieron cargar tus Métricas desde tu servidor.',
+        'tdahMetrics.retry': 'Reintentar',
+        'tdahMetrics.offlineBanner': 'Sin conexión — mostrando las últimas Métricas cargadas.',
+        'tdahMetrics.kpi.definition': 'Completadas el mismo día planeado',
+        'tdahMetrics.kpi.noData': 'Aún no hay historia — usá el modo unos días',
+        'tdahMetrics.kpi.fraction': '{completed} de {total}',
+        'tdahMetrics.byOrigin.title': 'Por origen',
+        'tdahMetrics.trend.title': 'Tendencia de 8 semanas',
+        'tdahMetrics.trend.weekFraction': '{completed} de {total} ({rate})',
+        'tdahMetrics.trend.noData': 'Sin datos',
 };

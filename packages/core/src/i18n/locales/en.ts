@@ -2740,4 +2740,66 @@ export const en: Record<string, string> = {
         'tdahRoutines.editor.saveError': 'Could not save this Routine. Try again.',
         'tdahRoutines.editor.saveInvalid': 'Fix the highlighted fields before saving.',
         'tdahRoutines.editor.saveNotFound': 'This Routine no longer exists — it may have been deleted elsewhere.',
+
+        // tdahPeriod.* / tdahHistory.* / tdahMetrics.* — T-09/T-10 (spec 3.5):
+        // read-only reporting screens over `tdah_activity` history, desktop
+        // PWA only. tdahPeriod.* is the shared period-selector vocabulary
+        // (day/week/month/custom rolling windows) used by the pure
+        // `tdah-period-range.ts` helper for both screens; its resolved-range
+        // label is Intl-formatted presentation, not an i18n template.
+        // tdahMetrics' KPI color is fixed, never a semaphore (SM-C2: a
+        // sustained 100% reads as over-planning, not an achievement — no
+        // celebration, no streaks).
+        //
+        // tdahHistory.* / tdahMetrics.* are verified key-for-key against
+        // `TdahHistoryView.tsx` / `TdahMetricsView.tsx` (written in parallel
+        // by a different agent from the same spec, ADR 0026's "kept in sync
+        // by hand" convention) — tdahMetrics reuses several tdahHistory.
+        // filter keys (period/from/to/customRangeInvalid/originRoutine/
+        // originManual) rather than duplicating them, matching that file.
+        'tdahPeriod.day': 'Day',
+        'tdahPeriod.week': 'Week',
+        'tdahPeriod.month': 'Month',
+        'tdahPeriod.custom': 'Custom',
+        'tdahHistory.title': 'History',
+        'tdahHistory.loading': 'Loading History…',
+        'tdahHistory.needsSync': 'Set up Self-Hosted cloud sync to see your History.',
+        'tdahHistory.inactive': 'ADHD mode is off — turn it on to start building your History.',
+        'tdahHistory.loadError': 'Could not load your History from your server.',
+        'tdahHistory.retry': 'Retry',
+        'tdahHistory.offlineBanner': 'Offline — showing the last loaded History.',
+        'tdahHistory.filters.period': 'Period',
+        'tdahHistory.filters.from': 'From',
+        'tdahHistory.filters.to': 'To',
+        'tdahHistory.filters.origin': 'Origin',
+        'tdahHistory.filters.originAll': 'All origins',
+        'tdahHistory.filters.originRoutine': 'Routine',
+        'tdahHistory.filters.originManual': 'Manual',
+        'tdahHistory.filters.routine': 'Routine',
+        'tdahHistory.filters.routineAll': 'All Routines',
+        'tdahHistory.filters.customRangeInvalid': 'Choose a start date on or before the end date, within a 366-day span.',
+        'tdahHistory.entry.fromRoutine': 'Part of Routine {title}',
+        'tdahHistory.entry.moved': 'Moved',
+        'tdahHistory.result.completedLate': 'Completed late',
+        'tdahHistory.result.limbo': 'In limbo',
+        'tdahHistory.result.missed': 'Not completed',
+        'tdahHistory.empty': 'No incomplete activities in this range',
+        'tdahMetrics.title': 'Metrics',
+        'tdahMetrics.loading': 'Loading Metrics…',
+        'tdahMetrics.needsSync': 'Set up Self-Hosted cloud sync to see your Metrics.',
+        'tdahMetrics.inactive': 'ADHD mode is off — turn it on to start building your Metrics.',
+        'tdahMetrics.loadError': 'Could not load your Metrics from your server.',
+        'tdahMetrics.retry': 'Retry',
+        'tdahMetrics.offlineBanner': 'Offline — showing the last loaded Metrics.',
+        'tdahMetrics.kpi.definition': 'Completed the same day it was planned',
+        'tdahMetrics.kpi.noData': 'No history yet — use the mode for a few days',
+        'tdahMetrics.kpi.fraction': '{completed} of {total}',
+        'tdahMetrics.byOrigin.title': 'By origin',
+        'tdahMetrics.trend.title': '8-week trend',
+        'tdahMetrics.trend.weekFraction': '{completed} of {total} ({rate})',
+        // Per-row empty label for a week with no planned activities. Distinct
+        // from tdahMetrics.kpi.noData, which is the whole-screen empty state
+        // ('No history yet — use the mode for a few days') and reads wrong
+        // repeated eight times down the trend list.
+        'tdahMetrics.trend.noData': 'No data',
 };

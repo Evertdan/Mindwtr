@@ -53,10 +53,17 @@ export const allowedEnglishMirrorKeysByLocale: Record<string, readonly string[]>
         // title and the nav/tile label (story 3.4).
         'tdahToday.limboTitle',
         'nav.tdahLimbo',
+        // Same "Routine" reasoning as tdahToday.routineLabel above, for the
+        // History/Metrics origin and Routine filter labels (story 3.5).
+        'tdahHistory.filters.originRoutine',
+        'tdahHistory.filters.routine',
     ],
     es: [
         // "Manual" is the ordinary Spanish adjective/noun, identical to English.
         'tdahActivity.origin.manual',
+        // Same "Manual" reasoning, for the History/Metrics origin filter option
+        // (story 3.5).
+        'tdahHistory.filters.originManual',
         // "Limbo" is the ordinary Spanish noun for the concept (same spelling as
         // English), matching tdahToday.scoreboardLimbo/tdahActivity.state.limbo —
         // same reasoning for both the T-08 in-screen title and the nav/tile
@@ -76,6 +83,10 @@ export const allowedEnglishMirrorKeysByLocale: Record<string, readonly string[]>
         // title and the nav/tile label (story 3.4).
         'tdahToday.limboTitle',
         'nav.tdahLimbo',
+        // Same "Routine" reasoning as tdahToday.routineLabel above, for the
+        // History/Metrics origin and Routine filter labels (story 3.5).
+        'tdahHistory.filters.originRoutine',
+        'tdahHistory.filters.routine',
     ],
     ko: [
         // Korean UI writes the e-ink theme in Latin.
@@ -98,10 +109,20 @@ export const allowedEnglishMirrorKeysByLocale: Record<string, readonly string[]>
         // title and the nav/tile label (story 3.4).
         'tdahToday.limboTitle',
         'nav.tdahLimbo',
+        // Same "Routine" reasoning as tdahToday.routineLabel above, for the
+        // History/Metrics origin and Routine filter labels (story 3.5).
+        'tdahHistory.filters.originRoutine',
+        'tdahHistory.filters.routine',
+        // "Week" is the ordinary Dutch noun for the concept, spelled exactly as
+        // in English, for the shared period selector (story 3.5).
+        'tdahPeriod.week',
     ],
     pt: [
         // "Manual" is the ordinary Portuguese adjective, identical to English.
         'tdahActivity.origin.manual',
+        // Same "Manual" reasoning, for the History/Metrics origin filter option
+        // (story 3.5).
+        'tdahHistory.filters.originManual',
         // "Limbo" is the ordinary Portuguese noun for the concept (same spelling
         // as English), matching tdahToday.scoreboardLimbo ('Em Limbo') and
         // tdahActivity.state.limbo — same reasoning for both the T-08 in-screen
@@ -167,6 +188,9 @@ export const allowedEnglishMirrorKeysByLocale: Record<string, readonly string[]>
         'settings.localApiPort',
         'settings.emailCapturePort',
         'settings.appleRemindersImport.appleReminders',
+        // "Period" is the ordinary Swedish noun for the concept (same spelling as
+        // English), used for the History/Metrics range selector (story 3.5).
+        'tdahHistory.filters.period',
     ],
     fr: [
         'calendar.date',
@@ -209,6 +233,10 @@ export const allowedEnglishMirrorKeysByLocale: Record<string, readonly string[]>
         // in-screen title and the nav/tile label (story 3.4).
         'tdahToday.limboTitle',
         'nav.tdahLimbo',
+        // Same "Routine" reasoning as tdahToday.routineLabel above, for the
+        // History/Metrics origin and Routine filter labels (story 3.5).
+        'tdahHistory.filters.originRoutine',
+        'tdahHistory.filters.routine',
     ],
 };
 

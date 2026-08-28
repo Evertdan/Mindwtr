@@ -20,6 +20,7 @@
 import { existsSync, readdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { ensureDurableDirectory } from '../server-storage';
+import { TDAH_ACTIVITY_ORIGINS } from './types';
 import type {
     TdahActivity,
     TdahActivityDecideRequest,
@@ -27,7 +28,11 @@ import type {
     TdahActivityState,
     TdahActivityTransitionAction,
     TdahConfirmMorningRequest,
+    TdahHistoryEntry,
     TdahLimboDecideBatchRequest,
+    TdahMetricsOriginBreakdown,
+    TdahMetricsResponse,
+    TdahMetricsTrendPoint,
     TdahMode,
     TdahProfile,
     TdahProfileUpsertRequest,
@@ -1323,6 +1328,39 @@ export const computeTomorrowDate = (timeZone: string, now: Date = new Date()): s
     return formatDateInTimeZone(tomorrowUtc, 'UTC');
 };
 
+/**
+ * `date` (a `YYYY-MM-DD` string already resolved via `formatDateInTimeZone`)
+ * shifted by `deltaDays` (positive or negative), calendar-safe via the same
+ * `Date.UTC`-normalization trick `computeTomorrowDate` above already uses for
+ * its own `+1` day case — treats the Y-M-D components as UTC and lets
+ * `Date.UTC` handle month/year rollover, so no time zone is needed for this
+ * second step (the zone was already applied once, when `date` itself was
+ * first resolved).
+ */
+const shiftDateString = (date: string, deltaDays: number): string => {
+    const parts = date.split('-').map(Number);
+    const [year, month, day] = parts as [number, number, number];
+    const shifted = new Date(Date.UTC(year, month - 1, day + deltaDays));
+    return formatDateInTimeZone(shifted, 'UTC');
+};
+
+/**
+ * Story 3.5 — the shared rolling-window primitive behind History/Metrics'
+ * `day`/`week`/`month` presets (`routes.ts`) and Metrics' own always-8-week
+ * trend window (`getMetrics` below): a `days`-day window ending "today" in
+ * `timeZone` (AD-6: `formatDateInTimeZone(new Date(), timeZone)`, never the
+ * client's clock). `days: 1` yields `from === to === today`.
+ */
+export const computeRollingRange = (
+    timeZone: string,
+    days: number,
+    now: Date = new Date(),
+): { from: string; to: string } => {
+    const to = formatDateInTimeZone(now, timeZone);
+    const from = shiftDateString(to, -(days - 1));
+    return { from, to };
+};
+
 export type GenerateTomorrowResult = {
     date: string;
     activityCount: number;
@@ -1727,6 +1765,72 @@ const SELECT_LIMBO_ACTIVITIES_SQL = `
     WHERE state = 'limbo'
     ORDER BY day_plan_date ASC, id ASC;
 `;
+// Story 3.5 — History (T-09) candidate query. The denominator both screens
+// draw from (Boundaries & Constraints): every Actividad
+// `missed`/`limbo`/`completed` in `[?, ?]` (lexical `>=`/`<=` on
+// `day_plan_date`'s `YYYY-MM-DD` text key, same idiom as
+// `CLOSE_OUTGOING_DAY_SQL` above) — deliberately excludes `pending`/`started`
+// (not yet decided) and `discarded` (never penalized, SM-C2). `origin`/
+// `tdah_routine.id` are optional filters expressed as `(? IS NULL OR …)`;
+// `getHistory` is the only caller, and `getMetrics` uses its own two-window
+// variant below rather than widening this single window.
+// `LEFT JOIN` (not `JOIN`, unlike `SELECT_ROUTINE_TITLE_FOR_DAY_SQL`): a
+// `manual` Actividad, or a `routine` one whose Bloque/Rutina was since
+// deleted, must still surface in the candidate set — it simply carries a
+// `NULL` `routine_title`/`routine_id_for_filter`.
+const SELECT_HISTORY_CANDIDATES_SQL = `
+    SELECT
+        tdah_activity.id AS id,
+        tdah_activity.day_plan_date AS day_plan_date,
+        tdah_activity.block_id AS block_id,
+        tdah_activity.title AS title,
+        tdah_activity.start_time AS start_time,
+        tdah_activity.duration_minutes AS duration_minutes,
+        tdah_activity.origin AS origin,
+        tdah_activity.state AS state,
+        tdah_activity.started_at AS started_at,
+        tdah_activity.completed_at AS completed_at,
+        tdah_activity.moved_at AS moved_at,
+        tdah_routine.title AS routine_title
+    FROM tdah_activity
+    LEFT JOIN tdah_routine_block ON tdah_activity.block_id = tdah_routine_block.id
+    LEFT JOIN tdah_routine ON tdah_routine_block.routine_id = tdah_routine.id
+    WHERE tdah_activity.state IN ('missed', 'limbo', 'completed')
+      AND tdah_activity.day_plan_date >= ? AND tdah_activity.day_plan_date <= ?
+      AND (? IS NULL OR tdah_activity.origin = ?)
+      AND (? IS NULL OR tdah_routine.id = ?)
+    ORDER BY tdah_activity.day_plan_date DESC, tdah_activity.id DESC;
+`;
+// `getMetrics`' own candidate select. It needs TWO windows at once (the
+// requested KPI period and the always-rolling 56-day trend), which are not
+// necessarily adjacent — a `custom` period may sit entirely in the past. Two
+// explicit `BETWEEN` predicates, never the hull `min(from) .. max(to)`: the
+// hull would silently scan every day between an old custom period and today,
+// re-creating exactly the unscoped read this story exists to fix (Boundaries &
+// Constraints: "todo rango de consulta es explícito y acotado... nunca una
+// consulta 'todo el historial' sin tope"). Rows in the gap between the two
+// windows are never read at all. No `origin`/`routineId` filters: Metrics
+// always aggregates the whole range and breaks down by origin in JS.
+const SELECT_METRICS_CANDIDATES_SQL = `
+    SELECT
+        tdah_activity.id AS id,
+        tdah_activity.day_plan_date AS day_plan_date,
+        tdah_activity.block_id AS block_id,
+        tdah_activity.title AS title,
+        tdah_activity.start_time AS start_time,
+        tdah_activity.duration_minutes AS duration_minutes,
+        tdah_activity.origin AS origin,
+        tdah_activity.state AS state,
+        tdah_activity.started_at AS started_at,
+        tdah_activity.completed_at AS completed_at,
+        tdah_activity.moved_at AS moved_at
+    FROM tdah_activity
+    WHERE tdah_activity.state IN ('missed', 'limbo', 'completed')
+      AND (
+          (tdah_activity.day_plan_date >= ? AND tdah_activity.day_plan_date <= ?)
+          OR (tdah_activity.day_plan_date >= ? AND tdah_activity.day_plan_date <= ?)
+      );
+`;
 const SELECT_ROUTINE_TITLE_FOR_DAY_SQL = `
     SELECT tdah_routine.title AS title
     FROM tdah_activity
@@ -1914,6 +2018,170 @@ export async function getLimboActivities(dataDir: string, key: string): Promise<
     return await withReadDatabase(databasePath, (database) => (
         prepareAll<TdahActivityRow>(database, SELECT_LIMBO_ACTIVITIES_SQL).all().map(rowToActivity)
     ));
+}
+
+// --- History / Metrics (story 3.5) ------------------------------------------
+
+type TdahHistoryCandidateRow = TdahActivityRow & { routine_title: unknown };
+
+/**
+ * "Completada a tiempo" (Boundaries & Constraints): `state === 'completed'`
+ * AND the LOCAL calendar date of `completedAt`, in the caller's own profile
+ * time zone, equals `dayPlanDate`. Deliberately JS (`formatDateInTimeZone`),
+ * never SQLite's `date()`/`strftime()` — those only understand UTC or a
+ * fixed numeric offset, not an IANA zone's actual (DST-aware) rules, so this
+ * comparison can never be pushed into the SQL query itself. `completedAt`
+ * being `null` here would only ever happen for a `missed`/`limbo` row (never
+ * a `completed` one — see `UPDATE_ACTIVITY_COMPLETE_SQL`), so the `null`
+ * guard is defensive, not a real production path.
+ */
+const isCompletedOnTime = (activity: TdahActivity, timeZone: string): boolean => (
+    activity.state === 'completed'
+    && activity.completedAt !== null
+    && formatDateInTimeZone(new Date(activity.completedAt), timeZone) === activity.dayPlanDate
+);
+
+export type TdahGetHistoryOptions = {
+    from: string;
+    to: string;
+    origin?: TdahActivityOrigin;
+    routineId?: number;
+    timeZone: string;
+};
+
+/**
+ * GET /v1/tdah/history — story 3.5, T-09. `from`/`to` arrive already resolved
+ * (routes.ts: either the validated `custom` bounds, or a `computeRollingRange`
+ * preset computed from the caller's own profile time zone) — this function
+ * never computes "today" itself, unlike `getTodayDayPlan`/`getTomorrowDayPlan`
+ * above. Reads `SELECT_HISTORY_CANDIDATES_SQL`'s full missed/limbo/completed
+ * candidate set for the range, then drops every `completed` row that was ON
+ * TIME (`isCompletedOnTime` above) — those never belong in the Historial
+ * (Boundaries & Constraints: "el Historial muestra... completadas tarde", not
+ * every completion). The remaining rows are already ordered most-recent-first
+ * by the SQL itself, so no re-sort is needed here.
+ *
+ * Never plants the namespace's tdah directory on disk for a namespace with no
+ * database yet — same read-only contract `getLimboActivities` above follows.
+ */
+export async function getHistory(
+    dataDir: string,
+    key: string,
+    options: TdahGetHistoryOptions,
+): Promise<TdahHistoryEntry[]> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    if (!existsSync(databasePath)) return [];
+    const originParam = options.origin ?? null;
+    const routineIdParam = options.routineId ?? null;
+    return await withReadDatabase(databasePath, (database) => {
+        const rows = prepareAll<TdahHistoryCandidateRow>(database, SELECT_HISTORY_CANDIDATES_SQL)
+            .all(options.from, options.to, originParam, originParam, routineIdParam, routineIdParam);
+        const entries: TdahHistoryEntry[] = [];
+        for (const row of rows) {
+            const activity = rowToActivity(row);
+            const completedLate = activity.state === 'completed' && !isCompletedOnTime(activity, options.timeZone);
+            // A same-day `completed` Actividad is excluded outright — it never
+            // appears in the Historial (Boundaries & Constraints).
+            if (activity.state === 'completed' && !completedLate) continue;
+            entries.push({
+                activity,
+                routineTitle: row.routine_title === null || row.routine_title === undefined ? null : String(row.routine_title),
+                completedLate,
+            });
+        }
+        return entries;
+    });
+}
+
+// Story 3.5 — Metrics' own always-rolling trend window: 8 weeks (56 days)
+// ending "today", independent of whatever `period` the caller requested for
+// the KPI (Boundaries & Constraints).
+const TDAH_METRICS_TREND_WEEKS = 8;
+const TDAH_METRICS_TREND_WINDOW_DAYS = TDAH_METRICS_TREND_WEEKS * 7;
+
+/**
+ * Buckets `rows` (already classified `isCompletedOnTime`) into
+ * `TDAH_METRICS_TREND_WEEKS` consecutive 7-day windows starting at
+ * `trendRange.from`, oldest week first — the last bucket's own last day
+ * always equals `trendRange.to` ("hoy"), since `trendRange` is itself exactly
+ * `TDAH_METRICS_TREND_WINDOW_DAYS` days wide. Called with `rows: []` for a
+ * namespace with no database yet, yielding 8 all-zero/`null`-rate points
+ * rather than a separate empty-state builder.
+ */
+const buildMetricsTrend = (
+    trendRange: { from: string; to: string },
+    rows: Array<{ activity: TdahActivity; completedOnTime: boolean }>,
+): TdahMetricsTrendPoint[] => {
+    const points: TdahMetricsTrendPoint[] = [];
+    for (let week = 0; week < TDAH_METRICS_TREND_WEEKS; week += 1) {
+        const weekStart = shiftDateString(trendRange.from, week * 7);
+        const weekEnd = shiftDateString(weekStart, 6);
+        const weekRows = rows.filter((row) => row.activity.dayPlanDate >= weekStart && row.activity.dayPlanDate <= weekEnd);
+        const total = weekRows.length;
+        const completedOnTime = weekRows.filter((row) => row.completedOnTime).length;
+        points.push({ weekStart, completedOnTime, total, rate: total === 0 ? null : completedOnTime / total });
+    }
+    return points;
+};
+
+export type TdahGetMetricsOptions = {
+    from: string;
+    to: string;
+    timeZone: string;
+};
+
+/**
+ * GET /v1/tdah/metrics — story 3.5, T-10. `from`/`to` are the requested KPI
+ * period (already resolved by routes.ts, same convention as `getHistory`
+ * above); the trend window is always its own independent 56-day rolling
+ * range ending "today" (`computeRollingRange`, this function's own `now`).
+ *
+ * Reads `SELECT_METRICS_CANDIDATES_SQL` — one query holding BOTH windows as
+ * two separate `BETWEEN` predicates, never the hull between them, so a
+ * `custom` period sitting far in the past cannot turn this into a scan from
+ * that date to today. Then classifies every row once (`isCompletedOnTime`)
+ * and slices the in-memory result twice: once against `[from, to]` for the
+ * KPI/`byOrigin` numbers, once against the trend range for `trend`. Never a
+ * precomputed/persisted aggregate (AD-13).
+ */
+export async function getMetrics(
+    dataDir: string,
+    key: string,
+    options: TdahGetMetricsOptions,
+): Promise<TdahMetricsResponse> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    const period = { from: options.from, to: options.to };
+    const trendRange = computeRollingRange(options.timeZone, TDAH_METRICS_TREND_WINDOW_DAYS);
+    const emptyByOrigin: TdahMetricsOriginBreakdown[] = TDAH_ACTIVITY_ORIGINS.map((origin) => ({ origin, completedOnTime: 0, total: 0 }));
+    if (!existsSync(databasePath)) {
+        return { period, completedOnTime: 0, total: 0, rate: null, byOrigin: emptyByOrigin, trend: buildMetricsTrend(trendRange, []) };
+    }
+    return await withReadDatabase(databasePath, (database) => {
+        const rows = prepareAll<TdahActivityRow>(database, SELECT_METRICS_CANDIDATES_SQL)
+            .all(period.from, period.to, trendRange.from, trendRange.to);
+        const classified = rows.map((row) => {
+            const activity = rowToActivity(row);
+            return { activity, completedOnTime: isCompletedOnTime(activity, options.timeZone) };
+        });
+
+        const periodRows = classified.filter((row) => row.activity.dayPlanDate >= period.from && row.activity.dayPlanDate <= period.to);
+        const total = periodRows.length;
+        const completedOnTime = periodRows.filter((row) => row.completedOnTime).length;
+        const rate = total === 0 ? null : completedOnTime / total;
+        const byOrigin: TdahMetricsOriginBreakdown[] = TDAH_ACTIVITY_ORIGINS.map((origin) => {
+            const originRows = periodRows.filter((row) => row.activity.origin === origin);
+            return {
+                origin,
+                completedOnTime: originRows.filter((row) => row.completedOnTime).length,
+                total: originRows.length,
+            };
+        });
+
+        const trendRows = classified.filter((row) => row.activity.dayPlanDate >= trendRange.from && row.activity.dayPlanDate <= trendRange.to);
+        const trend = buildMetricsTrend(trendRange, trendRows);
+
+        return { period, completedOnTime, total, rate, byOrigin, trend };
+    });
 }
 
 export type TdahCreateManualActivityInput = {

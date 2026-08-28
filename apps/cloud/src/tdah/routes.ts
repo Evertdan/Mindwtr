@@ -9,7 +9,10 @@
  * POST `/v1/tdah/activities/:id/decide` — plus (story 3.4, T-08) El Limbo:
  * GET `/v1/tdah/limbo` and POST `/v1/tdah/limbo/decide` (the same decisions
  * as `/activities/:id/decide`, minus `'undated'`, applied to a whole set of
- * ids atomically). PUT `/tdah/profile`
+ * ids atomically) — plus (story 3.5, T-09/T-10) GET `/v1/tdah/history` and
+ * GET `/v1/tdah/metrics`, both computed fresh at request time over the same
+ * `missed`/`limbo`/`completed` candidate set (AD-13: no precomputed
+ * aggregate). PUT `/tdah/profile`
  * only ever sets `mode:'off'` or updates timeZone/ritualHour on an existing
  * profile — POST /activate is the only way to set `mode:'on'`, and PUT
  * rejects a `mode:'on'` body outright with `TDAH_ACTIVATE_REQUIRED`.
@@ -25,6 +28,7 @@ import { jsonResponse, logError } from '../server-config';
 import {
     activateTdahProfile,
     computeApplicabilityPreview,
+    computeRollingRange,
     computeRoutineConflicts,
     confirmMorning,
     createManualActivity,
@@ -33,7 +37,9 @@ import {
     decideActivity,
     decideLimboBatch,
     deleteRoutine,
+    getHistory,
     getLimboActivities,
+    getMetrics,
     getRoutineWithBlocks,
     getTodayDayPlan,
     getTomorrowDayPlan,
@@ -51,17 +57,21 @@ import {
 } from './storage';
 import {
     isTdahMode,
+    TDAH_ACTIVITY_ORIGINS,
     TDAH_ERRORS,
     type TdahActivateResponse,
     type TdahActivityDecideRequest,
+    type TdahActivityOrigin,
     type TdahActivityResponse,
     type TdahActivityTransitionAction,
     type TdahConfirmMorningRequest,
     type TdahDayResponse,
     type TdahErrorCode,
+    type TdahHistoryResponse,
     type TdahLimboDecideBatchRequest,
     type TdahLimboDecideBatchResponse,
     type TdahLimboResponse,
+    type TdahMetricsResponse,
     type TdahMode,
     type TdahProfileResponse,
     type TdahRoutinePattern,
@@ -101,6 +111,11 @@ const TDAH_LIMBO_DECIDE_PATH = `${TDAH_LIMBO_PATH}/decide`;
 const TDAH_DAY_TOMORROW_PATH = `${TDAH_DAY_PATH}/tomorrow`;
 const TDAH_DAY_TOMORROW_ACTIVITIES_PATH = `${TDAH_DAY_TOMORROW_PATH}/activities`;
 const TDAH_DAY_TOMORROW_CONFIRM_PATH = `${TDAH_DAY_TOMORROW_PATH}/confirm`;
+// Story 3.5 — T-09 Historial / T-10 Métricas. Exact-string dispatch, matched
+// ahead of `TDAH_PROFILE_PATH`'s catch-all fallback, same as every other
+// sub-path above.
+const TDAH_HISTORY_PATH = `${TDAH_PATH_PREFIX}/history`;
+const TDAH_METRICS_PATH = `${TDAH_PATH_PREFIX}/metrics`;
 
 const IANA_TIME_ZONE_PATTERN = /^[A-Za-z0-9+_/-]{1,64}$/;
 const RITUAL_HOUR_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -132,6 +147,79 @@ const parsePositiveIntegerId = (raw: string): number | null => {
     // different id than the one it actually typed out.
     return Number.isSafeInteger(id) && id > 0 ? id : null;
 };
+
+// Story 3.5 — T-09 Historial / T-10 Métricas shared query-param parsing.
+const TDAH_HISTORY_METRICS_PERIODS = ['day', 'week', 'month', 'custom'] as const;
+type TdahHistoryMetricsPeriod = (typeof TDAH_HISTORY_METRICS_PERIODS)[number];
+const isTdahHistoryMetricsPeriod = (value: string): value is TdahHistoryMetricsPeriod => (
+    (TDAH_HISTORY_METRICS_PERIODS as readonly string[]).includes(value)
+);
+// day/week/month are rolling windows of 1/7/30 days ending "today" (AD-6) —
+// never calendar-aligned (Design Notes: "ventanas rodantes vs. calendario").
+const TDAH_HISTORY_METRICS_PRESET_DAYS: Record<Exclude<TdahHistoryMetricsPeriod, 'custom'>, number> = {
+    day: 1,
+    week: 7,
+    month: 30,
+};
+// Boundaries & Constraints: "un span máximo de 366 días" — never an unbounded
+// "todo el historial" query (this story's own fix for 3.4's unscoped Limbo
+// read).
+const TDAH_HISTORY_METRICS_MAX_CUSTOM_SPAN_DAYS = 366;
+
+/**
+ * Calendar-day difference between two already-`isValidDateString`-validated
+ * `YYYY-MM-DD` strings (`to - from`, never negative once `from <= to` has
+ * already been checked by the caller) — pure date arithmetic, no time zone
+ * needed since both inputs are already resolved local calendar dates.
+ */
+const daysBetweenDateStrings = (from: string, to: string): number => {
+    const fromParts = from.split('-').map(Number) as [number, number, number];
+    const toParts = to.split('-').map(Number) as [number, number, number];
+    const fromUtc = Date.UTC(fromParts[0], fromParts[1] - 1, fromParts[2]);
+    const toUtc = Date.UTC(toParts[0], toParts[1] - 1, toParts[2]);
+    return Math.round((toUtc - fromUtc) / 86_400_000);
+};
+
+type TdahParsedHistoryMetricsQuery =
+    | { ok: true; period: TdahHistoryMetricsPeriod; from?: string; to?: string }
+    | { ok: false };
+
+/**
+ * Shape-level validation only — never touches the caller's profile/time zone
+ * (that read happens after this, alongside the FR-1 mode gate every other
+ * handler already does). `custom` is fully resolved here (`from <= to`, span
+ * <= 366 days); `day`/`week`/`month` are left unresolved (no `from`/`to`) for
+ * `resolveHistoryMetricsRange` below to turn into an explicit window once the
+ * caller's time zone is known.
+ */
+const parseHistoryMetricsPeriodQuery = (url: URL): TdahParsedHistoryMetricsQuery => {
+    const periodParam = url.searchParams.get('period') ?? 'day';
+    if (!isTdahHistoryMetricsPeriod(periodParam)) return { ok: false };
+    if (periodParam !== 'custom') return { ok: true, period: periodParam };
+    const from = url.searchParams.get('from');
+    const to = url.searchParams.get('to');
+    if (!from || !to || !isValidDateString(from) || !isValidDateString(to)) return { ok: false };
+    if (from > to) return { ok: false };
+    if (daysBetweenDateStrings(from, to) > TDAH_HISTORY_METRICS_MAX_CUSTOM_SPAN_DAYS) return { ok: false };
+    return { ok: true, period: 'custom', from, to };
+};
+
+/**
+ * Turns a shape-validated query into the explicit, bounded `{from, to}`
+ * range actually queried (Boundaries & Constraints: "todo rango de consulta
+ * es explícito y acotado"). `custom`'s bounds were already resolved by the
+ * parse step above; `day`/`week`/`month` are resolved here, now that
+ * `timeZone` (the caller's own profile) is available (`computeRollingRange`,
+ * storage.ts).
+ */
+const resolveHistoryMetricsRange = (
+    parsed: Extract<TdahParsedHistoryMetricsQuery, { ok: true }>,
+    timeZone: string,
+): { from: string; to: string } => (
+    parsed.period === 'custom'
+        ? { from: parsed.from as string, to: parsed.to as string }
+        : computeRollingRange(timeZone, TDAH_HISTORY_METRICS_PRESET_DAYS[parsed.period])
+);
 
 export type TdahRequestContext = {
     key: string;
@@ -1065,6 +1153,95 @@ const handleDecideLimboBatch = async (
     }
 };
 
+/**
+ * GET /v1/tdah/history — story 3.5, T-09. Query-param shape validation
+ * happens first (`parseHistoryMetricsPeriodQuery`, plus `origin`/`routineId`
+ * below) — invalid input never even reads the profile — then the same FR-1
+ * mode gate every other route uses, then the rolling-window resolution
+ * (`resolveHistoryMetricsRange`) that needs the now-known profile time zone.
+ */
+const handleGetHistory = async (
+    req: Request,
+    ctx: TdahRequestContext,
+    options: TdahRequestOptions,
+): Promise<Response> => {
+    const url = new URL(req.url);
+    const parsedQuery = parseHistoryMetricsPeriodQuery(url);
+    if (!parsedQuery.ok) return tdahErrorResponse(TDAH_ERRORS.invalidBody, 400);
+
+    const originParam = url.searchParams.get('origin');
+    if (originParam !== null && !(TDAH_ACTIVITY_ORIGINS as readonly string[]).includes(originParam)) {
+        return tdahErrorResponse(TDAH_ERRORS.invalidBody, 400);
+    }
+    const routineIdParam = url.searchParams.get('routineId');
+    let routineId: number | undefined;
+    if (routineIdParam !== null) {
+        const parsed = parsePositiveIntegerId(routineIdParam);
+        if (parsed === null) return tdahErrorResponse(TDAH_ERRORS.invalidBody, 400);
+        routineId = parsed;
+    }
+
+    try {
+        const profile = await readTdahProfile(options.dataDir, ctx.key);
+        if (!profile || profile.mode !== 'on') {
+            return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
+        }
+        const range = resolveHistoryMetricsRange(parsedQuery, profile.timeZone);
+        const entries = await getHistory(options.dataDir, ctx.key, {
+            from: range.from,
+            to: range.to,
+            timeZone: profile.timeZone,
+            ...(originParam !== null ? { origin: originParam as TdahActivityOrigin } : {}),
+            ...(routineId !== undefined ? { routineId } : {}),
+        });
+        const responseBody: TdahHistoryResponse = { range, entries };
+        return jsonResponse(responseBody);
+    } catch (error) {
+        logError('request failed', {
+            failureClass: 'filesystem',
+            failureCode: 'request_failed',
+            failureErrno: getFsErrorCode(error),
+        });
+        return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
+    }
+};
+
+/**
+ * GET /v1/tdah/metrics — story 3.5, T-10. Same parse-then-gate-then-resolve
+ * order as `handleGetHistory` above, minus the `origin`/`routineId` filters
+ * (Metrics never filters by either — only History's per-Actividad list does).
+ */
+const handleGetMetrics = async (
+    req: Request,
+    ctx: TdahRequestContext,
+    options: TdahRequestOptions,
+): Promise<Response> => {
+    const url = new URL(req.url);
+    const parsedQuery = parseHistoryMetricsPeriodQuery(url);
+    if (!parsedQuery.ok) return tdahErrorResponse(TDAH_ERRORS.invalidBody, 400);
+
+    try {
+        const profile = await readTdahProfile(options.dataDir, ctx.key);
+        if (!profile || profile.mode !== 'on') {
+            return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
+        }
+        const range = resolveHistoryMetricsRange(parsedQuery, profile.timeZone);
+        const responseBody: TdahMetricsResponse = await getMetrics(options.dataDir, ctx.key, {
+            from: range.from,
+            to: range.to,
+            timeZone: profile.timeZone,
+        });
+        return jsonResponse(responseBody);
+    } catch (error) {
+        logError('request failed', {
+            failureClass: 'filesystem',
+            failureCode: 'request_failed',
+            failureErrno: getFsErrorCode(error),
+        });
+        return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
+    }
+};
+
 export async function handleTdahRequest(
     req: Request,
     pathname: string,
@@ -1176,6 +1353,19 @@ export async function handleTdahRequest(
         if (activityId === null) return tdahErrorResponse(TDAH_ERRORS.notFound, 404);
         if (req.method !== 'POST') return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
         return handleDecideActivity(req, activityId, ctx, options);
+    }
+
+    // Story 3.5 — T-09 Historial / T-10 Métricas. Must be checked ahead of
+    // TDAH_PROFILE_PATH's catch-all fallback below, same as every other
+    // sub-path above.
+    if (pathname === TDAH_HISTORY_PATH) {
+        if (req.method !== 'GET') return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
+        return handleGetHistory(req, ctx, options);
+    }
+
+    if (pathname === TDAH_METRICS_PATH) {
+        if (req.method !== 'GET') return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
+        return handleGetMetrics(req, ctx, options);
     }
 
     if (pathname !== TDAH_PROFILE_PATH) {

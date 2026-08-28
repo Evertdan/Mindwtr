@@ -349,6 +349,85 @@ export type TdahConfirmMorningRequest = {
 };
 
 /**
+ * GET /v1/tdah/history — story 3.5, T-09. One entry per Actividad in the
+ * requested range that is `missed`, `limbo`, or `completed` *after* its own
+ * `dayPlanDate` ("completada tarde") — a same-day `completed` Actividad never
+ * appears here (see `getHistory` in storage.ts's own doc comment for the
+ * exact JS-side, timezone-correct classification, and AGENTS.md's "the
+ * server computes" rule). `entries` is ordered most-recent-first
+ * (`day_plan_date DESC, id DESC`).
+ *
+ * `routineTitle` mirrors `TdahDayResponse.routineTitle`'s own null
+ * convention — `null` for a manual (`origin:'manual'`) Actividad, or for a
+ * `origin:'routine'` one whose Bloque/Rutina has since been deleted (the
+ * LEFT JOIN simply stops matching, same accepted divergence
+ * `SELECT_ROUTINE_TITLE_FOR_DAY_SQL` already documents).
+ *
+ * `completedLate` is `true` only for the "completada tarde" case above —
+ * always `false` for `missed`/`limbo` entries. The UI never re-derives this
+ * from `activity.completedAt`/`dayPlanDate` itself (AD-5: the server
+ * computes, the client only renders).
+ */
+export type TdahHistoryEntry = {
+    activity: TdahActivity;
+    routineTitle: string | null;
+    completedLate: boolean;
+};
+
+/**
+ * `range` echoes back the server-resolved `{from, to}` bounds actually
+ * queried — the rolling-window math for `day`/`week`/`month` presets happens
+ * server-side (AD-6: `formatDateInTimeZone(new Date(), profile.timeZone)`,
+ * never the client's clock), so the client reads the resolved dates here
+ * rather than recomputing them.
+ */
+export type TdahHistoryResponse = {
+    range: { from: string; to: string };
+    entries: TdahHistoryEntry[];
+};
+
+/**
+ * GET /v1/tdah/metrics — story 3.5, T-10. Every count below is computed
+ * fresh, at request time, over the same three-state candidate set
+ * (`missed`/`limbo`/`completed`) `TdahHistoryResponse` draws from — never a
+ * precomputed/persisted aggregate (AD-13). `completedOnTime`/`total` are the
+ * KPI's numerator/denominator; `rate` is `completedOnTime / total` as a
+ * **fraction in `[0, 1]`, never a pre-multiplied percentage** — `null` only
+ * when `total === 0` (not enough history yet). The KPI's color is a single
+ * fixed token regardless of `rate`'s value (epics.md AC, SM-C2 — never a
+ * semáforo, see the spec's Design Notes for the doc-05 wording conflict this
+ * resolves).
+ */
+export type TdahMetricsOriginBreakdown = {
+    origin: TdahActivityOrigin;
+    completedOnTime: number;
+    total: number;
+};
+
+/**
+ * One week of the always-8-week (56-day), always-rolling-to-today trend
+ * (independent of whatever `period` the caller requested for the KPI above —
+ * see the spec's Boundaries & Constraints). `weekStart` is that week's first
+ * `YYYY-MM-DD` date; `rate` follows the same fraction-or-`null` convention as
+ * `TdahMetricsResponse.rate`.
+ */
+export type TdahMetricsTrendPoint = {
+    weekStart: string;
+    completedOnTime: number;
+    total: number;
+    rate: number | null;
+};
+
+export type TdahMetricsResponse = {
+    period: { from: string; to: string };
+    completedOnTime: number;
+    total: number;
+    rate: number | null;
+    byOrigin: TdahMetricsOriginBreakdown[];
+    trend: TdahMetricsTrendPoint[];
+};
+
+/**
  * POST /v1/tdah/activate body. Always turns the mode on (first activation or
  * reactivation) — `PUT /tdah/profile` remains the only way to turn it off.
  * `routine` is optional: omitting it skips Rutina creation and yields an
