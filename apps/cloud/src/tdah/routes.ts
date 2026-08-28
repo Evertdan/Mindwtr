@@ -17,6 +17,10 @@
  * routes in this module that talk to a third party (read-only, GET-only, see
  * `jira-origin.ts`) and the only ones that ever receive a secret — which is
  * sealed at rest and never appears in any response, log or subsequent read.
+ * — plus (story 4.3, T-12) el DND: GET/PUT `/v1/tdah/dnd`, POST
+ * `/v1/tdah/dnd/windows`, PUT/DELETE `/v1/tdah/dnd/windows/:id` and PUT
+ * `/v1/tdah/dnd/calendar` (the phone's raw UTC observation, converted and
+ * clipped server-side — no client ever decides what gets silenced, AD-8).
  * PUT `/tdah/profile`
  * only ever sets `mode:'off'` or updates timeZone/ritualHour on an existing
  * profile — POST /activate is the only way to set `mode:'on'`, and PUT
@@ -42,6 +46,7 @@ import {
     decideActivity,
     decideLimboBatch,
     deleteRoutine,
+    formatDateInTimeZone,
     getHistory,
     getLimboActivities,
     getMetrics,
@@ -70,6 +75,20 @@ import {
     TDAH_WORK_ORIGIN_MAX_TOKEN_LENGTH,
     TDAH_WORK_ORIGIN_MIN_PULL_INTERVAL_MINUTES,
 } from './storage';
+import {
+    createDndWindow,
+    deleteDndWindow,
+    readDndState,
+    replaceDndCalendarWindows,
+    updateDndWindow,
+    upsertDndSettings,
+} from './storage';
+import {
+    materializeCalendarWindows,
+    parseCalendarSyncInput,
+    parseDndSettingsInput,
+    parseManualWindowInput,
+} from './dnd';
 import { resolveOriginEncryptionKey, sealOriginSecret } from './origin-crypto';
 import { resolveWorkOriginProvider, type WorkOriginFetch } from './work-origin';
 import { runNamespaceWorkOriginPull } from './origin-pull';
@@ -84,6 +103,7 @@ import {
     type TdahActivityTransitionAction,
     type TdahConfirmMorningRequest,
     type TdahDayResponse,
+    type TdahDndResponse,
     type TdahErrorCode,
     type TdahHistoryResponse,
     type TdahLimboDecideBatchRequest,
@@ -143,6 +163,18 @@ const TDAH_METRICS_PATH = `${TDAH_PATH_PREFIX}/metrics`;
 // `TDAH_PROFILE_PATH`'s catch-all fallback.
 const TDAH_ORIGIN_PATH = `${TDAH_PATH_PREFIX}/origin`;
 const TDAH_ORIGIN_SYNC_PATH = `${TDAH_ORIGIN_PATH}/sync`;
+// Story 4.3 — T-12's DND. Dispatched most-specific-first
+// (`/dnd/calendar` -> `/dnd/windows/:id` -> `/dnd/windows` -> `/dnd`), the
+// same ordering `TDAH_ORIGIN_SYNC_PATH` follows over `TDAH_ORIGIN_PATH`, and
+// all of them ahead of `TDAH_PROFILE_PATH`'s catch-all fallback.
+const TDAH_DND_PATH = `${TDAH_PATH_PREFIX}/dnd`;
+const TDAH_DND_CALENDAR_PATH = `${TDAH_DND_PATH}/calendar`;
+const TDAH_DND_WINDOWS_PATH = `${TDAH_DND_PATH}/windows`;
+// Built from `TDAH_DND_WINDOWS_PATH` rather than repeating the literal prefix,
+// so the pattern cannot drift from the exact-string path it is the `/:id`
+// sibling of. The prefix is a fixed ASCII path with no regex metacharacters, so
+// it needs no escaping.
+const TDAH_DND_WINDOW_ID_PATTERN = new RegExp(`^${TDAH_DND_WINDOWS_PATH}/([^/]+)$`);
 
 const IANA_TIME_ZONE_PATTERN = /^[A-Za-z0-9+_/-]{1,64}$/;
 const RITUAL_HOUR_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -903,6 +935,15 @@ const handleGetRoutineConflicts = async (ctx: TdahRequestContext, options: TdahR
  * `selectDayPlanView` (storage.ts). Neither ever carries the sealed credential:
  * the snapshot table has no token column to read, and the error code is a
  * stable `TDAH_…` classification, never a raw provider message.
+ *
+ * Story 4.3 — and `dndActiveUntil`, T-01's `🌙 DND · hasta {hora}` chip. It is
+ * the one field in this body whose value comes from a CLOCK rather than from
+ * stored rows: `selectDayPlanView` resolves it against the profile-local "now"
+ * at request time, over the same `resolveDndActive` predicate the two
+ * notification ticks use, so the chip can never disagree with whether a
+ * notification would actually be suppressed. Being clock-derived, it is
+ * attached only to TODAY's view — tomorrow's editor and the confirm write have
+ * no "now" to be inside of and read `null` (AD-8: the client computes nothing).
  */
 const handleGetDay = async (ctx: TdahRequestContext, options: TdahRequestOptions): Promise<Response> => {
     try {
@@ -1604,6 +1645,247 @@ const handleSyncWorkOrigin = async (ctx: TdahRequestContext, options: TdahReques
     }
 };
 
+// --- Story 4.3: el DND (T-12) -----------------------------------------------
+//
+// Every handler below shares the module's FR-1 gate (409
+// TDAH_ACTIVATE_REQUIRED unless the mode is on) and the same
+// parse-before-any-I/O order the Origen's routes established, so a malformed
+// window never reaches storage. None of them decides anything about
+// suppression: the verdict comes from `dnd.ts` and travels back as
+// `activeUntil` (AD-8).
+
+/** GET /v1/tdah/dnd — T-12's whole read: the settings, every window (manual and calendar-derived) and the server-computed `activeUntil`. */
+const handleGetDnd = async (ctx: TdahRequestContext, options: TdahRequestOptions): Promise<Response> => {
+    try {
+        const profile = await readTdahProfile(options.dataDir, ctx.key);
+        if (!profile || profile.mode !== 'on') {
+            return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
+        }
+        const responseBody: TdahDndResponse = await readDndState(options.dataDir, ctx.key, profile.timeZone);
+        return jsonResponse(responseBody);
+    } catch (error) {
+        logError('request failed', {
+            failureClass: 'filesystem',
+            failureCode: 'request_failed',
+            failureErrno: getFsErrorCode(error),
+        });
+        return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
+    }
+};
+
+/**
+ * PUT /v1/tdah/dnd — doc 06 zones 2 and 3: the calendar-detection toggle and
+ * the working window that bounds it.
+ *
+ * `workStart < workEnd` is checked on the MERGED pair (body over persisted over
+ * default), the same way `handlePutWorkOrigin` checks the Origen's — a
+ * settings-only PUT that omits one half must not be validated against a
+ * default the user never chose.
+ */
+const handlePutDnd = async (
+    req: Request,
+    ctx: TdahRequestContext,
+    options: TdahRequestOptions,
+): Promise<Response> => {
+    const body = await readJsonBody(req, options.maxBodyBytes, options.signal);
+    if (isBodyReadError(body)) {
+        return tdahErrorResponse(TDAH_ERRORS.invalidBody, body.__mindwtrError.status);
+    }
+    const input = parseDndSettingsInput(body);
+    if (!input) return tdahErrorResponse(TDAH_ERRORS.dndInvalid, 400);
+    try {
+        const profile = await readTdahProfile(options.dataDir, ctx.key);
+        if (!profile || profile.mode !== 'on') {
+            return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
+        }
+        const existing = await readDndState(options.dataDir, ctx.key, profile.timeZone);
+        const workStart = input.workStart ?? existing.settings.workStart;
+        const workEnd = input.workEnd ?? existing.settings.workEnd;
+        // Lexically comparable because both are zero-padded `HH:mm`. A window
+        // that does not run forward would silently disable every calendar
+        // detection, so it is rejected rather than clamped — same call the
+        // Origen's own window makes.
+        if (workStart >= workEnd) return tdahErrorResponse(TDAH_ERRORS.dndInvalid, 400);
+        // The check above is only the fast path: it reads the stored pair
+        // OUTSIDE the write transaction, so two concurrent partial PUTs could
+        // each pass it and still merge into an inverted window. The invariant
+        // itself is enforced by `mutateUpsertDndSettings`, inside the held
+        // transaction, and surfaces here as the very same 400.
+        const outcome = await upsertDndSettings(options.dataDir, ctx.key, profile.timeZone, input);
+        if (outcome.status !== 'ok') return tdahErrorResponse(TDAH_ERRORS.dndInvalid, 400);
+        const responseBody: TdahDndResponse = outcome.response;
+        return jsonResponse(responseBody);
+    } catch (error) {
+        logError('request failed', {
+            failureClass: 'filesystem',
+            failureCode: 'request_failed',
+            failureErrno: getFsErrorCode(error),
+        });
+        return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
+    }
+};
+
+/** Shared 409 mapping for the two by-id window mutations: a `source='calendar'` row is `TDAH_DND_READ_ONLY`, a missing one is a plain 404. */
+const dndWindowRejectionResponse = (
+    outcome: { status: 'notFound' } | { status: 'rejected'; reason: 'dndLimit' | 'dndReadOnly' },
+): Response => {
+    if (outcome.status === 'notFound') return tdahErrorResponse(TDAH_ERRORS.notFound, 404);
+    return outcome.reason === 'dndLimit'
+        ? tdahErrorResponse(TDAH_ERRORS.dndLimit, 409)
+        : tdahErrorResponse(TDAH_ERRORS.dndReadOnly, 409);
+};
+
+/** POST /v1/tdah/dnd/windows — doc 06 zone 4: a new MANUAL window (weekly or one-off). 409 TDAH_DND_LIMIT past `TDAH_DND_MAX_MANUAL_WINDOWS`. */
+const handleCreateDndWindow = async (
+    req: Request,
+    ctx: TdahRequestContext,
+    options: TdahRequestOptions,
+): Promise<Response> => {
+    const body = await readJsonBody(req, options.maxBodyBytes, options.signal);
+    if (isBodyReadError(body)) {
+        return tdahErrorResponse(TDAH_ERRORS.invalidBody, body.__mindwtrError.status);
+    }
+    const input = parseManualWindowInput(body);
+    if (!input) return tdahErrorResponse(TDAH_ERRORS.dndInvalid, 400);
+    try {
+        const profile = await readTdahProfile(options.dataDir, ctx.key);
+        if (!profile || profile.mode !== 'on') {
+            return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
+        }
+        const outcome = await createDndWindow(options.dataDir, ctx.key, profile.timeZone, input);
+        if (outcome.status !== 'ok') return dndWindowRejectionResponse(outcome);
+        const responseBody: TdahDndResponse = outcome.response;
+        return jsonResponse(responseBody, { status: 201 });
+    } catch (error) {
+        logError('request failed', {
+            failureClass: 'filesystem',
+            failureCode: 'request_failed',
+            failureErrno: getFsErrorCode(error),
+        });
+        return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
+    }
+};
+
+/** PUT /v1/tdah/dnd/windows/:id — edits one MANUAL window. A calendar-derived row is 409 TDAH_DND_READ_ONLY with nothing written (the next sync would replace it anyway). */
+const handleUpdateDndWindow = async (
+    req: Request,
+    windowId: string,
+    ctx: TdahRequestContext,
+    options: TdahRequestOptions,
+): Promise<Response> => {
+    const body = await readJsonBody(req, options.maxBodyBytes, options.signal);
+    if (isBodyReadError(body)) {
+        return tdahErrorResponse(TDAH_ERRORS.invalidBody, body.__mindwtrError.status);
+    }
+    const input = parseManualWindowInput(body);
+    if (!input) return tdahErrorResponse(TDAH_ERRORS.dndInvalid, 400);
+    try {
+        const profile = await readTdahProfile(options.dataDir, ctx.key);
+        if (!profile || profile.mode !== 'on') {
+            return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
+        }
+        const outcome = await updateDndWindow(options.dataDir, ctx.key, profile.timeZone, windowId, input);
+        if (outcome.status !== 'ok') return dndWindowRejectionResponse(outcome);
+        const responseBody: TdahDndResponse = outcome.response;
+        return jsonResponse(responseBody);
+    } catch (error) {
+        logError('request failed', {
+            failureClass: 'filesystem',
+            failureCode: 'request_failed',
+            failureErrno: getFsErrorCode(error),
+        });
+        return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
+    }
+};
+
+/** DELETE /v1/tdah/dnd/windows/:id — same read-only rule as the PUT above. */
+const handleDeleteDndWindow = async (
+    windowId: string,
+    ctx: TdahRequestContext,
+    options: TdahRequestOptions,
+): Promise<Response> => {
+    try {
+        const profile = await readTdahProfile(options.dataDir, ctx.key);
+        if (!profile || profile.mode !== 'on') {
+            return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
+        }
+        const outcome = await deleteDndWindow(options.dataDir, ctx.key, profile.timeZone, windowId);
+        if (outcome.status !== 'ok') return dndWindowRejectionResponse(outcome);
+        const responseBody: TdahDndResponse = outcome.response;
+        return jsonResponse(responseBody);
+    } catch (error) {
+        logError('request failed', {
+            failureClass: 'filesystem',
+            failureCode: 'request_failed',
+            failureErrno: getFsErrorCode(error),
+        });
+        return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
+    }
+};
+
+/**
+ * PUT /v1/tdah/dnd/calendar — the phone's observation, and the concrete AD-8
+ * boundary. The body is nothing but `{rangeStart, rangeEnd, events:[{startsAt,
+ * endsAt}]}` in raw UTC ISO: no titles, no calendar names, no wall-clock times,
+ * no "is this in working hours" judgment. Everything after that happens here —
+ * `materializeCalendarWindows` converts each instant into the PROFILE's zone
+ * (which may differ from the device's, AD-6), splits by local midnight, clips
+ * to the DND working window and drops whatever is left empty — and
+ * `replaceDndCalendarWindows` swaps that range's projection in block, never
+ * touching a manual window.
+ *
+ * Replacing a whole range (rather than upserting events) is what lets a
+ * cancelled meeting disappear: it is expressed by its ABSENCE from the payload.
+ */
+const handleSyncDndCalendar = async (
+    req: Request,
+    ctx: TdahRequestContext,
+    options: TdahRequestOptions,
+): Promise<Response> => {
+    const body = await readJsonBody(req, options.maxBodyBytes, options.signal);
+    if (isBodyReadError(body)) {
+        return tdahErrorResponse(TDAH_ERRORS.invalidBody, body.__mindwtrError.status);
+    }
+    const input = parseCalendarSyncInput(body);
+    if (!input) return tdahErrorResponse(TDAH_ERRORS.dndInvalid, 400);
+    try {
+        const profile = await readTdahProfile(options.dataDir, ctx.key);
+        if (!profile || profile.mode !== 'on') {
+            return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
+        }
+        const existing = await readDndState(options.dataDir, ctx.key, profile.timeZone);
+        const windows = materializeCalendarWindows(
+            input.events,
+            profile.timeZone,
+            existing.settings.workStart,
+            existing.settings.workEnd,
+        );
+        // The range's own local-date bounds, resolved in the profile's zone for
+        // exactly the same reason the events are: the phone reports absolute
+        // instants, and the rows are keyed by local calendar day.
+        const rangeStartDate = formatDateInTimeZone(new Date(input.rangeStartMs), profile.timeZone);
+        const rangeEndDate = formatDateInTimeZone(new Date(input.rangeEndMs), profile.timeZone);
+        const responseBody: TdahDndResponse = await replaceDndCalendarWindows(
+            options.dataDir,
+            ctx.key,
+            profile.timeZone,
+            windows,
+            rangeStartDate,
+            rangeEndDate,
+        );
+        return jsonResponse(responseBody);
+    } catch (error) {
+        // `.code` only — never the caught error's message, and never anything
+        // read out of the user's calendar.
+        logError('request failed', {
+            failureClass: 'filesystem',
+            failureCode: 'request_failed',
+            failureErrno: getFsErrorCode(error),
+        });
+        return tdahErrorResponse(TDAH_ERRORS.storageFailed, 500);
+    }
+};
+
 export async function handleTdahRequest(
     req: Request,
     pathname: string,
@@ -1743,6 +2025,50 @@ export async function handleTdahRequest(
         if (req.method === 'GET') return handleGetWorkOrigin(ctx, options);
         if (req.method === 'PUT') return handlePutWorkOrigin(req, ctx, options);
         if (req.method === 'DELETE') return handleDeleteWorkOrigin(ctx, options);
+        return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
+    }
+
+    // Story 4.3 — T-12's DND, dispatched MOST SPECIFIC FIRST
+    // (`/dnd/calendar` -> `/dnd/windows/:id` -> `/dnd/windows` -> `/dnd`) so a
+    // sub-path can never be swallowed by a shorter one, and all of them ahead
+    // of `TDAH_PROFILE_PATH`'s catch-all fallback below — the same ordering
+    // every other family in this dispatcher follows.
+    if (pathname === TDAH_DND_CALENDAR_PATH) {
+        if (req.method !== 'PUT') return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
+        return handleSyncDndCalendar(req, ctx, options);
+    }
+
+    const dndWindowMatch = pathname.match(TDAH_DND_WINDOW_ID_PATTERN);
+    if (dndWindowMatch) {
+        // A window id is an opaque UUID string (not a positive integer like
+        // every other id in this module), so it is passed through as-is; a
+        // nonexistent one simply resolves to 404 in the handler.
+        //
+        // The decode runs OUTSIDE any handler's try/catch, so a malformed
+        // percent-escape (`%E0%A4%A`) would otherwise throw a `URIError`
+        // straight out of the dispatcher and become a 500. An unparseable id
+        // is an id that matches nothing, so it answers 404 — the same outcome
+        // `parsePositiveIntegerId` returning `null` produces for every other
+        // id in this dispatcher.
+        let windowId: string;
+        try {
+            windowId = decodeURIComponent(dndWindowMatch[1] as string);
+        } catch {
+            return tdahErrorResponse(TDAH_ERRORS.notFound, 404);
+        }
+        if (req.method === 'PUT') return handleUpdateDndWindow(req, windowId, ctx, options);
+        if (req.method === 'DELETE') return handleDeleteDndWindow(windowId, ctx, options);
+        return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
+    }
+
+    if (pathname === TDAH_DND_WINDOWS_PATH) {
+        if (req.method !== 'POST') return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
+        return handleCreateDndWindow(req, ctx, options);
+    }
+
+    if (pathname === TDAH_DND_PATH) {
+        if (req.method === 'GET') return handleGetDnd(ctx, options);
+        if (req.method === 'PUT') return handlePutDnd(req, ctx, options);
         return tdahErrorResponse(TDAH_ERRORS.methodNotAllowed, 405);
     }
 

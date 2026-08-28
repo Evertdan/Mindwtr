@@ -17,6 +17,7 @@ import {
     withWriteTransaction,
 } from './storage';
 import { handleTdahRequest } from './routes';
+import { computeLocalTimeOfDay, computeLocalWeekday } from './dnd';
 import { runNightlyTdahTick } from './scheduler';
 import { runActivityTriggerTick } from './activity-trigger';
 import { openOriginSecret, resolveOriginEncryptionKey, sealOriginSecret, TDAH_ORIGIN_KEY_ENV_VAR } from './origin-crypto';
@@ -218,6 +219,10 @@ describe('tdah module', () => {
         // Story 4.2 — always present on the wire; optional here only so the
         // pre-4.2 assertions above keep type-checking untouched.
         workOriginErrorCode?: string | null;
+        // Story 4.3 — same rule: always present on the wire for
+        // `GET /v1/tdah/day`, optional here so every earlier assertion in this
+        // file keeps type-checking untouched.
+        dndActiveUntil?: string | null;
     };
 
     const readDay = async (response: Response): Promise<TdahTestDay> => (
@@ -7648,6 +7653,933 @@ describe('tdah module', () => {
             expect(summary.firedWorkBandCount).toBe(0);
             expect(tick.bandEvents).toHaveLength(0);
             expect((await readBandRows()).find((row) => row.id === band.id)?.start_notified_at).toBeNull();
+        });
+    });
+
+
+    describe('Juntas sin vibras (story 4.3: DND por calendario y ventanas manuales)', () => {
+        /** An exact UTC instant on the REAL current calendar day, same fixture idiom every other tick block in this file uses. */
+        const dndInstant = (hhmm: string): Date => (
+            new Date(`${formatDateInTimeZone(new Date(), 'UTC')}T${hhmm}:00.000Z`)
+        );
+        const today = (): string => formatDateInTimeZone(new Date(), 'UTC');
+
+        const alwaysConnected = (): boolean => true;
+        const neverConnected = (): boolean => false;
+
+        type Collected = {
+            events: TdahWsActivityTriggerEvent[];
+            bandEvents: TdahWsWorkBandEvent[];
+            ritualEvents: TdahWsRitualInvitationEvent[];
+            onFire: (key: string, event: TdahWsActivityTriggerEvent) => void;
+            onWorkBandFire: (key: string, event: TdahWsWorkBandEvent) => void;
+            onRitualFire: (key: string, event: TdahWsRitualInvitationEvent) => void;
+        };
+
+        const collect = (): Collected => {
+            const events: TdahWsActivityTriggerEvent[] = [];
+            const bandEvents: TdahWsWorkBandEvent[] = [];
+            const ritualEvents: TdahWsRitualInvitationEvent[] = [];
+            return {
+                events,
+                bandEvents,
+                ritualEvents,
+                onFire: (_key, event) => events.push(event),
+                onWorkBandFire: (_key, event) => bandEvents.push(event),
+                onRitualFire: (_key, event) => ritualEvents.push(event),
+            };
+        };
+
+        type DndNotifiedRow = {
+            id: number;
+            title: string;
+            origin: string;
+            state: string;
+            start_notified_at: string | null;
+            end_notified_at: string | null;
+        };
+
+        const readDndNotifiedRows = async (token: string = TOKEN_ALPHA): Promise<DndNotifiedRow[]> => {
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(tdahDatabasePath(dataDir, tokenToKey(token)), { readonly: true });
+            try {
+                return (database.prepare(
+                    'SELECT id, title, origin, state, start_notified_at, end_notified_at FROM tdah_activity ORDER BY id;',
+                ) as unknown as { all(): DndNotifiedRow[] }).all();
+            } finally {
+                database.close();
+            }
+        };
+
+        const readRitualNotifiedDateRow = async (token: string = TOKEN_ALPHA): Promise<string | null> => {
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(tdahDatabasePath(dataDir, tokenToKey(token)), { readonly: true });
+            try {
+                const row = database.prepare('SELECT ritual_notified_date FROM tdah_profile WHERE id = 1;').get() as {
+                    ritual_notified_date: string | null;
+                } | undefined;
+                return row?.ritual_notified_date ?? null;
+            } finally {
+                database.close();
+            }
+        };
+
+        const countState = async (state: string, token: string = TOKEN_ALPHA): Promise<number> => {
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(tdahDatabasePath(dataDir, tokenToKey(token)), { readonly: true });
+            try {
+                const row = database.prepare('SELECT COUNT(*) AS count FROM tdah_activity WHERE state = ?;').get(state) as { count: number };
+                return Number(row.count);
+            } finally {
+                database.close();
+            }
+        };
+
+        const listTableNames = async (token: string = TOKEN_ALPHA): Promise<string[]> => {
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(tdahDatabasePath(dataDir, tokenToKey(token)), { readonly: true });
+            try {
+                return (database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name;") as unknown as {
+                    all(): { name: string }[];
+                }).all().map((row) => row.name);
+            } finally {
+                database.close();
+            }
+        };
+
+        const activityColumnNames = async (token: string = TOKEN_ALPHA): Promise<string[]> => {
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(tdahDatabasePath(dataDir, tokenToKey(token)), { readonly: true });
+            try {
+                return (database.prepare("PRAGMA table_info('tdah_activity');") as unknown as {
+                    all(): { name: string }[];
+                }).all().map((row) => row.name);
+            } finally {
+                database.close();
+            }
+        };
+
+        type TdahTestDndWindow = {
+            id: string;
+            source: string;
+            kind: string;
+            weekdays: number[] | null;
+            date: string | null;
+            startTime: string;
+            endTime: string;
+            label: string | null;
+        };
+
+        type TdahTestDnd = {
+            settings: { calendarEnabled: boolean; workStart: string; workEnd: string };
+            windows: TdahTestDndWindow[];
+            activeUntil: string | null;
+        };
+
+        const dndRequest = async (
+            method: string,
+            options: { path?: string; body?: unknown; token?: string } = {},
+        ): Promise<Response> => {
+            const path = options.path ?? '/v1/tdah/dnd';
+            const token = options.token ?? TOKEN_ALPHA;
+            const req = new Request(`http://localhost${path}`, {
+                method,
+                ...(options.body !== undefined
+                    ? { body: JSON.stringify(options.body), headers: { 'Content-Type': 'application/json' } }
+                    : {}),
+            });
+            const response = await handleTdahRequest(req, path, { key: tokenToKey(token) }, {
+                dataDir,
+                maxBodyBytes: 200_000,
+            });
+            expect(response).not.toBeNull();
+            return response as Response;
+        };
+
+        const readDnd = async (response: Response): Promise<TdahTestDnd> => await response.json() as TdahTestDnd;
+
+        /** Creates a MANUAL one-off window covering `start`-`end` on today's real UTC date, through the real route. */
+        const createOnceWindow = async (
+            start: string,
+            end: string,
+            options: { date?: string; token?: string } = {},
+        ): Promise<TdahTestDnd> => {
+            const response = await dndRequest('POST', {
+                path: '/v1/tdah/dnd/windows',
+                body: { kind: 'once', date: options.date ?? today(), startTime: start, endTime: end },
+                ...(options.token ? { token: options.token } : {}),
+            });
+            expect(response.status).toBe(201);
+            return await readDnd(response);
+        };
+
+        /** Creates a MANUAL weekly window on `weekdays` (0=Sunday … 6=Saturday), through the real route. */
+        const createWeeklyWindow = async (
+            weekdays: number[],
+            start: string,
+            end: string,
+            options: { token?: string } = {},
+        ): Promise<TdahTestDnd> => {
+            const response = await dndRequest('POST', {
+                path: '/v1/tdah/dnd/windows',
+                body: { kind: 'weekly', weekdays, startTime: start, endTime: end },
+                ...(options.token ? { token: options.token } : {}),
+            });
+            expect(response.status).toBe(201);
+            return await readDnd(response);
+        };
+
+        /**
+         * The UTC instant at which the wall clock in `timeZone` reads exactly
+         * `date` `hhmm`. Solved by measuring the zone's real offset at a probe
+         * instant and correcting, never by assuming a fixed offset and never by
+         * touching the device's own zone — the same discipline the production
+         * code follows. Two passes always suffice; the third is only there so a
+         * DST edge cannot loop.
+         */
+        const instantAtLocalTime = (timeZone: string, date: string, hhmm: string): Date => {
+            const asUtcMs = (isoDate: string, time: string): number => Date.UTC(
+                Number(isoDate.slice(0, 4)),
+                Number(isoDate.slice(5, 7)) - 1,
+                Number(isoDate.slice(8, 10)),
+                Number(time.slice(0, 2)),
+                Number(time.slice(3, 5)),
+            );
+            const target = asUtcMs(date, hhmm);
+            let guess = new Date(target);
+            for (let pass = 0; pass < 3; pass += 1) {
+                const localMs = asUtcMs(
+                    formatDateInTimeZone(guess, timeZone),
+                    computeLocalTimeOfDay(timeZone, guess),
+                );
+                if (localMs === target) break;
+                guess = new Date(guess.getTime() + (target - localMs));
+            }
+            return guess;
+        };
+
+        /**
+         * Plants a Jira work band (N-04's subject) and one snapshot issue with
+         * direct SQL — the same "reach into the namespace's own sqlite" fixture
+         * technique `forceActivityLimbo` and the migration blocks already use.
+         * Deliberately NOT a full Origen connection: 4.3 must be provable
+         * without a credential, an encryption key or a fake Atlassian, since
+         * the whole point is that the DND is independent of story 4.1.
+         */
+        const seedWorkBand = async (startTime: string, durationMinutes: number, token: string = TOKEN_ALPHA): Promise<void> => {
+            const databasePath = tdahDatabasePath(dataDir, tokenToKey(token));
+            await withWriteTransaction(databasePath, (database) => {
+                database
+                    .prepare("INSERT INTO tdah_activity (day_plan_date, block_id, title, start_time, duration_minutes, origin, state) VALUES (?, NULL, 'Sprint', ?, ?, 'jira', 'pending');")
+                    .run(today(), startTime, durationMinutes);
+                database
+                    .prepare("INSERT INTO tdah_work_origin_item (external_key, summary, status, sprint_name, sort_order) VALUES ('ACME-1', 'Algo', 'To Do', NULL, 0);")
+                    .run();
+            });
+        };
+
+        /** Activates the mode, materializes today's DayPlan and plants the four notifications' subjects. */
+        const seedAllFourTriggers = async (token: string = TOKEN_ALPHA): Promise<void> => {
+            await activate({ timeZone: 'UTC', ritualHour: '23:00' }, token);
+            // GET /day is what materializes TODAY's plan (activate only ever
+            // generates tomorrow's), and the band's FK needs that row to exist.
+            expect((await getDay(token)).status).toBe(200);
+            await createManualActivityApi({ title: 'Foco', startTime: '10:00', durationMinutes: 30 }, token);
+            await seedWorkBand('10:00', 480, token);
+        };
+
+        // --- (a) no window at all: the four notifications behave exactly as before 4.3
+
+        test('(a) sin ninguna ventana, N-01, N-02, N-03 y N-04 se emiten los cuatro exactamente como antes', async () => {
+            await seedAllFourTriggers();
+
+            const tick = collect();
+            const summary = await runActivityTriggerTick(
+                dataDir,
+                dndInstant('10:35'),
+                alwaysConnected,
+                tick.onFire,
+                tick.onWorkBandFire,
+            );
+            expect(summary.firedEventCount).toBe(2);
+            expect(summary.firedWorkBandCount).toBe(1);
+            expect(summary.suppressedCount).toBe(0);
+            expect(tick.events.map((event) => event.edge)).toEqual(['start', 'end']);
+            expect(tick.bandEvents).toHaveLength(1);
+
+            const nightly = collect();
+            const nightlySummary = await runNightlyTdahTick(
+                dataDir,
+                dndInstant('23:30'),
+                alwaysConnected,
+                nightly.onRitualFire,
+            );
+            expect(nightlySummary.suppressedCount).toBe(0);
+            expect(nightly.ritualEvents).toHaveLength(1);
+            expect(await readRitualNotifiedDateRow()).toBe(today());
+        });
+
+        /**
+         * (a-bis) The mutant this kills: replacing every `resolveDndActive(...)`
+         * call site with a bare `readDndWindows(database).length > 0` — i.e.
+         * dropping the time-of-day comparison entirely — leaves the whole rest
+         * of the suite green, because every other suppression test has a window
+         * that is genuinely active at the tick instant, and (c)/(d) return
+         * `skipped` before ever reaching the DND branch.
+         *
+         * So: a window that exists TODAY but does not contain either tick
+         * instant must behave exactly like (a)'s no-window-at-all case, field
+         * for field.
+         */
+        test('(a-bis) una ventana de HOY que no cubre el instante del tick no suprime nada: los cuatro se emiten igual que sin ventana', async () => {
+            await seedAllFourTriggers();
+            // 14:00-15:00 contains neither the 10:35 activity tick nor the
+            // 23:30 nightly one.
+            await createOnceWindow('14:00', '15:00');
+
+            const tick = collect();
+            const summary = await runActivityTriggerTick(
+                dataDir,
+                dndInstant('10:35'),
+                alwaysConnected,
+                tick.onFire,
+                tick.onWorkBandFire,
+            );
+            expect(summary.firedEventCount).toBe(2);
+            expect(summary.firedWorkBandCount).toBe(1);
+            expect(summary.suppressedCount).toBe(0);
+            expect(tick.events.map((event) => event.edge)).toEqual(['start', 'end']);
+            expect(tick.bandEvents).toHaveLength(1);
+
+            const nightly = collect();
+            const nightlySummary = await runNightlyTdahTick(
+                dataDir,
+                dndInstant('23:30'),
+                alwaysConnected,
+                nightly.onRitualFire,
+            );
+            expect(nightlySummary.suppressedCount).toBe(0);
+            expect(nightly.ritualEvents).toHaveLength(1);
+            expect(await readRitualNotifiedDateRow()).toBe(today());
+        });
+
+        // --- (b) window active: all four are sealed and none is emitted
+
+        test('(b) con una ventana activa, los cuatro se sellan y no emiten nada', async () => {
+            await seedAllFourTriggers();
+            // One window covering the whole working day AND the ritual hour.
+            await createOnceWindow('09:00', '23:59');
+
+            const tick = collect();
+            const summary = await runActivityTriggerTick(
+                dataDir,
+                dndInstant('10:35'),
+                alwaysConnected,
+                tick.onFire,
+                tick.onWorkBandFire,
+            );
+            expect(summary.firedEventCount).toBe(0);
+            expect(summary.firedWorkBandCount).toBe(0);
+            expect(summary.firedNamespaceCount).toBe(0);
+            // Two milestones (start + end) plus the band.
+            expect(summary.suppressedCount).toBe(3);
+            expect(tick.events).toHaveLength(0);
+            expect(tick.bandEvents).toHaveLength(0);
+
+            // Sealed exactly as a real fire seals: the dedupe columns moved.
+            const rows = await readDndNotifiedRows();
+            const manual = rows.find((row) => row.origin === 'manual');
+            const band = rows.find((row) => row.origin === 'jira');
+            expect(manual?.start_notified_at).not.toBeNull();
+            expect(manual?.end_notified_at).not.toBeNull();
+            expect(band?.start_notified_at).not.toBeNull();
+
+            const nightly = collect();
+            const nightlySummary = await runNightlyTdahTick(
+                dataDir,
+                dndInstant('23:30'),
+                alwaysConnected,
+                nightly.onRitualFire,
+            );
+            expect(nightly.ritualEvents).toHaveLength(0);
+            expect(nightlySummary.suppressedCount).toBe(1);
+            expect(await readRitualNotifiedDateRow()).toBe(today());
+        });
+
+        // --- (c) nothing is ever recovered once the window is over
+
+        test('(c) tras terminar la ventana, ningún tick posterior entrega lo suprimido', async () => {
+            await activate({ timeZone: 'UTC' });
+            expect((await getDay()).status).toBe(200);
+            await createManualActivityApi({ title: 'Foco', startTime: '10:00', durationMinutes: 30 });
+            await createOnceWindow('10:00', '11:00');
+
+            // 10:30 is exactly the END milestone too, so BOTH are due and both
+            // are sealed inside the same still-active window — which is what
+            // makes the 11:05 tick below a real proof of no recovery.
+            const inside = collect();
+            const insideSummary = await runActivityTriggerTick(dataDir, dndInstant('10:30'), alwaysConnected, inside.onFire);
+            expect(insideSummary.suppressedCount).toBe(2);
+            expect(inside.events).toHaveLength(0);
+
+            // 11:05 — the window is over and the end milestone (10:30) has long
+            // crossed. Nothing arrives, because the row is already sealed.
+            const after = collect();
+            const afterSummary = await runActivityTriggerTick(dataDir, dndInstant('11:05'), alwaysConnected, after.onFire);
+            expect(afterSummary.firedEventCount).toBe(0);
+            expect(afterSummary.suppressedCount).toBe(0);
+            expect(after.events).toHaveLength(0);
+
+            // Even much later, and even after a fresh tick function call (what
+            // a restarted process looks like).
+            const muchLater = collect();
+            const muchLaterSummary = await runActivityTriggerTick(dataDir, dndInstant('22:00'), alwaysConnected, muchLater.onFire);
+            expect(muchLaterSummary.firedEventCount).toBe(0);
+            expect(muchLater.events).toHaveLength(0);
+        });
+
+        // --- (d) suppression happens with the socket closed too, and reconnecting delivers nothing
+
+        test('(d) con el WS cerrado la supresión sella igual, y al reconectar no llega nada', async () => {
+            await activate({ timeZone: 'UTC' });
+            expect((await getDay()).status).toBe(200);
+            await createManualActivityApi({ title: 'Foco', startTime: '10:00', durationMinutes: 30 });
+            await createOnceWindow('10:00', '11:00');
+
+            // No socket at all — the DND gate runs BEFORE the connection gate,
+            // which is the whole point: otherwise this would mark nothing and
+            // the reconnect below would deliver the avalanche.
+            const offline = collect();
+            const offlineSummary = await runActivityTriggerTick(dataDir, dndInstant('10:30'), neverConnected, offline.onFire);
+            expect(offlineSummary.suppressedCount).toBe(2);
+            expect(offline.events).toHaveLength(0);
+
+            const rowsWhileOffline = await readDndNotifiedRows();
+            expect(rowsWhileOffline[0]?.start_notified_at).not.toBeNull();
+            expect(rowsWhileOffline[0]?.end_notified_at).not.toBeNull();
+
+            // The phone comes back at 11:05, after the meeting.
+            const reconnected = collect();
+            const reconnectedSummary = await runActivityTriggerTick(dataDir, dndInstant('11:05'), alwaysConnected, reconnected.onFire);
+            expect(reconnectedSummary.firedEventCount).toBe(0);
+            expect(reconnected.events).toHaveLength(0);
+        });
+
+        // --- (e) the 2.2/4.2 reconnect contract is untouched when no window exists
+
+        test('(e) sin DND y con el WS cerrado nada se marca, y la reconexión sí dispara (2.2/4.2 intactos)', async () => {
+            await activate({ timeZone: 'UTC' });
+            expect((await getDay()).status).toBe(200);
+            await createManualActivityApi({ title: 'Foco', startTime: '10:00', durationMinutes: 30 });
+
+            const offline = collect();
+            const offlineSummary = await runActivityTriggerTick(dataDir, dndInstant('10:30'), neverConnected, offline.onFire);
+            expect(offlineSummary.firedEventCount).toBe(0);
+            expect(offlineSummary.suppressedCount).toBe(0);
+            expect(offlineSummary.skippedCount).toBe(1);
+            expect(offline.events).toHaveLength(0);
+
+            const rowsWhileOffline = await readDndNotifiedRows();
+            expect(rowsWhileOffline[0]?.start_notified_at).toBeNull();
+            expect(rowsWhileOffline[0]?.end_notified_at).toBeNull();
+
+            const reconnected = collect();
+            const reconnectedSummary = await runActivityTriggerTick(dataDir, dndInstant('10:35'), alwaysConnected, reconnected.onFire);
+            expect(reconnectedSummary.firedEventCount).toBe(2);
+            expect(reconnected.events.map((event) => event.edge)).toEqual(['start', 'end']);
+        });
+
+        // --- (f) N-03 suppressed, but the close and the generate still happen
+
+        test('(f) N-03 suprimida, pero el día igual se cierra y mañana igual se genera', async () => {
+            await activate({ timeZone: 'UTC', ritualHour: '23:00' });
+            expect((await getDay()).status).toBe(200);
+            await createManualActivityApi({ title: 'Pendiente', startTime: '10:00', durationMinutes: 30 });
+            // Matrix: "Ventana manual 22:45-23:30; ritualHour 23:00".
+            await createOnceWindow('22:45', '23:30');
+
+            const nightly = collect();
+            const summary = await runNightlyTdahTick(dataDir, dndInstant('23:00'), alwaysConnected, nightly.onRitualFire);
+
+            expect(nightly.ritualEvents).toHaveLength(0);
+            expect(summary.suppressedCount).toBe(1);
+            // The sweep and the generation are OUTSIDE every DND condition.
+            expect(summary.limboCount).toBeGreaterThan(0);
+            expect(await countState('limbo')).toBeGreaterThan(0);
+            const tomorrow = computeTomorrowDate('UTC');
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(tdahDatabasePath(dataDir, tokenToKey(TOKEN_ALPHA)), { readonly: true });
+            try {
+                const row = database.prepare('SELECT date FROM tdah_day_plan WHERE date = ?;').get(tomorrow) as { date?: string } | undefined;
+                expect(row?.date).toBe(tomorrow);
+            } finally {
+                database.close();
+            }
+            expect(await readRitualNotifiedDateRow()).toBe(today());
+        });
+
+        // --- (g) Limbo is identical with and without DND, and no queue exists
+
+        test('(g) el limboCount del cierre es idéntico con y sin DND, y no existe ninguna tabla de cola ni columna de diferido', async () => {
+            // Alpha runs WITH an active DND window, Beta with none. Same
+            // fixture, same tick, same instant.
+            await activate({ timeZone: 'UTC', ritualHour: '23:00' }, TOKEN_ALPHA);
+            expect((await getDay(TOKEN_ALPHA)).status).toBe(200);
+            await createManualActivityApi({ title: 'Pendiente', startTime: '10:00', durationMinutes: 30 }, TOKEN_ALPHA);
+            await createOnceWindow('22:45', '23:30', { token: TOKEN_ALPHA });
+
+            await activate({ timeZone: 'UTC', ritualHour: '23:00' }, TOKEN_BETA);
+            expect((await getDay(TOKEN_BETA)).status).toBe(200);
+            await createManualActivityApi({ title: 'Pendiente', startTime: '10:00', durationMinutes: 30 }, TOKEN_BETA);
+
+            const nightly = collect();
+            const summary = await runNightlyTdahTick(dataDir, dndInstant('23:00'), alwaysConnected, nightly.onRitualFire);
+            expect(summary.suppressedCount).toBe(1);
+            // Exactly one invitation was pushed: Beta's. Alpha's was sealed.
+            expect(nightly.ritualEvents).toHaveLength(1);
+
+            const alphaLimbo = await countState('limbo', TOKEN_ALPHA);
+            const betaLimbo = await countState('limbo', TOKEN_BETA);
+            expect(alphaLimbo).toBeGreaterThan(0);
+            expect(alphaLimbo).toBe(betaLimbo);
+
+            // No queue, no deferral, no new Activity state: the only tables the
+            // DND added are its two, and `tdah_activity` gained no column.
+            const tables = await listTableNames(TOKEN_ALPHA);
+            expect(tables).toContain('tdah_dnd_window');
+            expect(tables).toContain('tdah_dnd_settings');
+            expect(tables.filter((name) => /queue|deferred|suppress|pending_notification/i.test(name))).toEqual([]);
+            const columns = await activityColumnNames(TOKEN_ALPHA);
+            expect(columns.filter((name) => /suppress|defer|queue/i.test(name))).toEqual([]);
+        });
+
+        // --- (h) the CRUD surface
+
+        describe('(h) CRUD de ventanas, solo-lectura del calendario y tope', () => {
+            test('GET devuelve los defaults antes de escribir nada', async () => {
+                await activate({ timeZone: 'UTC' });
+                const body = await readDnd(await dndRequest('GET'));
+                expect(body.settings).toEqual({ calendarEnabled: false, workStart: '09:00', workEnd: '18:00' });
+                expect(body.windows).toEqual([]);
+                expect(body.activeUntil).toBeNull();
+            });
+
+            test('PUT /v1/tdah/dnd guarda el toggle y el horario laboral, y rechaza un horario que no avanza', async () => {
+                await activate({ timeZone: 'UTC' });
+                const saved = await readDnd(await dndRequest('PUT', { body: { calendarEnabled: true, workStart: '08:00', workEnd: '17:00' } }));
+                expect(saved.settings).toEqual({ calendarEnabled: true, workStart: '08:00', workEnd: '17:00' });
+
+                // A partial PUT merges over what is stored, never over the defaults.
+                const merged = await readDnd(await dndRequest('PUT', { body: { calendarEnabled: false } }));
+                expect(merged.settings).toEqual({ calendarEnabled: false, workStart: '08:00', workEnd: '17:00' });
+
+                const bad = await dndRequest('PUT', { body: { workStart: '18:00', workEnd: '09:00' } });
+                expect(bad.status).toBe(400);
+                expect(await readErrorCode(bad)).toBe('TDAH_DND_INVALID');
+            });
+
+            /**
+             * The route's own `workStart < workEnd` check reads the stored pair
+             * OUTSIDE the write transaction, so two concurrent PARTIAL PUTs can
+             * each pass it against the same pre-merge snapshot and still merge
+             * into an inverted window — which would silently make
+             * `materializeCalendarWindows` discard every calendar window, with
+             * nothing on screen to explain it. The invariant therefore lives in
+             * `mutateUpsertDndSettings`, inside the held transaction; whatever
+             * order these two land in, what ends up persisted must run forward.
+             */
+            test('dos PUT parciales concurrentes nunca dejan persistido un horario laboral invertido', async () => {
+                await activate({ timeZone: 'UTC' });
+                expect((await dndRequest('PUT', { body: { workStart: '09:00', workEnd: '18:00' } })).status).toBe(200);
+
+                const [first, second] = await Promise.all([
+                    dndRequest('PUT', { body: { workStart: '17:00' } }),
+                    dndRequest('PUT', { body: { workEnd: '10:00' } }),
+                ]);
+                for (const response of [first, second]) {
+                    expect([200, 400]).toContain(response.status);
+                    if (response.status === 400) {
+                        expect(await readErrorCode(response)).toBe('TDAH_DND_INVALID');
+                    }
+                }
+
+                const final = await readDnd(await dndRequest('GET'));
+                expect(final.settings.workStart < final.settings.workEnd).toBe(true);
+            });
+
+            test('crea, edita y borra ventanas manuales semanales y puntuales', async () => {
+                await activate({ timeZone: 'UTC' });
+                const created = await readDnd(await dndRequest('POST', {
+                    path: '/v1/tdah/dnd/windows',
+                    body: { kind: 'weekly', weekdays: [3, 1], startTime: '09:30', endTime: '09:45', label: 'Daily' },
+                }));
+                expect(created.windows).toHaveLength(1);
+                const window = created.windows[0] as TdahTestDndWindow;
+                expect(window.source).toBe('manual');
+                expect(window.kind).toBe('weekly');
+                expect(window.weekdays).toEqual([1, 3]);
+                expect(window.date).toBeNull();
+                expect(window.label).toBe('Daily');
+
+                const updated = await readDnd(await dndRequest('PUT', {
+                    path: `/v1/tdah/dnd/windows/${window.id}`,
+                    body: { kind: 'once', date: '2026-09-01', startTime: '10:00', endTime: '11:00' },
+                }));
+                expect(updated.windows).toHaveLength(1);
+                expect(updated.windows[0]?.kind).toBe('once');
+                expect(updated.windows[0]?.date).toBe('2026-09-01');
+                expect(updated.windows[0]?.weekdays).toBeNull();
+
+                const deleted = await readDnd(await dndRequest('DELETE', { path: `/v1/tdah/dnd/windows/${window.id}` }));
+                expect(deleted.windows).toEqual([]);
+
+                const missing = await dndRequest('DELETE', { path: `/v1/tdah/dnd/windows/${window.id}` });
+                expect(missing.status).toBe(404);
+            });
+
+            test('una ventana manual inválida es 400 TDAH_DND_INVALID y no persiste nada', async () => {
+                await activate({ timeZone: 'UTC' });
+                for (const body of [
+                    { kind: 'once', date: today(), startTime: '11:00', endTime: '10:00' },
+                    { kind: 'once', date: today(), startTime: '11:00', endTime: '11:00' },
+                    { kind: 'once', date: '2026-02-31', startTime: '10:00', endTime: '11:00' },
+                    { kind: 'weekly', weekdays: [], startTime: '10:00', endTime: '11:00' },
+                    { kind: 'weekly', weekdays: [9], startTime: '10:00', endTime: '11:00' },
+                    { kind: 'weekly', weekdays: [1], startTime: '9:00', endTime: '11:00' },
+                ]) {
+                    const response = await dndRequest('POST', { path: '/v1/tdah/dnd/windows', body });
+                    expect(response.status).toBe(400);
+                    expect(await readErrorCode(response)).toBe('TDAH_DND_INVALID');
+                }
+                expect((await readDnd(await dndRequest('GET'))).windows).toEqual([]);
+            });
+
+            test('PUT /v1/tdah/dnd/calendar materializa, recorta y reemplaza SOLO las ventanas de calendario', async () => {
+                await activate({ timeZone: 'UTC' });
+                await createOnceWindow('12:00', '12:30');
+
+                const date = today();
+                const synced = await readDnd(await dndRequest('PUT', {
+                    path: '/v1/tdah/dnd/calendar',
+                    body: {
+                        rangeStart: `${date}T00:00:00.000Z`,
+                        rangeEnd: `${date}T23:59:00.000Z`,
+                        events: [
+                            // Straddles the start of the 09:00-18:00 window -> clipped.
+                            { startsAt: `${date}T08:00:00.000Z`, endsAt: `${date}T10:00:00.000Z` },
+                            // Entirely outside it -> discarded.
+                            { startsAt: `${date}T20:00:00.000Z`, endsAt: `${date}T21:00:00.000Z` },
+                        ],
+                    },
+                }));
+                const calendarWindows = synced.windows.filter((entry) => entry.source === 'calendar');
+                expect(calendarWindows).toHaveLength(1);
+                expect(calendarWindows[0]?.startTime).toBe('09:00');
+                expect(calendarWindows[0]?.endTime).toBe('10:00');
+                expect(calendarWindows[0]?.date).toBe(date);
+                expect(calendarWindows[0]?.label).toBeNull();
+                // The manual window is untouched by the sync.
+                expect(synced.windows.filter((entry) => entry.source === 'manual')).toHaveLength(1);
+
+                // A calendar row is read-only: the next sync replaces it.
+                const calendarId = calendarWindows[0]?.id as string;
+                const rejectedUpdate = await dndRequest('PUT', {
+                    path: `/v1/tdah/dnd/windows/${calendarId}`,
+                    body: { kind: 'once', date, startTime: '09:00', endTime: '09:30' },
+                });
+                expect(rejectedUpdate.status).toBe(409);
+                expect(await readErrorCode(rejectedUpdate)).toBe('TDAH_DND_READ_ONLY');
+
+                const rejectedDelete = await dndRequest('DELETE', { path: `/v1/tdah/dnd/windows/${calendarId}` });
+                expect(rejectedDelete.status).toBe(409);
+                expect(await readErrorCode(rejectedDelete)).toBe('TDAH_DND_READ_ONLY');
+
+                // A second sync of the same range with fewer events replaces the
+                // whole block; the manual window survives untouched.
+                const resynced = await readDnd(await dndRequest('PUT', {
+                    path: '/v1/tdah/dnd/calendar',
+                    body: {
+                        rangeStart: `${date}T00:00:00.000Z`,
+                        rangeEnd: `${date}T23:59:00.000Z`,
+                        events: [],
+                    },
+                }));
+                expect(resynced.windows.filter((entry) => entry.source === 'calendar')).toHaveLength(0);
+                expect(resynced.windows.filter((entry) => entry.source === 'manual')).toHaveLength(1);
+            });
+
+            test('la ventana manual nº 51 es 409 TDAH_DND_LIMIT', async () => {
+                await activate({ timeZone: 'UTC' });
+                for (let index = 0; index < 50; index += 1) {
+                    const response = await dndRequest('POST', {
+                        path: '/v1/tdah/dnd/windows',
+                        body: { kind: 'weekly', weekdays: [index % 7], startTime: '09:00', endTime: '09:30' },
+                    });
+                    expect(response.status).toBe(201);
+                }
+                const overflow = await dndRequest('POST', {
+                    path: '/v1/tdah/dnd/windows',
+                    body: { kind: 'weekly', weekdays: [1], startTime: '10:00', endTime: '10:30' },
+                });
+                expect(overflow.status).toBe(409);
+                expect(await readErrorCode(overflow)).toBe('TDAH_DND_LIMIT');
+            });
+
+            test('con el modo apagado toda la superficie DND responde 409 TDAH_ACTIVATE_REQUIRED', async () => {
+                await activate({ timeZone: 'UTC' });
+                await putProfile({ mode: 'off' });
+                for (const [method, path, body] of [
+                    ['GET', '/v1/tdah/dnd', undefined],
+                    ['PUT', '/v1/tdah/dnd', { calendarEnabled: true }],
+                    ['POST', '/v1/tdah/dnd/windows', { kind: 'weekly', weekdays: [1], startTime: '10:00', endTime: '11:00' }],
+                    ['PUT', '/v1/tdah/dnd/windows/anything', { kind: 'weekly', weekdays: [1], startTime: '10:00', endTime: '11:00' }],
+                    ['DELETE', '/v1/tdah/dnd/windows/anything', undefined],
+                    ['PUT', '/v1/tdah/dnd/calendar', { rangeStart: '2026-08-30T00:00:00.000Z', rangeEnd: '2026-08-31T00:00:00.000Z', events: [] }],
+                ] as [string, string, unknown][]) {
+                    const response = await dndRequest(method, { path, ...(body !== undefined ? { body } : {}) });
+                    expect(response.status).toBe(409);
+                    expect(await readErrorCode(response)).toBe('TDAH_ACTIVATE_REQUIRED');
+                }
+            });
+
+            /**
+             * The window id is the only opaque (non-integer) id in this
+             * dispatcher, and its `decodeURIComponent` runs OUTSIDE any
+             * handler's try/catch — a malformed percent-escape would otherwise
+             * throw a `URIError` straight out and become a 500. An id that
+             * cannot be decoded is an id that matches nothing: 404, exactly
+             * what `parsePositiveIntegerId` returning `null` produces
+             * everywhere else.
+             */
+            test('un id de ventana con un escape porcentual malformado es 404, nunca un 500', async () => {
+                await activate({ timeZone: 'UTC' });
+                const malformed = '/v1/tdah/dnd/windows/%E0%A4%A';
+
+                const update = await dndRequest('PUT', {
+                    path: malformed,
+                    body: { kind: 'weekly', weekdays: [1], startTime: '10:00', endTime: '11:00' },
+                });
+                expect(update.status).toBe(404);
+                expect(await readErrorCode(update)).toBe('TDAH_NOT_FOUND');
+
+                const remove = await dndRequest('DELETE', { path: malformed });
+                expect(remove.status).toBe(404);
+                expect(await readErrorCode(remove)).toBe('TDAH_NOT_FOUND');
+            });
+
+            test('un método no soportado en cada ruta DND es 405', async () => {
+                await activate({ timeZone: 'UTC' });
+                for (const [method, path] of [
+                    ['DELETE', '/v1/tdah/dnd'],
+                    ['GET', '/v1/tdah/dnd/windows'],
+                    ['GET', '/v1/tdah/dnd/windows/anything'],
+                    ['GET', '/v1/tdah/dnd/calendar'],
+                ] as [string, string][]) {
+                    const response = await dndRequest(method, { path });
+                    expect(response.status).toBe(405);
+                    expect(await readErrorCode(response)).toBe('TDAH_METHOD_NOT_ALLOWED');
+                }
+            });
+        });
+
+        // --- (i) the chip: GET /v1/tdah/day carries the server's own verdict
+
+        test('(i) GET /v1/tdah/day trae dndActiveUntil, calculado por el servidor como fin del bloque contiguo', async () => {
+            await activate({ timeZone: 'UTC' });
+
+            const withoutWindow = await readDay(await getDay());
+            expect(withoutWindow.dndActiveUntil).toBeNull();
+
+            // Two abutting windows covering the whole day: whichever one holds
+            // "now", the block end is the same, so this is deterministic
+            // regardless of the wall clock the test happens to run at.
+            await createOnceWindow('00:00', '12:00');
+            await createOnceWindow('12:00', '23:59');
+
+            // ...with exactly one minute of exception. Every DND range is
+            // half-open `[start, end)` (a deliberate, documented design
+            // decision in dnd.ts — a window ending at 11:00 is already over at
+            // 11:00), so `00:00-12:00` + `12:00-23:59` covers `[00:00, 23:59)`
+            // and NOT the final minute of the day. Between 23:59:00 and
+            // 23:59:59 UTC the correct answer is `null`, so the covered-day
+            // assertions are skipped rather than the production semantics bent.
+            if (computeLocalTimeOfDay('UTC', new Date()) === '23:59') return;
+
+            const withWindow = await readDay(await getDay());
+            expect(withWindow.dndActiveUntil).toBe('23:59');
+
+            // And the same value travels on the DND surface itself.
+            expect((await readDnd(await dndRequest('GET'))).activeUntil).toBe('23:59');
+        });
+
+        /**
+         * DW-9 in miniature. The two DND tables are created with
+         * `CREATE TABLE IF NOT EXISTS` and deliberately do NOT bump
+         * `SCHEMA_TARGET_VERSION`, so a database already at the target version
+         * from a pre-4.3 release never re-runs `ensureSchema` on a READ-ONLY
+         * open — the tables can genuinely be absent when a tick reads. Dropping
+         * them reproduces exactly that file, and the answer must be "no
+         * windows" (which is the truth), never a namespace-wide failure.
+         */
+        test('una base sin las tablas del DND (pre-4.3, misma versión de esquema) lee cero ventanas en vez de fallar', async () => {
+            await activate({ timeZone: 'UTC' });
+            expect((await getDay()).status).toBe(200);
+            await createManualActivityApi({ title: 'Foco', startTime: '10:00', durationMinutes: 30 });
+
+            const databasePath = tdahDatabasePath(dataDir, tokenToKey(TOKEN_ALPHA));
+            const { Database } = await import('bun:sqlite');
+            const seed = new Database(databasePath);
+            try {
+                seed.exec('DROP TABLE tdah_dnd_window;');
+                seed.exec('DROP TABLE tdah_dnd_settings;');
+            } finally {
+                seed.close();
+            }
+
+            // The read-only day view survives and reports no silence.
+            expect((await readDay(await getDay())).dndActiveUntil).toBeNull();
+
+            // And the tick fires normally rather than counting a failure.
+            const tick = collect();
+            const summary = await runActivityTriggerTick(dataDir, dndInstant('10:35'), alwaysConnected, tick.onFire);
+            expect(summary.failedCount).toBe(0);
+            expect(summary.suppressedCount).toBe(0);
+            expect(summary.firedEventCount).toBe(2);
+        });
+
+        test('(i) una ventana de otro día no activa el chip', async () => {
+            await activate({ timeZone: 'UTC' });
+            await createOnceWindow('00:00', '23:59', { date: '2030-01-01' });
+            expect((await readDay(await getDay())).dndActiveUntil).toBeNull();
+        });
+
+        /**
+         * (j) The zone/weekday derivation, exercised END TO END rather than only
+         * in `dnd.test.ts`'s pure unit block.
+         *
+         * Every other integration test here runs on `timeZone: 'UTC'` with
+         * `once` windows only, where a wrong derivation coincides with the right
+         * one and proves nothing. `Pacific/Auckland` is UTC+12/+13, so at
+         * 10:35 profile-local the instant is still the PREVIOUS day in UTC —
+         * which makes the profile's weekday and the instant's UTC weekday two
+         * different numbers, and lets each of the two tests below fail loudly if
+         * `runNamespaceActivityTriggerTick` ever derives the weekday from
+         * anything but `computeLocalWeekday(formatDateInTimeZone(now, zone))`.
+         */
+        test('(j) con un perfil en Pacific/Auckland, una ventana weekly del día de la semana DEL PERFIL suprime', async () => {
+            await activate({ timeZone: 'Pacific/Auckland' });
+            expect((await getDay()).status).toBe(200);
+            await createManualActivityApi({ title: 'Foco', startTime: '10:00', durationMinutes: 30 });
+
+            const profileToday = formatDateInTimeZone(new Date(), 'Pacific/Auckland');
+            const profileWeekday = computeLocalWeekday(profileToday);
+            await createWeeklyWindow([profileWeekday], '10:00', '11:00');
+
+            // 10:35 on the PROFILE's clock: both the start (10:00) and the end
+            // (10:30) milestones are due, and both fall inside the window.
+            const tick = collect();
+            const summary = await runActivityTriggerTick(
+                dataDir,
+                instantAtLocalTime('Pacific/Auckland', profileToday, '10:35'),
+                alwaysConnected,
+                tick.onFire,
+            );
+            expect(summary.suppressedCount).toBe(2);
+            expect(summary.firedEventCount).toBe(0);
+            expect(tick.events).toHaveLength(0);
+        });
+
+        test('(j) la misma ventana weekly en OTRO día de la semana (el que marca el UTC del instante) no suprime', async () => {
+            await activate({ timeZone: 'Pacific/Auckland' });
+            expect((await getDay()).status).toBe(200);
+            await createManualActivityApi({ title: 'Foco', startTime: '10:00', durationMinutes: 30 });
+
+            const profileToday = formatDateInTimeZone(new Date(), 'Pacific/Auckland');
+            const profileWeekday = computeLocalWeekday(profileToday);
+            // Deliberately the weekday the tick instant has in UTC (Auckland
+            // 10:35 is ~21:35/22:35 of the PREVIOUS UTC day), so a derivation
+            // that reached for `now.getUTCDay()`/`new Date().getDay()` would
+            // suppress here — and this assertion is what catches it.
+            const utcWeekday = (profileWeekday + 6) % 7;
+            expect(utcWeekday).not.toBe(profileWeekday);
+            await createWeeklyWindow([utcWeekday], '10:00', '11:00');
+
+            const tick = collect();
+            const summary = await runActivityTriggerTick(
+                dataDir,
+                instantAtLocalTime('Pacific/Auckland', profileToday, '10:35'),
+                alwaysConnected,
+                tick.onFire,
+            );
+            expect(summary.suppressedCount).toBe(0);
+            expect(summary.firedEventCount).toBe(2);
+            expect(tick.events.map((event) => event.edge)).toEqual(['start', 'end']);
+        });
+
+        /**
+         * (k) `calendarEnabled` is the user's KILL SWITCH, and nothing else can
+         * undo a calendar window: the row answers 409 `TDAH_DND_READ_ONLY` to
+         * both edit and delete, and once detection is off the phone stops
+         * syncing, so the replacing `PUT /v1/tdah/dnd/calendar` never arrives.
+         * If evaluation ignored the toggle, a switch the user reads as "off"
+         * would keep silencing N-01..N-04 forever with no way out.
+         */
+        test('(k) con calendarEnabled en false una ventana de calendario deja de suprimir, y al encenderlo vuelve a suprimir', async () => {
+            await seedAllFourTriggers();
+            const date = today();
+
+            // Detection ON while syncing (the phone only ever syncs while it
+            // is), with a working window wide enough to keep the whole event.
+            expect((await dndRequest('PUT', {
+                body: { calendarEnabled: true, workStart: '00:00', workEnd: '23:59' },
+            })).status).toBe(200);
+            const synced = await readDnd(await dndRequest('PUT', {
+                path: '/v1/tdah/dnd/calendar',
+                body: {
+                    rangeStart: `${date}T00:00:00.000Z`,
+                    rangeEnd: `${date}T23:59:00.000Z`,
+                    events: [{ startsAt: `${date}T00:00:00.000Z`, endsAt: `${date}T23:59:00.000Z` }],
+                },
+            }));
+            expect(synced.windows.filter((entry) => entry.source === 'calendar')).toHaveLength(1);
+
+            const off = await readDnd(await dndRequest('PUT', { body: { calendarEnabled: false } }));
+            // Still LISTED — the user must keep seeing what was detected; it
+            // simply stops counting.
+            expect(off.windows.filter((entry) => entry.source === 'calendar')).toHaveLength(1);
+            expect(off.activeUntil).toBeNull();
+            expect((await readDay(await getDay())).dndActiveUntil).toBeNull();
+
+            const tick = collect();
+            const summary = await runActivityTriggerTick(
+                dataDir,
+                dndInstant('10:35'),
+                alwaysConnected,
+                tick.onFire,
+                tick.onWorkBandFire,
+            );
+            expect(summary.suppressedCount).toBe(0);
+            expect(summary.firedEventCount).toBe(2);
+            expect(summary.firedWorkBandCount).toBe(1);
+            expect(tick.events.map((event) => event.edge)).toEqual(['start', 'end']);
+
+            // Flip it back on: the very same row now silences the nightly N-03.
+            expect((await dndRequest('PUT', { body: { calendarEnabled: true } })).status).toBe(200);
+            const nightly = collect();
+            const nightlySummary = await runNightlyTdahTick(
+                dataDir,
+                dndInstant('23:30'),
+                alwaysConnected,
+                nightly.onRitualFire,
+            );
+            expect(nightlySummary.suppressedCount).toBe(1);
+            expect(nightly.ritualEvents).toHaveLength(0);
+
+            // Same half-open `[start, end)` caveat test (i) documents: during
+            // the 23:59 minute of the UTC day nothing covers "now".
+            if (computeLocalTimeOfDay('UTC', new Date()) === '23:59') return;
+            expect((await readDnd(await dndRequest('GET'))).activeUntil).toBe('23:59');
+            expect((await readDay(await getDay())).dndActiveUntil).toBe('23:59');
         });
     });
 

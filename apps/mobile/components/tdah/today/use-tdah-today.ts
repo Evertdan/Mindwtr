@@ -45,6 +45,13 @@ export type UseTdahTodayResult = {
      * day down with it (FR-11).
      */
     workOriginErrorCode: string | null;
+    /**
+     * Story 4.3 — the server's own `dndActiveUntil` (`HH:mm` while a quiet
+     * window is active, `null` otherwise), passed straight through. T-01
+     * paints its DND chip from this and nothing else: the client never
+     * decides whether a window is active (AD-8).
+     */
+    dndActiveUntil: string | null;
     reload: () => Promise<void>;
     createManualActivity: (input: TdahCreateManualActivityRequest) => Promise<TdahActivity>;
     registerActivityAction: (activityId: number, action: TdahActivityTransitionAction) => Promise<TdahActivity>;
@@ -102,6 +109,7 @@ export function useTdahToday(): UseTdahTodayResult {
     const [routineTitle, setRoutineTitle] = useState<string | null>(null);
     const [activities, setActivities] = useState<TdahActivity[]>([]);
     const [workOriginErrorCode, setWorkOriginErrorCode] = useState<string | null>(null);
+    const [dndActiveUntil, setDndActiveUntil] = useState<string | null>(null);
     const mountedRef = useRef(true);
     // The rendered day (`date`), readable from the mutation callbacks below
     // without re-creating them whenever the day changes — the merge guard
@@ -152,6 +160,10 @@ export function useTdahToday(): UseTdahTodayResult {
             // Read defensively: a server that predates story 4.2 omits the
             // field entirely, and that is a healthy day, not a degraded one.
             setWorkOriginErrorCode(typeof day.workOriginErrorCode === 'string' ? day.workOriginErrorCode : null);
+            // Read defensively for the same reason as the field above: a
+            // server that predates story 4.3 omits it, and that means "no
+            // window active", never a degraded day.
+            setDndActiveUntil(typeof day.dndActiveUntil === 'string' ? day.dndActiveUntil : null);
             setActivities(day.activities);
             setPhase(day.activities.length > 0 ? 'ready' : 'empty');
         } catch (error) {
@@ -202,6 +214,7 @@ export function useTdahToday(): UseTdahTodayResult {
         routineTitle,
         activities,
         workOriginErrorCode,
+        dndActiveUntil,
         reload,
         createManualActivity,
         registerActivityAction,

@@ -81,7 +81,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Tiếng Việt',
         nonLatin: false,
-        translatedKeyFloor: 2472,  // +8: story 4.2's tdahToday.workBand*/tdahActivity.errorReadOnly keys (2026-08-28)
+        translatedKeyFloor: 2531,  // +59: story 4.3's tdahDnd.*/tdahToday.dndChip* keys (2026-08-28)
     },
     zh: {
         loadSync: () => require('./locales/zh-Hans') as typeof import('./locales/zh-Hans'),
@@ -111,7 +111,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Español',
         nonLatin: false,
-        translatedKeyFloor: 1631,  // +8: story 4.2's tdahToday.workBand*/tdahActivity.errorReadOnly keys (2026-08-28)
+        translatedKeyFloor: 1690,  // +59: story 4.3's tdahDnd.*/tdahToday.dndChip* keys (2026-08-28)
     },
     hi: {
         loadSync: () => require('./locales/hi') as typeof import('./locales/hi'),
@@ -121,7 +121,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'हिन्दी',
         nonLatin: true,
-        translatedKeyFloor: 1687,  // +8: story 4.2's tdahToday.workBand*/tdahActivity.errorReadOnly keys (2026-08-28)
+        translatedKeyFloor: 1746,  // +59: story 4.3's tdahDnd.*/tdahToday.dndChip* keys (2026-08-28)
     },
     ar: {
         loadSync: () => require('./locales/ar') as typeof import('./locales/ar'),
@@ -131,7 +131,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'العربية',
         nonLatin: true,
-        translatedKeyFloor: 1714,  // +8: story 4.2's tdahToday.workBand*/tdahActivity.errorReadOnly keys (2026-08-28)
+        translatedKeyFloor: 1773,  // +59: story 4.3's tdahDnd.*/tdahToday.dndChip* keys (2026-08-28)
     },
     de: {
         loadSync: () => require('./locales/de') as typeof import('./locales/de'),
@@ -141,7 +141,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Deutsch',
         nonLatin: false,
-        translatedKeyFloor: 1724,  // +8: story 4.2's tdahToday.workBand*/tdahActivity.errorReadOnly keys (2026-08-28)
+        translatedKeyFloor: 1783,  // +59: story 4.3's tdahDnd.*/tdahToday.dndChip* keys (2026-08-28)
     },
     ru: {
         loadSync: () => require('./locales/ru') as typeof import('./locales/ru'),
@@ -151,7 +151,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Русский',
         nonLatin: true,
-        translatedKeyFloor: 1687,  // +8: story 4.2's tdahToday.workBand*/tdahActivity.errorReadOnly keys (2026-08-28)
+        translatedKeyFloor: 1746,  // +59: story 4.3's tdahDnd.*/tdahToday.dndChip* keys (2026-08-28)
     },
     ja: {
         loadSync: () => require('./locales/ja') as typeof import('./locales/ja'),
@@ -173,7 +173,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Français',
         nonLatin: false,
-        translatedKeyFloor: 2217,  // +8: story 4.2's tdahToday.workBand*/tdahActivity.errorReadOnly keys (2026-08-28)
+        translatedKeyFloor: 2276,  // +59: story 4.3's tdahDnd.*/tdahToday.dndChip* keys (2026-08-28)
     },
     pt: {
         loadSync: () => require('./locales/pt') as typeof import('./locales/pt'),
@@ -186,7 +186,7 @@ export const LOCALES = {
         // which variant they are choosing. Same reason zh/zh-Hant carry a script tag.
         native: 'Português (Brasil)',
         nonLatin: false,
-        translatedKeyFloor: 1731,  // +8: story 4.2's tdahToday.workBand*/tdahActivity.errorReadOnly keys (2026-08-28)
+        translatedKeyFloor: 1790,  // +59: story 4.3's tdahDnd.*/tdahToday.dndChip* keys (2026-08-28)
     },
     pl: {
         loadSync: () => require('./locales/pl') as typeof import('./locales/pl'),
@@ -196,7 +196,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Polski',
         nonLatin: false,
-        translatedKeyFloor: 1711,  // +8: story 4.2's tdahToday.workBand*/tdahActivity.errorReadOnly keys (2026-08-28)
+        translatedKeyFloor: 1770,  // +59: story 4.3's tdahDnd.*/tdahToday.dndChip* keys (2026-08-28)
     },
     cs: {
         loadSync: () => require('./locales/cs') as typeof import('./locales/cs'),
@@ -206,7 +206,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Čeština',
         nonLatin: false,
-        translatedKeyFloor: 2492,  // +8: story 4.2's tdahToday.workBand*/tdahActivity.errorReadOnly keys (2026-08-28)
+        translatedKeyFloor: 2551,  // +59: story 4.3's tdahDnd.*/tdahToday.dndChip* keys (2026-08-28)
     },
     ko: {
         loadSync: () => require('./locales/ko') as typeof import('./locales/ko'),
@@ -224,11 +224,11 @@ export const LOCALES = {
         // sibling `tdahActivity.ariaLabel`) — without this bump, ko's
         // translatedKeyFloor/englishKeyCount ratio drops just under the 90%
         // mixed-English-check ceiling and starts flagging ko's other,
-        // unrelated pre-existing untranslated keys. Story 4.1's +52 and story
-        // 4.2's +8 carry the same reasoning: en.ts grew by that many keys, so
-        // this floor has to grow with it or ko slips back under that same
-        // ceiling.
-        translatedKeyFloor: 2494,  // +8: story 4.2's tdahToday.workBand*/tdahActivity.errorReadOnly keys (2026-08-28)
+        // unrelated pre-existing untranslated keys. Story 4.1's +52, story
+        // 4.2's +8 and story 4.3's +59 carry the same reasoning: en.ts grew by
+        // that many keys, so this floor has to grow with it or ko slips back
+        // under that same ceiling.
+        translatedKeyFloor: 2553,  // +59: story 4.3's tdahDnd.*/tdahToday.dndChip* keys (2026-08-28)
     },
     it: {
         loadSync: () => require('./locales/it') as typeof import('./locales/it'),
@@ -238,7 +238,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Italiano',
         nonLatin: false,
-        translatedKeyFloor: 1826,  // +8: story 4.2's tdahToday.workBand*/tdahActivity.errorReadOnly keys (2026-08-28)
+        translatedKeyFloor: 1885,  // +59: story 4.3's tdahDnd.*/tdahToday.dndChip* keys (2026-08-28)
     },
     tr: {
         loadSync: () => require('./locales/tr') as typeof import('./locales/tr'),
@@ -248,7 +248,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Türkçe',
         nonLatin: false,
-        translatedKeyFloor: 1734,  // +8: story 4.2's tdahToday.workBand*/tdahActivity.errorReadOnly keys (2026-08-28)
+        translatedKeyFloor: 1793,  // +59: story 4.3's tdahDnd.*/tdahToday.dndChip* keys (2026-08-28)
     },
     nl: {
         loadSync: () => require('./locales/nl') as typeof import('./locales/nl'),
@@ -258,7 +258,7 @@ export const LOCALES = {
         mode: 'overrides',
         native: 'Nederlands',
         nonLatin: false,
-        translatedKeyFloor: 835,  // +8: story 4.2's tdahToday.workBand*/tdahActivity.errorReadOnly keys (2026-08-28)
+        translatedKeyFloor: 894,  // +59: story 4.3's tdahDnd.*/tdahToday.dndChip* keys (2026-08-28)
     },
     fa: {
         loadSync: () => require('./locales/fa') as typeof import('./locales/fa'),

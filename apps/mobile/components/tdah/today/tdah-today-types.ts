@@ -125,6 +125,18 @@ export type TdahDayResponse = {
      * degraded band.
      */
     workOriginErrorCode?: string | null;
+    /**
+     * Story 4.3: `HH:mm` while a DND window is active for this profile,
+     * `null` otherwise. The end of the whole **contiguous block** of
+     * overlapping/adjacent quiet windows, resolved by the server in
+     * `profile.timeZone` (AD-8: no client ever computes whether a window is
+     * active) — T-01 renders it verbatim in its `🌙 DND · hasta {hora}` chip.
+     *
+     * Optional (`?`) for the same reason `workOriginErrorCode` is: a server
+     * that predates story 4.3, and every pre-4.3 fixture, must read the same
+     * as an explicit `null` — no chip, never a broken day.
+     */
+    dndActiveUntil?: string | null;
 };
 
 /** POST /v1/tdah/day/activities body. `startTime`/`durationMinutes` are genuinely optional — omit either to leave it unset ("sin hora"). */

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 
 import { cloudGetJson, cloudPutJson, getCloudBaseUrl } from '@mindwtr/core';
 
@@ -54,6 +55,7 @@ const buildCloudOptions = (config: CloudSyncConfig) => ({
 
 export function TdahSettingsScreen() {
     const tc = useThemeColors();
+    const router = useRouter();
     const { t } = useSettingsLocalization();
     const scrollContentStyle = useSettingsScrollContent();
     const [phase, setPhase] = useState<TdahScreenPhase>('loading');
@@ -148,6 +150,20 @@ export function TdahSettingsScreen() {
 
     const modeEnabled = profile?.mode === 'on';
 
+    // Story 4.3 — T-11's access to T-12 (doc 06: "Accesos: Rutinas (T-03) ·
+    // DND (T-12) · Origen Jira (T-13) · Limbo (T-08)"). Dimmed and inert
+    // while the mode is off, matching doc 06's own "modo off (controles
+    // atenuados excepto el toggle maestro)": every `/v1/tdah/dnd*` route
+    // answers 409 TDAH_ACTIVATE_REQUIRED then, so opening T-12 could only
+    // show its "mode is off" state.
+    //
+    // T-11 lives inside the `/settings` route while T-12 is a route of its
+    // own, so the jump is imperative — the same `useRouter` idiom
+    // `TdahTodayScreen` already uses to reach `/tdah-dnd`.
+    const openDnd = useCallback(() => {
+        router.push('/tdah-dnd');
+    }, [router]);
+
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: tc.bg }]} edges={['bottom']}>
             <SettingsTopBar title={t('settings.tdah.title')} />
@@ -233,6 +249,18 @@ export function TdahSettingsScreen() {
                             </SettingRow>
                         ) : null}
                     </View>
+                    {phase === 'ready' ? (
+                        <View style={[styles.menuCard, { backgroundColor: tc.cardBg }]}>
+                            <SettingRow
+                                label={t('tdahDnd.settings.entry')}
+                                description={t('tdahDnd.settings.entryHint')}
+                                dimmed={!modeEnabled}
+                                disabled={!modeEnabled}
+                                onPress={openDnd}
+                                testID="tdah-dnd-entry"
+                            />
+                        </View>
+                    ) : null}
                 </View>
             </ScrollView>
             {onboardingVariant && cloud ? (

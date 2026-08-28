@@ -71,6 +71,13 @@ const ritualButtonStyle = { padding: 4 as const };
 // counterpart in tdah-today.styles.ts, out of this story's owned files).
 const limboBadgeStyle = { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 4 as const, padding: 4 as const };
 const limboBadgeTextStyle = { fontSize: 13 as const, fontWeight: '700' as const };
+// Story 4.3 (T-12's DND chip in T-01's header, spec Code Map: "el chip DND
+// entra ahí con el mismo render condicional") — ad-hoc like the five styles
+// above, for the same reason. Deliberately the same weight/size as the
+// limbo-badge rather than anything louder: doc 06 calls the active state "un
+// dato de calma ... discreto pero localizable", never an alert.
+const dndChipStyle = { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 4 as const, padding: 4 as const };
+const dndChipTextStyle = { fontSize: 13 as const, fontWeight: '700' as const };
 
 /**
  * T-01 — the today timeline (spec Code Map). Every focus is a fresh
@@ -89,7 +96,7 @@ export function TdahTodayScreen() {
     // (spec I/O matrix: "Deep-link inválido → T-01 sin expandir").
     const { workBandId } = useLocalSearchParams<{ workBandId?: string }>();
     const deepLinkedWorkBandId = typeof workBandId === 'string' ? Number(workBandId) : Number.NaN;
-    const { phase, date, timeZone, routineTitle, activities, workOriginErrorCode, reload } = useTdahToday();
+    const { phase, date, timeZone, routineTitle, activities, workOriginErrorCode, dndActiveUntil, reload } = useTdahToday();
     const now = useTdahNow();
     // Story 3.4 (T-08's limbo-badge, spec Code Map): a second, independent
     // `useTdahLimbo()` instance for the live count alone — never merged into
@@ -233,6 +240,12 @@ export function TdahTodayScreen() {
         router.push('/tdah-limbo');
     }, [router]);
 
+    // Story 4.3 (T-12): the DND chip's tap opens the quiet-window screen —
+    // same always-available, phase-independent affordance as the two above.
+    const openDnd = useCallback(() => {
+        router.push('/tdah-dnd');
+    }, [router]);
+
     const limboCount = limboActivities.length;
     // AC: "muestra N en color terciario (nunca rojo)" — Material 3's own
     // tertiary role when the active theme resolves one (`tokens.roles`,
@@ -240,6 +253,23 @@ export function TdahTodayScreen() {
     // `tc.tint` rather than any red/danger token so a non-Material theme
     // still reads as calm/neutral, never an alert.
     const limboBadgeColor = tokens.roles?.tertiary ?? tc.tint;
+    // Story 4.3: the `dnd` role the focus themes already define
+    // (packages/core/src/theme-focus-colors.ts), with the exact same
+    // `tokens.roles?.X ?? tc.tint` fallback shape — never a danger token, for
+    // the same reason: DND is a datum of calm, not an alert.
+    const dndChipColor = tokens.roles?.dnd ?? tc.tint;
+    // `dndActiveUntil` is the server's own computation (AD-8): the chip
+    // renders whatever `GET /v1/tdah/day` returned and never decides for
+    // itself whether a window is active or when its block ends.
+    const dndChipLabel = dndActiveUntil !== null
+        ? formatI18nTemplate(tFallback(t, 'tdahToday.dndChip', 'DND \u00b7 until {time}'), { time: dndActiveUntil })
+        : null;
+    const dndChipA11yLabel = dndActiveUntil !== null
+        ? formatI18nTemplate(
+            tFallback(t, 'tdahToday.dndChipA11y', 'Do not disturb is on until {time}. Opens do-not-disturb settings.'),
+            { time: dndActiveUntil },
+        )
+        : null;
     const limboBadgeLabel = formatI18nTemplate(
         tFallback(t, 'tdahToday.limboBadgeLabel', '{count} in Limbo'),
         { count: String(limboCount) },
@@ -304,6 +334,23 @@ export function TdahTodayScreen() {
                         >
                             <Moon size={20} color={tc.secondaryText} />
                         </TouchableOpacity>
+                        {dndChipLabel !== null ? (
+                            <TouchableOpacity
+                                accessibilityRole="button"
+                                accessibilityLabel={dndChipA11yLabel ?? dndChipLabel}
+                                onPress={openDnd}
+                                style={dndChipStyle}
+                                hitSlop={8}
+                                testID="tdah-today-dnd-chip"
+                            >
+                                <Text
+                                    style={[dndChipTextStyle, { color: dndChipColor }]}
+                                    testID="tdah-today-dnd-chip-label"
+                                >
+                                    {`\u{1F319} ${dndChipLabel}`}
+                                </Text>
+                            </TouchableOpacity>
+                        ) : null}
                         {limboCount > 0 ? (
                             <TouchableOpacity
                                 accessibilityRole="button"

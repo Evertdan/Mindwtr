@@ -4,6 +4,9 @@ export { runNightlyTdahTick } from './scheduler';
 export { runWorkOriginPullTick } from './origin-pull';
 export type { WorkOriginFetch } from './work-origin';
 export type {
+    TdahDndResponse,
+    TdahDndSettings,
+    TdahDndWindow,
     TdahErrorCode,
     TdahMode,
     TdahNightlyTickSummary,

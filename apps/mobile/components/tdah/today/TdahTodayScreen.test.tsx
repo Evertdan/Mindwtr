@@ -12,6 +12,8 @@ const hookState = vi.hoisted(() => ({
     timeZone: 'America/Mexico_City',
     routineTitle: null as string | null,
     activities: [] as TdahActivity[],
+    // Story 4.3: the server's own DND answer, which T-01 only renders.
+    dndActiveUntil: null as string | null,
     reload: vi.fn(),
 }));
 
@@ -32,7 +34,7 @@ vi.mock('./use-tdah-limbo', () => ({
     useTdahLimbo: () => limboHookState,
 }));
 
-const themeTokens = vi.hoisted(() => ({ roles: null as { tertiary: string } | null }));
+const themeTokens = vi.hoisted(() => ({ roles: null as { tertiary?: string; dnd?: string } | null }));
 vi.mock('@/hooks/use-theme-tokens', () => ({
     useThemeTokens: () => themeTokens,
 }));
@@ -159,6 +161,7 @@ describe('TdahTodayScreen', () => {
         hookState.date = '2026-08-26';
         hookState.routineTitle = null;
         hookState.activities = [];
+        hookState.dndActiveUntil = null;
         hookState.reload.mockReset();
         limboHookState.activities = [];
         limboHookState.reload.mockReset();
@@ -586,6 +589,79 @@ describe('TdahTodayScreen', () => {
             const label = tree!.root.findByProps({ testID: 'tdah-today-limbo-badge-count' });
             expect(flattenStyle(label.props.style).color).toBe(THEME.tint);
             expect(flattenStyle(label.props.style).color).not.toBe(THEME.danger);
+        });
+    });
+
+    describe('Story 4.3 — T-12\'s DND chip (T-01 header entry point)', () => {
+        it('is hidden entirely when the server reports no active window', async () => {
+            hookState.dndActiveUntil = null;
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+            expect(tree!.root.findAllByProps({ testID: 'tdah-today-dnd-chip' })).toHaveLength(0);
+        });
+
+        // AD-8's client half: the chip prints the `until` the server already
+        // computed as the end of the contiguous block — T-01 never derives it
+        // from any window list of its own (it has none).
+        it('prints the server\'s own until, verbatim', async () => {
+            hookState.dndActiveUntil = '11:00';
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+
+            const label = tree!.root.findByProps({ testID: 'tdah-today-dnd-chip-label' });
+            expect(label.props.children).toContain('DND \u00b7 until 11:00');
+        });
+
+        it('announces the state and the destination for screen readers', async () => {
+            hookState.dndActiveUntil = '12:00';
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+
+            const chip = tree!.root.findByProps({ testID: 'tdah-today-dnd-chip' });
+            expect(chip.props.accessibilityLabel).toBe(
+                'Do not disturb is on until 12:00. Opens do-not-disturb settings.',
+            );
+        });
+
+        it('navigates to /tdah-dnd on tap', async () => {
+            hookState.dndActiveUntil = '11:00';
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+
+            const chip = tree!.root.findByProps({ testID: 'tdah-today-dnd-chip' });
+            await act(async () => { chip.props.onPress(); });
+            expect(router.push).toHaveBeenCalledWith('/tdah-dnd');
+        });
+
+        it('colors the chip with the Material 3 dnd role when the active theme resolves one', async () => {
+            themeTokens.roles = { dnd: '#A78BFA' };
+            hookState.dndActiveUntil = '11:00';
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+
+            const label = tree!.root.findByProps({ testID: 'tdah-today-dnd-chip-label' });
+            expect(flattenStyle(label.props.style).color).toBe('#A78BFA');
+        });
+
+        it('falls back to tc.tint (never a danger/red token) for a non-Material theme', async () => {
+            themeTokens.roles = null;
+            hookState.dndActiveUntil = '11:00';
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+
+            const label = tree!.root.findByProps({ testID: 'tdah-today-dnd-chip-label' });
+            expect(flattenStyle(label.props.style).color).toBe(THEME.tint);
+            expect(flattenStyle(label.props.style).color).not.toBe(THEME.danger);
+        });
+
+        it('coexists with the limbo badge without either one hiding the other', async () => {
+            hookState.dndActiveUntil = '11:00';
+            limboHookState.activities = [activity];
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+
+            expect(tree!.root.findByProps({ testID: 'tdah-today-dnd-chip' })).toBeTruthy();
+            expect(tree!.root.findByProps({ testID: 'tdah-today-limbo-badge' })).toBeTruthy();
         });
     });
 

@@ -1034,6 +1034,11 @@ export async function runTdahNightlyIntervalTick(
             namespaceCount: summary.namespaceCount,
             ritualPushFailedCount: summary.ritualPushFailedCount,
             skippedCount: summary.skippedCount,
+            // Story 4.3 — namespaces whose N-03 invitation was sealed and
+            // discarded by an active DND window. Never folded into
+            // `firedCount`'s meaning here: the write happened, the push did
+            // not, and the audit line has to be able to say so.
+            suppressedCount: summary.suppressedCount,
         });
     } catch (error) {
         logError('tdah nightly trigger crashed', {
@@ -1072,7 +1077,18 @@ export async function runTdahActivityTriggerIntervalTick(
         // Story 4.2 — `firedWorkBandCount` joins the "did this tick actually do
         // anything?" gate as well as the context: a tick whose only work was
         // N-04 must still leave an audit line behind.
-        if (summary.firedEventCount > 0 || summary.firedWorkBandCount > 0 || summary.failedCount > 0) {
+        //
+        // Story 4.3 — `suppressedCount` joins that same gate AND the context. A
+        // tick whose only work was sealing-and-discarding a meeting's
+        // notifications wrote to the database and must leave a trace; without
+        // this clause the one moment the feature actually acts would be the one
+        // moment the audit log stays silent.
+        if (
+            summary.firedEventCount > 0
+            || summary.firedWorkBandCount > 0
+            || summary.suppressedCount > 0
+            || summary.failedCount > 0
+        ) {
             logInfo('tdah activity trigger fired', {
                 date: summary.date,
                 failedCount: summary.failedCount,
@@ -1081,6 +1097,7 @@ export async function runTdahActivityTriggerIntervalTick(
                 firedWorkBandCount: summary.firedWorkBandCount,
                 namespaceCount: summary.namespaceCount,
                 skippedCount: summary.skippedCount,
+                suppressedCount: summary.suppressedCount,
             });
         }
     } catch (error) {

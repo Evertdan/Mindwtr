@@ -241,6 +241,19 @@ export type TdahDayResponse = {
      * explicitly, so "no lo sé" can never be confused with "está sano".
      */
     workOriginErrorCode: TdahErrorCode | null;
+    /**
+     * Story 4.3 — the end (`HH:mm`, profile-local) of the contiguous DND block
+     * covering "now", or `null` when no window is active. Computed BY THE
+     * SERVER (`resolveDndActive`, dnd.ts) over the same windows the two
+     * notification ticks evaluate, so T-01's `🌙 DND · hasta {hora}` chip is a
+     * rendering of a server decision, never a client-side re-derivation
+     * (AD-8).
+     *
+     * Only ever non-null on today's day (`GET /v1/tdah/day`): tomorrow's plan
+     * (`GET /v1/tdah/day/tomorrow`) has no "now" to be inside of, so it always
+     * reports `null`.
+     */
+    dndActiveUntil: string | null;
 };
 
 /**
@@ -668,6 +681,120 @@ export type TdahNightlyTickSummary = {
      * failure).
      */
     ritualPushFailedCount: number;
+    /**
+     * Story 4.3 — namespaces whose ritual invitation (N-03) was SEALED AND
+     * DISCARDED this tick because a DND window was active: `ritual_notified_date`
+     * is marked exactly as a real fire marks it, and no event is built or
+     * pushed. Counted in `firedCount` too (the tick genuinely wrote), and never
+     * retried — the seal is the whole point. A suppressed invitation is gone,
+     * not deferred (FR-12: "lo suprimido no vuelve después").
+     */
+    suppressedCount: number;
+};
+
+/**
+ * Story 4.3 — el DND (FR-12, T-12). The whole feature's data is these two
+ * shapes plus one derived string; there is deliberately no queue table, no
+ * `suppressed_at` column and no new Activity state (see dnd.ts's own header).
+ *
+ * `source` is the provenance, and it is what makes a window editable or not:
+ * `'manual'` rows are the user's own rules (weekly or one-off), `'calendar'`
+ * rows are a pure projection of what the phone observed, materialized by the
+ * server (`materializeCalendarWindows`) and replaced wholesale by the next
+ * `PUT /v1/tdah/dnd/calendar` — editing one by hand would silently un-happen,
+ * so the routes reject it with `TDAH_DND_READ_ONLY`.
+ *
+ * `kind` is the recurrence: `'weekly'` carries `weekdays` (0=Sunday … 6=
+ * Saturday, the same numbering `TdahRoutineWeekdayPattern` already uses) and a
+ * `null` `date`; `'once'` carries a `YYYY-MM-DD` `date` and `null` `weekdays`.
+ * Every calendar-derived window is `'once'`.
+ *
+ * `startTime`/`endTime` are zero-padded `HH:mm` in the PROFILE's time zone,
+ * half-open `[start, end)` — the same lexically-comparable idiom
+ * `isWithinWorkingHours` (origin-pull.ts) already uses. `start < end` is
+ * enforced at parse time, so a window never crosses local midnight; the server
+ * splits a midnight-crossing calendar event into two windows instead.
+ */
+export type TdahDndWindowSource = 'manual' | 'calendar';
+export type TdahDndWindowKind = 'weekly' | 'once';
+
+export type TdahDndWindow = {
+    id: string;
+    source: TdahDndWindowSource;
+    kind: TdahDndWindowKind;
+    weekdays: number[] | null;
+    date: string | null;
+    startTime: string;
+    endTime: string;
+    label: string | null;
+};
+
+/**
+ * A window before it has an id — what `materializeCalendarWindows` (dnd.ts)
+ * returns and what `mutateReplaceCalendarWindows` (storage.ts) inserts. Kept
+ * separate from `TdahDndWindow` so the pure module stays pure: minting an id
+ * is I/O-ish (randomness), and a deterministic-by-construction test of the
+ * materializer would be impossible if it had to invent them.
+ */
+export type TdahDndWindowDraft = Omit<TdahDndWindow, 'id'>;
+
+/** POST/PUT `/v1/tdah/dnd/windows[/:id]` body, already validated by `parseManualWindowInput` (dnd.ts). Always `source: 'manual'` by construction — the route never accepts a `source`. */
+export type TdahDndWindowInput = TdahDndWindowDraft;
+
+/**
+ * The DND's own working hours, deliberately NOT shared with
+ * `tdah_work_origin.work_start/work_end` (story 4.1): 4.3 must work for a user
+ * who never connects a Jira Origen, so requiring one to bound calendar
+ * detection would leave the whole feature dead for them. Unifying the two
+ * definitions is explicit deferred work, not a silent coupling.
+ *
+ * `calendarEnabled` is the user's toggle for calendar detection. It gates the
+ * PHONE's upload (T-12 only collects and PUTs while it is on); the server
+ * still evaluates whatever `source: 'calendar'` windows exist, so turning the
+ * toggle off and syncing an empty range is what actually clears them.
+ */
+export type TdahDndSettings = {
+    calendarEnabled: boolean;
+    workStart: string;
+    workEnd: string;
+};
+
+/** PUT `/v1/tdah/dnd` body — every field optional, merged over what is stored, then over the defaults (same body → persisted → default order `handlePutWorkOrigin` already uses). */
+export type TdahDndSettingsInput = {
+    calendarEnabled?: boolean;
+    workStart?: string;
+    workEnd?: string;
+};
+
+/** GET `/v1/tdah/dnd` / every DND mutation's response. `activeUntil` is the same server-computed value `TdahDayResponse.dndActiveUntil` carries. */
+export type TdahDndResponse = {
+    settings: TdahDndSettings;
+    windows: TdahDndWindow[];
+    activeUntil: string | null;
+};
+
+/**
+ * One busy event as the phone observed it: two RAW UTC ISO instants and
+ * nothing else. No title, no calendar name, no attendee — the server never
+ * needs them and must never log them, and the client never converts, clips or
+ * decides anything (AD-8).
+ */
+export type TdahDndCalendarEvent = {
+    startsAt: string;
+    endsAt: string;
+};
+
+/**
+ * PUT `/v1/tdah/dnd/calendar` body. `rangeStart`/`rangeEnd` are UTC ISO
+ * instants bounding what the phone actually looked at, so the server can
+ * replace exactly that slice of `source: 'calendar'` windows in block — an
+ * event deleted from the phone's calendar disappears here because it is
+ * ABSENT from the new payload, which only works if the range is explicit.
+ */
+export type TdahDndCalendarSyncRequest = {
+    rangeStart: string;
+    rangeEnd: string;
+    events: TdahDndCalendarEvent[];
 };
 
 const TDAH_ERROR_CODES = {
@@ -730,6 +857,27 @@ const TDAH_ERROR_CODES = {
     // simply not the user's to edit — the work record lives in Jira, and
     // Mindwtr never writes there.
     originReadOnly: 'TDAH_ORIGIN_READ_ONLY',
+    // Story 4.3 — el DND (T-12). Three codes, one per genuinely distinct thing
+    // the user (or the client) did wrong, following the same "one code per
+    // action the user can take differently" rule the `origin*` block above
+    // establishes:
+    // - `dndInvalid`: the window/settings payload itself is malformed — an
+    //   `endTime <= startTime`, a non-`HH:mm` time, an empty or out-of-range
+    //   `weekdays`, a `date` that is not a real ISO calendar date, a work
+    //   window that does not run forward, or a calendar sync body over
+    //   `TDAH_DND_MAX_CALENDAR_EVENTS`. Nothing is persisted.
+    // - `dndReadOnly`: the row is real and the request is well-formed, but the
+    //   window's `source` is `'calendar'` — it is a projection of the phone's
+    //   observation (AD-8), replaced wholesale by the next
+    //   `PUT /v1/tdah/dnd/calendar`, so editing or deleting it by hand would
+    //   silently un-happen. The exact counterpart of `originReadOnly`.
+    // - `dndLimit`: the namespace already holds `TDAH_DND_MAX_MANUAL_WINDOWS`
+    //   manual windows. Bounded like every other list in this module
+    //   (`TDAH_DAY_MAX_ACTIVITIES` is the precedent), and actionable: the user
+    //   deletes one.
+    dndInvalid: 'TDAH_DND_INVALID',
+    dndReadOnly: 'TDAH_DND_READ_ONLY',
+    dndLimit: 'TDAH_DND_LIMIT',
 } as const;
 
 export type TdahErrorCode = (typeof TDAH_ERROR_CODES)[keyof typeof TDAH_ERROR_CODES];
@@ -881,4 +1029,14 @@ export type TdahActivityTriggerTickSummary = {
     skippedCount: number;
     /** Namespaces whose write transaction failed this tick — retried automatically next tick. */
     failedCount: number;
+    /**
+     * Story 4.3 — total N-01/N-02/N-04 milestones SEALED AND DISCARDED this
+     * tick because a DND window was active. Each one marked its dedupe column
+     * (`start_notified_at`/`end_notified_at`) exactly like a real fire and
+     * produced no event, so it can never be delivered later — not by a
+     * post-window tick, not by a reconnection. Deliberately its own counter and
+     * never folded into `firedEventCount`: a suppression that reported itself
+     * as a fire would make the audit log claim the user was notified.
+     */
+    suppressedCount: number;
 };

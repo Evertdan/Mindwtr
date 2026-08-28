@@ -70,6 +70,16 @@ vi.mock('./settings.shell', () => ({
     SettingsTopBar: () => React.createElement('SettingsTopBar'),
 }));
 
+// Story 4.3 — T-11 gained an imperative jump to T-12 via `useRouter`. This
+// suite mounts the screen in a plain Node environment, where expo-router's
+// JSX entry point cannot be parsed, so the module is stubbed the same way
+// the other TDAH screen suites stub it.
+const routerPush = vi.hoisted(() => vi.fn());
+vi.mock('expo-router', () => ({
+    useRouter: () => ({ push: routerPush }),
+    router: { push: routerPush },
+}));
+
 vi.mock('react-native-safe-area-context', () => ({
     SafeAreaView: (props: { children?: React.ReactNode }) => (
         React.createElement('SafeAreaView', null, props.children)
@@ -126,6 +136,7 @@ describe('TdahSettingsScreen', () => {
         asyncStorageGetItem.mockReset();
         getSecureConfigValue.mockReset();
         mockOnboardingProps.mockReset();
+        routerPush.mockReset();
     });
 
     it('falls back to UTC when the device time zone cannot be resolved', () => {
@@ -369,6 +380,46 @@ describe('TdahSettingsScreen', () => {
             await findSwitch(tree).props.onValueChange(false);
         });
         expect(tree.root.findAllByProps({ testID: 'tdah-save-error' })).toHaveLength(0);
+    });
+
+    // Story 4.3 — T-11's only access to T-12. The row and its `router.push`
+    // are the whole join between the two screens: without these assertions the
+    // callback could push the wrong route (or nothing at all) and every other
+    // suite stays green, because T-12 is a route of its own and never renders
+    // here.
+    it('opens T-12 from the DND entry row once the mode is on', async () => {
+        configureCloudSync();
+        cloudGetJson.mockResolvedValueOnce({
+            profile: { mode: 'on', timeZone: 'Europe/Madrid', ritualHour: '22:30' },
+        });
+        const tree = await renderScreen();
+
+        const rows = tree.root.findAllByType(TouchableOpacity)
+            .filter((node) => node.props.testID === 'tdah-dnd-entry');
+        expect(rows).toHaveLength(1);
+        expect(rows[0].props.disabled).toBe(false);
+
+        await renderer.act(async () => {
+            rows[0].props.onPress();
+        });
+        expect(routerPush).toHaveBeenCalledWith('/tdah-dnd');
+    });
+
+    // Doc 06's "modo off (controles atenuados excepto el toggle maestro)":
+    // every `/v1/tdah/dnd*` route answers 409 TDAH_ACTIVATE_REQUIRED while the
+    // mode is off, so opening T-12 could only show its "mode is off" state.
+    it('keeps the DND entry row inert while the TDAH mode is off', async () => {
+        configureCloudSync();
+        cloudGetJson.mockResolvedValueOnce({
+            profile: { mode: 'off', timeZone: 'Europe/Madrid', ritualHour: '22:30' },
+        });
+        const tree = await renderScreen();
+
+        const rows = tree.root.findAllByType(TouchableOpacity)
+            .filter((node) => node.props.testID === 'tdah-dnd-entry');
+        expect(rows).toHaveLength(1);
+        expect(rows[0].props.disabled).toBe(true);
+        expect(routerPush).not.toHaveBeenCalled();
     });
 
     it('exposes the retry control as a labelled button', async () => {

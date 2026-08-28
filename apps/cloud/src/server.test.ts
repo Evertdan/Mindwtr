@@ -74,6 +74,7 @@ import {
 import {
     canonicalCloudRoute,
     resolveServerMergeTimestamp,
+    runTdahActivityTriggerIntervalTick,
     runTdahNightlyIntervalTick,
     shouldLogCloudRequest,
     startCloudServer,
@@ -1783,6 +1784,72 @@ describe('cloud server api', () => {
         expect(typeof parsed.context?.generatedCount).toBe('number');
         expect(typeof parsed.context?.limboCount).toBe('number');
         expect(typeof parsed.context?.date).toBe('string');
+    });
+
+    // Story 4.3 — the activity-trigger tick logs NOTHING in the steady state
+    // (it runs every few seconds), so `suppressedCount > 0` had to join the
+    // "did this tick actually do anything?" gate. Without that clause the one
+    // moment the DND actually acts — sealing and discarding a meeting's
+    // notifications, a real database write — is the one moment the audit log
+    // stays silent, and the suppression becomes invisible after the fact.
+    // Same stdout-capture idiom as the nightly audit-line test above.
+    test('runTdahActivityTriggerIntervalTick logs the audit line when a tick\'s only work was a DND suppression', async () => {
+        const tdahJson = async (method: string, path: string, body?: unknown): Promise<Response> => await fetch(`${baseUrl}${path}`, {
+            method,
+            headers: { ...authHeaders, 'content-type': 'application/json' },
+            ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+        });
+
+        expect((await tdahJson('POST', '/v1/tdah/activate', { timeZone: 'UTC' })).status).toBe(200);
+        // GET /day is what materializes TODAY's plan, which the Activity needs.
+        expect((await fetch(`${baseUrl}/v1/tdah/day`, { headers: authHeaders })).status).toBe(200);
+        // Starts at the very top of the local day, so both its milestones are
+        // already due whatever the wall clock happens to read.
+        expect((await tdahJson('POST', '/v1/tdah/day/activities', {
+            title: 'Foco',
+            startTime: '00:00',
+            durationMinutes: 1,
+        })).status).toBe(201);
+        expect((await tdahJson('POST', '/v1/tdah/dnd/windows', {
+            kind: 'weekly',
+            weekdays: [0, 1, 2, 3, 4, 5, 6],
+            startTime: '00:00',
+            endTime: '23:59',
+        })).status).toBe(201);
+
+        // Every DND range is half-open `[start, end)` and '23:59' is the last
+        // representable `HH:mm`, so the final minute of the local day cannot be
+        // covered by any window. Nothing would be suppressed then.
+        const nowUtc = new Intl.DateTimeFormat('en-GB', {
+            timeZone: 'UTC',
+            hour: '2-digit',
+            minute: '2-digit',
+            hourCycle: 'h23',
+        }).format(new Date());
+        if (nowUtc === '23:59') return;
+
+        const captured: string[] = [];
+        const stdoutSpy = spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+            captured.push(String(chunk));
+            return true;
+        });
+        try {
+            await runTdahActivityTriggerIntervalTick(dataDir, () => true, () => {}, () => {});
+        } finally {
+            stdoutSpy.mockRestore();
+        }
+
+        const auditLine = captured.find((line) => line.includes('"message":"tdah activity trigger fired"'));
+        if (!auditLine) {
+            throw new Error('expected the tdah activity trigger fired audit line to be logged for a suppression-only tick');
+        }
+        const parsed = JSON.parse(auditLine) as { message?: string; context?: Record<string, unknown> };
+        expect(parsed.message).toBe('tdah activity trigger fired');
+        // The tick's ONLY work was the suppression: nothing fired, nothing failed.
+        expect(Number(parsed.context?.firedEventCount)).toBe(0);
+        expect(Number(parsed.context?.firedWorkBandCount)).toBe(0);
+        expect(Number(parsed.context?.failedCount)).toBe(0);
+        expect(Number(parsed.context?.suppressedCount)).toBeGreaterThan(0);
     });
 
     test('handles CORS preflight without requiring auth or returning JSON', async () => {

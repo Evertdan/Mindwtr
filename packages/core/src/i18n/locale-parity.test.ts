@@ -97,10 +97,11 @@ describe('locale parity', () => {
     // again story 3.5, whose tdahPeriod.*/tdahHistory.*/tdahMetrics.* keys landed
     // in only seven of twenty locales. Only a key-set assertion catches it, so
     // every locale (not just the full-parity cohort) is held to the complete
-    // tdahToday.*/tdahActivity.*/tdahPeriod.*/tdahHistory.*/tdahMetrics.*/tdahJira.*
-    // set. Extend this prefix list whenever a new ADHD-screen namespace ships.
-    const tdahScreenPrefixes = ['tdahToday.', 'tdahActivity.', 'tdahPeriod.', 'tdahHistory.', 'tdahMetrics.', 'tdahJira.'];
-    it.each(locales)('keeps every ADHD today/activity/history/metrics/Jira key translated in %s', (lang) => {
+    // tdahToday.*/tdahActivity.*/tdahPeriod.*/tdahHistory.*/tdahMetrics.*/
+    // tdahJira.*/tdahDnd.* set. Extend this prefix list whenever a new
+    // ADHD-screen namespace ships.
+    const tdahScreenPrefixes = ['tdahToday.', 'tdahActivity.', 'tdahPeriod.', 'tdahHistory.', 'tdahMetrics.', 'tdahJira.', 'tdahDnd.'];
+    it.each(locales)('keeps every ADHD today/activity/history/metrics/Jira/DND key translated in %s', (lang) => {
         const tdahScreenKeys = Object.keys(en).filter((key) => tdahScreenPrefixes.some((prefix) => key.startsWith(prefix)));
         const missing = tdahScreenKeys.filter((key) => !translationsByLocale[lang][key]);
         expect(missing).toEqual([]);

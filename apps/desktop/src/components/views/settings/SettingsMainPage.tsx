@@ -9,6 +9,7 @@ import type { DesktopThemeMode } from '../../../lib/theme';
 import { Switch } from '../../ui/Switch';
 import { SettingRow, SettingsCard, SettingsSectionHeader } from './SettingRow';
 import { TdahActivationSection } from './TdahActivationSection';
+import { TdahDndView } from './TdahDndView';
 import { TdahHistoryView } from './TdahHistoryView';
 import { TdahJiraView } from './TdahJiraView';
 import { TdahMetricsView } from './TdahMetricsView';
@@ -471,6 +472,14 @@ export function SettingsMainPage({
                 No `settingsKey` anywhere inside it, like every TDAH view: they
                 stay out of the settings-search roster. */}
             <TdahJiraView />
+
+            {/* No molestar (T-12, spec 4.3) — same self-contained convention;
+                gates on `profile.mode === 'on'` through its own 409 too. The
+                PWA manages manual windows only and never reads a calendar
+                (permanent state, not a degradation), and it renders the
+                server's `activeUntil` rather than deciding anything itself
+                (AD-8). No `settingsKey`, like every TDAH view. */}
+            <TdahDndView />
 
             {/* Window Behavior */}
             {hasWindowSection && (

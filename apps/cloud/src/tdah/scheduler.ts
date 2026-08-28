@@ -37,6 +37,7 @@
  */
 import { getFsErrorCode } from '../server-storage';
 import { logError } from '../server-config';
+import { computeLocalTimeOfDay, computeLocalWeekday, resolveDndActive } from './dnd';
 import {
     computeTomorrowDate,
     formatDateInTimeZone,
@@ -46,6 +47,7 @@ import {
     mutateCloseOutgoingDay,
     mutateGenerateTomorrowIfMissing,
     mutateMarkRitualNotified,
+    readEffectiveDndWindows,
     readRitualNotifiedDate,
     readTdahProfile,
     tdahDatabasePath,
@@ -55,20 +57,14 @@ import {
 import type { TdahNightlyTickSummary, TdahWsRitualInvitationEvent } from './types';
 
 /**
- * "HH:mm" wall-clock time in `timeZone` at `now`, resolved through
- * `Intl.DateTimeFormat` rather than manual UTC-offset math — the same
- * "never bypass Intl for calendar/time-zone work" convention `storage.ts`'s
- * `weekdayOfDate`/`formatDateInTimeZone` already establish. Zero-padded
- * (`hourCycle: 'h23'`), so it's directly comparable, lexically, against the
- * profile's own zero-padded `ritualHour` string.
- *
- * Exported (story 2.2) so `activity-trigger.ts`'s tick can resolve the same
- * namespace-local "now" wall clock this file already uses, instead of a
- * second copy of this `Intl.DateTimeFormat` call.
+ * "HH:mm" wall-clock time in `timeZone` at `now` — re-exported unchanged from
+ * `dnd.ts`, which is where the implementation moved in story 4.3 (`storage.ts`
+ * needs the same value to attach `dndActiveUntil` to the day, and
+ * `storage.ts` importing this file would close an import cycle). Every
+ * existing importer — `activity-trigger.ts`, the tests — keeps importing it
+ * from here, and its behavior is byte-identical.
  */
-export const computeLocalTimeOfDay = (timeZone: string, now: Date): string => (
-    new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(now)
-);
+export { computeLocalTimeOfDay };
 
 const isRitualHourReached = (timeZone: string, ritualHour: string, now: Date): boolean => (
     computeLocalTimeOfDay(timeZone, now) >= ritualHour
@@ -76,7 +72,19 @@ const isRitualHourReached = (timeZone: string, ritualHour: string, now: Date): b
 
 type NamespaceTickOutcome =
     | { kind: 'skipped' }
-    | { kind: 'fired'; generatedCount: number; limboCount: number; ritualEvent: TdahWsRitualInvitationEvent | null }
+    | {
+        kind: 'fired';
+        generatedCount: number;
+        limboCount: number;
+        ritualEvent: TdahWsRitualInvitationEvent | null;
+        /**
+         * Story 4.3 — this tick SEALED `ritual_notified_date` because a DND
+         * window was active, and built no event. Never both this and a
+         * `ritualEvent`: the two are the mutually exclusive halves of the same
+         * "the invitation is now resolved for today" write.
+         */
+        ritualSuppressed: boolean;
+    }
     | { kind: 'failed'; code: string };
 
 /**
@@ -137,6 +145,13 @@ const runNamespaceTick = async (
 
         const today = formatDateInTimeZone(now, profile.timeZone);
         const tomorrow = computeTomorrowDate(profile.timeZone, now);
+        // Story 4.3 — every DND input derives from the PROFILE's zone: the
+        // wall clock via `computeLocalTimeOfDay`, and the weekday from the
+        // already-resolved `today` string (never `now.getDay()`, which reports
+        // the process's own day and would misfire every weekly rule for a
+        // profile whose local date differs from the server's).
+        const nowTimeOfDay = computeLocalTimeOfDay(profile.timeZone, now);
+        const weekday = computeLocalWeekday(today);
         const databasePath = tdahDatabasePath(dataDir, key);
 
         // Steady-state guard: open the write transaction only when there is
@@ -147,14 +162,31 @@ const runNamespaceTick = async (
         // already through tonight's ritual (plan generated, nothing to
         // sweep, already invited today) matches none of the three and stays
         // entirely read-only until the next local day.
+        //
+        // Story 4.3 widens the third clause with `|| dndActive`, and the OR is
+        // the whole point: an active DND window must reach the write
+        // transaction so it can SEAL the invitation, even (especially) when
+        // there is no socket. The two gates are exact opposites —
+        // `hasOpenConnection === false` means "mark nothing, retry on
+        // reconnect", `dndActive === true` means "mark it and send nothing,
+        // ever" — so a namespace in a meeting with a dropped socket must not
+        // fall through the connection gate and get the whole backlog on
+        // reconnect.
         const needsWrite = await withReadDatabase(databasePath, (database) => {
-            const ritualInvitationDue = readRitualNotifiedDate(database) !== today && hasOpenConnection(key);
+            const dndActive = resolveDndActive(readEffectiveDndWindows(database), today, weekday, nowTimeOfDay).active;
+            const ritualInvitationDue = readRitualNotifiedDate(database) !== today
+                && (hasOpenConnection(key) || dndActive);
             return !hasDayPlan(database, tomorrow) || hasPendingOrStartedUpTo(database, today) || ritualInvitationDue;
         });
         if (!needsWrite) {
             return { kind: 'skipped' };
         }
         const result = await withWriteTransaction(databasePath, (database) => {
+            // Story 4.3, "Never": the close and the generate are OUTSIDE every
+            // DND condition, unconditionally, exactly as story 1.5 left them.
+            // The DND silences the INVITATION (N-03), never the sweep that
+            // precedes it — a suppressed day still closes, still limboes what
+            // was left pending, and still generates tomorrow.
             const closed = mutateCloseOutgoingDay(database, today);
             const generated = mutateGenerateTomorrowIfMissing(database, tomorrow);
             // Re-evaluated INSIDE the held write transaction — never trusts
@@ -164,11 +196,21 @@ const runNamespaceTick = async (
             // the read and the write, and marking must stay atomic with the
             // close/generate write it shares this transaction with.
             let ritualEvent: TdahWsRitualInvitationEvent | null = null;
-            if (readRitualNotifiedDate(database) !== today && hasOpenConnection(key)) {
-                mutateMarkRitualNotified(database, today);
-                ritualEvent = buildTdahRitualInvitationEvent(now);
+            let ritualSuppressed = false;
+            if (readRitualNotifiedDate(database) !== today) {
+                // DND is checked FIRST, over the same handle: a suppressed
+                // invitation must seal whether or not a socket exists, whereas
+                // the connection gate deliberately seals nothing. Reversing
+                // these two turns suppression into recovery.
+                if (resolveDndActive(readEffectiveDndWindows(database), today, weekday, nowTimeOfDay).active) {
+                    mutateMarkRitualNotified(database, today);
+                    ritualSuppressed = true;
+                } else if (hasOpenConnection(key)) {
+                    mutateMarkRitualNotified(database, today);
+                    ritualEvent = buildTdahRitualInvitationEvent(now);
+                }
             }
-            return { closed, generated, ritualEvent };
+            return { closed, generated, ritualEvent, ritualSuppressed };
         });
         // The narrow race `needsWrite`'s own doc comment above flags:
         // `!hasDayPlan`/`hasPendingOrStartedUpTo` are stable DB facts that
@@ -182,7 +224,17 @@ const runNamespaceTick = async (
         // three write outcomes below is a no-op — that tick did nothing at
         // all and must be reported as `skipped`, not `fired`, or
         // `firedCount` inflates for ticks with zero real effect.
-        if (result.closed.limboCount === 0 && !result.generated.created && result.ritualEvent === null) {
+        //
+        // Story 4.3 adds `ritualSuppressed` to this check: a sealed-and-
+        // discarded invitation IS real write work (the dedupe column moved),
+        // so reporting it as `skipped` would hide the suppression from the
+        // audit line entirely.
+        if (
+            result.closed.limboCount === 0
+            && !result.generated.created
+            && result.ritualEvent === null
+            && !result.ritualSuppressed
+        ) {
             return { kind: 'skipped' };
         }
         return {
@@ -190,6 +242,7 @@ const runNamespaceTick = async (
             generatedCount: result.generated.created ? result.generated.activityCount : 0,
             limboCount: result.closed.limboCount,
             ritualEvent: result.ritualEvent,
+            ritualSuppressed: result.ritualSuppressed,
         };
     } catch (error) {
         return { kind: 'failed', code: getFsErrorCode(error) };
@@ -244,6 +297,7 @@ export async function runNightlyTdahTick(
         generatedCount: 0,
         limboCount: 0,
         ritualPushFailedCount: 0,
+        suppressedCount: 0,
     };
 
     for (const key of namespaces) {
@@ -254,6 +308,7 @@ export async function runNightlyTdahTick(
             summary.firedCount += 1;
             summary.generatedCount += outcome.generatedCount;
             summary.limboCount += outcome.limboCount;
+            if (outcome.ritualSuppressed) summary.suppressedCount += 1;
             if (outcome.ritualEvent) {
                 // The notified mark is already durably committed by this
                 // point (inside `mutateMarkRitualNotified`'s own write

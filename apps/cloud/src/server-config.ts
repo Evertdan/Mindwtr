@@ -144,6 +144,16 @@ type CloudOperationalLogContext = Partial<Record<
     | 'signal'
     | 'skippedCount'
     | 'status'
+    // Story 4.3 (DND): 'suppressedCount' joins BOTH the 'tdah activity trigger
+    // fired' and the 'tdah nightly trigger fired' audit lines — the count of
+    // notifications that had their dedupe column sealed and were then
+    // discarded because a DND window was active. Kept strictly separate from
+    // every 'fired*' count: a suppression reported as a fire would make the
+    // audit log claim the user was notified when the entire promise of FR-12
+    // is that they were not. A bare count, like every field here — never a
+    // namespace key, an Activity title, or anything read from the user's
+    // calendar.
+    | 'suppressedCount'
     | 'syncedCount'
     | 'trustedProxyIps',
     string | number

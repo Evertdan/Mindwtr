@@ -17,6 +17,12 @@ export const allowedEnglishMirrorTerms = [
     // (tdahToday.workBandNotificationTitle, story 4.2) leads with it so the
     // notification reads the same on a watch face as it does in Jira.
     'Sprint',
+    // The do-not-disturb acronym, kept in Latin the way 'Jira'/'Sprint' are: it
+    // is the label every phone OS already shows in its own quick settings, and
+    // T-01's chip (tdahToday.dndChip, story 4.3) has room for three glyphs and
+    // not for a spelled-out translation — so the acronym travels verbatim into
+    // the non-Latin locales too.
+    'DND',
     'OpenAI',
     'Gemini',
     'Anthropic',
@@ -247,6 +253,10 @@ export const allowedEnglishMirrorKeysByLocale: Record<string, readonly string[]>
         // History/Metrics origin and Routine filter labels (story 3.5).
         'tdahHistory.filters.originRoutine',
         'tdahHistory.filters.routine',
+        // "Date" is the ordinary French noun, spelled exactly as in English —
+        // same reasoning as the pre-existing calendar.date entry above, here for
+        // T-12's one-off quiet-window date field (story 4.3).
+        'tdahDnd.editor.date',
     ],
 };
 

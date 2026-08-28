@@ -166,6 +166,34 @@ describe('useTdahToday', () => {
         expect(latest?.workOriginErrorCode).toBeNull();
     });
 
+    // Story 4.3 — the same join, for the DND chip: the server computes
+    // `dndActiveUntil` (AD-8, the client resolves nothing) and this hook is the
+    // only thing that carries it to T-01. The screen test mocks this hook
+    // wholesale, so without these three assertions the field could be dropped
+    // here and every other test stays green while no user ever sees the chip.
+    it('threads dndActiveUntil from the day response, and reports null when the field is absent or not a string', async () => {
+        cloudGetJson.mockResolvedValue({
+            date: '2026-08-26', timeZone: 'UTC', routineTitle: null, activities: [],
+            dndActiveUntil: '12:00',
+        });
+        await mount();
+        await act(async () => { await latest?.reload(); });
+        expect(latest?.dndActiveUntil).toBe('12:00');
+
+        // No window covering "now" sends null; a server that predates story 4.3
+        // sends nothing at all. Both mean "no chip", never a rendered "null".
+        cloudGetJson.mockResolvedValue({
+            date: '2026-08-26', timeZone: 'UTC', routineTitle: null, activities: [],
+            dndActiveUntil: null,
+        });
+        await act(async () => { await latest?.reload(); });
+        expect(latest?.dndActiveUntil).toBeNull();
+
+        cloudGetJson.mockResolvedValue({ date: '2026-08-26', timeZone: 'UTC', routineTitle: null, activities: [] });
+        await act(async () => { await latest?.reload(); });
+        expect(latest?.dndActiveUntil).toBeNull();
+    });
+
     it('falls back to the device time zone when the server response omits timeZone, without failing the fetch', async () => {
         cloudGetJson.mockResolvedValue({ date: '2026-08-26', routineTitle: null, activities: [] });
         await mount();

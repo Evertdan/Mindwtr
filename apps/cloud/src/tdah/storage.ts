@@ -18,9 +18,23 @@
  * does.
  */
 import { existsSync, readdirSync } from 'fs';
+import { randomUUID } from 'crypto';
 import { dirname, join } from 'path';
 import { ensureDurableDirectory } from '../server-storage';
 import { TDAH_ACTIVITY_ORIGINS, TDAH_ERRORS } from './types';
+// Story 4.3 — the DND's pure predicate module. The dependency only ever points
+// this way (storage -> dnd): `dnd.ts` imports nothing but types, which is what
+// lets `withReadDatabase`/`selectDayPlanView` here call it without closing an
+// import cycle, and what keeps the suppression logic exhaustively unit-testable
+// on its own.
+import {
+    computeLocalTimeOfDay,
+    computeLocalWeekday,
+    resolveDndActive,
+    TDAH_DND_DEFAULT_WORK_END,
+    TDAH_DND_DEFAULT_WORK_START,
+    TDAH_DND_MAX_MANUAL_WINDOWS,
+} from './dnd';
 import type {
     TdahActivity,
     TdahActivityDecideRequest,
@@ -29,6 +43,12 @@ import type {
     TdahActivityTransitionAction,
     TdahConfirmMorningRequest,
     TdahDayWorkItem,
+    TdahDndResponse,
+    TdahDndSettings,
+    TdahDndSettingsInput,
+    TdahDndWindow,
+    TdahDndWindowDraft,
+    TdahDndWindowInput,
     TdahErrorCode,
     TdahHistoryEntry,
     TdahLimboDecideBatchRequest,
@@ -276,6 +296,53 @@ const CREATE_WORK_ORIGIN_ITEM_SQL = `
         status TEXT NOT NULL,
         sprint_name TEXT,
         sort_order INTEGER NOT NULL
+    );
+`;
+
+// Story 4.3 — el DND (FR-12). TWO new tables, and deliberately no
+// `SCHEMA_TARGET_VERSION` bump: `CREATE TABLE IF NOT EXISTS` materializes them
+// on any database, new or old, and nothing existing changes shape — the exact
+// convention story 4.1's own two Origen tables established (see
+// `SCHEMA_VERSION_JIRA_ORIGIN`'s comment below). In the riskiest story of the
+// epic, not moving the schema version is the deliberate choice.
+//
+// `tdah_dnd_settings` is a singleton row (`CHECK (id = 1)`, same shape as
+// `tdah_profile`/`tdah_work_origin`). Its `work_start`/`work_end` are the DND's
+// OWN working window, independent of `tdah_work_origin`'s: 4.3 must work for a
+// user who never connects a Jira Origen.
+const CREATE_DND_SETTINGS_TABLE_SQL = `
+    CREATE TABLE IF NOT EXISTS tdah_dnd_settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        calendar_enabled INTEGER NOT NULL,
+        work_start TEXT NOT NULL,
+        work_end TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
+`;
+
+// One silence window. `id` is TEXT (a UUID) rather than the AUTOINCREMENT
+// integer the rest of the module uses because `mutateReplaceCalendarWindows`
+// wipes and reinserts whole ranges on every phone sync — an integer key would
+// climb forever and mean nothing, while the id here is never a stable handle
+// for a calendar row anyway (only manual rows are ever addressed by id).
+//
+// `weekdays` is a CSV of 0-6 (`'1,3,5'`), NULL for `kind='once'`; `date` is a
+// `YYYY-MM-DD`, NULL for `kind='weekly'`. Storing weekdays as text mirrors
+// `tdah_routine.pattern_weekdays`, which already encodes exactly this domain
+// the same way — a second convention for the same thing would be worse than
+// the imperfection of a CSV column.
+const CREATE_DND_WINDOW_TABLE_SQL = `
+    CREATE TABLE IF NOT EXISTS tdah_dnd_window (
+        id TEXT PRIMARY KEY,
+        source TEXT NOT NULL CHECK (source IN ('manual', 'calendar')),
+        kind TEXT NOT NULL CHECK (kind IN ('weekly', 'once')),
+        weekdays TEXT,
+        date TEXT,
+        start_time TEXT NOT NULL,
+        end_time TEXT NOT NULL,
+        label TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
     );
 `;
 
@@ -727,7 +794,7 @@ const migrateSchemaIfNeeded = (database: TdahDatabase): void => {
     }
 };
 
-/** Schema init (`CREATE TABLE IF NOT EXISTS` x7) plus the migration step above, run on every open. */
+/** Schema init (`CREATE TABLE IF NOT EXISTS` x9) plus the migration step above, run on every open. */
 const ensureSchema = (database: TdahDatabase): void => {
     database.exec(CREATE_PROFILE_TABLE_SQL);
     database.exec(CREATE_ROUTINE_TABLE_SQL);
@@ -736,6 +803,10 @@ const ensureSchema = (database: TdahDatabase): void => {
     database.exec(CREATE_ACTIVITY_TABLE_SQL);
     database.exec(CREATE_WORK_ORIGIN_TABLE_SQL);
     database.exec(CREATE_WORK_ORIGIN_ITEM_SQL);
+    // Story 4.3 — see these two statements' own comments: new tables, no
+    // version bump, exactly like the Origen's pair above.
+    database.exec(CREATE_DND_SETTINGS_TABLE_SQL);
+    database.exec(CREATE_DND_WINDOW_TABLE_SQL);
     migrateSchemaIfNeeded(database);
 };
 
@@ -1951,6 +2022,472 @@ export const mutateMarkDueWorkBandNotified = (
     return due;
 };
 
+// --- DND: silence windows and settings (story 4.3) --------------------------
+
+const SELECT_DND_SETTINGS_SQL = 'SELECT calendar_enabled, work_start, work_end FROM tdah_dnd_settings WHERE id = 1;';
+const UPSERT_DND_SETTINGS_SQL = `
+    INSERT INTO tdah_dnd_settings (id, calendar_enabled, work_start, work_end, updated_at)
+    VALUES (1, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+        calendar_enabled = excluded.calendar_enabled,
+        work_start = excluded.work_start,
+        work_end = excluded.work_end,
+        updated_at = excluded.updated_at;
+`;
+const SELECT_DND_WINDOWS_SQL = `
+    SELECT id, source, kind, weekdays, date, start_time, end_time, label
+    FROM tdah_dnd_window
+    ORDER BY start_time ASC, end_time ASC, id ASC;
+`;
+const SELECT_DND_WINDOW_SOURCE_SQL = 'SELECT source FROM tdah_dnd_window WHERE id = ?;';
+const COUNT_MANUAL_DND_WINDOWS_SQL = "SELECT COUNT(*) AS count FROM tdah_dnd_window WHERE source = 'manual';";
+const INSERT_DND_WINDOW_SQL = `
+    INSERT INTO tdah_dnd_window (id, source, kind, weekdays, date, start_time, end_time, label, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+`;
+const UPDATE_DND_WINDOW_SQL = `
+    UPDATE tdah_dnd_window
+    SET kind = ?, weekdays = ?, date = ?, start_time = ?, end_time = ?, label = ?, updated_at = ?
+    WHERE id = ? AND source = 'manual';
+`;
+const DELETE_DND_WINDOW_SQL = "DELETE FROM tdah_dnd_window WHERE id = ? AND source = 'manual';";
+// Wholesale replacement of ONE date range's calendar projection: an event the
+// user deleted on the phone disappears here by being ABSENT from the new
+// payload, which only works if the range is cleared first. `source='manual'`
+// rows are untouched by construction — they are the user's own rules and no
+// sync may ever eat them.
+const DELETE_DND_CALENDAR_WINDOWS_IN_RANGE_SQL = "DELETE FROM tdah_dnd_window WHERE source = 'calendar' AND date >= ? AND date <= ?;";
+
+/**
+ * Story 4.3's two tables are created with `CREATE TABLE IF NOT EXISTS` and
+ * deliberately do NOT bump `SCHEMA_TARGET_VERSION` — which means a database
+ * already at the target version from a pre-4.3 release never re-runs
+ * `ensureSchema` on a READ-ONLY open (see `withReadDatabase`'s version probe),
+ * so these tables can genuinely be missing on a read path.
+ *
+ * That is exactly DW-9 (ADR 0026's own addendum) in miniature, and the answer
+ * here is a presence probe rather than a version bump: a namespace with no
+ * `tdah_dnd_window` table has, by definition, no windows, so reading zero of
+ * them is not a degraded answer — it is the correct one. The first DND write
+ * (any `PUT`/`POST` under `/v1/tdah/dnd`) opens a write transaction, which
+ * runs `ensureSchema` and materializes both tables for good.
+ */
+const tdahTableExists = (database: TdahDatabase, table: string): boolean => {
+    const row = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?;").get(table) as { name?: unknown } | undefined | null;
+    return Boolean(row);
+};
+
+type TdahDndWindowRow = {
+    id: unknown;
+    source: unknown;
+    kind: unknown;
+    weekdays: unknown;
+    date: unknown;
+    start_time: unknown;
+    end_time: unknown;
+    label: unknown;
+};
+
+const parseDndWeekdaysCsv = (value: unknown): number[] | null => {
+    const raw = asString(value);
+    if (raw === null || raw.length === 0) return null;
+    const weekdays = raw.split(',').map(Number).filter((entry) => Number.isInteger(entry) && entry >= 0 && entry <= 6);
+    return weekdays.length > 0 ? weekdays : null;
+};
+
+const rowToDndWindow = (row: TdahDndWindowRow): TdahDndWindow => ({
+    id: String(row.id),
+    source: row.source === 'calendar' ? 'calendar' : 'manual',
+    kind: row.kind === 'weekly' ? 'weekly' : 'once',
+    weekdays: parseDndWeekdaysCsv(row.weekdays),
+    date: asString(row.date),
+    startTime: String(row.start_time),
+    endTime: String(row.end_time),
+    label: asString(row.label),
+});
+
+/**
+ * The DND settings for this namespace, or the defaults when nothing was ever
+ * written. Same already-open-handle contract as `hasDayPlan`/
+ * `readRitualNotifiedDate`: the caller decides whether this read happens
+ * standalone or inside a held write transaction.
+ */
+export const readDndSettings = (database: TdahDatabase): TdahDndSettings => {
+    const fallback: TdahDndSettings = {
+        calendarEnabled: false,
+        workStart: TDAH_DND_DEFAULT_WORK_START,
+        workEnd: TDAH_DND_DEFAULT_WORK_END,
+    };
+    if (!tdahTableExists(database, 'tdah_dnd_settings')) return fallback;
+    const row = database.prepare(SELECT_DND_SETTINGS_SQL).get() as {
+        calendar_enabled: unknown;
+        work_start: unknown;
+        work_end: unknown;
+    } | undefined | null;
+    if (!row) return fallback;
+    return {
+        calendarEnabled: Number(row.calendar_enabled) === 1,
+        workStart: asString(row.work_start) ?? TDAH_DND_DEFAULT_WORK_START,
+        workEnd: asString(row.work_end) ?? TDAH_DND_DEFAULT_WORK_END,
+    };
+};
+
+/**
+ * Every silence window, manual and calendar-derived alike, in one list — the
+ * OR-of-all-windows semantics FR-12 asks for means the two sources are never
+ * distinguished at evaluation time, only at edit time. This is the read both
+ * notification ticks perform before deciding anything.
+ */
+export const readDndWindows = (database: TdahDatabase): TdahDndWindow[] => {
+    if (!tdahTableExists(database, 'tdah_dnd_window')) return [];
+    return prepareAll<TdahDndWindowRow>(database, SELECT_DND_WINDOWS_SQL).all().map(rowToDndWindow);
+};
+
+/**
+ * The windows that may actually SILENCE something right now — every manual
+ * window, plus the calendar-derived ones only while `calendarEnabled` is true.
+ *
+ * `calendarEnabled` is the user's kill switch for detection, so calendar rows
+ * must stop counting the very moment it goes false. Nothing deletes those rows
+ * when the switch flips (the next `PUT /v1/tdah/dnd/calendar` never arrives —
+ * the phone stopped syncing), and the user cannot remove them by hand either:
+ * a calendar row answers 409 `TDAH_DND_READ_ONLY` to both edit and delete. So
+ * filtering at evaluation time is the ONLY thing that makes the toggle mean
+ * what its label says; without it a switch the user reads as "off" keeps
+ * silencing N-01/N-02/N-03/N-04 forever, with no way out.
+ *
+ * Evaluation only. Every CRUD/list read still returns `readDndWindows`'s
+ * complete set, so T-12 keeps showing what was detected even while detection
+ * is off — hiding those rows would leave the user unable to see why the list
+ * looks the way it does.
+ */
+export const readEffectiveDndWindows = (database: TdahDatabase): TdahDndWindow[] => {
+    const windows = readDndWindows(database);
+    if (readDndSettings(database).calendarEnabled) return windows;
+    return windows.filter((window) => window.source === 'manual');
+};
+
+/** `GET /v1/tdah/dnd`'s whole read, minus the `activeUntil` the caller derives with `resolveDndActive`. */
+export const selectDndState = (database: TdahDatabase): { settings: TdahDndSettings; windows: TdahDndWindow[] } => ({
+    settings: readDndSettings(database),
+    windows: readDndWindows(database),
+});
+
+export type TdahDndSettingsMutation =
+    | { status: 'ok'; settings: TdahDndSettings }
+    | { status: 'rejected'; reason: 'dndInvalid' };
+
+/**
+ * Writes the settings, enforcing `workStart < workEnd` on the values it is
+ * about to persist — inside the same held transaction that persists them, the
+ * identical check-then-write-atomically shape `mutateCreateDndWindow` uses for
+ * the manual-window cap.
+ *
+ * The route checks the merged pair too (the fast path, so a plainly inverted
+ * body never opens a write transaction at all), but that check reads the stored
+ * pair OUTSIDE the transaction and so cannot be the invariant's guard: two
+ * concurrent partial PUTs — one sending only `workStart: '17:00'`, the other
+ * only `workEnd: '10:00'` — each pass their own check against a pre-merge
+ * snapshot and would otherwise both land, leaving `17:00 >= 10:00` persisted.
+ * An inverted working window makes `materializeCalendarWindows` discard every
+ * calendar window (`isWithinDndWorkingHours` requires `start < end`), so the
+ * user would silently stop being silenced with nothing on screen to explain it.
+ */
+export const mutateUpsertDndSettings = (
+    database: TdahDatabase,
+    settings: TdahDndSettings,
+    updatedAtIso: string,
+): TdahDndSettingsMutation => {
+    if (settings.workStart >= settings.workEnd) return { status: 'rejected', reason: 'dndInvalid' };
+    database.prepare(UPSERT_DND_SETTINGS_SQL).run(
+        settings.calendarEnabled ? 1 : 0,
+        settings.workStart,
+        settings.workEnd,
+        updatedAtIso,
+    );
+    return { status: 'ok', settings };
+};
+
+export type TdahDndWindowMutation =
+    | { status: 'ok'; window: TdahDndWindow }
+    | { status: 'notFound' }
+    | { status: 'rejected'; reason: 'dndLimit' | 'dndReadOnly' };
+
+const insertDndWindow = (
+    database: TdahDatabase,
+    id: string,
+    draft: TdahDndWindowDraft,
+    nowIso: string,
+): TdahDndWindow => {
+    database.prepare(INSERT_DND_WINDOW_SQL).run(
+        id,
+        draft.source,
+        draft.kind,
+        draft.weekdays === null ? null : draft.weekdays.join(','),
+        draft.date,
+        draft.startTime,
+        draft.endTime,
+        draft.label,
+        nowIso,
+        nowIso,
+    );
+    return { id, ...draft };
+};
+
+/**
+ * Creates one MANUAL window, enforcing `TDAH_DND_MAX_MANUAL_WINDOWS` inside
+ * the same held transaction that inserts (so two racing creates can never both
+ * see 49 and both land) — the identical count-then-insert-atomically shape
+ * `mutateCreateManualActivity` already uses for `TDAH_DAY_MAX_ACTIVITIES`.
+ * Calendar windows never pass through here and are never counted against the
+ * cap: they are a replaceable projection, bounded by the sync payload's own
+ * `TDAH_DND_MAX_CALENDAR_EVENTS`.
+ */
+export const mutateCreateDndWindow = (
+    database: TdahDatabase,
+    input: TdahDndWindowInput,
+    id: string,
+    nowIso: string,
+): TdahDndWindowMutation => {
+    const countRow = database.prepare(COUNT_MANUAL_DND_WINDOWS_SQL).get() as { count: unknown };
+    if (Number(countRow.count) >= TDAH_DND_MAX_MANUAL_WINDOWS) {
+        return { status: 'rejected', reason: 'dndLimit' };
+    }
+    return { status: 'ok', window: insertDndWindow(database, id, { ...input, source: 'manual' }, nowIso) };
+};
+
+/**
+ * Edits one manual window. A row whose `source` is `'calendar'` is
+ * `rejected: 'dndReadOnly'`, never silently updated: the next
+ * `PUT /v1/tdah/dnd/calendar` replaces that whole range, so an accepted edit
+ * would quietly un-happen — the same reasoning `originReadOnly` (story 4.2)
+ * applies to the Jira band's rows.
+ */
+export const mutateUpdateDndWindow = (
+    database: TdahDatabase,
+    id: string,
+    input: TdahDndWindowInput,
+    nowIso: string,
+): TdahDndWindowMutation => {
+    const existing = database.prepare(SELECT_DND_WINDOW_SOURCE_SQL).get(id) as { source: unknown } | undefined | null;
+    if (!existing) return { status: 'notFound' };
+    if (existing.source !== 'manual') return { status: 'rejected', reason: 'dndReadOnly' };
+    database.prepare(UPDATE_DND_WINDOW_SQL).run(
+        input.kind,
+        input.weekdays === null ? null : input.weekdays.join(','),
+        input.date,
+        input.startTime,
+        input.endTime,
+        input.label,
+        nowIso,
+        id,
+    );
+    return { status: 'ok', window: { id, ...input, source: 'manual' } };
+};
+
+/** Deletes one manual window. Same read-only rule as `mutateUpdateDndWindow` above. */
+export const mutateDeleteDndWindow = (database: TdahDatabase, id: string): TdahDndWindowMutation | { status: 'deleted' } => {
+    const existing = database.prepare(SELECT_DND_WINDOW_SOURCE_SQL).get(id) as { source: unknown } | undefined | null;
+    if (!existing) return { status: 'notFound' };
+    if (existing.source !== 'manual') return { status: 'rejected', reason: 'dndReadOnly' };
+    database.prepare(DELETE_DND_WINDOW_SQL).run(id);
+    return { status: 'deleted' };
+};
+
+/**
+ * Replaces, in block, every `source: 'calendar'` window whose local date falls
+ * inside `[rangeStartDate, rangeEndDate]` — and touches no `'manual'` row at
+ * all. Delete-then-insert rather than a merge because the phone's payload is
+ * the complete truth for that range: a meeting the user cancelled is expressed
+ * by its absence, which no merge could ever detect.
+ */
+export const mutateReplaceCalendarWindows = (
+    database: TdahDatabase,
+    windows: TdahDndWindowDraft[],
+    rangeStartDate: string,
+    rangeEndDate: string,
+    nowIso: string,
+    mintId: () => string,
+): number => {
+    database.prepare(DELETE_DND_CALENDAR_WINDOWS_IN_RANGE_SQL).run(rangeStartDate, rangeEndDate);
+    let inserted = 0;
+    for (const draft of windows) {
+        // A materialized window outside the range the phone actually looked at
+        // would survive the next sync's delete and become immortal, so it is
+        // dropped instead of stored.
+        if (draft.date === null || draft.date < rangeStartDate || draft.date > rangeEndDate) continue;
+        insertDndWindow(database, mintId(), { ...draft, source: 'calendar' }, nowIso);
+        inserted += 1;
+    }
+    return inserted;
+};
+
+/**
+ * `GET /v1/tdah/dnd`'s whole body, built over one already-open handle: the
+ * settings, every window, and the `activeUntil` the SERVER resolved. Every DND
+ * mutation returns this same shape, so a client never has to re-fetch to learn
+ * whether its edit just started (or ended) a silence.
+ */
+const buildDndResponse = (database: TdahDatabase, timeZone: string, now: Date): TdahDndResponse => {
+    const state = selectDndState(database);
+    const date = formatDateInTimeZone(now, timeZone);
+    // `activeUntil` is resolved over the EFFECTIVE set (calendar rows count
+    // only while detection is on), while `windows` below stays the complete
+    // list — the screen must keep showing what was detected even when nothing
+    // detected is currently allowed to silence anything.
+    const resolution = resolveDndActive(
+        readEffectiveDndWindows(database),
+        date,
+        computeLocalWeekday(date),
+        computeLocalTimeOfDay(timeZone, now),
+    );
+    return {
+        settings: state.settings,
+        windows: state.windows,
+        activeUntil: resolution.active ? resolution.until : null,
+    };
+};
+
+const openDndWriteDirectory = (databasePath: string): void => {
+    const durableDir = ensureDurableDirectory(dirname(databasePath));
+    if (!durableDir) {
+        throw new Error('TDAH database directory is unsafe');
+    }
+};
+
+export async function readDndState(
+    dataDir: string,
+    key: string,
+    timeZone: string,
+    now: Date = new Date(),
+): Promise<TdahDndResponse> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    // A read must never plant the namespace's tdah directory on disk (the same
+    // rule `readTdahProfile`/`listRoutinesWithBlocks` follow) — a namespace
+    // with no database has no windows and no settings, which is exactly the
+    // "nothing configured yet" body T-12 renders on first open.
+    if (!existsSync(databasePath)) {
+        return {
+            settings: { calendarEnabled: false, workStart: TDAH_DND_DEFAULT_WORK_START, workEnd: TDAH_DND_DEFAULT_WORK_END },
+            windows: [],
+            activeUntil: null,
+        };
+    }
+    return await withReadDatabase(databasePath, (database) => buildDndResponse(database, timeZone, now));
+}
+
+/**
+ * `PUT /v1/tdah/dnd` — the settings write. The merge (body → persisted →
+ * default) happens HERE, inside the held transaction, rather than in the route:
+ * reading the stored pair outside the transaction and writing the merged one
+ * inside would let two concurrent PUTs each preserve a value the other just
+ * replaced. `workStart < workEnd` is enforced HERE too, by
+ * `mutateUpsertDndSettings`, over the pair this transaction actually merged —
+ * the route's own 400 is only a fast path over a pre-transaction snapshot and
+ * cannot see what a concurrent partial PUT is about to merge in.
+ */
+export type TdahDndSettingsWriteResult =
+    | { status: 'ok'; response: TdahDndResponse }
+    | { status: 'rejected'; reason: 'dndInvalid' };
+
+export async function upsertDndSettings(
+    dataDir: string,
+    key: string,
+    timeZone: string,
+    input: TdahDndSettingsInput,
+    now: Date = new Date(),
+): Promise<TdahDndSettingsWriteResult> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    openDndWriteDirectory(databasePath);
+    return await withWriteTransaction(databasePath, (database) => {
+        const existing = readDndSettings(database);
+        const outcome = mutateUpsertDndSettings(database, {
+            calendarEnabled: input.calendarEnabled ?? existing.calendarEnabled,
+            workStart: input.workStart ?? existing.workStart,
+            workEnd: input.workEnd ?? existing.workEnd,
+        }, now.toISOString());
+        if (outcome.status !== 'ok') return outcome as TdahDndSettingsWriteResult;
+        return { status: 'ok', response: buildDndResponse(database, timeZone, now) };
+    });
+}
+
+export type TdahDndWindowWriteResult =
+    | { status: 'ok'; response: TdahDndResponse }
+    | { status: 'notFound' }
+    | { status: 'rejected'; reason: 'dndLimit' | 'dndReadOnly' };
+
+export async function createDndWindow(
+    dataDir: string,
+    key: string,
+    timeZone: string,
+    input: TdahDndWindowInput,
+    now: Date = new Date(),
+): Promise<TdahDndWindowWriteResult> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    openDndWriteDirectory(databasePath);
+    return await withWriteTransaction(databasePath, (database) => {
+        const outcome = mutateCreateDndWindow(database, input, randomUUID(), now.toISOString());
+        if (outcome.status !== 'ok') return outcome as TdahDndWindowWriteResult;
+        return { status: 'ok', response: buildDndResponse(database, timeZone, now) };
+    });
+}
+
+export async function updateDndWindow(
+    dataDir: string,
+    key: string,
+    timeZone: string,
+    id: string,
+    input: TdahDndWindowInput,
+    now: Date = new Date(),
+): Promise<TdahDndWindowWriteResult> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    openDndWriteDirectory(databasePath);
+    return await withWriteTransaction(databasePath, (database) => {
+        const outcome = mutateUpdateDndWindow(database, id, input, now.toISOString());
+        if (outcome.status !== 'ok') return outcome as TdahDndWindowWriteResult;
+        return { status: 'ok', response: buildDndResponse(database, timeZone, now) };
+    });
+}
+
+export async function deleteDndWindow(
+    dataDir: string,
+    key: string,
+    timeZone: string,
+    id: string,
+    now: Date = new Date(),
+): Promise<TdahDndWindowWriteResult> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    openDndWriteDirectory(databasePath);
+    return await withWriteTransaction(databasePath, (database) => {
+        const outcome = mutateDeleteDndWindow(database, id);
+        if (outcome.status === 'notFound') return { status: 'notFound' } as TdahDndWindowWriteResult;
+        if (outcome.status === 'rejected') return outcome as TdahDndWindowWriteResult;
+        return { status: 'ok', response: buildDndResponse(database, timeZone, now) };
+    });
+}
+
+/**
+ * `PUT /v1/tdah/dnd/calendar` — the phone's observation, materialized. The
+ * drafts arrive already converted, split and clipped by
+ * `materializeCalendarWindows` (dnd.ts); this only decides where they live.
+ */
+export async function replaceDndCalendarWindows(
+    dataDir: string,
+    key: string,
+    timeZone: string,
+    windows: TdahDndWindowDraft[],
+    rangeStartDate: string,
+    rangeEndDate: string,
+    now: Date = new Date(),
+): Promise<TdahDndResponse> {
+    const databasePath = tdahDatabasePath(dataDir, key);
+    openDndWriteDirectory(databasePath);
+    return await withWriteTransaction(databasePath, (database) => {
+        mutateReplaceCalendarWindows(database, windows, rangeStartDate, rangeEndDate, now.toISOString(), randomUUID);
+        return buildDndResponse(database, timeZone, now);
+    });
+}
+
 /**
  * Every namespace under `dataDir` with an existing TDAH database, for
  * `scheduler.ts` to walk each tick. Reuses `pruneOrphanedCalendarFeeds`'s
@@ -2220,6 +2757,8 @@ export type TdahDayPlanView = {
     activities: TdahActivity[];
     /** Story 4.2 — `tdah_work_origin.last_error_code`, or `null` with no Origen connected or a healthy last pull. */
     workOriginErrorCode: TdahErrorCode | null;
+    /** Story 4.3 — the end of the contiguous DND block covering "now", or `null`. Only today's view ever resolves it (see `selectDayPlanView`'s `nowTimeOfDay`). */
+    dndActiveUntil: string | null;
 };
 
 const SELECT_DAY_PLAN_CONFIRMED_AT_SQL = 'SELECT confirmed_at FROM tdah_day_plan WHERE date = ?;';
@@ -2236,7 +2775,17 @@ const SELECT_WORK_ORIGIN_ERROR_CODE_SQL = 'SELECT last_error_code FROM tdah_work
  * from the profile here, since the caller already resolved it (with the
  * `TDAH_DEFAULT_TIME_ZONE` fallback) before opening this transaction.
  */
-const selectDayPlanView = (database: TdahDatabase, date: string, timeZone: string): TdahDayPlanView => {
+const selectDayPlanView = (
+    database: TdahDatabase,
+    date: string,
+    timeZone: string,
+    // Story 4.3 — the profile-local "HH:mm" of the moment this view is being
+    // built, supplied ONLY by `getTodayDayPlan`. Every other caller (tomorrow's
+    // editor, the confirm write) passes nothing: a future day has no "now" to
+    // be inside of, so its `dndActiveUntil` is `null` rather than a value
+    // computed against today's clock, which would be a quiet lie.
+    nowTimeOfDay: string | null = null,
+): TdahDayPlanView => {
     const activities = prepareAll<TdahActivityRow>(database, SELECT_ACTIVITIES_FOR_DAY_SQL).all(date).map(rowToActivity);
     const routineTitleRow = database.prepare(SELECT_ROUTINE_TITLE_FOR_DAY_SQL).get(date) as { title: unknown } | undefined | null;
     const dayPlanRow = database.prepare(SELECT_DAY_PLAN_CONFIRMED_AT_SQL).get(date) as { confirmed_at: unknown } | undefined | null;
@@ -2259,6 +2808,17 @@ const selectDayPlanView = (database: TdahDatabase, date: string, timeZone: strin
     }
     const originRow = database.prepare(SELECT_WORK_ORIGIN_ERROR_CODE_SQL).get() as { last_error_code: unknown } | undefined | null;
     const workOriginErrorCode = originRow ? asString(originRow.last_error_code) as TdahErrorCode | null : null;
+    // Story 4.3 — T-01's `🌙 DND · hasta {hora}` chip. Resolved HERE, by the
+    // server, over exactly the same windows and the same `resolveDndActive`
+    // predicate the two notification ticks use, so the chip can never disagree
+    // with whether a notification would actually be suppressed. The client is
+    // handed a finished string and computes nothing (AD-8).
+    const dndActiveUntil = nowTimeOfDay === null
+        ? null
+        : (() => {
+            const resolution = resolveDndActive(readEffectiveDndWindows(database), date, computeLocalWeekday(date), nowTimeOfDay);
+            return resolution.active ? resolution.until : null;
+        })();
     return {
         date,
         timeZone,
@@ -2266,6 +2826,7 @@ const selectDayPlanView = (database: TdahDatabase, date: string, timeZone: strin
         confirmedAt: dayPlanRow ? asString(dayPlanRow.confirmed_at) : null,
         activities,
         workOriginErrorCode,
+        dndActiveUntil,
     };
 };
 
@@ -2293,10 +2854,15 @@ export async function getTodayDayPlan(
     timeZone: string,
 ): Promise<TdahDayPlanView> {
     const databasePath = tdahDatabasePath(dataDir, key);
-    const date = formatDateInTimeZone(new Date(), timeZone);
+    const now = new Date();
+    const date = formatDateInTimeZone(now, timeZone);
+    // Story 4.3 — resolved once, from the same instant `date` came from, and
+    // threaded into both branches: two independent `Intl` calls could straddle
+    // a minute boundary and hand the two paths different clocks.
+    const nowTimeOfDay = computeLocalTimeOfDay(timeZone, now);
     if (existsSync(databasePath)) {
         const existing = await withReadDatabase(databasePath, (database) => (
-            hasDayPlan(database, date) ? selectDayPlanView(database, date, timeZone) : null
+            hasDayPlan(database, date) ? selectDayPlanView(database, date, timeZone, nowTimeOfDay) : null
         ));
         if (existing) return existing;
     }
@@ -2306,7 +2872,7 @@ export async function getTodayDayPlan(
     }
     return await withWriteTransaction(databasePath, (database) => {
         mutateGenerateTomorrowIfMissing(database, date);
-        return selectDayPlanView(database, date, timeZone);
+        return selectDayPlanView(database, date, timeZone, nowTimeOfDay);
     });
 }
 

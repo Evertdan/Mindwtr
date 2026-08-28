@@ -42,6 +42,7 @@
 import { getFsErrorCode } from '../server-storage';
 import { logError } from '../server-config';
 import { computeLocalTimeOfDay } from './scheduler';
+import { computeLocalWeekday, resolveDndActive } from './dnd';
 import {
     formatDateInTimeZone,
     hasDueActivityTriggers,
@@ -49,6 +50,7 @@ import {
     listActiveTdahNamespaces,
     mutateMarkDueActivityTriggersNotified,
     mutateMarkDueWorkBandNotified,
+    readEffectiveDndWindows,
     readTdahProfile,
     tdahDatabasePath,
     withReadDatabase,
@@ -93,6 +95,14 @@ export const buildTdahWorkBandEvent = (fire: TdahWorkBandTriggerFire, now: Date)
 type NamespaceActivityTriggerOutcome =
     | { kind: 'skipped' }
     | { kind: 'fired'; events: TdahWsActivityTriggerEvent[]; workBandEvents: TdahWsWorkBandEvent[] }
+    /**
+     * Story 4.3 — a DND window was active, so every due milestone had its
+     * dedupe column marked (exactly as a real fire marks it) and NO event was
+     * built. Deliberately a third outcome rather than a `fired` with an empty
+     * event list: the tick genuinely wrote, so it is not `skipped`, and it
+     * genuinely notified nobody, so it must never inflate `firedEventCount`.
+     */
+    | { kind: 'suppressed'; suppressedCount: number }
     | { kind: 'failed'; code: string };
 
 /**
@@ -113,15 +123,26 @@ const runNamespaceActivityTriggerTick = async (
         if (!profile || profile.mode !== 'on') {
             return { kind: 'skipped' };
         }
-        // No live socket to push to right now — never mark anything
-        // notified (see this file's own doc comment on the reconnect edge
-        // case).
-        if (!hasOpenConnection(key)) {
-            return { kind: 'skipped' };
-        }
 
+        // Story 4.3 REORDERED this function's gates, and the order is the
+        // contract:
+        //
+        //   profile -> zone/clock -> one read pass (dnd + due) -> SUPPRESS
+        //   -> hasOpenConnection -> fire
+        //
+        // The `hasOpenConnection` check used to sit right here, above
+        // everything. It now sits below the suppression branch, because the
+        // two gates are exact opposites (see the block comment at the
+        // suppression branch itself). Moving it back up would mean a user
+        // whose socket happened to be down during a meeting seals nothing and
+        // receives the whole backlog on reconnect — the notification fatigue
+        // (SM-C1) this epic exists to prevent.
         const today = formatDateInTimeZone(now, profile.timeZone);
         const nowTimeOfDay = computeLocalTimeOfDay(profile.timeZone, now);
+        // The weekday comes from the already-zone-resolved `today` string, not
+        // from `now` — see `computeLocalWeekday`'s own doc comment for the
+        // Pacific/Auckland case that makes `now.getDay()` wrong.
+        const weekday = computeLocalWeekday(today);
         const databasePath = tdahDatabasePath(dataDir, key);
 
         // Steady-state guard, mirroring scheduler.ts's own `needsWrite`
@@ -135,11 +156,56 @@ const runNamespaceActivityTriggerTick = async (
         // inside the same local day still delivers N-04) and the same write
         // transaction. That is the whole reason N-04 lives here and not in a
         // fourth `setInterval`.
-        const needsWrite = await withReadDatabase(databasePath, (database) => (
-            hasDueActivityTriggers(database, today, nowTimeOfDay)
-            || hasDueWorkBandTrigger(database, today, nowTimeOfDay)
-        ));
-        if (!needsWrite) {
+        //
+        // Story 4.3 — the DND windows ride this same single read pass rather
+        // than paying for a second open: a namespace with nothing due never
+        // even looks at whether it is silenced, because there is nothing to
+        // silence.
+        const pass = await withReadDatabase(databasePath, (database) => ({
+            dndActive: resolveDndActive(readEffectiveDndWindows(database), today, weekday, nowTimeOfDay).active,
+            due: hasDueActivityTriggers(database, today, nowTimeOfDay)
+                || hasDueWorkBandTrigger(database, today, nowTimeOfDay),
+        }));
+        if (!pass.due) {
+            return { kind: 'skipped' };
+        }
+
+        // SUPPRESSION, before the connection gate. The two gates look alike and
+        // are opposites:
+        //
+        //   hasOpenConnection === false  ->  mark NOTHING  ->  reconnect recovers  (Epic 2 / 4.2)
+        //   dndActive         === true   ->  MARK it       ->  nothing is ever recovered (FR-12)
+        //
+        // So suppression must happen whether or not a socket exists. Sealing
+        // is literally calling the same `mutateMark*Notified` writes the firing
+        // path calls and THROWING THE RESULT AWAY: no queue, no `suppressed_at`
+        // column, no deferral. The row is already marked, which is what makes a
+        // later delivery structurally impossible rather than merely unlikely.
+        if (pass.dndActive) {
+            const sealedCount = await withWriteTransaction(databasePath, (database) => {
+                // Re-evaluated inside the held transaction, same discipline the
+                // marking writes themselves follow. A window that ended in the
+                // gap between the read and the write is not suppressed at all;
+                // the `null` falls through to the ordinary firing path below.
+                if (!resolveDndActive(readEffectiveDndWindows(database), today, weekday, nowTimeOfDay).active) return null;
+                const notifiedAtIso = now.toISOString();
+                const fires = mutateMarkDueActivityTriggersNotified(database, today, nowTimeOfDay, notifiedAtIso);
+                const bandFires = mutateMarkDueWorkBandNotified(database, today, nowTimeOfDay, notifiedAtIso);
+                return fires.length + bandFires.length;
+            });
+            if (sealedCount !== null) {
+                // Zero means another tick won the race and already marked
+                // everything — nothing was suppressed here, so it is a plain
+                // skip, exactly like the firing path's own lost-race branch.
+                return sealedCount === 0 ? { kind: 'skipped' } : { kind: 'suppressed', suppressedCount: sealedCount };
+            }
+        }
+
+        // No live socket to push to right now — never mark anything notified
+        // (see this file's own doc comment on the reconnect edge case). Reached
+        // only when the DND is NOT active, which is what preserves story
+        // 2.2/4.2's reconnect behavior byte for byte.
+        if (!hasOpenConnection(key)) {
             return { kind: 'skipped' };
         }
 
@@ -205,12 +271,20 @@ export async function runActivityTriggerTick(
         firedWorkBandCount: 0,
         skippedCount: 0,
         failedCount: 0,
+        suppressedCount: 0,
     };
 
     for (const key of namespaces) {
         const outcome = await runNamespaceActivityTriggerTick(dataDir, key, now, hasOpenConnection);
         if (outcome.kind === 'skipped') {
             summary.skippedCount += 1;
+        } else if (outcome.kind === 'suppressed') {
+            // Story 4.3 — counted on its own axis and NOWHERE else: not in
+            // `firedNamespaceCount` (nothing was pushed), not in
+            // `firedEventCount`/`firedWorkBandCount` (no event exists), not in
+            // `skippedCount` (the tick did write). There is no sink to call:
+            // the whole point is that nothing leaves the server.
+            summary.suppressedCount += outcome.suppressedCount;
         } else if (outcome.kind === 'fired') {
             summary.firedNamespaceCount += 1;
             summary.firedEventCount += outcome.events.length;
