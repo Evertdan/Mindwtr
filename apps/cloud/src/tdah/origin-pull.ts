@@ -67,19 +67,26 @@ export type RunNamespaceWorkOriginPullOptions = {
 };
 
 /**
- * `now` is inside `[workStart, workEnd)` in the namespace's own zone.
+ * `localTime` (the namespace's own "HH:mm", already resolved by the caller via
+ * `computeLocalTimeOfDay`) is inside `[workStart, workEnd)`.
  *
  * Half-open on purpose: `workEnd` itself is outside the window, so an 18:00
  * end means the last eligible instant is 17:59 — the same convention the band
- * itself encodes (`start_time = workStart`, ending exactly at `workEnd`).
+ * itself encodes (it ends exactly at `workEnd`).
  *
  * A window whose end is not after its start is rejected at parse time
  * (routes.ts), so no midnight-crossing case can reach here.
+ *
+ * Story 4.2: takes the already-computed wall clock rather than recomputing it
+ * from `timeZone`/`now`. The band's own start clipping needs the very same
+ * value (`mutateSyncWorkOriginBand`), and two independent `Intl` calls a few
+ * lines apart could straddle a minute boundary and disagree — the gate would
+ * say "inside the window" while the band was clipped to a minute the gate never
+ * saw.
  */
-const isWithinWorkingHours = (timeZone: string, workStart: string, workEnd: string, now: Date): boolean => {
-    const localTime = computeLocalTimeOfDay(timeZone, now);
-    return localTime >= workStart && localTime < workEnd;
-};
+const isWithinWorkingHours = (localTime: string, workStart: string, workEnd: string): boolean => (
+    localTime >= workStart && localTime < workEnd
+);
 
 /**
  * Has the configured cadence elapsed since the last ATTEMPT? Measured in
@@ -160,11 +167,17 @@ export const runNamespaceWorkOriginPull = async (
         const plan = await readWorkOriginPullPlan(dataDir, key);
         if (!plan) return { kind: 'skipped' };
 
+        // Resolved ONCE, here, and then reused by both the working-hours gate
+        // below and the band's own start clipping in `commitWorkOriginPull`
+        // (story 4.2) — one `Intl` reading of this namespace's wall clock per
+        // pull, never two that could disagree across a minute boundary.
+        const nowTimeOfDay = computeLocalTimeOfDay(profile.timeZone, now);
+
         if (!options.ignoreSchedule) {
             // Working hours first, deliberately: it is the gate that must
             // guarantee "no outbound request at all", so nothing above it may
             // touch the network or the disk.
-            if (!isWithinWorkingHours(profile.timeZone, plan.workStart, plan.workEnd, now)) {
+            if (!isWithinWorkingHours(nowTimeOfDay, plan.workStart, plan.workEnd)) {
                 return { kind: 'skipped' };
             }
             if (!isPullIntervalElapsed(plan.lastPullAt, plan.pullIntervalMinutes, now)) {
@@ -229,6 +242,7 @@ export const runNamespaceWorkOriginPull = async (
             pulledAtIso: nowIso,
             workStart: plan.workStart,
             workEnd: plan.workEnd,
+            nowTimeOfDay,
             bandTitle: TDAH_WORK_ORIGIN_BAND_TITLE,
         });
         if (commit.kind === 'disconnected') {

@@ -115,6 +115,12 @@ type CloudOperationalLogContext = Partial<Record<
     // never-a-namespace-key discipline as the nightly tick's own context above.
     | 'firedNamespaceCount'
     | 'firedEventCount'
+    // Story 4.2 (N-04, the Jira work band): 'firedWorkBandCount' joins the
+    // 'tdah activity trigger fired' audit line's context. Counted separately
+    // from 'firedEventCount' on purpose — folding N-04 into the N-01/N-02 total
+    // would hide exactly the double-notification regression this story fixed.
+    // Still a bare count: never a namespace key, an issue key or a band title.
+    | 'firedWorkBandCount'
     | 'generatedCount'
     | 'hint'
     // Story 4.1 (tdah Origen pull tick): 'itemCount' and 'syncedCount' back

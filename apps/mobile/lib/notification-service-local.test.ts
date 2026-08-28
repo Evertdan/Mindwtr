@@ -145,6 +145,7 @@ import {
   setLocalNotificationOpenHandler,
   showTdahActivityNotification,
   showTdahRitualNotification,
+  showTdahWorkBandNotification,
   startLocalMobileNotifications,
   stopLocalMobileNotifications,
   TDAH_ACTIVITY_NOTIFICATION_CHANNEL,
@@ -395,6 +396,62 @@ describe('notification-service-local', () => {
       expect.objectContaining({
         data: expect.objectContaining({ notificationActionComplete: expect.anything() }),
       })
+    );
+  });
+
+  // Story 4.2 ("La franja laboral en mi día"): N-04 reuses the same channel
+  // as N-01/N-02/N-03 (spec Always: "El canal Android de notificaciones no
+  // cambia") with vibration on and every action button off — its only action
+  // is "Ver", which is the plain body tap. Same reasoning as the N-03 case
+  // above: use-root-layout-tdah-connection.test.tsx mocks this whole module,
+  // so this is the only coverage of the real scheduleAlarmForKey wiring.
+  it('schedules the real work-band notification on the reused TDAH channel with no action buttons', async () => {
+    await showTdahWorkBandNotification({
+      key: 'tdah-work-band:91',
+      title: 'Sprint: 3 tareas pendientes asignadas',
+      message: 'Tu franja laboral empieza ahora.',
+      vibrationPattern: [0, 90],
+      channelName: 'Recordatorios de Actividades',
+      data: { kind: 'tdah-work-band', context: '91' },
+    });
+
+    expect(mockAlarmScheduleAlarm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Sprint: 3 tareas pendientes asignadas',
+        message: 'Tu franja laboral empieza ahora.',
+        channel: TDAH_ACTIVITY_NOTIFICATION_CHANNEL,
+        has_button: false,
+        has_complete_action: false,
+        vibrate: true,
+        data: expect.objectContaining({
+          kind: 'tdah-work-band',
+          context: '91',
+          vibrationPattern: '0,90',
+          tdahActivityNotificationChannelName: 'Recordatorios de Actividades',
+        }),
+      })
+    );
+
+    // objectContaining can't assert absence — these close the same gap the
+    // N-03 case does: a stray action flag would turn N-04 into an actionable
+    // notification, and a snooze would let the band be postponed, which it
+    // has no concept of.
+    expect(mockAlarmScheduleAlarm).not.toHaveBeenCalledWith(
+      expect.objectContaining({ snooze_interval: expect.anything() })
+    );
+    expect(mockAlarmScheduleAlarm).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ notificationActionStart: expect.anything() }),
+      })
+    );
+    expect(mockAlarmScheduleAlarm).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ notificationActionComplete: expect.anything() }),
+      })
+    );
+    // Never the GTD reminder channel — TDAH's own pipeline (ADR-0013).
+    expect(mockAlarmScheduleAlarm).not.toHaveBeenCalledWith(
+      expect.objectContaining({ channel: 'mindwtr_reminders_v2' })
     );
   });
 

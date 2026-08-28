@@ -223,6 +223,82 @@ export const styles = StyleSheet.create({
         fontWeight: '700',
         textTransform: 'uppercase',
     },
+    // --- Story 4.2: the Jira work band ---------------------------------
+    // The band is one grouped row on the same timeline as everything else,
+    // so it reuses `rowWrapper`/`rowWrapperStatic` for positioning and only
+    // adds what a collapsed/expanded group needs on top.
+    workBandRow: {
+        borderRadius: 10,
+        borderWidth: 1,
+        overflow: 'hidden',
+    },
+    workBandHeader: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        minHeight: TDAH_TIMELINE_MIN_ROW_HEIGHT,
+    },
+    // Same accordion glyph the repo already uses (CollapsibleSection.tsx).
+    workBandChevron: {
+        fontSize: 12,
+        width: 16,
+        textAlign: 'center',
+        marginTop: 2,
+    },
+    workBandHeaderBody: {
+        flex: 1,
+        minWidth: 0,
+    },
+    // No fixed height and no line cap anywhere in the band, same AC as
+    // TdahActivityRow's: content grows the row at 200% font scale.
+    workBandTopLine: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        flexWrap: 'wrap',
+    },
+    workBandRange: {
+        fontSize: 12,
+        fontWeight: '700',
+        fontVariant: ['tabular-nums'],
+    },
+    workBandTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        flexShrink: 1,
+    },
+    workBandCount: {
+        fontSize: 12,
+    },
+    workBandNotice: {
+        fontSize: 11,
+        marginTop: 4,
+    },
+    workBandPanel: {
+        borderTopWidth: StyleSheet.hairlineWidth,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        gap: 6,
+    },
+    workBandItem: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 6,
+        flexWrap: 'wrap',
+    },
+    workBandItemKey: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    workBandItemSummary: {
+        fontSize: 12,
+        flexShrink: 1,
+    },
+    workBandItemStatus: {
+        fontSize: 11,
+    },
     emptyTitle: {
         fontSize: 17,
         fontWeight: '700',

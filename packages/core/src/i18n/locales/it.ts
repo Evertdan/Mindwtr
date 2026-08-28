@@ -1797,6 +1797,13 @@ export const itOverrides: Record<string, string> = {
         'tdahToday.decisionCompleteLate': 'Completa (in ritardo)',
         'tdahToday.limboSelectionCount': '{count} selezionate',
         'tdahToday.limboBatchApply': 'Applica alla selezione',
+        'tdahToday.workBandTasks': '{count} attività',
+        'tdahToday.workBandExpandLabel': 'Mostra le attività di questa fascia di lavoro',
+        'tdahToday.workBandCollapseLabel': 'Nascondi le attività di questa fascia di lavoro',
+        'tdahToday.workBandReadOnly': 'Sola lettura — la registrazione del lavoro vive in Jira',
+        'tdahToday.workBandItemsEmpty': 'L’elenco delle attività non è ancora stato sincronizzato.',
+        'tdahToday.workBandNotificationTitle': 'Sprint: {count} attività assegnate in sospeso',
+        'tdahToday.workBandNotificationBody': 'La tua fascia di lavoro inizia adesso.',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Routine',
@@ -1821,6 +1828,7 @@ export const itOverrides: Record<string, string> = {
         'tdahActivity.alreadyRegistered': 'Già registrata',
         'tdahActivity.errorGeneric': "Impossibile completare l'azione. Riprova.",
         'tdahActivity.actionOfflineMessage': "Nessuna connessione a Internet. L'azione non è stata registrata.",
+        'tdahActivity.errorReadOnly': 'Questa fascia di lavoro è in sola lettura: la sua registrazione vive in Jira.',
         'tdahActivity.routineContext': 'Parte della routine {name}',
 
         // ADHD mode Routines (Blocks & calendar patterns)

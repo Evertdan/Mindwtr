@@ -51,7 +51,22 @@ export type TdahActivityState = (typeof TDAH_ACTIVITY_STATES)[number];
  * always includes it. Read it as `activity.movedAt ?? null`, never a bare
  * `!== null`, so an omitted field in an older fixture reads the same as an
  * explicit `null` (never mistaken for "moved").
+ *
+ * `workItems` (story 4.2): the sprint issues the server attaches to the one
+ * `origin: 'jira'` Activity of the day — absent on every other row. Three
+ * fields and no fourth: `externalKey`, `summary` and `status` are exactly
+ * what Jira returns under the current `fields=summary,status` query, and the
+ * band deliberately renders **no per-task time at all** (FR-11: "SIN horas
+ * inventadas por tarea"). `sprintName` is not mirrored here (spec Design
+ * Notes: no surface of the day reads it; the multi-sprint notice stays in
+ * T-13).
  */
+export type TdahDayWorkItem = {
+    externalKey: string;
+    summary: string;
+    status: string;
+};
+
 export type TdahActivity = {
     id: number;
     dayPlanDate: string;
@@ -64,6 +79,14 @@ export type TdahActivity = {
     startedAt: string | null;
     completedAt: string | null;
     movedAt?: string | null;
+    /**
+     * Optional for exactly the reason `movedAt` is: `use-tdah-limbo.ts` and
+     * `use-tdah-morning.ts` build `TdahActivity[]` of their own out of
+     * responses that never carry a work band, and neither file belongs to
+     * this story. Read it as `activity.workItems ?? []`, never a bare
+     * `.length`.
+     */
+    workItems?: TdahDayWorkItem[];
 };
 
 /**
@@ -88,6 +111,20 @@ export type TdahDayResponse = {
      * near-identical response shapes for one field.
      */
     confirmedAt: string | null;
+    /**
+     * Story 4.2: `tdah_work_origin.last_error_code` — the code of the last
+     * failed pull, or `null` when the last pull succeeded (and absent
+     * entirely when there is no Origen configured at all). T-01 maps it onto
+     * the already-translated `tdahJira.error.*` copy to paint the band's
+     * degradation notice, exactly as T-13 does with the same codes; nothing
+     * personal in the day is gated on it (FR-11: "lo personal sigue
+     * funcionando").
+     *
+     * Optional (`?`) so a pre-4.2 fixture, or a server that has not shipped
+     * this field yet, reads the same as an explicit `null` — never as a
+     * degraded band.
+     */
+    workOriginErrorCode?: string | null;
 };
 
 /** POST /v1/tdah/day/activities body. `startTime`/`durationMinutes` are genuinely optional — omit either to leave it unset ("sin hora"). */

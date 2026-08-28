@@ -21,6 +21,7 @@ const {
     tdahModeActiveMock,
     showTdahActivityNotificationMock,
     showTdahRitualNotificationMock,
+    showTdahWorkBandNotificationMock,
 } = vi.hoisted(() => ({
     appState: { currentState: 'active' as 'active' | 'background' | 'inactive' },
     appStateListeners: new Set<(state: 'active' | 'background' | 'inactive') => void>(),
@@ -51,11 +52,20 @@ const {
         channelName: string;
         data: Record<string, string>;
     }) => Promise<void>>(async () => undefined),
+    showTdahWorkBandNotificationMock: vi.fn<(request: {
+        key: string;
+        title: string;
+        message?: string;
+        vibrationPattern: number[];
+        channelName: string;
+        data: Record<string, string>;
+    }) => Promise<void>>(async () => undefined),
 }));
 
 vi.mock('@/lib/notification-service-local', () => ({
     showTdahActivityNotification: showTdahActivityNotificationMock,
     showTdahRitualNotification: showTdahRitualNotificationMock,
+    showTdahWorkBandNotification: showTdahWorkBandNotificationMock,
 }));
 
 vi.mock('react-native', async () => {
@@ -119,6 +129,8 @@ describe('useRootLayoutTdahConnection', () => {
         showTdahActivityNotificationMock.mockResolvedValue(undefined);
         showTdahRitualNotificationMock.mockReset();
         showTdahRitualNotificationMock.mockResolvedValue(undefined);
+        showTdahWorkBandNotificationMock.mockReset();
+        showTdahWorkBandNotificationMock.mockResolvedValue(undefined);
     });
 
     afterEach(() => {
@@ -373,6 +385,104 @@ describe('useRootLayoutTdahConnection', () => {
 
             expect(showTdahRitualNotificationMock).not.toHaveBeenCalled();
             expect(showTdahActivityNotificationMock).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('story 4.2 — work-band WS message -> N-04', () => {
+        const workBandEvent = {
+            kind: 'work-band',
+            activityId: 91,
+            title: 'Sprint',
+            startTime: '09:00',
+            durationMinutes: 540,
+            itemCount: 3,
+            at: '2026-08-28T15:00:00.000Z',
+        };
+
+        // AC: "se emite exactamente una notificación con el conteo y un solo
+        // pulso corto".
+        it('shows N-04 with the count in the title, the single short pulse, and kind: tdah-work-band', async () => {
+            tdahModeActiveMock.mockReturnValue(true);
+            await act(async () => { tree = create(<TestHarness />); });
+            const { options } = fakeHandles[0];
+
+            await act(async () => { options.onMessage(JSON.stringify(workBandEvent)); });
+
+            expect(showTdahWorkBandNotificationMock).toHaveBeenCalledTimes(1);
+            const request = showTdahWorkBandNotificationMock.mock.calls[0][0];
+            expect(request.key).toBe('tdah-work-band:91');
+            expect(request.title).toBe('Sprint: 3 pending assigned tasks');
+            expect(request.message).toBe('Your work band starts now.');
+            expect(request.vibrationPattern).toEqual([0, 90]);
+            expect(request.data).toMatchObject({ kind: 'tdah-work-band', context: '91' });
+        });
+
+        it('interpolates the real count, never a hard-coded one', async () => {
+            tdahModeActiveMock.mockReturnValue(true);
+            await act(async () => { tree = create(<TestHarness />); });
+            const { options } = fakeHandles[0];
+
+            await act(async () => {
+                options.onMessage(JSON.stringify({ ...workBandEvent, itemCount: 11 }));
+            });
+
+            expect(showTdahWorkBandNotificationMock.mock.calls[0][0].title).toBe('Sprint: 11 pending assigned tasks');
+        });
+
+        it('resolves the title and body through resolveText instead of raw keys', async () => {
+            tdahModeActiveMock.mockReturnValue(true);
+            const resolveText = vi.fn((_key: string, fallback: string) => `translated:${fallback}`);
+            await act(async () => { tree = create(<TestHarness resolveText={resolveText} />); });
+            const { options } = fakeHandles[0];
+
+            await act(async () => { options.onMessage(JSON.stringify(workBandEvent)); });
+
+            const request = showTdahWorkBandNotificationMock.mock.calls[0][0];
+            expect(request.title).toBe('translated:Sprint: 3 pending assigned tasks');
+            expect(request.message).toBe('translated:Your work band starts now.');
+            expect(request.channelName).toBe('translated:Activity reminders');
+        });
+
+        // Spec Always: the band fires N-04 and nothing else — never N-01/N-02
+        // (the server drops it from the candidate query) and never N-03.
+        it('fires only the work-band notifier, never the Activity or ritual one', async () => {
+            tdahModeActiveMock.mockReturnValue(true);
+            await act(async () => { tree = create(<TestHarness />); });
+            const { options } = fakeHandles[0];
+
+            await act(async () => { options.onMessage(JSON.stringify(workBandEvent)); });
+
+            expect(showTdahActivityNotificationMock).not.toHaveBeenCalled();
+            expect(showTdahRitualNotificationMock).not.toHaveBeenCalled();
+        });
+
+        it('leaves the other two events routed to their own handlers, unaffected by the third branch', async () => {
+            tdahModeActiveMock.mockReturnValue(true);
+            await act(async () => { tree = create(<TestHarness />); });
+            const { options } = fakeHandles[0];
+
+            await act(async () => {
+                options.onMessage(JSON.stringify({
+                    kind: 'activity-trigger', edge: 'start', activityId: 1, title: 'Foo', durationMinutes: 10,
+                }));
+                options.onMessage(JSON.stringify({ kind: 'ritual-invitation', at: '2026-08-28T05:00:00.000Z' }));
+            });
+
+            expect(showTdahActivityNotificationMock).toHaveBeenCalledTimes(1);
+            expect(showTdahRitualNotificationMock).toHaveBeenCalledTimes(1);
+            expect(showTdahWorkBandNotificationMock).not.toHaveBeenCalled();
+        });
+
+        it('ignores a malformed work-band payload rather than announcing a NaN count', async () => {
+            tdahModeActiveMock.mockReturnValue(true);
+            await act(async () => { tree = create(<TestHarness />); });
+            const { options } = fakeHandles[0];
+
+            await act(async () => {
+                options.onMessage(JSON.stringify({ ...workBandEvent, itemCount: undefined }));
+            });
+
+            expect(showTdahWorkBandNotificationMock).not.toHaveBeenCalled();
         });
     });
 });

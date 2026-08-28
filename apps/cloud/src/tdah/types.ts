@@ -176,6 +176,31 @@ export type TdahActivity = {
      * `origin:'routine'`'s own "De Rutina X" badge.
      */
     movedAt: string | null;
+    /**
+     * Story 4.2 — present ONLY on the grouped Jira band (`origin: 'jira'`),
+     * absent on every other Actividad. The issues the band stands for, in the
+     * snapshot's own order, so T-01 can render read-only sub-rows without a
+     * second request to `GET /v1/tdah/origin` (which is T-13's surface and
+     * carries connection settings the day has no business knowing).
+     *
+     * Optional rather than `TdahDayWorkItem[] | null` because the mobile
+     * mirror of this type is also built by `use-tdah-limbo`/`use-tdah-morning`
+     * from responses that never carry it.
+     */
+    workItems?: TdahDayWorkItem[];
+};
+
+/**
+ * Story 4.2 — one read-only sub-row of the grouped band. Deliberately a
+ * NARROWER shape than `TdahWorkOriginItem`: no `sprintName` (no surface of the
+ * day reads it — see the story's Design Notes; the multi-sprint notice lives
+ * only in T-13) and, above all, no hour of any kind. The band never invents a
+ * time per task (FR-11).
+ */
+export type TdahDayWorkItem = {
+    externalKey: string;
+    summary: string;
+    status: string;
 };
 
 /**
@@ -204,6 +229,18 @@ export type TdahDayResponse = {
      */
     confirmedAt: string | null;
     activities: TdahActivity[];
+    /**
+     * Story 4.2 — the Origen's last failure code (`tdah_work_origin
+     * .last_error_code`), or `null` when the last pull succeeded, when no
+     * Origen is connected, and when the mode never had one at all. T-01 maps it
+     * onto the already-translated `tdahJira.error.*` copy to paint the band's
+     * degradation notice while everything personal keeps working (FR-11's own
+     * consequence).
+     *
+     * Deliberately NOT optional here: the day always states the Origen's health
+     * explicitly, so "no lo sé" can never be confused with "está sano".
+     */
+    workOriginErrorCode: TdahErrorCode | null;
 };
 
 /**
@@ -684,6 +721,15 @@ const TDAH_ERROR_CODES = {
     // resolves it by removing something from the day, so it is actionable —
     // which is what earns it a code of its own.
     originDayFull: 'TDAH_ORIGIN_DAY_FULL',
+    // Story 4.2 — the server half of "la franja es de solo lectura". The band
+    // is excluded from `SELECT_ELIGIBLE_MORNING_ACTIVITY_IDS_SQL`, so any
+    // `POST /v1/tdah/day/tomorrow/confirm` body that names it (to re-time it or
+    // to delete it) is rejected without writing anything. It gets its own code
+    // rather than the generic `activityInvalid` because it is not a malformed
+    // request at all: the payload is well-formed and the id is real, the row is
+    // simply not the user's to edit — the work record lives in Jira, and
+    // Mindwtr never writes there.
+    originReadOnly: 'TDAH_ORIGIN_READ_ONLY',
 } as const;
 
 export type TdahErrorCode = (typeof TDAH_ERROR_CODES)[keyof typeof TDAH_ERROR_CODES];
@@ -769,7 +815,41 @@ export type TdahWsRitualInvitationEvent = {
     at: string;
 };
 
-export type TdahWsServerEvent = TdahWsConnectedEvent | TdahWsActivityTriggerEvent | TdahWsRitualInvitationEvent;
+/**
+ * Story 4.2 — N-04, the grouped work band's own event kind. Pushed by the SAME
+ * `activity-trigger.ts` tick as `TdahWsActivityTriggerEvent` above (never a
+ * fourth `setInterval`, never a second channel), exactly ONCE per band per
+ * local day: the tick that first crosses the band's own `start_time` with an
+ * open WS connection seals `tdah_activity.start_notified_at` and emits this.
+ *
+ * The band is deliberately absent from the N-01/N-02 candidate query
+ * (`SELECT_ACTIVITY_TRIGGER_CANDIDATES_SQL` excludes `origin = 'jira'`), so it
+ * can never also produce a start AND an end `activity-trigger` — the
+ * two-notifications-per-band avalanche FR-11 forbids. There is no end-of-band
+ * notification at all, by design.
+ *
+ * `itemCount` is the count of issues in the last successful snapshot, carried
+ * raw so the client composes "Sprint: 3 tareas" itself with its own localized
+ * copy (`tdahToday.workBandNotificationTitle`/`…Body`) — the same
+ * client-formats-the-string convention `durationMinutes` already follows above.
+ * No per-issue detail travels here: the band never names a task in a
+ * notification, and never invents an hour for one.
+ */
+export type TdahWsWorkBandEvent = {
+    kind: 'work-band';
+    activityId: number;
+    title: string;
+    startTime: string;
+    durationMinutes: number | null;
+    itemCount: number;
+    at: string;
+};
+
+export type TdahWsServerEvent =
+    | TdahWsConnectedEvent
+    | TdahWsActivityTriggerEvent
+    | TdahWsRitualInvitationEvent
+    | TdahWsWorkBandEvent;
 
 /**
  * Story 2.2 — per-tick aggregate stats across every namespace scanned by
@@ -782,10 +862,17 @@ export type TdahActivityTriggerTickSummary = {
     date: string;
     /** Namespaces with an existing TDAH database, scanned this tick. */
     namespaceCount: number;
-    /** Namespaces that fired at least one activity-trigger event this tick. */
+    /** Namespaces that fired at least one event this tick. Story 4.2: unlike `firedEventCount`/`firedWorkBandCount`, which stay deliberately separate, this counts a namespace whose only work was N-04 — it answers "did this namespace push anything at all?", which is the question the skip accounting is checked against. */
     firedNamespaceCount: number;
-    /** Total individual start/end trigger events fired across every namespace this tick. */
+    /** Total individual start/end trigger events fired across every namespace this tick. Story 4.2: work-band events are counted separately below, never folded in here — an N-01/N-02 count that silently included N-04 would hide exactly the double-notification regression this story fixed. */
     firedEventCount: number;
+    /**
+     * Story 4.2 — total `work-band` (N-04) events fired across every namespace
+     * this tick. At most one per namespace per local day by construction (the
+     * band's own `start_notified_at` seal), so in steady state this is 0 and,
+     * on the tick that crosses a band's start, 1.
+     */
+    firedWorkBandCount: number;
     /**
      * Namespaces skipped this tick — mode off, no open WS connection to push
      * to (never marks anything notified in that case — see

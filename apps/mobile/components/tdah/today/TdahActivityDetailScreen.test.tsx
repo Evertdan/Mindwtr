@@ -256,6 +256,35 @@ describe('TdahActivityDetailScreen — view mode', () => {
         expect(tree!.root.findByProps({ testID: 'tdah-activity-action-start' }).props.disabled).toBe(true);
     });
 
+    // Story 4.2 (doc 02's T-02: "Jira: campos bloqueados + aviso 'solo
+    // lectura'"). The three registration actions deliberately stay
+    // available: marking the band attended is a local alert record and never
+    // writes to Jira (FR-11).
+    describe('a jira-origin work band (story 4.2)', () => {
+        it('shows the persistent read-only notice', async () => {
+            hookState.activities = [{ ...activity, origin: 'jira', title: 'Sprint' }];
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahActivityDetailScreen mode="view" activityId={5} />); });
+            const notice = tree!.root.findByProps({ testID: 'tdah-activity-read-only-notice' });
+            expect(notice.props.children).toBe('Read-only — work logging lives in Jira');
+        });
+
+        it('keeps the three registration actions available', async () => {
+            hookState.activities = [{ ...activity, origin: 'jira', title: 'Sprint' }];
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahActivityDetailScreen mode="view" activityId={5} />); });
+            expect(tree!.root.findByProps({ testID: 'tdah-activity-action-start' }).props.disabled).toBe(false);
+            expect(tree!.root.findByProps({ testID: 'tdah-activity-action-complete' }).props.disabled).toBe(false);
+            expect(tree!.root.findByProps({ testID: 'tdah-activity-action-miss' }).props.disabled).toBe(false);
+        });
+
+        it('shows no such notice on a personal Activity', async () => {
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahActivityDetailScreen mode="view" activityId={5} />); });
+            expect(tree!.root.findAllByProps({ testID: 'tdah-activity-read-only-notice' })).toHaveLength(0);
+        });
+    });
+
     it('registers "start" via the hook on tap', async () => {
         hookState.registerActivityAction.mockResolvedValue({ ...activity, state: 'started' });
         let tree: ReturnType<typeof create> | undefined;

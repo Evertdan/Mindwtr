@@ -37,6 +37,14 @@ export type UseTdahTodayResult = {
     timeZone: string;
     routineTitle: string | null;
     activities: TdahActivity[];
+    /**
+     * Story 4.2 — the last work-origin pull's error code, or `null` when the
+     * last pull succeeded (or no Origen is connected at all). T-01 renders it
+     * as the degradation notice inside the Jira band itself, never as a
+     * screen-level error: a broken Jira sync must never take the personal
+     * day down with it (FR-11).
+     */
+    workOriginErrorCode: string | null;
     reload: () => Promise<void>;
     createManualActivity: (input: TdahCreateManualActivityRequest) => Promise<TdahActivity>;
     registerActivityAction: (activityId: number, action: TdahActivityTransitionAction) => Promise<TdahActivity>;
@@ -93,6 +101,7 @@ export function useTdahToday(): UseTdahTodayResult {
     const [timeZone, setTimeZone] = useState<string>(DEVICE_TIME_ZONE);
     const [routineTitle, setRoutineTitle] = useState<string | null>(null);
     const [activities, setActivities] = useState<TdahActivity[]>([]);
+    const [workOriginErrorCode, setWorkOriginErrorCode] = useState<string | null>(null);
     const mountedRef = useRef(true);
     // The rendered day (`date`), readable from the mutation callbacks below
     // without re-creating them whenever the day changes — the merge guard
@@ -140,6 +149,9 @@ export function useTdahToday(): UseTdahTodayResult {
             dateRef.current = day.date;
             setTimeZone(typeof day.timeZone === 'string' && day.timeZone.length > 0 ? day.timeZone : DEVICE_TIME_ZONE);
             setRoutineTitle(day.routineTitle);
+            // Read defensively: a server that predates story 4.2 omits the
+            // field entirely, and that is a healthy day, not a degraded one.
+            setWorkOriginErrorCode(typeof day.workOriginErrorCode === 'string' ? day.workOriginErrorCode : null);
             setActivities(day.activities);
             setPhase(day.activities.length > 0 ? 'ready' : 'empty');
         } catch (error) {
@@ -183,5 +195,15 @@ export function useTdahToday(): UseTdahTodayResult {
         return result.activity;
     }, []);
 
-    return { phase, date, timeZone, routineTitle, activities, reload, createManualActivity, registerActivityAction };
+    return {
+        phase,
+        date,
+        timeZone,
+        routineTitle,
+        activities,
+        workOriginErrorCode,
+        reload,
+        createManualActivity,
+        registerActivityAction,
+    };
 }

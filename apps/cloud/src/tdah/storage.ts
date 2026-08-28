@@ -28,6 +28,7 @@ import type {
     TdahActivityState,
     TdahActivityTransitionAction,
     TdahConfirmMorningRequest,
+    TdahDayWorkItem,
     TdahErrorCode,
     TdahHistoryEntry,
     TdahLimboDecideBatchRequest,
@@ -1565,9 +1566,25 @@ const SELECT_DAY_PLAN_EXISTS_SQL = 'SELECT 1 FROM tdah_day_plan WHERE date = ? L
 // down 23:00–00:00 — leaves yesterday's rows pending forever if the close
 // only ever targeted exactly "today"). `tdah_activity.day_plan_date` is a
 // YYYY-MM-DD text key, so lexical `<=` is chronological.
+//
+// Story 4.2 — the Jira band is deliberately NOT swept into `limbo`. El Limbo
+// (T-08) is the tray where the user renegotiates their own unattended
+// commitments: complete-late, move to a future day, or discard. A work band is
+// a read-only mirror of Jira, so every one of those decisions is a write the
+// module has promised never to offer — and `move` is worse than cosmetic, since
+// it would plant an `origin='jira'` row on a FUTURE day with `start_notified_at`
+// still NULL, firing N-04 again for a band no pull ever materialized. An
+// unattended band is not a debt to renegotiate ("el registro laboral vive en
+// Jira"), so it leaves the day terminally as `discarded`: excluded from T-08,
+// from history/metrics (`missed`/`limbo`/`completed`) and from the trigger
+// candidates, exactly like a band the user had discarded by hand.
+const CLOSE_OUTGOING_DAY_BANDS_SQL = `
+    UPDATE tdah_activity SET state = 'discarded'
+    WHERE day_plan_date <= ? AND state IN ('pending', 'started') AND origin = 'jira';
+`;
 const CLOSE_OUTGOING_DAY_SQL = `
     UPDATE tdah_activity SET state = 'limbo'
-    WHERE day_plan_date <= ? AND state IN ('pending', 'started');
+    WHERE day_plan_date <= ? AND state IN ('pending', 'started') AND origin <> 'jira';
 `;
 const SELECT_PENDING_OR_STARTED_UP_TO_SQL = `
     SELECT 1 FROM tdah_activity WHERE day_plan_date <= ? AND state IN ('pending', 'started') LIMIT 1;
@@ -1607,8 +1624,15 @@ export type CloseOutgoingDayResult = { limboCount: number };
  * idempotent from `mutateGenerateTomorrowIfMissing`: re-running it against a
  * date whose Actividades are already `limbo` (or `completed`/`missed`/
  * `discarded`) matches zero rows and changes nothing.
+ *
+ * Story 4.2 — runs in two disjoint passes: Jira bands are retired as
+ * `discarded` (see `CLOSE_OUTGOING_DAY_BANDS_SQL` for why they must never
+ * reach T-08), everything else becomes `limbo`. `limboCount` keeps counting
+ * only the rows that actually entered El Limbo, since that is what the
+ * scheduler's audit line and the tray's own copy mean by it.
  */
 export const mutateCloseOutgoingDay = (database: TdahDatabase, date: string): CloseOutgoingDayResult => {
+    database.prepare(CLOSE_OUTGOING_DAY_BANDS_SQL).run(date);
     const result = database.prepare(CLOSE_OUTGOING_DAY_SQL).run(date);
     return { limboCount: Number(result.changes) };
 };
@@ -1672,10 +1696,18 @@ export const mutateMarkRitualNotified = (database: TdahDatabase, date: string): 
 // once in SQL; the actual crossing comparison happens in JS below via
 // `localInstantMs`, never raw minutes-of-day (see that helper's own comment
 // for why).
+// Story 4.2: SELECT_ACTIVITY_TRIGGER_CANDIDATES_SQL now filters origin <> 'jira',
+// and that negative clause is the whole surgery N-04 needed. The
+// grouped work band IS a `tdah_activity` row with a `start_time` and a
+// `duration_minutes`, so before this clause it matched here like any other
+// Actividad and fired BOTH an N-01 (at `workStart`) and an N-02 (at
+// `workEnd`) — precisely the per-band avalanche FR-11 forbids. It is now
+// handled exclusively by `selectDueWorkBandTriggers` below, which emits one
+// `work-band` event at its start and nothing at its end.
 const SELECT_ACTIVITY_TRIGGER_CANDIDATES_SQL = `
     SELECT id, day_plan_date, title, start_time, duration_minutes, start_notified_at, end_notified_at
     FROM tdah_activity
-    WHERE day_plan_date <= ? AND start_time IS NOT NULL
+    WHERE day_plan_date <= ? AND start_time IS NOT NULL AND origin <> 'jira'
       AND state NOT IN ('completed', 'discarded', 'missed')
       AND (start_notified_at IS NULL OR (duration_minutes IS NOT NULL AND end_notified_at IS NULL));
 `;
@@ -1794,6 +1826,127 @@ export const mutateMarkDueActivityTriggersNotified = (
         } else {
             database.prepare(UPDATE_ACTIVITY_END_NOTIFIED_SQL).run(notifiedAtIso, fire.id);
         }
+    }
+    return due;
+};
+
+// --- N-04: the work band's own single trigger (story 4.2) --------------------
+
+// The band, and only the band, for ONE local day. Three deliberate divergences
+// from `SELECT_ACTIVITY_TRIGGER_CANDIDATES_SQL` above:
+//
+// - `day_plan_date = ?`, never the `<= ?` backward sweep. A band whose day
+//   already rolled over must NOT be retro-announced: notifying at 09:00 today
+//   about yesterday's sprint window is the notification fatigue (SM-C1) this
+//   epic exists to prevent, and it is also a lie about the past. Yesterday's
+//   band simply stays unnotified forever (the nightly sweep moves it to
+//   `limbo`, and `state = 'pending'` below stops matching anyway).
+// - `end_notified_at` is never read or written. There is no end-of-band
+//   notification at all (Never: "N-02 para la franja queda deliberadamente
+//   eliminada").
+// - `state = 'pending'` only, not the broader "not terminal" set: a band the
+//   user already started/completed/dismissed needs no announcement, and one
+//   swept into `limbo` belongs to a day that is over.
+const SELECT_WORK_BAND_TRIGGER_CANDIDATE_SQL = `
+    SELECT id, day_plan_date, title, start_time, duration_minutes
+    FROM tdah_activity
+    WHERE day_plan_date = ? AND origin = 'jira' AND state = 'pending'
+      AND start_time IS NOT NULL AND start_notified_at IS NULL
+    ORDER BY id ASC;
+`;
+const COUNT_WORK_ORIGIN_ITEMS_SQL = 'SELECT COUNT(*) AS count FROM tdah_work_origin_item;';
+
+/**
+ * The band milestone `activity-trigger.ts` turns into exactly one N-04
+ * `work-band` WS event. `itemCount` is the live snapshot count — the only
+ * payload the notification actually carries beyond the band's own title and
+ * range, and never a per-issue detail.
+ */
+export type TdahWorkBandTriggerFire = {
+    id: number;
+    title: string;
+    startTime: string;
+    durationMinutes: number | null;
+    itemCount: number;
+};
+
+/**
+ * The band for `date` whose `start_time` has already crossed `nowTimeOfDay`
+ * and whose `start_notified_at` seal is still `NULL`. Returns an array (rather
+ * than a single row) purely so the caller's loop reads like
+ * `selectDueActivityTriggers`'s; by construction there is at most one band per
+ * local day (`SELECT_WORK_ORIGIN_BAND_SQL`'s own "identified by (day, origin)
+ * alone" invariant).
+ *
+ * A band standing for an EMPTY snapshot never fires: the notification's whole
+ * content is the count, so "0 tareas" would be a push with nothing in it. That
+ * state is transient anyway — a pull with zero issues retires a still-`pending`
+ * band — but a `DELETE /v1/tdah/origin` clears the snapshot while deliberately
+ * leaving already-materialized bands alone, so it is genuinely reachable.
+ *
+ * Anchored through `localInstantMs` on the band's OWN `day_plan_date`, exactly
+ * like `selectDueActivityTriggers`, rather than minutes-of-day arithmetic.
+ */
+const selectDueWorkBandTriggers = (database: TdahDatabase, date: string, nowTimeOfDay: string): TdahWorkBandTriggerFire[] => {
+    const rows = prepareAll<{
+        id: unknown;
+        day_plan_date: unknown;
+        title: unknown;
+        start_time: unknown;
+        duration_minutes: unknown;
+    }>(database, SELECT_WORK_BAND_TRIGGER_CANDIDATE_SQL).all(date);
+    if (rows.length === 0) return [];
+    const countRow = database.prepare(COUNT_WORK_ORIGIN_ITEMS_SQL).get() as { count: unknown };
+    const itemCount = Number(countRow.count);
+    if (itemCount <= 0) return [];
+
+    const nowInstantMs = localInstantMs(date, nowTimeOfDay);
+    const fires: TdahWorkBandTriggerFire[] = [];
+    for (const row of rows) {
+        const startTime = String(row.start_time);
+        if (localInstantMs(String(row.day_plan_date), startTime) > nowInstantMs) continue;
+        fires.push({
+            id: Number(row.id),
+            title: String(row.title),
+            startTime,
+            durationMinutes: asNumberOrNull(row.duration_minutes),
+            itemCount,
+        });
+    }
+    return fires;
+};
+
+/**
+ * The work-band tick's own pre-transaction skip check, the exact counterpart of
+ * `hasDueActivityTriggers` above: a namespace with no band due never opens a
+ * write transaction for one. Same already-open-handle contract.
+ */
+export const hasDueWorkBandTrigger = (database: TdahDatabase, date: string, nowTimeOfDay: string): boolean => (
+    selectDueWorkBandTriggers(database, date, nowTimeOfDay).length > 0
+);
+
+/**
+ * Re-evaluates the due band INSIDE the held write transaction and seals its
+ * `start_notified_at` before returning it — the one and only dedupe marker for
+ * N-04, and the reason a second tick, a second pull, a reconnection or a server
+ * restart all produce zero further notifications for that band that day.
+ *
+ * Reuses `UPDATE_ACTIVITY_START_NOTIFIED_SQL` (with its `... IS NULL` guard)
+ * rather than a parallel statement: it is literally the same column with the
+ * same idempotency requirement. Crucially, `UPDATE_WORK_ORIGIN_BAND_SQL` — the
+ * only other writer that touches a band row — sets `title`/`start_time`/
+ * `duration_minutes` and nothing else, so a later pull the same day can never
+ * clear this seal and re-arm the notification.
+ */
+export const mutateMarkDueWorkBandNotified = (
+    database: TdahDatabase,
+    date: string,
+    nowTimeOfDay: string,
+    notifiedAtIso: string,
+): TdahWorkBandTriggerFire[] => {
+    const due = selectDueWorkBandTriggers(database, date, nowTimeOfDay);
+    for (const fire of due) {
+        database.prepare(UPDATE_ACTIVITY_START_NOTIFIED_SQL).run(notifiedAtIso, fire.id);
     }
     return due;
 };
@@ -2065,9 +2218,16 @@ export type TdahDayPlanView = {
     /** `null` until `POST /v1/tdah/day/tomorrow/confirm` (story 3.3, T-06/T-07) sets it; re-confirming overwrites it with a fresher timestamp. */
     confirmedAt: string | null;
     activities: TdahActivity[];
+    /** Story 4.2 — `tdah_work_origin.last_error_code`, or `null` with no Origen connected or a healthy last pull. */
+    workOriginErrorCode: TdahErrorCode | null;
 };
 
 const SELECT_DAY_PLAN_CONFIRMED_AT_SQL = 'SELECT confirmed_at FROM tdah_day_plan WHERE date = ?;';
+// Story 4.2 — deliberately its OWN statement rather than reusing
+// `SELECT_WORK_ORIGIN_SQL`: the day needs exactly one field of the Origen's
+// health and has no business reading the site URL, the account email or the
+// JQL, none of which belong in a `GET /v1/tdah/day` response.
+const SELECT_WORK_ORIGIN_ERROR_CODE_SQL = 'SELECT last_error_code FROM tdah_work_origin WHERE id = 1;';
 
 /**
  * `getTodayDayPlan`'s raw-database read half — every Activity for `date`
@@ -2080,12 +2240,32 @@ const selectDayPlanView = (database: TdahDatabase, date: string, timeZone: strin
     const activities = prepareAll<TdahActivityRow>(database, SELECT_ACTIVITIES_FOR_DAY_SQL).all(date).map(rowToActivity);
     const routineTitleRow = database.prepare(SELECT_ROUTINE_TITLE_FOR_DAY_SQL).get(date) as { title: unknown } | undefined | null;
     const dayPlanRow = database.prepare(SELECT_DAY_PLAN_CONFIRMED_AT_SQL).get(date) as { confirmed_at: unknown } | undefined | null;
+    // Story 4.2 — the band's read-only sub-rows and the Origen's degraded
+    // state, both attached here so T-01 renders the whole day (personal AND
+    // laboral) from one response, instead of reaching for T-13's
+    // `GET /v1/tdah/origin` (which also carries connection settings the day has
+    // no business knowing).
+    //
+    // `workItems` is attached only to the band, and only when a band exists, so
+    // an "Origen apagado" day pays for no extra query and stays exactly as
+    // clean as before this story. The error code, by contrast, is read
+    // unconditionally: a pull that fails BEFORE ever materializing today's band
+    // (a token revoked overnight) leaves no band to hang the notice on, and
+    // that is precisely the case the user needs told about.
+    const bandIndex = activities.findIndex((activity) => activity.origin === 'jira');
+    if (bandIndex >= 0) {
+        const band = activities[bandIndex] as TdahActivity;
+        activities[bandIndex] = { ...band, workItems: selectWorkOriginItems(database).map(toDayWorkItem) };
+    }
+    const originRow = database.prepare(SELECT_WORK_ORIGIN_ERROR_CODE_SQL).get() as { last_error_code: unknown } | undefined | null;
+    const workOriginErrorCode = originRow ? asString(originRow.last_error_code) as TdahErrorCode | null : null;
     return {
         date,
         timeZone,
         routineTitle: routineTitleRow ? String(routineTitleRow.title) : null,
         confirmedAt: dayPlanRow ? asString(dayPlanRow.confirmed_at) : null,
         activities,
+        workOriginErrorCode,
     };
 };
 
@@ -2772,13 +2952,33 @@ export async function decideLimboBatch(
 // an id from another day/namespace, or one that is no longer `pending`
 // (already started/completed/missed/limbo/discarded), can never sneak
 // through either list.
-const SELECT_ELIGIBLE_MORNING_ACTIVITY_IDS_SQL = "SELECT id FROM tdah_activity WHERE day_plan_date = ? AND state = 'pending';";
+// Story 4.2 adds `origin <> 'jira'`: the grouped work band is NEVER editable
+// or deletable, on any surface. Excluding it here is the server half of that
+// promise — the exact-accounting check below then turns any confirm body that
+// names it into a rejection without a single write, so a client that has not
+// been updated (or one hand-rolled against the API) cannot re-time or delete
+// the band either. The three layers are: T-01/T-06 offer no edit affordance,
+// T-06 leaves it out of its editable set, and this query makes the server
+// refuse regardless.
+const SELECT_ELIGIBLE_MORNING_ACTIVITY_IDS_SQL = "SELECT id FROM tdah_activity WHERE day_plan_date = ? AND state = 'pending' AND origin <> 'jira';";
+// The complement of the query above, so the rejection can name its real reason
+// (409 TDAH_ORIGIN_READ_ONLY) instead of the generic "your payload does not add
+// up" (400 TDAH_ACTIVITY_INVALID) — a client that includes the band is not
+// desynced, it is asking for something the module never allows.
+const SELECT_WORK_BAND_ACTIVITY_IDS_SQL = "SELECT id FROM tdah_activity WHERE day_plan_date = ? AND origin = 'jira';";
 const UPDATE_ACTIVITY_MORNING_EDIT_SQL = 'UPDATE tdah_activity SET start_time = ?, duration_minutes = ?, sort_order = ? WHERE id = ?;';
 const DELETE_ACTIVITY_BY_ID_SQL = 'DELETE FROM tdah_activity WHERE id = ?;';
 const UPDATE_DAY_PLAN_CONFIRMED_AT_SQL = 'UPDATE tdah_day_plan SET confirmed_at = ? WHERE date = ?;';
 
 export type TdahConfirmMorningResult =
-    | { kind: 'rejected' }
+    /**
+     * `reason` (story 4.2) tells the route which error code to answer with:
+     * `'invalid'` is the pre-existing generic rejection (400
+     * TDAH_ACTIVITY_INVALID — desynced accounting, an unknown or repeated id),
+     * `'originReadOnly'` means the body named the Jira band (409
+     * TDAH_ORIGIN_READ_ONLY). Neither writes anything.
+     */
+    | { kind: 'rejected'; reason: 'invalid' | 'originReadOnly' }
     | { kind: 'ok'; day: TdahDayPlanView };
 
 /**
@@ -2819,17 +3019,30 @@ export const mutateConfirmMorning = (
     const eligibleRows = prepareAll<{ id: unknown }>(database, SELECT_ELIGIBLE_MORNING_ACTIVITY_IDS_SQL).all(date);
     const eligibleIds = new Set(eligibleRows.map((row) => Number(row.id)));
 
+    // Story 4.2 — checked FIRST, before the accounting check below. A body that
+    // names the band already fails that check (the band is no longer counted as
+    // eligible), but it would fail it as a generic "your numbers do not add
+    // up", which is both wrong and unactionable: nothing the client re-syncs
+    // will ever make the band editable.
+    const bandRows = prepareAll<{ id: unknown }>(database, SELECT_WORK_BAND_ACTIVITY_IDS_SQL).all(date);
+    const bandIds = new Set(bandRows.map((row) => Number(row.id)));
+    if (bandIds.size > 0) {
+        const namesBand = request.activities.some((entry) => bandIds.has(entry.id))
+            || request.deletedActivityIds.some((id) => bandIds.has(id));
+        if (namesBand) return { kind: 'rejected', reason: 'originReadOnly' };
+    }
+
     if (request.activities.length + request.deletedActivityIds.length !== eligibleIds.size) {
-        return { kind: 'rejected' };
+        return { kind: 'rejected', reason: 'invalid' };
     }
 
     const seenIds = new Set<number>();
     for (const entry of request.activities) {
-        if (!eligibleIds.has(entry.id) || seenIds.has(entry.id)) return { kind: 'rejected' };
+        if (!eligibleIds.has(entry.id) || seenIds.has(entry.id)) return { kind: 'rejected', reason: 'invalid' };
         seenIds.add(entry.id);
     }
     for (const id of request.deletedActivityIds) {
-        if (!eligibleIds.has(id) || seenIds.has(id)) return { kind: 'rejected' };
+        if (!eligibleIds.has(id) || seenIds.has(id)) return { kind: 'rejected', reason: 'invalid' };
         seenIds.add(id);
     }
 
@@ -2952,7 +3165,7 @@ const UPDATE_WORK_ORIGIN_PULL_RESULT_SQL = `
 `;
 // The band is identified by (day, origin) alone — there is exactly one per
 // local day by construction (Never: "una sola Actividad-franja por día").
-const SELECT_WORK_ORIGIN_BAND_SQL = "SELECT id, state FROM tdah_activity WHERE day_plan_date = ? AND origin = 'jira' ORDER BY id ASC LIMIT 1;";
+const SELECT_WORK_ORIGIN_BAND_SQL = "SELECT id, state, start_time FROM tdah_activity WHERE day_plan_date = ? AND origin = 'jira' ORDER BY id ASC LIMIT 1;";
 const UPDATE_WORK_ORIGIN_BAND_SQL = "UPDATE tdah_activity SET title = ?, start_time = ?, duration_minutes = ? WHERE id = ? AND state = 'pending';";
 const DELETE_WORK_ORIGIN_BAND_SQL = "DELETE FROM tdah_activity WHERE id = ? AND state = 'pending';";
 const INSERT_WORK_ORIGIN_BAND_SQL = `
@@ -3016,6 +3229,18 @@ const rowToWorkOriginItem = (row: TdahWorkOriginItemRow): TdahWorkOriginItem => 
 const selectWorkOriginItems = (database: TdahDatabase): TdahWorkOriginItem[] => (
     prepareAll<TdahWorkOriginItemRow>(database, SELECT_WORK_ORIGIN_ITEMS_SQL).all().map(rowToWorkOriginItem)
 );
+
+/**
+ * Story 4.2 — narrows a snapshot row down to what the DAY is allowed to show.
+ * `sprintName` is dropped on purpose (the story's Design Notes: no surface of
+ * the day reads it; the multi-sprint notice lives only in T-13), and no hour of
+ * any kind is added — the band never invents a time per task (FR-11).
+ */
+const toDayWorkItem = (item: TdahWorkOriginItem): TdahDayWorkItem => ({
+    externalKey: item.externalKey,
+    summary: item.summary,
+    status: item.status,
+});
 
 const selectWorkOriginStatus = (database: TdahDatabase): TdahWorkOriginStatus => {
     const row = database.prepare(SELECT_WORK_ORIGIN_SQL).get() as TdahWorkOriginRow | undefined | null;
@@ -3292,6 +3517,31 @@ export const mutateMarkWorkOriginPullResult = (
  * `mutateGenerateTomorrowIfMissing`, exactly as `mutateCreateManualActivity`
  * does, so the first pull of a day still applies that day's Rutina instead of
  * planting an empty plan that would block it forever.
+ *
+ * ## Story 4.2 — the band never lies about the past, and never moves backwards
+ *
+ * On CREATE the start is clipped to the moment the band actually comes into
+ * existence:
+ *
+ * ```
+ * bandStart = max(workStart, nowTimeOfDay)
+ * bandStart >= workEnd  ->  no band for this day at all
+ * ```
+ *
+ * A first pull at 15:20 into a 09:00-18:00 window therefore produces
+ * 15:20-18:00, not 09:00-18:00. Three things follow, and all three are the
+ * point: the band never claims hours that already went by, T-01's "ahora"
+ * marker never lands inside a band that never started, and N-04 fires at the
+ * band's REAL start (on the very next tick, with the count) instead of
+ * retro-announcing an event from six hours ago — which is exactly the
+ * notification fatigue (SM-C1) this epic exists to prevent. A manual
+ * `POST /origin/sync` at 22:00 creates nothing, since the clipped start is
+ * already past `workEnd`.
+ *
+ * On UPDATE the existing `start_time` is PRESERVED and only the duration is
+ * recomputed. A band that has already fired N-04 must never slide backwards
+ * into the future-again state, and a later pull the same day must never
+ * re-open a window the user already watched go by.
  */
 export type TdahWorkOriginBandOutcome =
     /** A band was inserted for this day. */
@@ -3300,7 +3550,7 @@ export type TdahWorkOriginBandOutcome =
     | 'updated'
     /** The sprint emptied and this day's still-`pending` band was retired. */
     | 'removed'
-    /** Nothing to do: no issues and no band to retire, or a band the user already acted on. */
+    /** Nothing to do: no issues and no band to retire, a band the user already acted on, or (story 4.2) a working window that is already over for today. */
     | 'none'
     /** The day is already at `TDAH_DAY_MAX_ACTIVITIES` — the band could NOT be created. */
     | 'capped';
@@ -3311,9 +3561,15 @@ export const mutateSyncWorkOriginBand = (
     itemCount: number,
     workStart: string,
     workEnd: string,
+    /** The namespace's OWN local "HH:mm" at the instant of this pull (`computeLocalTimeOfDay`, already resolved by the caller — never recomputed here and never `new Date()`). */
+    nowTimeOfDay: string,
     title: string,
 ): TdahWorkOriginBandOutcome => {
-    const existing = database.prepare(SELECT_WORK_ORIGIN_BAND_SQL).get(date) as { id: unknown; state: unknown } | undefined | null;
+    const existing = database.prepare(SELECT_WORK_ORIGIN_BAND_SQL).get(date) as {
+        id: unknown;
+        state: unknown;
+        start_time: unknown;
+    } | undefined | null;
 
     if (itemCount <= 0) {
         if (existing && existing.state === 'pending') {
@@ -3323,15 +3579,44 @@ export const mutateSyncWorkOriginBand = (
         return 'none';
     }
 
-    const durationMinutes = Math.max(0, startTimeToMinutes(workEnd) - startTimeToMinutes(workStart));
+    const endMinutes = startTimeToMinutes(workEnd);
 
     if (existing) {
         if (existing.state !== 'pending') return 'none';
+        // The existing start survives verbatim (see this function's own doc
+        // comment): only the duration is re-derived, against the possibly
+        // changed `workEnd`.
+        //
+        // `start_time` is nullable at the schema level, so a row that did not
+        // come from `INSERT_WORK_ORIGIN_BAND_SQL` (which always writes it)
+        // would otherwise stringify to "null" and write a NaN duration.
+        const keptStart = asString(existing.start_time);
+        if (keptStart === null) return 'none';
+        const keptDuration = endMinutes - startTimeToMinutes(keptStart);
+        // The create path below refuses to draw a band whose window is already
+        // over; the update path has to make the same judgement, or narrowing
+        // `workEnd` in T-13 to before an already-clipped start leaves a
+        // zero-length band that renders as a start with no range — a band that
+        // lies about the day. Retiring it matches the `itemCount <= 0` branch
+        // above: the honest band for this day no longer exists.
+        if (keptDuration <= 0) {
+            database.prepare(DELETE_WORK_ORIGIN_BAND_SQL).run(Number(existing.id));
+            return 'removed';
+        }
         // The `AND state = 'pending'` guard lives in the SQL too, so even a
         // read/write race cannot overwrite a band the user just started.
-        database.prepare(UPDATE_WORK_ORIGIN_BAND_SQL).run(title, workStart, durationMinutes, Number(existing.id));
+        database.prepare(UPDATE_WORK_ORIGIN_BAND_SQL).run(title, keptStart, keptDuration, Number(existing.id));
         return 'updated';
     }
+
+    // Clipped to now, never retro-dated. Lexical `>` on two zero-padded `HH:mm`
+    // strings is a real comparison (`computeLocalTimeOfDay` uses `h23`), the
+    // same idiom `isRitualHourReached`/`isWithinWorkingHours` already rely on.
+    const bandStart = nowTimeOfDay > workStart ? nowTimeOfDay : workStart;
+    const durationMinutes = endMinutes - startTimeToMinutes(bandStart);
+    // The window is already over for today (a late first pull, or a manual
+    // sync outside working hours): there is no honest band to draw.
+    if (durationMinutes <= 0) return 'none';
 
     mutateGenerateTomorrowIfMissing(database, date);
     const countRow = database.prepare(COUNT_ACTIVITIES_FOR_DAY_PLAN_SQL).get(date) as { count: unknown };
@@ -3340,7 +3625,7 @@ export const mutateSyncWorkOriginBand = (
     // to tell that from "the sprint is empty". The caller turns this into a
     // persisted `TDAH_ORIGIN_DAY_FULL`, which T-13 can act on.
     if (Number(countRow.count) >= TDAH_DAY_MAX_ACTIVITIES) return 'capped';
-    database.prepare(INSERT_WORK_ORIGIN_BAND_SQL).run(date, title, workStart, durationMinutes);
+    database.prepare(INSERT_WORK_ORIGIN_BAND_SQL).run(date, title, bandStart, durationMinutes);
     return 'created';
 };
 
@@ -3377,6 +3662,8 @@ export async function commitWorkOriginPull(
         pulledAtIso: string;
         workStart: string;
         workEnd: string;
+        /** Story 4.2 — the namespace's own local "HH:mm" at `pulledAtIso`, threaded down to `mutateSyncWorkOriginBand`'s start clipping. Already computed by the pull's own working-hours gate; never recomputed here. */
+        nowTimeOfDay: string;
         bandTitle: string;
     },
 ): Promise<TdahCommitWorkOriginPullResult> {
@@ -3399,6 +3686,7 @@ export async function commitWorkOriginPull(
             options.items.length,
             options.workStart,
             options.workEnd,
+            options.nowTimeOfDay,
             options.bandTitle,
         );
         mutateMarkWorkOriginPullResult(

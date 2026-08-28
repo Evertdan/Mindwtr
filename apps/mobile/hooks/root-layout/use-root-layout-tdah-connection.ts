@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
+import { formatI18nTemplate } from '@mindwtr/core';
+
 import {
     getTdahActivityVibrationPattern,
     parseTdahWsActivityTriggerEvent,
@@ -12,8 +14,17 @@ import {
     TDAH_RITUAL_VIBRATION_PATTERN,
     type TdahWsRitualInvitationEvent,
 } from '@/components/tdah/today/tdah-ritual-notification';
+import {
+    parseTdahWsWorkBandEvent,
+    TDAH_WORK_BAND_VIBRATION_PATTERN,
+    type TdahWsWorkBandEvent,
+} from '@/components/tdah/today/tdah-work-band-notification';
 import { useTdahModeActive } from '@/components/tdah/today/use-tdah-mode-active';
-import { showTdahActivityNotification, showTdahRitualNotification } from '@/lib/notification-service-local';
+import {
+    showTdahActivityNotification,
+    showTdahRitualNotification,
+    showTdahWorkBandNotification,
+} from '@/lib/notification-service-local';
 import {
     INITIAL_TDAH_CONNECTION_STATE,
     isPersistentConnectionSupported,
@@ -137,6 +148,39 @@ function handleTdahRitualInvitationEvent(_event: TdahWsRitualInvitationEvent, re
     });
 }
 
+/**
+ * Story 4.2 ("La franja laboral en mi día") glue: WS raw message -> parsed
+ * `work-band` event -> N-04. Same seam as the two handlers above (Code Map:
+ * "el parseo/branching del nuevo evento debe vivir en su consumidor").
+ *
+ * The count is the message: doc 02's N-04 is literally "Sprint: 3 tareas
+ * pendientes asignadas", so `itemCount` goes into the *title*, which is the
+ * only thing that survives the Bluetooth re-forward to the watch — the same
+ * self-sufficiency rule story 2.2 applied to "{Actividad} — {duración}".
+ * The Activity id rides in `data.context` for exactly the reason
+ * handleTdahActivityTriggerEvent documents: the native->JS open-payload path
+ * forwards a fixed field allowlist with no per-feature id slot, and
+ * `context` is its one generic passthrough.
+ */
+function handleTdahWorkBandEvent(event: TdahWsWorkBandEvent, resolveText: ResolveText): void {
+    const title = formatI18nTemplate(
+        resolveText('tdahToday.workBandNotificationTitle', 'Sprint: {count} pending assigned tasks'),
+        { count: String(event.itemCount) },
+    );
+
+    void showTdahWorkBandNotification({
+        key: `tdah-work-band:${event.activityId}`,
+        title,
+        message: resolveText('tdahToday.workBandNotificationBody', 'Your work band starts now.'),
+        vibrationPattern: TDAH_WORK_BAND_VIBRATION_PATTERN,
+        channelName: resolveText('tdahToday.activityNotificationChannelName', 'Activity reminders'),
+        data: {
+            kind: 'tdah-work-band',
+            context: String(event.activityId),
+        },
+    });
+}
+
 // There is no push signal for the mode flag flipping off elsewhere in the
 // same foreground session (AD-1 forbids caching it client-side), so this
 // hook re-checks on the same 30s cadence already established for this exact
@@ -197,6 +241,11 @@ export function useRootLayoutTdahConnection({ resolveText }: UseRootLayoutTdahCo
                 const ritualEvent = parseTdahWsRitualInvitationEvent(data);
                 if (ritualEvent) {
                     handleTdahRitualInvitationEvent(ritualEvent, resolveTextRef.current);
+                    return;
+                }
+                const workBandEvent = parseTdahWsWorkBandEvent(data);
+                if (workBandEvent) {
+                    handleTdahWorkBandEvent(workBandEvent, resolveTextRef.current);
                 }
             },
         });

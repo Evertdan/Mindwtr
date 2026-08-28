@@ -1022,6 +1022,64 @@ export async function showTdahRitualNotification(request: TdahRitualNotification
   }
 }
 
+export type TdahWorkBandNotificationRequest = {
+  /** Stable per band (`tdah-work-band:{activityId}`) — the server already dedupes on the band row's own `start_notified_at` (spec Always: one notification per band per local day), so this key only has to make a duplicate WS *delivery* replace rather than stack. */
+  key: string;
+  title: string;
+  message?: string;
+  /** `[delay, on, off, on, ...]` ms — see TDAH_WORK_BAND_VIBRATION_PATTERN in components/tdah/today/tdah-work-band-notification.ts. */
+  vibrationPattern: number[];
+  /** Localized Android notification-channel display name — same pass-through as the two requests above; only takes effect the very first time the (already-existing) TDAH Activity channel gets created on a given device. */
+  channelName: string;
+  /** Caller-built payload — always includes `kind: 'tdah-work-band'` and the band's Activity id in `context` (see use-root-layout-notification-open-handler.ts's isTdahWorkBandOpen). */
+  data: Record<string, string>;
+};
+
+/**
+ * Story 4.2 ("La franja laboral en mi día") — shows N-04, the single
+ * work-band notification the VPS pushes at the band's start over the same WS
+ * channel story 2.1 opened.
+ *
+ * Structurally identical to `showTdahRitualNotification` above, and for the
+ * same two reasons: it reuses `TDAH_ACTIVITY_NOTIFICATION_CHANNEL` (spec
+ * Always: "El canal Android de notificaciones no cambia" — vibration is a
+ * per-notification `vibrationPattern`, not a channel property), and all
+ * three action flags are `false` because the band has no Iniciar/Completada/
+ * Posponer semantics: its only action is "Ver" (doc 02's N-04), which is the
+ * plain body tap this dispatcher already routes. Marking the band attended
+ * stays inside the app and is a local alert record — nothing here, and
+ * nothing downstream of here, ever writes to Jira (FR-11).
+ */
+export async function showTdahWorkBandNotification(request: TdahWorkBandNotificationRequest): Promise<void> {
+  const trimmedTitle = String(request.title || '').trim();
+  if (!trimmedTitle) return;
+
+  const api = await loadAlarmApi();
+  if (!api) return;
+
+  const permission = await requestLocalNotificationPermission();
+  if (!permission.granted) return;
+
+  await loadAlarmMapIfNeeded();
+  try {
+    await scheduleAlarmForKey(api, request.key, {
+      title: trimmedTitle,
+      message: request.message ?? trimmedTitle,
+      fireAt: new Date(Date.now() + 2000),
+      hasSnoozeAction: false,
+      hasCompleteAction: false,
+      hasStartAction: false,
+      channel: TDAH_ACTIVITY_NOTIFICATION_CHANNEL,
+      vibrate: true,
+      vibrationPattern: request.vibrationPattern,
+      channelDisplayName: request.channelName,
+      data: request.data,
+    });
+  } finally {
+    await saveAlarmMap();
+  }
+}
+
 export async function cancelLocalPomodoroCompletionNotification(
   loadedApi?: AlarmNotificationsApi | null,
   options: { removeFired?: boolean; reason?: string } = {},

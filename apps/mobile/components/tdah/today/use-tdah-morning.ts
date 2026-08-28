@@ -286,8 +286,15 @@ export function useTdahMorning(): UseTdahMorningResult {
     const confirmMorning = useCallback(async (): Promise<{ changesCount: number }> => {
         const cloud = await loadTdahCloudConfig();
         if (!cloud) throw new Error('TDAH cloud sync is not configured');
+        // Story 4.2: the Jira work band is read-only, and the server excludes
+        // `origin: 'jira'` rows from the eligible set T-06 is allowed to edit.
+        // Sending one would fail the server's exact-count check and reject the
+        // whole confirmation with TDAH_ORIGIN_READ_ONLY, so the band is
+        // filtered out here too — the display guard in TdahMorningScreen and
+        // this payload guard have to agree or a legitimate confirmation dies.
+        const editableActivities = draftActivities.filter((activity) => activity.origin !== 'jira');
         const request: TdahConfirmMorningRequest = {
-            activities: draftActivities.map((activity) => ({
+            activities: editableActivities.map((activity) => ({
                 id: activity.id,
                 startTime: activity.startTime,
                 durationMinutes: activity.durationMinutes,

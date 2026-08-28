@@ -55,6 +55,44 @@ export function computeActivityLayout(startTime: string | null, durationMinutes:
     return { top, height };
 }
 
+const MINUTES_PER_DAY = 24 * 60;
+
+/** `9:30`, `14:00` — hour unpadded, minute padded, matching the AC's own `9:30–14:00`. */
+function formatClockMinutes(totalMinutes: number): string {
+    const normalized = ((totalMinutes % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+    const hours = Math.floor(normalized / 60);
+    const minutes = normalized % 60;
+    return `${hours}:${minutes.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Story 4.2 AC: the work band renders as "una sola fila agrupada con su
+ * rango horario" — `'9:30–14:00'`. Nothing in T-01 formatted a *range*
+ * before this (`TdahActivityRow` prints the bare `startTime` and the
+ * duration as a separate "{n} min" chip), so the band gets its own pure
+ * helper here rather than a second ad-hoc formatting site inside a
+ * component.
+ *
+ * Returns just the start (`'9:30'`) when there is no usable duration — a
+ * `null` or `0` `durationMinutes` (both read as "no duration given", the
+ * same convention `computeActivityLayout` and `TdahActivityRow` already
+ * use), never a fabricated `'9:30–9:30'`. Returns `null` for a `null` or
+ * unparseable `startTime`, so the caller drops the range segment entirely
+ * instead of printing a placeholder — the identical fallback contract
+ * `computeActivityLayout` uses for the same inputs.
+ *
+ * The end is taken modulo 24 h, so a band whose end crosses midnight reads
+ * as a real wall-clock time rather than `25:30`.
+ */
+export function formatActivityTimeRange(startTime: string | null, durationMinutes: number | null): string | null {
+    if (startTime === null) return null;
+    const startMinutes = parseHHMMToMinutes(startTime);
+    if (startMinutes === null) return null;
+    const start = formatClockMinutes(startMinutes);
+    if (durationMinutes === null || durationMinutes <= 0) return start;
+    return `${start}–${formatClockMinutes(startMinutes + durationMinutes)}`;
+}
+
 /** Horizontal inset applied per overlap lane — narrow lanes, no full column machinery. */
 export const TDAH_TIMELINE_LANE_OFFSET_PX = 28;
 

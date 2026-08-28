@@ -1683,6 +1683,13 @@ export const ptOverrides: Record<string, string> = {
         'tdahToday.decisionCompleteLate': 'Concluir (atrasado)',
         'tdahToday.limboSelectionCount': '{count} selecionado(s)',
         'tdahToday.limboBatchApply': 'Aplicar à seleção',
+        'tdahToday.workBandTasks': '{count} tarefas',
+        'tdahToday.workBandExpandLabel': 'Mostrar as tarefas desta faixa de trabalho',
+        'tdahToday.workBandCollapseLabel': 'Ocultar as tarefas desta faixa de trabalho',
+        'tdahToday.workBandReadOnly': 'Somente leitura — o registro de trabalho vive no Jira',
+        'tdahToday.workBandItemsEmpty': 'A lista de tarefas ainda não foi sincronizada.',
+        'tdahToday.workBandNotificationTitle': 'Sprint: {count} tarefas atribuídas pendentes',
+        'tdahToday.workBandNotificationBody': 'A sua faixa de trabalho começa agora.',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Rotina',
@@ -1707,6 +1714,7 @@ export const ptOverrides: Record<string, string> = {
         'tdahActivity.alreadyRegistered': 'Já registrada',
         'tdahActivity.errorGeneric': 'Não foi possível concluir a ação. Tente novamente.',
         'tdahActivity.actionOfflineMessage': 'Sem conexão com a internet. A ação não foi registrada.',
+        'tdahActivity.errorReadOnly': 'Esta faixa de trabalho é somente leitura: o registro dela vive no Jira.',
         'tdahActivity.routineContext': 'Parte da Rotina {name}',
 
         // tdahRoutines.* — Rotinas: lista CRUD + editor

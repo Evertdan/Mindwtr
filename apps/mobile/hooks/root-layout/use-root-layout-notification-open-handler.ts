@@ -72,6 +72,21 @@ function isTdahRitualOpen(kind: string | undefined): boolean {
     return kind === 'tdah-ritual';
 }
 
+// Story 4.2 ("La franja laboral en mi día"): a tap on N-04, the work-band
+// notification. Doc 02's N-04 action is "Ver → abre T-01 con la franja
+// expandida", so this routes to T-01 — never to T-02, which is the *personal*
+// Activity detail and has no business editing a read-only band — and carries
+// the band's own Activity id in a `workBandId` param TdahTodayScreen reads to
+// start that row expanded. The id rides in `context` for the same reason
+// tdah-activity's does (see isTdahActivityOpen above): it is the one generic
+// passthrough field the native->JS open-payload allowlist already forwards
+// end-to-end. An id that fails `parseTdahActivityId` still opens T-01, just
+// unexpanded (spec I/O matrix: "Deep-link inválido → T-01 sin expandir") —
+// a work band the user can see beats a swallowed tap.
+function isTdahWorkBandOpen(kind: string | undefined): boolean {
+    return kind === 'tdah-work-band';
+}
+
 export function useRootLayoutNotificationOpenHandler({
     appReady,
     pathname,
@@ -184,6 +199,15 @@ export function useRootLayoutNotificationOpenHandler({
         }
         if (isTdahRitualOpen(kind)) {
             router.push('/tdah-ritual');
+            return;
+        }
+        if (isTdahWorkBandOpen(kind)) {
+            const workBandId = parseTdahActivityId(context);
+            if (workBandId === null) {
+                router.push('/tdah-today');
+                return;
+            }
+            router.push({ pathname: '/tdah-today', params: { workBandId: String(workBandId) } });
             return;
         }
     }, [router]);

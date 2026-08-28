@@ -2446,6 +2446,13 @@ export const viOverrides: Record<string, string> = {
         'tdahToday.decisionCompleteLate': 'Hoàn tất (trễ)',
         'tdahToday.limboSelectionCount': '{count} đã chọn',
         'tdahToday.limboBatchApply': 'Áp dụng cho lựa chọn',
+        'tdahToday.workBandTasks': '{count} công việc',
+        'tdahToday.workBandExpandLabel': 'Hiện các công việc trong dải công việc này',
+        'tdahToday.workBandCollapseLabel': 'Ẩn các công việc trong dải công việc này',
+        'tdahToday.workBandReadOnly': 'Chỉ đọc — nhật ký công việc nằm trong Jira',
+        'tdahToday.workBandItemsEmpty': 'Danh sách công việc chưa được đồng bộ.',
+        'tdahToday.workBandNotificationTitle': 'Sprint: {count} công việc được giao đang chờ',
+        'tdahToday.workBandNotificationBody': 'Dải công việc của bạn bắt đầu ngay bây giờ.',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Thói quen',
@@ -2470,6 +2477,7 @@ export const viOverrides: Record<string, string> = {
         'tdahActivity.alreadyRegistered': 'Đã ghi nhận',
         'tdahActivity.errorGeneric': 'Không thể hoàn tất thao tác. Hãy thử lại.',
         'tdahActivity.actionOfflineMessage': 'Không có kết nối internet. Thao tác chưa được ghi nhận.',
+        'tdahActivity.errorReadOnly': 'Dải công việc này chỉ đọc: nhật ký của nó nằm trong Jira.',
         'tdahActivity.routineContext': 'Một phần của Thói quen {name}',
 
         // tdahRoutines.* — T-03/T-04 (spec 1.4): Rutinas CRUD list + editor

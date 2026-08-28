@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { addNetworkStateListener } from 'expo-network';
 import { Moon, Plus } from 'lucide-react-native';
 
@@ -27,6 +27,7 @@ import {
 import { TdahActivityRow } from './TdahActivityRow';
 import { TdahConnectionDot } from './TdahConnectionDot';
 import { TdahNowLine } from './TdahNowLine';
+import { TdahWorkBandRow } from './TdahWorkBandRow';
 import { findCurrentActivityId } from './tdah-current-activity';
 import {
     styles,
@@ -82,7 +83,13 @@ export function TdahTodayScreen() {
     const filledButton = useFilledButtonColors();
     const { t } = useLanguage();
     const router = useRouter();
-    const { phase, date, timeZone, routineTitle, activities, reload } = useTdahToday();
+    // Story 4.2: N-04's tap routes here with the band's Activity id
+    // (`use-root-layout-notification-open-handler.ts`), and the band starts
+    // expanded. An absent/garbage param simply means "no band pre-expanded"
+    // (spec I/O matrix: "Deep-link inválido → T-01 sin expandir").
+    const { workBandId } = useLocalSearchParams<{ workBandId?: string }>();
+    const deepLinkedWorkBandId = typeof workBandId === 'string' ? Number(workBandId) : Number.NaN;
+    const { phase, date, timeZone, routineTitle, activities, workOriginErrorCode, reload } = useTdahToday();
     const now = useTdahNow();
     // Story 3.4 (T-08's limbo-badge, spec Code Map): a second, independent
     // `useTdahLimbo()` instance for the live count alone — never merged into
@@ -262,8 +269,15 @@ export function TdahTodayScreen() {
     const timedActivities = activities.filter((activity) => activity.startTime !== null);
     const noTimeActivities = activities.filter((activity) => activity.startTime === null);
     const laneOffsets = computeActivityLaneOffsets(activities);
+    // Story 4.2: the band is excluded from the "vigente" search entirely. It
+    // is a multi-hour window that contains "now" for most of the working day,
+    // and `findCurrentActivityId`'s last-match-wins rule would let it steal
+    // the emphasis from the personal Activity the user is actually in — while
+    // the band itself never renders the emphasis anyway (it is not a
+    // TdahActivityRow). Filtered here rather than inside
+    // `findCurrentActivityId`, which is outside this story's owned files.
     const currentActivityId = findCurrentActivityId(
-        activities,
+        activities.filter((activity) => activity.origin !== 'jira'),
         getMinutesSinceMidnightInTimeZone(now, timeZone),
     );
 
@@ -479,13 +493,31 @@ export function TdahTodayScreen() {
                             })}
                             <TdahNowLine timeZone={timeZone} />
                             {timedActivities.map((activity) => (
-                                <TdahActivityRow
-                                    key={activity.id}
-                                    activity={activity}
-                                    onPress={openActivity}
-                                    isCurrent={activity.id === currentActivityId}
-                                    laneIndex={laneOffsets.get(activity.id) ?? 0}
-                                />
+                                // Story 4.2: the Jira work band is an ordinary
+                                // Activity on the wire but never an ordinary
+                                // row on screen — it is grouped, expandable and
+                                // read-only, and it must never route into T-02's
+                                // registration surface. Routing by `origin` here
+                                // (rather than filtering it out of `activities`)
+                                // keeps it in the same timeline, ordering and
+                                // overlap-lane machinery as everything else.
+                                activity.origin === 'jira' ? (
+                                    <TdahWorkBandRow
+                                        key={activity.id}
+                                        activity={activity}
+                                        workOriginErrorCode={workOriginErrorCode}
+                                        defaultExpanded={activity.id === deepLinkedWorkBandId}
+                                        laneIndex={laneOffsets.get(activity.id) ?? 0}
+                                    />
+                                ) : (
+                                    <TdahActivityRow
+                                        key={activity.id}
+                                        activity={activity}
+                                        onPress={openActivity}
+                                        isCurrent={activity.id === currentActivityId}
+                                        laneIndex={laneOffsets.get(activity.id) ?? 0}
+                                    />
+                                )
                             ))}
                         </View>
                         {noTimeActivities.length > 0 ? (
@@ -494,7 +526,22 @@ export function TdahTodayScreen() {
                                     {tFallback(t, 'tdahToday.noTime', 'No time')}
                                 </Text>
                                 {noTimeActivities.map((activity) => (
-                                    <TdahActivityRow key={activity.id} activity={activity} onPress={openActivity} />
+                                    // Defensive only: the server always gives
+                                    // the band a `startTime` (it is derived
+                                    // from the working window), so it never
+                                    // actually lands here — but a band that
+                                    // somehow did must still never render as an
+                                    // editable, tappable personal Activity.
+                                    activity.origin === 'jira' ? (
+                                        <TdahWorkBandRow
+                                            key={activity.id}
+                                            activity={activity}
+                                            workOriginErrorCode={workOriginErrorCode}
+                                            defaultExpanded={activity.id === deepLinkedWorkBandId}
+                                        />
+                                    ) : (
+                                        <TdahActivityRow key={activity.id} activity={activity} onPress={openActivity} />
+                                    )
                                 ))}
                             </View>
                         ) : null}

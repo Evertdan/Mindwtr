@@ -406,6 +406,24 @@ function TdahActivityViewMode({
                     {stateLabel}
                 </Text>
 
+                {activity.origin === 'jira' ? (
+                    // Story 4.2 (doc 02's T-02 "Jira: campos bloqueados +
+                    // aviso 'solo lectura'"): T-02 already renders
+                    // hora/duración as plain read-only text for every origin
+                    // and offers no deletion at all, so there is nothing to
+                    // hide here — what was missing was the band saying *why*
+                    // it can't be edited. The three registration actions below
+                    // stay available on purpose: marking the band attended is
+                    // a local alert record, and it never writes to Jira
+                    // (FR-11 — Mindwtr has no Jira write path).
+                    <Text
+                        style={[styles.routineContext, { color: tc.secondaryText }]}
+                        testID="tdah-activity-read-only-notice"
+                    >
+                        {tFallback(t, 'tdahToday.workBandReadOnly', 'Read-only — work logging lives in Jira')}
+                    </Text>
+                ) : null}
+
                 <View style={styles.fieldGroup}>
                     <Text style={[styles.fieldLabel, { color: tc.text }]}>
                         {tFallback(t, 'tdahActivity.startTimeLabel', 'Time (optional)')}

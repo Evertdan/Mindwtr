@@ -374,6 +374,36 @@ describe('TdahMorningScreen — draft rows', () => {
         expect(hookState.deleteDraftActivity).toHaveBeenCalledWith(1);
     });
 
+    // Story 4.2, the middle read-only layer: T-06 stops offering deletion and
+    // hora/duración editing on a jira-origin row (the server rejects a
+    // confirm body carrying it with TDAH_ORIGIN_READ_ONLY, so an affordance
+    // here could only ever fail) and says why instead.
+    describe('a jira-origin work band in the draft (story 4.2)', () => {
+        it('offers no delete affordance', async () => {
+            const { row } = await renderRow(activity({ origin: 'jira', title: 'Sprint' }));
+            expect(row.root.findAllByProps({ testID: 'tdah-morning-row-1-delete' })).toHaveLength(0);
+        });
+
+        it('offers no hora/duración inputs', async () => {
+            const { row } = await renderRow(activity({ origin: 'jira', title: 'Sprint' }));
+            expect(row.root.findAllByProps({ testID: 'tdah-morning-row-1-time' })).toHaveLength(0);
+            expect(row.root.findAllByProps({ testID: 'tdah-morning-row-1-duration' })).toHaveLength(0);
+        });
+
+        it('shows the persistent read-only notice in their place', async () => {
+            const { row } = await renderRow(activity({ origin: 'jira', title: 'Sprint' }));
+            const notice = row.root.findByProps({ testID: 'tdah-morning-row-1-read-only' });
+            expect(notice.props.children).toBe('Read-only — work logging lives in Jira');
+        });
+
+        it('leaves every non-jira row fully editable and deletable', async () => {
+            const { row } = await renderRow(activity({ origin: 'routine' }));
+            expect(row.root.findAllByProps({ testID: 'tdah-morning-row-1-delete' }).length).toBeGreaterThan(0);
+            expect(row.root.findAllByProps({ testID: 'tdah-morning-row-1-time' }).length).toBeGreaterThan(0);
+            expect(row.root.findAllByProps({ testID: 'tdah-morning-row-1-read-only' })).toHaveLength(0);
+        });
+    });
+
     it('calls reorderDraft with the drop indices on DraggableFlatList onDragEnd', async () => {
         hookState.draftActivities = [activity({ id: 1 }), activity({ id: 2 })];
         let tree: ReturnType<typeof create> | undefined;

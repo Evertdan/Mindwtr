@@ -349,6 +349,50 @@ describe('useTdahMorning', () => {
             expect(latest?.draftActivities.map((a) => a.id)).toEqual([2, 3]);
         });
 
+        // Story 4.2 — the payload half of the read-only band. The display
+        // guard in TdahMorningScreen and this filter have to agree: if the
+        // band ever reaches the request body, the server answers 409
+        // TDAH_ORIGIN_READ_ONLY and the user's whole legitimate confirmation
+        // dies with nothing written. Asserted here rather than at the screen,
+        // because the screen never sees the body.
+        it('never sends the read-only Jira band in the confirm payload, and does not count it as a change', async () => {
+            cloudGetJson.mockResolvedValue({
+                date: '2026-08-28', timeZone: 'UTC', routineTitle: null,
+                activities: [
+                    activity({ id: 1, title: 'A', startTime: '08:00' }),
+                    activity({ id: 7, title: 'Sprint', origin: 'jira', startTime: '09:00', durationMinutes: 540 }),
+                    activity({ id: 2, title: 'B', startTime: '14:00' }),
+                ],
+                confirmedAt: null,
+            });
+            await act(async () => { await latest?.reload(); });
+            // The band is still part of the draft the user SEES...
+            expect(latest?.draftActivities.map((a) => a.id)).toEqual([1, 7, 2]);
+
+            cloudRequestJson.mockResolvedValue({
+                date: '2026-08-28', timeZone: 'UTC', routineTitle: null,
+                activities: latest?.draftActivities ?? [],
+                confirmedAt: '2026-08-27T22:00:00.000Z',
+            });
+            let outcome: { changesCount: number } | undefined;
+            await act(async () => { outcome = await latest?.confirmMorning(); });
+
+            // ...but never part of what is SENT.
+            expect(cloudRequestJson).toHaveBeenCalledWith(
+                'POST',
+                'https://sync.example.com/v1/tdah/day/tomorrow/confirm',
+                {
+                    activities: [
+                        { id: 1, startTime: '08:00', durationMinutes: 30 },
+                        { id: 2, startTime: '14:00', durationMinutes: 30 },
+                    ],
+                    deletedActivityIds: [],
+                },
+                expect.objectContaining({ token: CLOUD_TOKEN }),
+            );
+            expect(outcome?.changesCount).toBe(0);
+        });
+
         it('counts a manual addition made this session toward changesCount', async () => {
             cloudRequestJson.mockResolvedValueOnce({ activity: activity({ id: 9, origin: 'manual', title: 'Nueva' }) });
             await act(async () => { await latest?.addManualActivity({ title: 'Nueva' }); });

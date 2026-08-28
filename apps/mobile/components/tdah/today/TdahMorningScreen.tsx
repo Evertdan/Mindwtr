@@ -115,6 +115,33 @@ function MorningActivityRow({ activity, routineTitle, onDrag, isActive, onCommit
             ? formatI18nTemplate(tFallback(t, 'tdahActivity.routineContext', 'Part of Routine {name}'), { name: routineTitle })
             : null);
 
+    // Story 4.2, the middle of the three read-only layers (spec Design Notes:
+    // "Cerrar la mitad blanda de 'solo lectura'"): T-06 stops offering
+    // deletion and hora/duración editing on a jira-origin row and says why
+    // instead. The server closes the same door from behind
+    // (`SELECT_ELIGIBLE_MORNING_ACTIVITY_IDS_SQL` excludes `origin='jira'`, so
+    // a confirm body carrying the band is rejected with
+    // `TDAH_ORIGIN_READ_ONLY`) — this is the half that keeps the user from
+    // reaching for an affordance that could only ever fail.
+    const isReadOnlyBand = activity.origin === 'jira';
+
+    if (isReadOnlyBand) {
+        return (
+            <View
+                style={[morningStyles.row, { borderColor: tc.border, backgroundColor: tc.cardBg }]}
+                testID={`tdah-morning-row-${activity.id}`}
+            >
+                <Text style={[morningStyles.rowTitle, { color: tc.text }]} numberOfLines={2}>{activity.title}</Text>
+                <Text
+                    style={[morningStyles.rowBadge, { color: tc.secondaryText }]}
+                    testID={`tdah-morning-row-${activity.id}-read-only`}
+                >
+                    {tFallback(t, 'tdahToday.workBandReadOnly', 'Read-only — work logging lives in Jira')}
+                </Text>
+            </View>
+        );
+    }
+
     return (
         <TouchableOpacity
             accessibilityRole="button"

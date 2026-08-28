@@ -2207,6 +2207,13 @@ export const frOverrides: Record<string, string> = {
         'tdahToday.decisionCompleteLate': 'Terminer (en retard)',
         'tdahToday.limboSelectionCount': '{count} sélectionné(s)',
         'tdahToday.limboBatchApply': 'Appliquer à la sélection',
+        'tdahToday.workBandTasks': '{count} tâches',
+        'tdahToday.workBandExpandLabel': 'Afficher les tâches de cette plage de travail',
+        'tdahToday.workBandCollapseLabel': 'Masquer les tâches de cette plage de travail',
+        'tdahToday.workBandReadOnly': 'Lecture seule — le suivi du travail vit dans Jira',
+        'tdahToday.workBandItemsEmpty': 'La liste des tâches n’a pas encore été synchronisée.',
+        'tdahToday.workBandNotificationTitle': 'Sprint : {count} tâches assignées en attente',
+        'tdahToday.workBandNotificationBody': 'Votre plage de travail commence maintenant.',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Routine',
@@ -2231,6 +2238,7 @@ export const frOverrides: Record<string, string> = {
         'tdahActivity.alreadyRegistered': 'Déjà enregistrée',
         'tdahActivity.errorGeneric': 'Impossible d’effectuer l’action. Réessayez.',
         'tdahActivity.actionOfflineMessage': 'Pas de connexion Internet. L’action n’a pas été enregistrée.',
+        'tdahActivity.errorReadOnly': 'Cette plage de travail est en lecture seule : son suivi vit dans Jira.',
         'tdahActivity.routineContext': 'Fait partie de la Routine {name}',
 
         // TDAH Routines

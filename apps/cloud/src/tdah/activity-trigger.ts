@@ -20,6 +20,18 @@
  * si la Actividad sigue sin marca de notificado — ningún disparo se pierde
  * silenciosamente por más de un ciclo de reconexión."
  *
+ * Story 4.2 adds N-04, the grouped Jira work band's single notification, onto
+ * this exact same tick — deliberately NOT a fourth `setInterval`. The band is
+ * already a `tdah_activity` row with a `start_time` and a `state`, so this tick
+ * already walks it with the profile's time zone resolved and the correct
+ * connection gate; mounting N-04 here reuses the dedupe column
+ * (`start_notified_at`), the latency and the audit line for free. The only
+ * surgery needed was negative: `origin = 'jira'` is now excluded from the
+ * N-01/N-02 candidate query (storage.ts), because the band used to match it and
+ * fire BOTH a start and an end notification — the per-band avalanche FR-11
+ * forbids. The band fires exactly one `work-band` event at its start, and
+ * nothing at its end.
+ *
  * `hasOpenConnection` is injected as a plain predicate rather than this file
  * importing `ws-channel.ts`'s real connection registry directly, so the tick
  * stays testable with a fake predicate — no real socket, port, or process
@@ -33,15 +45,18 @@ import { computeLocalTimeOfDay } from './scheduler';
 import {
     formatDateInTimeZone,
     hasDueActivityTriggers,
+    hasDueWorkBandTrigger,
     listActiveTdahNamespaces,
     mutateMarkDueActivityTriggersNotified,
+    mutateMarkDueWorkBandNotified,
     readTdahProfile,
     tdahDatabasePath,
     withReadDatabase,
     withWriteTransaction,
     type TdahActivityTriggerFire,
+    type TdahWorkBandTriggerFire,
 } from './storage';
-import type { TdahActivityTriggerTickSummary, TdahWsActivityTriggerEvent } from './types';
+import type { TdahActivityTriggerTickSummary, TdahWsActivityTriggerEvent, TdahWsWorkBandEvent } from './types';
 
 /**
  * Builds the ready-to-send WS event from one persisted-and-marked fire —
@@ -58,9 +73,26 @@ export const buildTdahActivityTriggerEvent = (fire: TdahActivityTriggerFire, now
     at: now.toISOString(),
 });
 
+/**
+ * Story 4.2 — N-04's ready-to-send event, the exact counterpart of
+ * `buildTdahActivityTriggerEvent` above. One per band, at its start, ever: the
+ * band is excluded from the N-01/N-02 candidate query, so it can never also
+ * produce a start and an end `activity-trigger`, and there is deliberately no
+ * end-of-band event at all.
+ */
+export const buildTdahWorkBandEvent = (fire: TdahWorkBandTriggerFire, now: Date): TdahWsWorkBandEvent => ({
+    kind: 'work-band',
+    activityId: fire.id,
+    title: fire.title,
+    startTime: fire.startTime,
+    durationMinutes: fire.durationMinutes,
+    itemCount: fire.itemCount,
+    at: now.toISOString(),
+});
+
 type NamespaceActivityTriggerOutcome =
     | { kind: 'skipped' }
-    | { kind: 'fired'; events: TdahWsActivityTriggerEvent[] }
+    | { kind: 'fired'; events: TdahWsActivityTriggerEvent[]; workBandEvents: TdahWsWorkBandEvent[] }
     | { kind: 'failed'; code: string };
 
 /**
@@ -96,23 +128,36 @@ const runNamespaceActivityTriggerTick = async (
         // check: a read-only pass serves the overwhelming-majority case
         // (nothing due yet), and only a namespace with a real milestone to
         // fire pays for a write transaction.
+        //
+        // Story 4.2 — the work band rides the SAME read, the same `today`/
+        // `nowTimeOfDay`, the same `hasOpenConnection` gate (the one that
+        // deliberately marks nothing when there is no socket, so a reconnect
+        // inside the same local day still delivers N-04) and the same write
+        // transaction. That is the whole reason N-04 lives here and not in a
+        // fourth `setInterval`.
         const needsWrite = await withReadDatabase(databasePath, (database) => (
             hasDueActivityTriggers(database, today, nowTimeOfDay)
+            || hasDueWorkBandTrigger(database, today, nowTimeOfDay)
         ));
         if (!needsWrite) {
             return { kind: 'skipped' };
         }
 
-        const fires = await withWriteTransaction(databasePath, (database) => (
-            mutateMarkDueActivityTriggersNotified(database, today, nowTimeOfDay, now.toISOString())
-        ));
-        if (fires.length === 0) {
+        const marked = await withWriteTransaction(databasePath, (database) => ({
+            fires: mutateMarkDueActivityTriggersNotified(database, today, nowTimeOfDay, now.toISOString()),
+            bandFires: mutateMarkDueWorkBandNotified(database, today, nowTimeOfDay, now.toISOString()),
+        }));
+        if (marked.fires.length === 0 && marked.bandFires.length === 0) {
             // Lost the race against another read between the pre-check and
             // the write transaction (e.g. a previous tick already marked
             // it) — not a failure, just nothing left to report.
             return { kind: 'skipped' };
         }
-        return { kind: 'fired', events: fires.map((fire) => buildTdahActivityTriggerEvent(fire, now)) };
+        return {
+            kind: 'fired',
+            events: marked.fires.map((fire) => buildTdahActivityTriggerEvent(fire, now)),
+            workBandEvents: marked.bandFires.map((fire) => buildTdahWorkBandEvent(fire, now)),
+        };
     } catch (error) {
         return { kind: 'failed', code: getFsErrorCode(error) };
     }
@@ -137,12 +182,19 @@ const runNamespaceActivityTriggerTick = async (
  * left in this same tick's `for` loop; this is the actual per-namespace
  * isolation the rest of this function's own doc comment above claims,
  * mirroring `scheduler.ts`'s `runNightlyTdahTick`.
+ *
+ * `onWorkBandFire` (story 4.2) is N-04's own sink, kept SEPARATE from `onFire`
+ * rather than widening it to a union — the same split `scheduler.ts` already
+ * draws between `hasOpenConnection` and `onRitualInvitationFire`. It is
+ * optional (defaulting to a no-op) so a caller that only cares about N-01/N-02
+ * keeps working unchanged; `server.ts`'s real 15s timer supplies both.
  */
 export async function runActivityTriggerTick(
     dataDir: string,
     now: Date,
     hasOpenConnection: (key: string) => boolean,
     onFire: (key: string, event: TdahWsActivityTriggerEvent) => void,
+    onWorkBandFire: (key: string, event: TdahWsWorkBandEvent) => void = () => {},
 ): Promise<TdahActivityTriggerTickSummary> {
     const namespaces = listActiveTdahNamespaces(dataDir);
     const summary: TdahActivityTriggerTickSummary = {
@@ -150,6 +202,7 @@ export async function runActivityTriggerTick(
         namespaceCount: namespaces.length,
         firedNamespaceCount: 0,
         firedEventCount: 0,
+        firedWorkBandCount: 0,
         skippedCount: 0,
         failedCount: 0,
     };
@@ -161,6 +214,7 @@ export async function runActivityTriggerTick(
         } else if (outcome.kind === 'fired') {
             summary.firedNamespaceCount += 1;
             summary.firedEventCount += outcome.events.length;
+            summary.firedWorkBandCount += outcome.workBandEvents.length;
             for (const event of outcome.events) {
                 try {
                     onFire(key, event);
@@ -170,6 +224,21 @@ export async function runActivityTriggerTick(
                     // the push itself failed, so this is logged and skipped,
                     // never rethrown, never a reason to abort the remaining
                     // events or namespaces in this tick.
+                    logError('tdah activity trigger onFire failed', {
+                        failureClass: 'runtime',
+                        failureCode: 'tdah_activity_trigger_onfire_failed',
+                        failureErrno: getFsErrorCode(error),
+                    });
+                }
+            }
+            for (const event of outcome.workBandEvents) {
+                try {
+                    onWorkBandFire(key, event);
+                } catch (error) {
+                    // Identical contract to `onFire` above: the band's
+                    // `start_notified_at` seal is already durable, so a failed
+                    // push is logged and dropped — never retried, since a retry
+                    // would be the second notification FR-11 forbids.
                     logError('tdah activity trigger onFire failed', {
                         failureClass: 'runtime',
                         failureCode: 'tdah_activity_trigger_onfire_failed',

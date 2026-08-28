@@ -295,6 +295,46 @@ describe('useRootLayoutNotificationOpenHandler', () => {
     expect(setHighlightTask).not.toHaveBeenCalled();
   });
 
+  it("routes story 4.2's 'tdah-work-band' kind (N-04's tap) to T-01 with the band id, so the franja opens already expanded", () => {
+    const router = { push: vi.fn() };
+
+    act(() => {
+      create(<TestHarness router={router} />);
+    });
+
+    const handler = setNotificationOpenHandler.mock.calls[0]?.[0];
+
+    act(() => {
+      handler({ kind: 'tdah-work-band', context: '91', notificationId: 'tdah-work-band:91' });
+    });
+
+    expect(router.push).toHaveBeenCalledWith({ pathname: '/tdah-today', params: { workBandId: '91' } });
+    expect(updateTask).not.toHaveBeenCalled();
+    expect(setHighlightTask).not.toHaveBeenCalled();
+  });
+
+  it("still opens T-01 — just not expanded — when the 'tdah-work-band' context is missing or not a valid activity id", () => {
+    const router = { push: vi.fn() };
+
+    act(() => {
+      create(<TestHarness router={router} />);
+    });
+
+    const handler = setNotificationOpenHandler.mock.calls[0]?.[0];
+
+    act(() => {
+      handler({ kind: 'tdah-work-band', notificationId: 'tdah-work-band:missing' });
+      handler({ kind: 'tdah-work-band', context: 'not-a-number', notificationId: 'tdah-work-band:nan' });
+      handler({ kind: 'tdah-work-band', context: '0', notificationId: 'tdah-work-band:zero' });
+    });
+
+    expect(router.push).toHaveBeenCalledTimes(3);
+    for (const call of router.push.mock.calls) {
+      expect(call[0]).toBe('/tdah-today');
+    }
+    expect(updateTask).not.toHaveBeenCalled();
+  });
+
   it('waits for app readiness before replaying a pending open from the root path', async () => {
     const router = { push: vi.fn() };
     consumePendingNotificationOpenPayload.mockResolvedValue({

@@ -38,8 +38,13 @@ vi.mock('@/hooks/use-theme-tokens', () => ({
 }));
 
 const router = vi.hoisted(() => ({ push: vi.fn() }));
+// Story 4.2: N-04's deep link reaches T-01 as a `workBandId` route param
+// (use-root-layout-notification-open-handler.ts), which the screen reads to
+// open that band already expanded.
+const searchParams = vi.hoisted(() => ({ current: {} as Record<string, string | undefined> }));
 vi.mock('expo-router', () => ({
     useRouter: () => router,
+    useLocalSearchParams: () => searchParams.current,
 }));
 
 vi.mock('@react-navigation/native', () => ({
@@ -158,6 +163,7 @@ describe('TdahTodayScreen', () => {
         limboHookState.activities = [];
         limboHookState.reload.mockReset();
         themeTokens.roles = null;
+        searchParams.current = {};
         router.push.mockReset();
         networkListeners.length = 0;
         connection.supported = false;
@@ -580,6 +586,103 @@ describe('TdahTodayScreen', () => {
             const label = tree!.root.findByProps({ testID: 'tdah-today-limbo-badge-count' });
             expect(flattenStyle(label.props.style).color).toBe(THEME.tint);
             expect(flattenStyle(label.props.style).color).not.toBe(THEME.danger);
+        });
+    });
+
+    describe('Story 4.2 — the Jira work band inside the timeline', () => {
+        const band: TdahActivity = {
+            id: 91, dayPlanDate: '2026-08-26', blockId: null, title: 'Sprint', startTime: '09:00',
+            durationMinutes: 540, origin: 'jira', state: 'pending', startedAt: null, completedAt: null,
+            workItems: [
+                { externalKey: 'ABC-1', summary: 'Arreglar el login', status: 'In Progress' },
+                { externalKey: 'ABC-2', summary: 'Revisar el informe', status: 'To Do' },
+            ],
+        };
+
+        const renderReady = async (activities: TdahActivity[]) => {
+            hookState.phase = 'ready';
+            hookState.activities = activities;
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+            return tree!;
+        };
+
+        it('routes the jira-origin Activity to the grouped band row, not to an ordinary Activity row', async () => {
+            const tree = await renderReady([activity, band]);
+            expect(tree.root.findAllByProps({ testID: `tdah-work-band-${band.id}` }).length).toBeGreaterThan(0);
+            // The band never renders as an editable, tappable personal row.
+            expect(tree.root.findAllByProps({ testID: `tdah-activity-row-${band.id}` })).toHaveLength(0);
+            // …and the personal Activities beside it are untouched.
+            expect(tree.root.findAllByProps({ testID: `tdah-activity-row-${activity.id}` }).length).toBeGreaterThan(0);
+        });
+
+        // Spec Always: "sin franja no se renderiza nada (estado limpio)" —
+        // no empty slot, no error, for a day with no Origen at all.
+        it('renders no band at all, and no empty placeholder, on a day without one', async () => {
+            const tree = await renderReady([activity]);
+            expect(tree.root.findAllByProps({ testID: `tdah-work-band-${band.id}` })).toHaveLength(0);
+            expect(tree.root.findAll((node) => (
+                typeof node.props?.testID === 'string' && node.props.testID.startsWith('tdah-work-band-')
+            ))).toHaveLength(0);
+        });
+
+        it('starts the band collapsed when no deep link named it', async () => {
+            const tree = await renderReady([band]);
+            expect(tree.root.findAllByProps({ testID: `tdah-work-band-${band.id}-panel` })).toHaveLength(0);
+        });
+
+        // N-04's tap (spec I/O matrix: "Abre T-01 con esa franja ya
+        // expandida").
+        it('opens the band already expanded when the deep link names it', async () => {
+            searchParams.current = { workBandId: String(band.id) };
+            const tree = await renderReady([band]);
+            expect(tree.root.findAllByProps({ testID: `tdah-work-band-${band.id}-panel` }).length).toBeGreaterThan(0);
+        });
+
+        it('leaves the band collapsed for an invalid deep link rather than failing the screen', async () => {
+            searchParams.current = { workBandId: 'not-a-number' };
+            const tree = await renderReady([band]);
+            expect(tree.root.findAllByProps({ testID: `tdah-work-band-${band.id}` }).length).toBeGreaterThan(0);
+            expect(tree.root.findAllByProps({ testID: `tdah-work-band-${band.id}-panel` })).toHaveLength(0);
+        });
+
+        it('leaves the band collapsed when the deep link names a different band', async () => {
+            searchParams.current = { workBandId: '404' };
+            const tree = await renderReady([band]);
+            expect(tree.root.findAllByProps({ testID: `tdah-work-band-${band.id}-panel` })).toHaveLength(0);
+        });
+
+        it('propagates workOriginErrorCode to the band so a degraded pull is announced on it', async () => {
+            (hookState as { workOriginErrorCode?: string | null }).workOriginErrorCode = 'TDAH_ORIGIN_CREDENTIALS_INVALID';
+            try {
+                const tree = await renderReady([band]);
+                expect(tree.root.findAllByProps({ testID: `tdah-work-band-${band.id}-degraded` }).length).toBeGreaterThan(0);
+            } finally {
+                delete (hookState as { workOriginErrorCode?: string | null }).workOriginErrorCode;
+            }
+        });
+
+        // The band is a multi-hour window that contains "now" for most of the
+        // working day; letting it win the "vigente" search would strip the
+        // emphasis off the personal Activity the user is actually in.
+        it('never lets the band claim the "vigente" emphasis away from a personal Activity', async () => {
+            // 15:40Z is 09:40 in America/Mexico_City (the fixture's profile
+            // zone, UTC-6 year-round), inside the 09:30+30min Activity.
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2026-08-26T15:40:00.000Z'));
+            try {
+                // A band that spans the whole day and is ordered *after* the
+                // personal Activity — exactly the shape that would win
+                // findCurrentActivityId's last-match-wins rule.
+                const wideBand: TdahActivity = { ...band, startTime: '00:00', durationMinutes: 1439 };
+                const tree = await renderReady([activity, wideBand]);
+                const row = tree.root.findAllByProps({ testID: `tdah-activity-row-${activity.id}` })[0];
+                const rowStyle = flattenStyle(row.props.style);
+                expect(rowStyle.backgroundColor).toBe(THEME.taskItemBg);
+                expect(rowStyle.borderColor).toBe(THEME.tint);
+            } finally {
+                vi.useRealTimers();
+            }
         });
     });
 });

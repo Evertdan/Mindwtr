@@ -107,7 +107,12 @@ import {
 } from './server-calendar-feed';
 import { TDAH_PATH_PREFIX, handleTdahRequest, runNightlyTdahTick, runWorkOriginPullTick, type WorkOriginFetch } from './tdah';
 import { runActivityTriggerTick } from './tdah/activity-trigger';
-import { TDAH_ERRORS, type TdahWsActivityTriggerEvent, type TdahWsRitualInvitationEvent } from './tdah/types';
+import {
+    TDAH_ERRORS,
+    type TdahWsActivityTriggerEvent,
+    type TdahWsRitualInvitationEvent,
+    type TdahWsWorkBandEvent,
+} from './tdah/types';
 import {
     buildTdahWsConnectedEvent,
     createTdahWsConnectionRegistry,
@@ -1054,15 +1059,26 @@ export async function runTdahActivityTriggerIntervalTick(
     dataDir: string,
     hasOpenConnection: (key: string) => boolean,
     onFire: (key: string, event: TdahWsActivityTriggerEvent) => void,
+    // Story 4.2 — REQUIRED, deliberately: `runActivityTriggerTick` seals
+    // `start_notified_at` inside its write transaction whether or not a sink
+    // consumes the event, so an omitted sink loses N-04 permanently for that
+    // local day while still logging `firedWorkBandCount: 1`. Making the
+    // parameter required puts that contract on the compiler instead of on a
+    // reviewer noticing a missing argument.
+    onWorkBandFire: (key: string, event: TdahWsWorkBandEvent) => void,
 ): Promise<void> {
     try {
-        const summary = await runActivityTriggerTick(dataDir, new Date(), hasOpenConnection, onFire);
-        if (summary.firedEventCount > 0 || summary.failedCount > 0) {
+        const summary = await runActivityTriggerTick(dataDir, new Date(), hasOpenConnection, onFire, onWorkBandFire);
+        // Story 4.2 — `firedWorkBandCount` joins the "did this tick actually do
+        // anything?" gate as well as the context: a tick whose only work was
+        // N-04 must still leave an audit line behind.
+        if (summary.firedEventCount > 0 || summary.firedWorkBandCount > 0 || summary.failedCount > 0) {
             logInfo('tdah activity trigger fired', {
                 date: summary.date,
                 failedCount: summary.failedCount,
                 firedEventCount: summary.firedEventCount,
                 firedNamespaceCount: summary.firedNamespaceCount,
+                firedWorkBandCount: summary.firedWorkBandCount,
                 namespaceCount: summary.namespaceCount,
                 skippedCount: summary.skippedCount,
             });
@@ -1382,15 +1398,20 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
     const tdahActivityTriggerTickTimer = setInterval(() => {
         if (tdahActivityTriggerTickInFlight) return;
         tdahActivityTriggerTickInFlight = true;
+        // Story 4.2 — N-04 rides the same registry and the same envelope as
+        // N-01/N-02; only the event `kind` differs. One helper serves both
+        // sinks so the two pushes cannot drift apart.
+        const pushToNamespace = (key: string, event: TdahWsActivityTriggerEvent | TdahWsWorkBandEvent) => {
+            const payload = JSON.stringify(event);
+            for (const ws of tdahWsRegistry.connectionsFor(key)) {
+                ws.send(payload);
+            }
+        };
         void runTdahActivityTriggerIntervalTick(
             dataDir,
             (key) => tdahWsRegistry.connectionCount(key) > 0,
-            (key, event) => {
-                const payload = JSON.stringify(event);
-                for (const ws of tdahWsRegistry.connectionsFor(key)) {
-                    ws.send(payload);
-                }
-            },
+            pushToNamespace,
+            pushToNamespace,
         ).finally(() => {
             tdahActivityTriggerTickInFlight = false;
         });

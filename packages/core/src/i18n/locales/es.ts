@@ -1570,6 +1570,13 @@ export const esOverrides: Record<string, string> = {
         'tdahToday.decisionCompleteLate': 'Completar tarde',
         'tdahToday.limboSelectionCount': '{count} seleccionadas',
         'tdahToday.limboBatchApply': 'Aplicar a la selección',
+        'tdahToday.workBandTasks': '{count} tareas',
+        'tdahToday.workBandExpandLabel': 'Ver las tareas de esta franja de trabajo',
+        'tdahToday.workBandCollapseLabel': 'Ocultar las tareas de esta franja de trabajo',
+        'tdahToday.workBandReadOnly': 'Solo lectura — el registro laboral vive en Jira',
+        'tdahToday.workBandItemsEmpty': 'La lista de tareas todavía no se sincronizó.',
+        'tdahToday.workBandNotificationTitle': 'Sprint: {count} tareas pendientes asignadas',
+        'tdahToday.workBandNotificationBody': 'Tu franja de trabajo empieza ahora.',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Rutina',
@@ -1594,6 +1601,7 @@ export const esOverrides: Record<string, string> = {
         'tdahActivity.alreadyRegistered': 'Ya registrada',
         'tdahActivity.errorGeneric': 'No se pudo completar la acción. Intentá de nuevo.',
         'tdahActivity.actionOfflineMessage': 'No hay conexión a internet. La acción no se registró.',
+        'tdahActivity.errorReadOnly': 'Esta franja de trabajo es de solo lectura: su registro vive en Jira.',
         'tdahActivity.routineContext': 'Parte de la Rutina {name}',
 
         // tdahRoutines.* — pantallas de lista y editor de Rutinas.

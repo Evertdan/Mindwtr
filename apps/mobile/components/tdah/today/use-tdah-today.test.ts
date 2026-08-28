@@ -138,6 +138,34 @@ describe('useTdahToday', () => {
         );
     });
 
+    // Story 4.2 — the only join between the server's `workOriginErrorCode` and
+    // the band's degradation notice. The server test asserts the field on the
+    // HTTP body and TdahWorkBandRow's test drives the prop directly; without
+    // this one, the hook could drop the field entirely and both ends stay green
+    // while no user ever sees the notice.
+    it('threads workOriginErrorCode from the day response, and reports null when the field is absent or not a string', async () => {
+        cloudGetJson.mockResolvedValue({
+            date: '2026-08-26', timeZone: 'UTC', routineTitle: null, activities: [],
+            workOriginErrorCode: 'TDAH_ORIGIN_CREDENTIALS_INVALID',
+        });
+        await mount();
+        await act(async () => { await latest?.reload(); });
+        expect(latest?.workOriginErrorCode).toBe('TDAH_ORIGIN_CREDENTIALS_INVALID');
+
+        // A healthy last pull sends null; a server that predates the field
+        // sends nothing at all. Both mean "no notice", never a rendered "null".
+        cloudGetJson.mockResolvedValue({
+            date: '2026-08-26', timeZone: 'UTC', routineTitle: null, activities: [],
+            workOriginErrorCode: null,
+        });
+        await act(async () => { await latest?.reload(); });
+        expect(latest?.workOriginErrorCode).toBeNull();
+
+        cloudGetJson.mockResolvedValue({ date: '2026-08-26', timeZone: 'UTC', routineTitle: null, activities: [] });
+        await act(async () => { await latest?.reload(); });
+        expect(latest?.workOriginErrorCode).toBeNull();
+    });
+
     it('falls back to the device time zone when the server response omits timeZone, without failing the fetch', async () => {
         cloudGetJson.mockResolvedValue({ date: '2026-08-26', routineTitle: null, activities: [] });
         await mount();

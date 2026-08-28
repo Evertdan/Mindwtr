@@ -12,6 +12,11 @@ export const allowedEnglishMirrorTerms = [
     // (story 4.1's tdahJira.* copy).
     'Jira',
     'JQL',
+    // The Jira iteration unit, kept in Latin the way 'Jira'/'JQL' are: it is the
+    // name the tool itself shows in every language, and N-04's title
+    // (tdahToday.workBandNotificationTitle, story 4.2) leads with it so the
+    // notification reads the same on a watch face as it does in Jira.
+    'Sprint',
     'OpenAI',
     'Gemini',
     'Anthropic',

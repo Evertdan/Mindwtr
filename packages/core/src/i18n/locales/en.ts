@@ -1194,6 +1194,23 @@ export const en: Record<string, string> = {
         'tdahToday.decisionCompleteLate': 'Complete (late)',
         'tdahToday.limboSelectionCount': '{count} selected',
         'tdahToday.limboBatchApply': 'Apply to selection',
+        // Story 4.2 — the Jira work band inside T-01 (N-04). The band is one
+        // grouped row: a time range, the server's neutral title, and a task
+        // count. Never a per-task hour — Jira issues carry no time of their
+        // own, and inventing one is exactly what FR-11 forbids.
+        'tdahToday.workBandTasks': '{count} tasks',
+        'tdahToday.workBandExpandLabel': 'Show the tasks in this work band',
+        'tdahToday.workBandCollapseLabel': 'Hide the tasks in this work band',
+        // The persistent read-only notice. It is the only thing standing
+        // between the user and the assumption that ticking a row here changes
+        // anything in Jira, so it stays visible the whole time the band is
+        // expanded rather than appearing once and fading.
+        'tdahToday.workBandReadOnly': 'Read-only — work logging lives in Jira',
+        'tdahToday.workBandItemsEmpty': 'The task list has not been synced yet.',
+        // N-04: fires once at band start, count in the title so the watch face
+        // is self-sufficient without opening anything.
+        'tdahToday.workBandNotificationTitle': 'Sprint: {count} pending assigned tasks',
+        'tdahToday.workBandNotificationBody': 'Your work band starts now.',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Routine',
@@ -1221,6 +1238,10 @@ export const en: Record<string, string> = {
         'tdahActivity.alreadyRegistered': 'Already registered',
         'tdahActivity.errorGeneric': 'Could not complete the action. Try again.',
         'tdahActivity.actionOfflineMessage': 'No internet connection. The action was not registered.',
+        // Story 4.2 — the server refuses to edit or delete a jira-origin
+        // Actividad. The client hides those affordances, so this copy only
+        // surfaces if something else reaches the guard.
+        'tdahActivity.errorReadOnly': 'This work band is read-only: its log lives in Jira.',
         'tdahActivity.routineContext': 'Part of Routine {name}',
         'settings.dataSync': "Data & Sync",
         'settings.dataDesc': "Import or export your data to sync with other devices.",

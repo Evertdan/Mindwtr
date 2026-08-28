@@ -896,6 +896,13 @@ const handleGetRoutineConflicts = async (ctx: TdahRequestContext, options: TdahR
  * profile at all, i.e. a namespace that never activated — this must NOT
  * auto-generate DayPlans/Actividades (and must not plant `tdah.sqlite` for a
  * never-activated namespace), so it returns 409 TDAH_ACTIVATE_REQUIRED.
+ *
+ * Story 4.2 — the response body now also carries the grouped Jira band's
+ * read-only sub-rows (`activities[].workItems`, only on the `origin: 'jira'`
+ * row) and the Origen's own `workOriginErrorCode`, both attached by
+ * `selectDayPlanView` (storage.ts). Neither ever carries the sealed credential:
+ * the snapshot table has no token column to read, and the error code is a
+ * stable `TDAH_…` classification, never a raw provider message.
  */
 const handleGetDay = async (ctx: TdahRequestContext, options: TdahRequestOptions): Promise<Response> => {
     try {
@@ -1111,7 +1118,19 @@ const handleConfirmMorning = async (
             return tdahErrorResponse(TDAH_ERRORS.activateRequired, 409);
         }
         const result = await confirmMorning(options.dataDir, ctx.key, confirmRequest, profile.timeZone);
-        if (result.kind === 'rejected') return tdahErrorResponse(TDAH_ERRORS.activityInvalid, 400);
+        if (result.kind === 'rejected') {
+            // Story 4.2 — a body that names the grouped Jira band is not a
+            // malformed request, it is a request for something the module never
+            // allows: the band is read-only on every surface, and the work
+            // record it stands for lives in Jira. 409 (conflict with the
+            // resource's own nature), with its own code, so the client can show
+            // the persistent read-only notice instead of a generic "revisá los
+            // datos".
+            if (result.reason === 'originReadOnly') {
+                return tdahErrorResponse(TDAH_ERRORS.originReadOnly, 409);
+            }
+            return tdahErrorResponse(TDAH_ERRORS.activityInvalid, 400);
+        }
         const responseBody: TdahDayResponse = result.day;
         return jsonResponse(responseBody);
     } catch (error) {

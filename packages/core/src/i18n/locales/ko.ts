@@ -2471,6 +2471,13 @@ export const koOverrides: Record<string, string> = {
         'tdahToday.decisionCompleteLate': '완료 (늦음)',
         'tdahToday.limboSelectionCount': '{count}개 선택됨',
         'tdahToday.limboBatchApply': '선택 항목에 적용',
+        'tdahToday.workBandTasks': '{count}개 작업',
+        'tdahToday.workBandExpandLabel': '이 업무 띠의 작업 보기',
+        'tdahToday.workBandCollapseLabel': '이 업무 띠의 작업 숨기기',
+        'tdahToday.workBandReadOnly': '읽기 전용 — 업무 기록은 Jira에 있습니다',
+        'tdahToday.workBandItemsEmpty': '작업 목록이 아직 동기화되지 않았어요.',
+        'tdahToday.workBandNotificationTitle': 'Sprint: 배정된 미완료 작업 {count}개',
+        'tdahToday.workBandNotificationBody': '업무 띠가 지금 시작됩니다.',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': '루틴',
@@ -2495,6 +2502,7 @@ export const koOverrides: Record<string, string> = {
         'tdahActivity.alreadyRegistered': '이미 등록됨',
         'tdahActivity.errorGeneric': '작업을 완료할 수 없습니다. 다시 시도하세요.',
         'tdahActivity.actionOfflineMessage': '인터넷에 연결되지 않았습니다. 작업이 등록되지 않았습니다.',
+        'tdahActivity.errorReadOnly': '이 업무 띠는 읽기 전용이에요: 기록은 Jira에 있습니다.',
         'tdahActivity.routineContext': '루틴 {name}의 일부',
 
         // tdahRoutines.* — 루틴 목록 및 편집 화면.

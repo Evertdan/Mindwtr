@@ -26,7 +26,7 @@ import { deleteWorkOrigin, readWorkOriginStatus } from './storage';
 import type { WorkOriginFetch } from './work-origin';
 import { createTdahWsConnectionRegistry, resolveTdahWsAuth, TDAH_WS_PATH } from './ws-channel';
 import { createAllowedAuthTokens } from '../server-auth';
-import type { TdahWsActivityTriggerEvent, TdahWsRitualInvitationEvent } from './types';
+import type { TdahWsActivityTriggerEvent, TdahWsRitualInvitationEvent, TdahWsWorkBandEvent } from './types';
 
 const TOKEN_ALPHA = 'tdah-token-alpha-1234567890';
 const TOKEN_BETA = 'tdah-token-beta-1234567890';
@@ -205,6 +205,8 @@ describe('tdah module', () => {
         startedAt: string | null;
         completedAt: string | null;
         movedAt: string | null;
+        // Story 4.2 — only ever present on the `origin: 'jira'` band.
+        workItems?: Array<{ externalKey: string; summary: string; status: string }>;
     };
 
     type TdahTestDay = {
@@ -213,6 +215,9 @@ describe('tdah module', () => {
         routineTitle: string | null;
         confirmedAt: string | null;
         activities: TdahTestActivity[];
+        // Story 4.2 — always present on the wire; optional here only so the
+        // pre-4.2 assertions above keep type-checking untouched.
+        workOriginErrorCode?: string | null;
     };
 
     const readDay = async (response: Response): Promise<TdahTestDay> => (
@@ -5493,6 +5498,7 @@ describe('tdah module', () => {
             // server.ts wires into its own setInterval without needing to
             // fake the clock.
             let onFireCalls = 0;
+            let onWorkBandFireCalls = 0;
             await expect(
                 runTdahActivityTriggerIntervalTick(
                     dataDir,
@@ -5501,9 +5507,15 @@ describe('tdah module', () => {
                         onFireCalls += 1;
                         throw new Error('boom - a send failure must never crash the tick');
                     },
+                    // Story 4.2 — required, so a future edit cannot drop N-04's
+                    // sink and still compile (the tick seals `start_notified_at`
+                    // whether or not anything consumes the event).
+                    () => { onWorkBandFireCalls += 1; },
                 ),
             ).resolves.toBeUndefined();
             expect(onFireCalls).toBeGreaterThan(0);
+            // No Origen is connected here, so there is no band to announce.
+            expect(onWorkBandFireCalls).toBe(0);
         });
 
         test('resolves cleanly with zero namespaces when dataDir has no TDAH database at all (steady-state no-op)', async () => {
@@ -5513,14 +5525,17 @@ describe('tdah module', () => {
             // wrapper's never-throws contract holds trivially here, and no
             // onFire call happens.
             let onFireCalls = 0;
+            let onWorkBandFireCalls = 0;
             await expect(
                 runTdahActivityTriggerIntervalTick(
                     join(dataDir, 'does-not-exist'),
                     () => true,
                     () => { onFireCalls += 1; },
+                    () => { onWorkBandFireCalls += 1; },
                 ),
             ).resolves.toBeUndefined();
             expect(onFireCalls).toBe(0);
+            expect(onWorkBandFireCalls).toBe(0);
         });
     });
 
@@ -6158,12 +6173,15 @@ describe('tdah module', () => {
                 expect(status.issues[0]?.summary).toBe('Arreglar el login');
                 expect(status.issues[0]?.status).toBe('In Progress');
 
-                // Exactly one Actividad, at the start of the band, lasting the
-                // whole window — never one per issue, never an invented hour.
+                // Exactly one Actividad, never one per issue and never an
+                // invented hour. Story 4.2: the band starts when it actually
+                // came into existence (this pull, 10:00) rather than at
+                // `workStart`, so it never claims the hour that already went
+                // by — 10:00-18:00 is 480 minutes, not 540.
                 const bands = (await readActivityRows()).filter((row) => row.origin === 'jira');
                 expect(bands).toHaveLength(1);
-                expect(bands[0]?.start_time).toBe('09:00');
-                expect(bands[0]?.duration_minutes).toBe(540);
+                expect(bands[0]?.start_time).toBe('10:00');
+                expect(bands[0]?.duration_minutes).toBe(480);
                 expect(bands[0]?.state).toBe('pending');
                 expect(bands[0]?.day_plan_date).toBe(formatDateInTimeZone(new Date(), 'UTC'));
                 // The title is DATA: it is written into tdah_activity.title and
@@ -7027,6 +7045,609 @@ describe('tdah module', () => {
                 expect((await runWorkOriginPullTick(dataDir, utcInstant('10:00'), pullFake.fetchImpl)).syncedCount).toBe(1);
                 expect((await readActivityRows()).filter((activity) => activity.origin === 'jira')).toHaveLength(1);
             });
+        });
+    });
+
+    describe('La franja laboral en mi día (story 4.2: N-04 y la franja en Hoy)', () => {
+        // Same fixed operator key + planted/restored env var as the 4.1 block
+        // above: without `MINDWTR_CLOUD_TDAH_ORIGIN_KEY` the Origen fails
+        // closed, so every test that needs a band has to supply one. The
+        // "sin clave" path gets its own explicit test at the bottom.
+        const TEST_ORIGIN_KEY_HEX = '0'.repeat(63) + '1';
+        const JIRA_TOKEN = 'ATATT-super-secret-jira-token-value';
+        const JIRA_SITE = 'https://acme.atlassian.net';
+        const JIRA_EMAIL = 'persona@acme.com';
+
+        let previousOriginKey: string | undefined;
+
+        beforeEach(() => {
+            previousOriginKey = process.env[TDAH_ORIGIN_KEY_ENV_VAR];
+            process.env[TDAH_ORIGIN_KEY_ENV_VAR] = TEST_ORIGIN_KEY_HEX;
+        });
+
+        afterEach(() => {
+            if (previousOriginKey === undefined) {
+                delete process.env[TDAH_ORIGIN_KEY_ENV_VAR];
+            } else {
+                process.env[TDAH_ORIGIN_KEY_ENV_VAR] = previousOriginKey;
+            }
+        });
+
+        const jsonOk = (body: unknown): Response => (
+            new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+        );
+
+        const fakeJira = (
+            respond: (url: string) => Response,
+        ): WorkOriginFetch => async (input) => respond(input);
+
+        /** `/myself` answers 200 and `/search/jql` answers `issues` — the happy path for both calls. */
+        const healthyJira = (issues: Array<{ key: string; summary: string; status: string }>): WorkOriginFetch => (
+            fakeJira((url) => (
+                url.includes('/rest/api/3/myself')
+                    ? jsonOk({ accountId: 'x' })
+                    : jsonOk({
+                        issues: issues.map((issue) => ({
+                            key: issue.key,
+                            fields: { summary: issue.summary, status: { name: issue.status } },
+                        })),
+                    })
+            ))
+        );
+
+        const revokedJira = (): WorkOriginFetch => async () => new Response('nope', { status: 401 });
+
+        const VALID_ORIGIN_BODY = {
+            provider: 'jira',
+            siteUrl: JIRA_SITE,
+            email: JIRA_EMAIL,
+            token: JIRA_TOKEN,
+            workStart: '09:00',
+            workEnd: '18:00',
+            pullIntervalMinutes: 120,
+        };
+
+        const putOrigin = async (
+            body: Record<string, unknown>,
+            fetchImpl: WorkOriginFetch,
+            token: string = TOKEN_ALPHA,
+        ): Promise<void> => {
+            const path = '/v1/tdah/origin';
+            const response = await handleTdahRequest(
+                new Request(`http://localhost${path}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(body),
+                    headers: { 'Content-Type': 'application/json' },
+                }),
+                path,
+                { key: tokenToKey(token) },
+                { dataDir, maxBodyBytes: 200_000, fetchImpl },
+            );
+            expect(response?.status).toBe(200);
+        };
+
+        /** Activates the mode and connects a healthy (issue-free) Origen. */
+        const connectOrigin = async (
+            token: string = TOKEN_ALPHA,
+            body: Record<string, unknown> = VALID_ORIGIN_BODY,
+        ): Promise<void> => {
+            await activate({ timeZone: 'UTC' }, token);
+            await putOrigin(body, healthyJira([]), token);
+        };
+
+        type BandRow = {
+            id: number;
+            day_plan_date: string;
+            title: string;
+            start_time: string | null;
+            duration_minutes: number | null;
+            origin: string;
+            state: string;
+            start_notified_at: string | null;
+            end_notified_at: string | null;
+        };
+
+        const readBandRows = async (token: string = TOKEN_ALPHA): Promise<BandRow[]> => {
+            const { Database } = await import('bun:sqlite');
+            const database = new Database(tdahDatabasePath(dataDir, tokenToKey(token)), { readonly: true });
+            try {
+                return (database.prepare(
+                    'SELECT id, day_plan_date, title, start_time, duration_minutes, origin, state, start_notified_at, end_notified_at FROM tdah_activity ORDER BY id;',
+                ) as unknown as { all(): BandRow[] }).all().filter((row) => row.origin === 'jira');
+            } finally {
+                database.close();
+            }
+        };
+
+        /** An exact UTC instant on the REAL current calendar day, so it lands on the same `tdah_day_plan.date` every fixture uses. */
+        const utcInstant = (hhmm: string): Date => (
+            new Date(`${formatDateInTimeZone(new Date(), 'UTC')}T${hhmm}:00.000Z`)
+        );
+
+        const alwaysConnected = (): boolean => true;
+        const neverConnected = (): boolean => false;
+
+        type CollectedTick = {
+            activityEvents: Array<{ key: string; event: TdahWsActivityTriggerEvent }>;
+            bandEvents: Array<{ key: string; event: TdahWsWorkBandEvent }>;
+            onFire: (key: string, event: TdahWsActivityTriggerEvent) => void;
+            onWorkBandFire: (key: string, event: TdahWsWorkBandEvent) => void;
+        };
+
+        const collect = (): CollectedTick => {
+            const activityEvents: CollectedTick['activityEvents'] = [];
+            const bandEvents: CollectedTick['bandEvents'] = [];
+            return {
+                activityEvents,
+                bandEvents,
+                onFire: (key, event) => activityEvents.push({ key, event }),
+                onWorkBandFire: (key, event) => bandEvents.push({ key, event }),
+            };
+        };
+
+        /** Connects the Origen and materializes today's band from a 10:00 pull. Returns the band row. */
+        const seedBand = async (
+            issues: Array<{ key: string; summary: string; status: string }>,
+        ): Promise<BandRow> => {
+            await connectOrigin();
+            const summary = await runWorkOriginPullTick(dataDir, utcInstant('10:00'), healthyJira(issues));
+            expect(summary.syncedCount).toBe(1);
+            const bands = await readBandRows();
+            expect(bands).toHaveLength(1);
+            return bands[0] as BandRow;
+        };
+
+        // (a) + the I/O matrix's "Fin de franja" row. This is the regression
+        // this whole story exists for: before it, the band matched the N-01/N-02
+        // candidate query like any other Actividad and fired TWICE — once at its
+        // start and once at its end. FR-11 allows exactly one notification per
+        // band, and none at all at the end.
+        test('(a) la franja NUNCA dispara N-01 ni N-02 — ni al inicio, ni al final, ni con el día entero cruzado', async () => {
+            const band = await seedBand([{ key: 'ACME-1', summary: 'Arreglar el login', status: 'To Do' }]);
+            // A personal Actividad in the same day, to prove the exclusion is
+            // surgical: N-01/N-02 keep working for everything that is not the
+            // band.
+            await createManualActivityApi({ title: 'Foco', startTime: '11:00', durationMinutes: 30 });
+
+            // Well past the band's own end (10:00 + 480 = 18:00) AND past the
+            // manual Actividad's end.
+            const tick = collect();
+            const summary = await runActivityTriggerTick(dataDir, utcInstant('19:00'), alwaysConnected, tick.onFire, tick.onWorkBandFire);
+
+            // The manual Actividad fired its start and its end. The band fired
+            // exactly one `work-band` and zero `activity-trigger`s.
+            expect(summary.firedEventCount).toBe(2);
+            expect(tick.activityEvents.every((fired) => fired.event.activityId !== band.id)).toBe(true);
+            expect(tick.activityEvents.map((fired) => fired.event.edge)).toEqual(['start', 'end']);
+            expect(summary.firedWorkBandCount).toBe(1);
+            expect(tick.bandEvents).toHaveLength(1);
+            expect(tick.bandEvents[0]?.event.activityId).toBe(band.id);
+
+            // The band's end marker is never written, so no later tick can ever
+            // decide an end notification is still owed.
+            const after = await readBandRows();
+            expect(after[0]?.start_notified_at).not.toBeNull();
+            expect(after[0]?.end_notified_at).toBeNull();
+
+            // And a later tick still produces nothing for the band.
+            const later = collect();
+            const laterSummary = await runActivityTriggerTick(dataDir, utcInstant('23:00'), alwaysConnected, later.onFire, later.onWorkBandFire);
+            expect(laterSummary.firedWorkBandCount).toBe(0);
+            expect(laterSummary.firedEventCount).toBe(0);
+        });
+
+        // (b) — the matrix's "N-04 al inicio" + "Segundo tick el mismo día".
+        test('(b) dispara exactamente UN evento work-band con el conteo, y un segundo tick da cero', async () => {
+            const band = await seedBand([
+                { key: 'ACME-1', summary: 'Arreglar el login', status: 'In Progress' },
+                { key: 'ACME-2', summary: 'Revisar el PR', status: 'To Do' },
+                { key: 'ACME-3', summary: 'Escribir el test', status: 'To Do' },
+            ]);
+            expect(band.start_time).toBe('10:00');
+            expect(band.start_notified_at).toBeNull();
+
+            const first = collect();
+            const firstSummary = await runActivityTriggerTick(dataDir, utcInstant('10:00'), alwaysConnected, first.onFire, first.onWorkBandFire);
+            expect(firstSummary.firedNamespaceCount).toBe(1);
+            expect(firstSummary.firedWorkBandCount).toBe(1);
+            expect(firstSummary.firedEventCount).toBe(0);
+            expect(first.bandEvents).toHaveLength(1);
+            expect(first.bandEvents[0]?.key).toBe(tokenToKey(TOKEN_ALPHA));
+
+            const event = first.bandEvents[0]?.event as TdahWsWorkBandEvent;
+            expect(event.kind).toBe('work-band');
+            expect(event.activityId).toBe(band.id);
+            expect(event.title).toBe('Sprint');
+            expect(event.startTime).toBe('10:00');
+            expect(event.durationMinutes).toBe(480);
+            expect(event.itemCount).toBe(3);
+            expect(Number.isNaN(Date.parse(event.at))).toBe(false);
+            // No per-issue detail rides the notification — the band never names
+            // a task, and never invents an hour for one.
+            expect(JSON.stringify(event)).not.toContain('ACME-1');
+
+            // The seal is durable...
+            expect((await readBandRows())[0]?.start_notified_at).not.toBeNull();
+
+            // ...so a second tick (and a third, later one) emits nothing.
+            const second = collect();
+            const secondSummary = await runActivityTriggerTick(dataDir, utcInstant('10:00'), alwaysConnected, second.onFire, second.onWorkBandFire);
+            expect(secondSummary.firedWorkBandCount).toBe(0);
+            expect(second.bandEvents).toHaveLength(0);
+            expect(secondSummary.skippedCount).toBe(1);
+
+            const third = collect();
+            expect((await runActivityTriggerTick(dataDir, utcInstant('15:00'), alwaysConnected, third.onFire, third.onWorkBandFire)).firedWorkBandCount).toBe(0);
+        });
+
+        // A second pull the same day must not re-arm N-04: `UPDATE_WORK_ORIGIN_BAND_SQL`
+        // deliberately does not touch `start_notified_at`, and the band's start
+        // is preserved rather than recomputed.
+        test('un pull posterior el mismo día NO reabre la franja ni vuelve a armar N-04', async () => {
+            await seedBand([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+            const fired = collect();
+            await runActivityTriggerTick(dataDir, utcInstant('10:00'), alwaysConnected, fired.onFire, fired.onWorkBandFire);
+            expect(fired.bandEvents).toHaveLength(1);
+            const sealedAt = (await readBandRows())[0]?.start_notified_at;
+
+            const second = await runWorkOriginPullTick(dataDir, utcInstant('12:00'), healthyJira([
+                { key: 'ACME-1', summary: 'x', status: 'To Do' },
+                { key: 'ACME-2', summary: 'y', status: 'To Do' },
+            ]));
+            expect(second.syncedCount).toBe(1);
+
+            const after = await readBandRows();
+            expect(after).toHaveLength(1);
+            // Start preserved (never moved backwards or forwards), seal intact.
+            expect(after[0]?.start_time).toBe('10:00');
+            expect(after[0]?.start_notified_at).toBe(sealedAt as string);
+
+            const again = collect();
+            const summary = await runActivityTriggerTick(dataDir, utcInstant('12:30'), alwaysConnected, again.onFire, again.onWorkBandFire);
+            expect(summary.firedWorkBandCount).toBe(0);
+            expect(again.bandEvents).toHaveLength(0);
+        });
+
+        // (c) — the matrix's "Sin conexión WS al inicio" row. Same contract as
+        // N-01/N-02: no socket means nothing is marked, so the notification is
+        // recovered on reconnect within the same local day rather than lost.
+        test('(c) sin WS abierto nada se marca; al reconectar dentro del día la franja dispara UNA vez', async () => {
+            await seedBand([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+
+            const offline = collect();
+            const offlineSummary = await runActivityTriggerTick(dataDir, utcInstant('11:00'), neverConnected, offline.onFire, offline.onWorkBandFire);
+            expect(offlineSummary.firedWorkBandCount).toBe(0);
+            expect(offlineSummary.skippedCount).toBe(1);
+            expect(offline.bandEvents).toHaveLength(0);
+            expect((await readBandRows())[0]?.start_notified_at).toBeNull();
+
+            const reconnected = collect();
+            const reconnectedSummary = await runActivityTriggerTick(dataDir, utcInstant('11:05'), alwaysConnected, reconnected.onFire, reconnected.onWorkBandFire);
+            expect(reconnectedSummary.firedWorkBandCount).toBe(1);
+            expect(reconnected.bandEvents).toHaveLength(1);
+
+            const third = collect();
+            expect((await runActivityTriggerTick(dataDir, utcInstant('11:10'), alwaysConnected, third.onFire, third.onWorkBandFire)).firedWorkBandCount).toBe(0);
+        });
+
+        // (d) — one `now`, two profiles, two different local days and therefore
+        // two different firing instants. This is the bug class that has already
+        // cost this module twice: anything derived from the process clock
+        // instead of `profile.timeZone` gets this wrong.
+        test('(d) el mismo `now` produce días locales distintos: la franja de beta dispara donde la de alpha ya no puede', async () => {
+            // 2026-06-15T12:00Z is still 2026-06-15 in UTC but already
+            // 2026-06-16 in Pacific/Kiritimati (+14).
+            const pullInstant = new Date('2026-06-15T12:00:00.000Z');
+            await activate({ timeZone: 'UTC' }, TOKEN_ALPHA);
+            await activate({ timeZone: 'Pacific/Kiritimati' }, TOKEN_BETA);
+            await putOrigin(VALID_ORIGIN_BODY, healthyJira([]), TOKEN_ALPHA);
+            // Kiritimati's local clock at that instant is 02:00, so beta needs a
+            // window that actually contains it.
+            await putOrigin({ ...VALID_ORIGIN_BODY, workStart: '00:00', workEnd: '23:59' }, healthyJira([]), TOKEN_BETA);
+
+            const pull = await runWorkOriginPullTick(dataDir, pullInstant, healthyJira([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]));
+            expect(pull.syncedCount).toBe(2);
+
+            const alphaBand = (await readBandRows(TOKEN_ALPHA))[0] as BandRow;
+            const betaBand = (await readBandRows(TOKEN_BETA))[0] as BandRow;
+            expect(alphaBand.day_plan_date).toBe('2026-06-15');
+            expect(alphaBand.start_time).toBe('12:00');
+            expect(betaBand.day_plan_date).toBe('2026-06-16');
+            expect(betaBand.start_time).toBe('02:00');
+
+            // One instant, evaluated against each profile's OWN zone:
+            // 2026-06-16T00:30Z is already 2026-06-16 for alpha (whose band
+            // belongs to the day that just ended — and is deliberately never
+            // retro-announced), and 2026-06-16 14:30 for beta (whose band
+            // started twelve local hours earlier that same day).
+            const tick = collect();
+            const summary = await runActivityTriggerTick(
+                dataDir,
+                new Date('2026-06-16T00:30:00.000Z'),
+                alwaysConnected,
+                tick.onFire,
+                tick.onWorkBandFire,
+            );
+            expect(summary.firedWorkBandCount).toBe(1);
+            expect(tick.bandEvents).toHaveLength(1);
+            expect(tick.bandEvents[0]?.key).toBe(tokenToKey(TOKEN_BETA));
+            expect(tick.bandEvents[0]?.event.activityId).toBe(betaBand.id);
+
+            // Alpha's band stays unnotified forever rather than announcing a
+            // window that closed yesterday.
+            expect((await readBandRows(TOKEN_ALPHA))[0]?.start_notified_at).toBeNull();
+            expect((await readBandRows(TOKEN_BETA))[0]?.start_notified_at).not.toBeNull();
+        });
+
+        // (e) — the matrix's "Primer pull a media tarde" and "Sync manual fuera
+        // de la ventana" rows.
+        test('(e) un primer pull a las 15:20 crea la franja 15:20-18:00, y un sync a las 22:00 no crea ninguna', async () => {
+            await connectOrigin();
+            expect((await runWorkOriginPullTick(dataDir, utcInstant('15:20'), healthyJira([
+                { key: 'ACME-1', summary: 'x', status: 'To Do' },
+            ]))).syncedCount).toBe(1);
+
+            const band = (await readBandRows())[0] as BandRow;
+            // Never 09:00-18:00: the band does not claim the six hours that
+            // already went by, so N-04 announces a real start rather than
+            // retro-notifying an event from this morning.
+            expect(band.start_time).toBe('15:20');
+            expect(band.duration_minutes).toBe(160);
+
+            // A manual `POST /origin/sync` outside the window (exactly what the
+            // route runs: same function, `ignoreSchedule: true`) on a namespace
+            // with no band yet creates nothing at all.
+            await connectOrigin(TOKEN_BETA);
+            const outcome = await runNamespaceWorkOriginPull(
+                dataDir,
+                tokenToKey(TOKEN_BETA),
+                utcInstant('22:00'),
+                healthyJira([{ key: 'ACME-9', summary: 'y', status: 'To Do' }]),
+                { ignoreSchedule: true },
+            );
+            expect(outcome.kind).toBe('synced');
+            expect(await readBandRows(TOKEN_BETA)).toHaveLength(0);
+
+            // ...and with no band there is nothing for N-04 to announce either.
+            const tick = collect();
+            const summary = await runActivityTriggerTick(dataDir, utcInstant('22:05'), alwaysConnected, tick.onFire, tick.onWorkBandFire);
+            expect(tick.bandEvents.some((fired) => fired.key === tokenToKey(TOKEN_BETA))).toBe(false);
+            expect(summary.failedCount).toBe(0);
+        });
+
+        // (f) — the matrix's "Franja del día con tareas" and "Último pull
+        // fallido" rows.
+        test('(f) GET /v1/tdah/day trae la franja con sus workItems y el workOriginErrorCode, y jamás el token', async () => {
+            await seedBand([
+                { key: 'ACME-1', summary: 'Arreglar el login', status: 'In Progress' },
+                { key: 'ACME-2', summary: 'Revisar el PR', status: 'To Do' },
+                { key: 'ACME-3', summary: 'Escribir el test', status: 'To Do' },
+            ]);
+
+            const response = await getDay();
+            expect(response.status).toBe(200);
+            const raw = await response.text();
+            // The sealed credential has no path into this response — the
+            // snapshot table has no token column to read at all.
+            expect(raw).not.toContain(JIRA_TOKEN);
+            const day = JSON.parse(raw) as TdahTestDay;
+
+            expect(day.workOriginErrorCode).toBeNull();
+            const band = day.activities.find((activity) => activity.origin === 'jira');
+            expect(band?.title).toBe('Sprint');
+            expect(band?.startTime).toBe('10:00');
+            expect(band?.durationMinutes).toBe(480);
+            expect(band?.workItems).toHaveLength(3);
+            expect(band?.workItems?.map((item) => item.externalKey)).toEqual(['ACME-1', 'ACME-2', 'ACME-3']);
+            expect(band?.workItems?.[0]?.summary).toBe('Arreglar el login');
+            expect(band?.workItems?.[0]?.status).toBe('In Progress');
+            // No hour is ever invented per task, and `sprintName` is not a field
+            // any surface of the day reads.
+            expect(Object.keys(band?.workItems?.[0] ?? {}).sort()).toEqual(['externalKey', 'status', 'summary']);
+
+            // Only the band carries sub-rows.
+            const personal = day.activities.filter((activity) => activity.origin !== 'jira');
+            expect(personal.every((activity) => activity.workItems === undefined)).toBe(true);
+
+            // A failed pull degrades the band without touching anything
+            // personal: the code surfaces, the band survives, the day still
+            // renders.
+            await createManualActivityApi({ title: 'Foco', startTime: '11:00', durationMinutes: 30 });
+            const failed = await runWorkOriginPullTick(dataDir, utcInstant('12:00'), revokedJira());
+            expect(failed.failedCount).toBe(1);
+
+            const degraded = await readDay(await getDay());
+            expect(degraded.workOriginErrorCode).toBe('TDAH_ORIGIN_CREDENTIALS_INVALID');
+            const stillThere = degraded.activities.find((activity) => activity.origin === 'jira');
+            expect(stillThere?.workItems).toHaveLength(3);
+            expect(degraded.activities.some((activity) => activity.title === 'Foco')).toBe(true);
+        });
+
+        // (g) — the matrix's "Confirmar T-06 incluyendo la franja" row. The
+        // server half of "solo lectura": even a client that offers no edit
+        // affordance cannot be the only thing standing between the user and a
+        // re-timed band.
+        test('(g) confirm-morning que nombra la franja responde 409 TDAH_ORIGIN_READ_ONLY y no escribe nada', async () => {
+            await connectOrigin();
+            // The band always belongs to a local day; T-06 edits TOMORROW, so
+            // the guard is exercised against a band planted on tomorrow's plan
+            // (same direct-SQL fixture technique the migration blocks use).
+            const tomorrow = computeTomorrowDate('UTC');
+            expect((await getTomorrowDay()).status).toBe(200);
+            const personal = await readActivity(await createManualActivityForTomorrowApi({ title: 'Leer', startTime: '08:00', durationMinutes: 30 }));
+            await withWriteTransaction(tdahDatabasePath(dataDir, tokenToKey(TOKEN_ALPHA)), (database) => {
+                database
+                    .prepare("INSERT INTO tdah_activity (day_plan_date, block_id, title, start_time, duration_minutes, origin, state) VALUES (?, NULL, 'Sprint', '09:00', 540, 'jira', 'pending');")
+                    .run(tomorrow);
+            });
+            const bandId = (await readBandRows()).find((row) => row.day_plan_date === tomorrow)?.id as number;
+            expect(typeof bandId).toBe('number');
+
+            // Naming it as a survivor is refused...
+            const edited = await confirmMorningApi({
+                activities: [
+                    { id: personal.id, startTime: '08:00', durationMinutes: 30 },
+                    { id: bandId, startTime: '06:00', durationMinutes: 60 },
+                ],
+                deletedActivityIds: [],
+            });
+            expect(edited.status).toBe(409);
+            expect(await readErrorCode(edited)).toBe('TDAH_ORIGIN_READ_ONLY');
+
+            // ...and so is naming it as a deletion.
+            const deleted = await confirmMorningApi({
+                activities: [{ id: personal.id, startTime: '08:00', durationMinutes: 30 }],
+                deletedActivityIds: [bandId],
+            });
+            expect(deleted.status).toBe(409);
+            expect(await readErrorCode(deleted)).toBe('TDAH_ORIGIN_READ_ONLY');
+
+            // Neither attempt wrote anything — not to the band, not to the
+            // personal Actividad, not to `confirmed_at`.
+            const untouched = (await readBandRows()).find((row) => row.day_plan_date === tomorrow);
+            expect(untouched?.start_time).toBe('09:00');
+            expect(untouched?.duration_minutes).toBe(540);
+            expect((await readDay(await getTomorrowDay())).confirmedAt).toBeNull();
+
+            // A confirm that simply leaves the band out succeeds: the band is
+            // not part of T-06's editable set at all, so the exact-accounting
+            // check never expects it.
+            const ok = await confirmMorningApi({
+                activities: [{ id: personal.id, startTime: '07:30', durationMinutes: 45 }],
+                deletedActivityIds: [],
+            });
+            expect(ok.status).toBe(200);
+            const confirmed = await readDay(ok);
+            expect(confirmed.confirmedAt).not.toBeNull();
+            expect(confirmed.activities.find((activity) => activity.id === personal.id)?.startTime).toBe('07:30');
+            const survivor = confirmed.activities.find((activity) => activity.origin === 'jira');
+            expect(survivor?.startTime).toBe('09:00');
+            expect(survivor?.durationMinutes).toBe(540);
+        });
+
+        // (h) — the matrix's "Modo apagado / Origen ausente" row. The Origen is
+        // off by default in every existing instance, so the no-key path is the
+        // one most users are actually on.
+        test('(h) sin clave de operador y sin Origen: día limpio, sin franja, sin error y sin notificaciones', async () => {
+            delete process.env[TDAH_ORIGIN_KEY_ENV_VAR];
+            await activate({ timeZone: 'UTC' });
+            await createManualActivityApi({ title: 'Foco', startTime: '11:00', durationMinutes: 30 });
+
+            const day = await readDay(await getDay());
+            expect(day.activities.some((activity) => activity.origin === 'jira')).toBe(false);
+            expect(day.activities.every((activity) => activity.workItems === undefined)).toBe(true);
+            expect(day.workOriginErrorCode).toBeNull();
+
+            expect((await runWorkOriginPullTick(dataDir, utcInstant('10:00'), healthyJira([]))).skippedCount).toBe(1);
+            expect(await readBandRows()).toHaveLength(0);
+
+            const tick = collect();
+            const summary = await runActivityTriggerTick(dataDir, utcInstant('11:05'), alwaysConnected, tick.onFire, tick.onWorkBandFire);
+            expect(summary.firedWorkBandCount).toBe(0);
+            expect(tick.bandEvents).toHaveLength(0);
+            // The personal Actividad still notifies exactly as before this story.
+            expect(summary.firedEventCount).toBe(1);
+        });
+
+        // The matrix's "Sprint vaciado" row, read from the DAY's own response
+        // rather than from the raw table: once the band is retired, `workItems`
+        // has nowhere left to hang.
+        test('cuando el sprint se vacía, la franja y sus workItems desaparecen de la respuesta del día', async () => {
+            await seedBand([{ key: 'ACME-1', summary: 'x', status: 'To Do' }]);
+            expect((await readDay(await getDay())).activities.some((activity) => activity.origin === 'jira')).toBe(true);
+
+            expect((await runWorkOriginPullTick(dataDir, utcInstant('12:00'), healthyJira([]))).syncedCount).toBe(1);
+
+            const day = await readDay(await getDay());
+            expect(day.activities.some((activity) => activity.origin === 'jira')).toBe(false);
+            expect(day.activities.every((activity) => activity.workItems === undefined)).toBe(true);
+            expect(day.workOriginErrorCode).toBeNull();
+        });
+
+        // The read-only promise has a midnight-shaped hole in it unless the
+        // sweep knows about the band. El Limbo (T-08) is where the user
+        // renegotiates their OWN unattended commitments — complete-late, move
+        // to a future day, or discard — and every one of those is a write this
+        // module has promised never to offer for a band. `move` is the worst of
+        // them: it would plant an `origin='jira'` row on a FUTURE day with
+        // `start_notified_at` still NULL, so N-04 would fire a second time for
+        // a band no pull ever materialized.
+        test('la franja sin atender NO cae al Limbo al cerrar el día — se retira como discarded y T-08 nunca la ofrece', async () => {
+            const band = await seedBand([{ key: 'ACME-1', summary: 'Arreglar el login', status: 'To Do' }]);
+            // A personal Actividad in the same day proves the exclusion is
+            // surgical: everything that is not the band still reaches El Limbo.
+            await createManualActivityApi({ title: 'Foco', startTime: '11:00', durationMinutes: 30 });
+
+            const closedSummary = await runNightlyTdahTick(dataDir, utcInstant('23:30'));
+            expect(closedSummary.failedCount).toBe(0);
+
+            const sweptBand = (await readBandRows()).find((row) => row.id === band.id);
+            expect(sweptBand?.state).toBe('discarded');
+            // `limboCount` keeps meaning "rows that actually entered El Limbo",
+            // so the band must not be counted among them.
+            expect(closedSummary.limboCount).toBe(1);
+
+            const limbo = await (await getLimboApi()).json() as { activities: Array<{ id: number; origin: string; title: string }> };
+            expect(limbo.activities.some((activity) => activity.origin === 'jira')).toBe(false);
+            expect(limbo.activities.map((activity) => activity.title)).toEqual(['Foco']);
+
+            // And the tray refuses to decide on it even when named directly:
+            // the band is not in `state = 'limbo'`, so the batch is rejected
+            // whole without writing anything.
+            const rejected = await decideLimboBatchApi({ activityIds: [band.id], decision: { decision: 'move-tomorrow' } });
+            expect(rejected.status).toBe(400);
+            expect((await readBandRows()).find((row) => row.id === band.id)?.state).toBe('discarded');
+        });
+
+        // The create path refuses to draw a band whose window is already over;
+        // the update path has to make the same judgement, or narrowing the
+        // working window in T-13 leaves a zero-length band behind — a band that
+        // renders as a bare start with no range and lies about the day.
+        test('estrechar workEnd por detrás del inicio ya recortado retira la franja en vez de dejarla en cero minutos', async () => {
+            const band = await seedBand([{ key: 'ACME-1', summary: 'Arreglar el login', status: 'To Do' }]);
+            // The 10:00 pull clipped the band to 10:00–18:00.
+            expect(band.start_time).toBe('10:00');
+            expect(band.duration_minutes).toBe(480);
+
+            // The user narrows the working window to end BEFORE the band's own
+            // already-materialized start.
+            await putOrigin({ ...VALID_ORIGIN_BODY, workStart: '08:00', workEnd: '09:30' }, healthyJira([]));
+            expect((await runWorkOriginPullTick(
+                dataDir,
+                utcInstant('09:00'),
+                healthyJira([{ key: 'ACME-1', summary: 'Arreglar el login', status: 'To Do' }]),
+            )).syncedCount).toBe(1);
+
+            expect(await readBandRows()).toHaveLength(0);
+            const day = await readDay(await getDay());
+            expect(day.activities.some((activity) => activity.origin === 'jira')).toBe(false);
+        });
+
+        // A band whose snapshot emptied out (e.g. `DELETE /v1/tdah/origin`
+        // clears the items but deliberately leaves an already-materialized band
+        // alone) must not announce "Sprint: 0 tareas pendientes" — and must not
+        // burn its once-per-day seal doing so.
+        test('una franja cuyo snapshot quedó vacío no dispara N-04 ni sella start_notified_at', async () => {
+            const band = await seedBand([{ key: 'ACME-1', summary: 'Arreglar el login', status: 'To Do' }]);
+            expect(band.start_notified_at).toBeNull();
+
+            // The state `DELETE /v1/tdah/origin` leaves behind: the snapshot is
+            // cleared while an already-materialized band is deliberately left
+            // alone. Planted directly, because no pull can produce it (a
+            // 0-issue pull retires the band instead).
+            const { Database } = await import('bun:sqlite');
+            const seedDatabase = new Database(tdahDatabasePath(dataDir, tokenToKey(TOKEN_ALPHA)));
+            try {
+                seedDatabase.prepare('DELETE FROM tdah_work_origin_item;').run();
+            } finally {
+                seedDatabase.close();
+            }
+
+            const tick = collect();
+            const summary = await runActivityTriggerTick(dataDir, utcInstant('11:00'), alwaysConnected, tick.onFire, tick.onWorkBandFire);
+            expect(summary.firedWorkBandCount).toBe(0);
+            expect(tick.bandEvents).toHaveLength(0);
+            expect((await readBandRows()).find((row) => row.id === band.id)?.start_notified_at).toBeNull();
         });
     });
 

@@ -1685,6 +1685,13 @@ export const deOverrides: Record<string, string> = {
         'tdahToday.decisionCompleteLate': 'Abschließen (verspätet)',
         'tdahToday.limboSelectionCount': '{count} ausgewählt',
         'tdahToday.limboBatchApply': 'Auf Auswahl anwenden',
+        'tdahToday.workBandTasks': '{count} Aufgaben',
+        'tdahToday.workBandExpandLabel': 'Aufgaben dieses Arbeitsblocks anzeigen',
+        'tdahToday.workBandCollapseLabel': 'Aufgaben dieses Arbeitsblocks ausblenden',
+        'tdahToday.workBandReadOnly': 'Schreibgeschützt – die Arbeitserfassung liegt in Jira',
+        'tdahToday.workBandItemsEmpty': 'Die Aufgabenliste wurde noch nicht synchronisiert.',
+        'tdahToday.workBandNotificationTitle': 'Sprint: {count} offene zugewiesene Aufgaben',
+        'tdahToday.workBandNotificationBody': 'Ihr Arbeitsblock beginnt jetzt.',
         'tdahActivity.ariaLabel': '{time}, {title}, {state}, {origin}',
         'tdahActivity.ariaLabelNoTime': '{title}, {state}, {origin}',
         'tdahActivity.origin.routine': 'Routine',
@@ -1709,6 +1716,7 @@ export const deOverrides: Record<string, string> = {
         'tdahActivity.alreadyRegistered': 'Bereits erfasst',
         'tdahActivity.errorGeneric': 'Aktion konnte nicht abgeschlossen werden. Versuche es erneut.',
         'tdahActivity.actionOfflineMessage': 'Keine Internetverbindung. Die Aktion wurde nicht gespeichert.',
+        'tdahActivity.errorReadOnly': 'Dieser Arbeitsblock ist schreibgeschützt: Seine Erfassung liegt in Jira.',
         'tdahActivity.routineContext': 'Teil der Routine {name}',
 
         // TDAH Routines
