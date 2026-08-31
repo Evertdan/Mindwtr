@@ -157,6 +157,21 @@ describe('useTdahDnd', () => {
             expect(latest.activeUntil).toBeNull();
         });
 
+        // DW-102: `activeUntil` is a bare "HH:mm", so T-12 needs the zone the
+        // server resolved it against to know when it has passed. AD-6 makes
+        // that zone editable and free to disagree with the device's.
+        it('exposes the profile zone the server resolved activeUntil against', async () => {
+            cloud.get.mockResolvedValue(state({ activeUntil: '12:00', timeZone: 'Asia/Tokyo' }));
+            await mountAndLoad();
+            expect(latest.timeZone).toBe('Asia/Tokyo');
+        });
+
+        it('falls back to the device zone when the server sends none', async () => {
+            cloud.get.mockResolvedValue({ ...state(), timeZone: undefined });
+            await mountAndLoad();
+            expect(latest.timeZone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+        });
+
         it('is unconfigured when Self-Hosted sync is not set up', async () => {
             config.value = null;
             await mountAndLoad();

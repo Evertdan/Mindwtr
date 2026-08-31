@@ -593,6 +593,21 @@ describe('TdahTodayScreen', () => {
     });
 
     describe('Story 4.3 — T-12\'s DND chip (T-01 header entry point)', () => {
+        // DW-102: the chip's truth is time-dependent, so every case here runs
+        // against a pinned clock inside the announced window (09:00 local in
+        // `America/Mexico_City`, i.e. before the '11:00'/'12:00' the cases
+        // below use as `until`) instead of whatever the wall clock happens to
+        // say when the suite runs.
+        beforeEach(() => {
+            vi.useFakeTimers();
+            hookState.timeZone = 'America/Mexico_City';
+            vi.setSystemTime(new Date('2026-08-26T15:00:00Z'));
+        });
+
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
         it('is hidden entirely when the server reports no active window', async () => {
             hookState.dndActiveUntil = null;
             let tree: ReturnType<typeof create> | undefined;
@@ -662,6 +677,68 @@ describe('TdahTodayScreen', () => {
 
             expect(tree!.root.findByProps({ testID: 'tdah-today-dnd-chip' })).toBeTruthy();
             expect(tree!.root.findByProps({ testID: 'tdah-today-limbo-badge' })).toBeTruthy();
+        });
+
+        // DW-102 — the regression the chip shipped with: `dndActiveUntil` was
+        // rendered verbatim forever, so a window that ended at 11:00 kept
+        // claiming a silence at 14:00.
+        it('keeps the chip up while the announced instant is still ahead', async () => {
+            hookState.phase = 'ready';
+            hookState.dndActiveUntil = '11:00';
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+            expect(hookState.reload).toHaveBeenCalledTimes(1); // focus only
+
+            // 09:00 → 10:00 local: still inside the window.
+            await act(async () => { vi.advanceTimersByTime(60 * 60 * 1000); });
+            expect(tree!.root.findByProps({ testID: 'tdah-today-dnd-chip' })).toBeTruthy();
+            expect(hookState.reload).toHaveBeenCalledTimes(1);
+
+            await act(async () => { tree!.unmount(); });
+        });
+
+        it('hides the chip and reloads exactly once when the announced instant passes', async () => {
+            hookState.phase = 'ready';
+            hookState.dndActiveUntil = '11:00';
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+            expect(tree!.root.findByProps({ testID: 'tdah-today-dnd-chip' })).toBeTruthy();
+            expect(hookState.reload).toHaveBeenCalledTimes(1); // focus only
+
+            // 09:00 → 11:10 local: the announced instant is behind us.
+            await act(async () => { vi.advanceTimersByTime((2 * 60 + 10) * 60 * 1000); });
+
+            expect(tree!.root.findAllByProps({ testID: 'tdah-today-dnd-chip' })).toHaveLength(0);
+            expect(hookState.reload).toHaveBeenCalledTimes(2);
+
+            // Every later tick with the same stale value must stay quiet —
+            // the reload is edge-triggered, never a poll.
+            await act(async () => { vi.advanceTimersByTime(TDAH_NOW_TICK_INTERVAL_MS * 10); });
+            expect(hookState.reload).toHaveBeenCalledTimes(2);
+
+            await act(async () => { tree!.unmount(); });
+        });
+
+        // The midnight edge the lexical "HH:mm" compare cannot see on its own:
+        // "00:05" is lexically SMALLER than "23:59", so the time term alone
+        // would keep the chip up for most of the following day.
+        it('expires an end-of-day window once the profile zone rolls past midnight', async () => {
+            hookState.phase = 'ready';
+            hookState.date = '2026-08-26';
+            hookState.dndActiveUntil = '23:59';
+            // 23:50 local (America/Mexico_City = UTC-6) on the loaded day.
+            vi.setSystemTime(new Date('2026-08-27T05:50:00Z'));
+
+            let tree: ReturnType<typeof create> | undefined;
+            await act(async () => { tree = create(<TdahTodayScreen />); });
+            expect(tree!.root.findByProps({ testID: 'tdah-today-dnd-chip' })).toBeTruthy();
+
+            // 23:50 → 00:20 the next local day.
+            await act(async () => { vi.advanceTimersByTime(30 * 60 * 1000); });
+
+            expect(tree!.root.findAllByProps({ testID: 'tdah-today-dnd-chip' })).toHaveLength(0);
+
+            await act(async () => { tree!.unmount(); });
         });
     });
 

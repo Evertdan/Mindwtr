@@ -1,7 +1,7 @@
 import React from 'react';
 import { Switch, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TdahDndScreen } from './TdahDndScreen';
 import type { TdahDndWindow } from './tdah-dnd-types';
@@ -12,6 +12,10 @@ const hookState = vi.hoisted(() => ({
     settings: { calendarEnabled: false, workStart: '09:00', workEnd: '18:00' },
     windows: [] as TdahDndWindow[],
     activeUntil: null as string | null,
+    // DW-102: the zone and the profile-zone day key the hook resolved
+    // `activeUntil` against (AD-6).
+    timeZone: 'America/Mexico_City',
+    dayKey: '2026-08-26' as string | null,
     permission: 'granted' as 'granted' | 'denied' | 'undetermined',
     calendarSupported: true,
     calendarSyncing: false,
@@ -128,6 +132,8 @@ beforeEach(() => {
     hookState.settings = { calendarEnabled: false, workStart: '09:00', workEnd: '18:00' };
     hookState.windows = [];
     hookState.activeUntil = null;
+    hookState.timeZone = 'America/Mexico_City';
+    hookState.dayKey = '2026-08-26';
     hookState.permission = 'granted';
     hookState.calendarSupported = true;
     hookState.calendarSyncing = false;
@@ -184,6 +190,18 @@ describe('TdahDndScreen (T-12)', () => {
     });
 
     describe('zone 1 — the current state and the promise', () => {
+        // DW-102: zone 1's truth is time-dependent, so these cases run against
+        // a pinned clock at 09:00 local — inside the '12:00' window they
+        // announce — instead of the wall clock the suite happens to run at.
+        beforeEach(() => {
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2026-08-26T15:00:00Z'));
+        });
+
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
         // The promise is product behavior, not decoration (FR-12/SM-C1): a
         // user who suspects a post-meeting avalanche turns DND off.
         it('always states that what is suppressed does not come back', async () => {
@@ -217,6 +235,62 @@ describe('TdahDndScreen (T-12)', () => {
             const value = tree.root.findByProps({ testID: 'tdah-dnd-status-value' });
             expect(flattenStyle(value.props.style).color).toBe(THEME.tint);
             expect(flattenStyle(value.props.style).color).not.toBe(THEME.danger);
+        });
+
+        // DW-102 — the regression T-12 shipped with: the server-computed
+        // `activeUntil` was rendered forever, so the screen the user opens to
+        // check whether they are quiet still claimed "Quiet until 12:00" at
+        // 14:00.
+        it('stops claiming a silence once the announced instant passes, and reloads once', async () => {
+            hookState.activeUntil = '12:00';
+            const tree = await render();
+            expect(allText(tree)).toContain('Quiet until 12:00');
+            expect(hookState.reload).toHaveBeenCalledTimes(1); // focus only
+
+            // 09:00 -> 12:10 local.
+            await act(async () => { vi.advanceTimersByTime((3 * 60 + 10) * 60 * 1000); });
+
+            expect(allText(tree)).toContain('Not quiet right now');
+            expect(allText(tree)).not.toContain('Quiet until 12:00');
+            expect(hookState.reload).toHaveBeenCalledTimes(2);
+
+            // Edge-triggered, never a poll: later ticks with the same stale
+            // value must stay quiet.
+            await act(async () => { vi.advanceTimersByTime(10 * 60 * 1000); });
+            expect(hookState.reload).toHaveBeenCalledTimes(2);
+        });
+
+        it('keeps the claim while the announced instant is still ahead', async () => {
+            hookState.activeUntil = '12:00';
+            const tree = await render();
+
+            // 09:00 -> 11:00 local: still inside.
+            await act(async () => { vi.advanceTimersByTime(2 * 60 * 60 * 1000); });
+
+            expect(allText(tree)).toContain('Quiet until 12:00');
+            expect(hookState.reload).toHaveBeenCalledTimes(1);
+        });
+
+        // The midnight edge the lexical "HH:mm" compare cannot see on its own:
+        // "00:20" is lexically SMALLER than "23:59", so the time term alone
+        // would keep the claim standing for most of the following day. T-12
+        // has no day-key rollover effect of its own to fall back on, which is
+        // why the day key is folded into the expiry itself.
+        it('expires an end-of-day claim once the profile zone rolls past midnight', async () => {
+            hookState.activeUntil = '23:59';
+            hookState.dayKey = '2026-08-26';
+            // 23:50 local (America/Mexico_City = UTC-6) on the stamped day.
+            vi.setSystemTime(new Date('2026-08-27T05:50:00Z'));
+
+            const tree = await render();
+            expect(allText(tree)).toContain('Quiet until 23:59');
+
+            // 23:50 -> 00:20 the next local day.
+            await act(async () => { vi.advanceTimersByTime(30 * 60 * 1000); });
+
+            expect(allText(tree)).toContain('Not quiet right now');
+            expect(allText(tree)).not.toContain('Quiet until 23:59');
+            expect(hookState.reload).toHaveBeenCalledTimes(2);
         });
     });
 

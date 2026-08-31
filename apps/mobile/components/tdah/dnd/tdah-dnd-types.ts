@@ -61,6 +61,15 @@ export type TdahDndResponse = {
      * server, rendered verbatim here and in T-01's chip.
      */
     activeUntil: string | null;
+    /**
+     * The profile's own IANA zone (AD-6), the same field `GET /v1/tdah/day`
+     * carries. `activeUntil` is a bare "HH:mm" with no zone of its own, so
+     * without this T-12 cannot tell whether the announced instant has already
+     * passed — and the device's zone is free to disagree with the profile's.
+     * Used ONLY to know when to ask the server again (DW-102); activeness
+     * itself is never recomputed here.
+     */
+    timeZone?: string;
 };
 
 /** `POST /v1/tdah/dnd/windows` and `PUT /v1/tdah/dnd/windows/{id}` body. */

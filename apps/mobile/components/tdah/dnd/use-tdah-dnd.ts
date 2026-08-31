@@ -10,6 +10,8 @@ import {
 } from '@/lib/external-calendar';
 import { collectBusyCalendarEvents } from '@/lib/tdah-dnd-calendar';
 
+import { formatDayKeyInTimeZone } from '../today/tdah-time';
+
 import {
     buildTdahDndCalendarUrl,
     buildTdahDndUrl,
@@ -59,6 +61,20 @@ export type UseTdahDndResult = {
     windows: TdahDndWindow[];
     /** The server's own answer, rendered verbatim (AD-8) — never recomputed here. */
     activeUntil: string | null;
+    /**
+     * The profile's zone the server resolved `activeUntil` against (DW-102),
+     * falling back to the device's own only while no response has landed yet.
+     */
+    timeZone: string;
+    /**
+     * The profile-zone day key (`YYYY-MM-DD`) the current `activeUntil` was
+     * resolved on, or `null` before the first response. `activeUntil` is a bare
+     * "HH:mm", and "HH:mm" only orders monotonically WITHIN one calendar day —
+     * past local midnight "00:05" is lexically smaller than a stale "23:59", so
+     * a comparison without this would silently conclude the silence is still
+     * running. T-01 reads the equivalent from `GET /v1/tdah/day`'s own `date`.
+     */
+    dayKey: string | null;
     permission: SystemCalendarPermissionStatus;
     /** `false` on web/PWA, which never reads calendars at all (doc 06, permanent state). */
     calendarSupported: boolean;
@@ -101,6 +117,13 @@ export const TDAH_DND_CALENDAR_HORIZON_MS = 7 * 24 * 60 * 60 * 1000;
  * clear `'error'` phase instead of throwing inside the success path and
  * being mislabeled `'offline'` by the generic catch.
  */
+/**
+ * Only ever a placeholder until the first response lands (same role and same
+ * resolution as `use-tdah-today.ts`'s own constant): AD-6's real source of
+ * truth is the profile's zone, which the server sends back on every read.
+ */
+const DEVICE_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 const isValidDndResponse = (value: unknown): value is TdahDndResponse => {
     if (!value || typeof value !== 'object') return false;
     const candidate = value as Partial<TdahDndResponse>;
@@ -123,6 +146,8 @@ export function useTdahDnd(): UseTdahDndResult {
     const [settings, setSettings] = useState<TdahDndSettings>(DEFAULT_SETTINGS);
     const [windows, setWindows] = useState<TdahDndWindow[]>([]);
     const [activeUntil, setActiveUntil] = useState<string | null>(null);
+    const [timeZone, setTimeZone] = useState<string>(DEVICE_TIME_ZONE);
+    const [dayKey, setDayKey] = useState<string | null>(null);
     const [permission, setPermission] = useState<SystemCalendarPermissionStatus>('undetermined');
     const [calendarSyncing, setCalendarSyncing] = useState(false);
     const [mutationError, setMutationError] = useState<TdahDndMutationError | null>(null);
@@ -145,6 +170,15 @@ export function useTdahDnd(): UseTdahDndResult {
         });
         setWindows(response.windows);
         setActiveUntil(typeof response.activeUntil === 'string' ? response.activeUntil : null);
+        const zone = typeof response.timeZone === 'string' && response.timeZone.length > 0
+            ? response.timeZone
+            : DEVICE_TIME_ZONE;
+        setTimeZone(zone);
+        // Stamped at receipt rather than sent by the server: `GET /v1/tdah/dnd`
+        // has no `date` of its own, and the sub-second window in which this
+        // could disagree with the server's own "today" closes itself — the very
+        // next tick sees the new day key and reloads.
+        setDayKey(formatDayKeyInTimeZone(new Date(), zone));
     }, []);
 
     const fetchState = useCallback(async (cloud: TdahDndCloudConfig): Promise<TdahDndResponse | null> => {
@@ -360,6 +394,8 @@ export function useTdahDnd(): UseTdahDndResult {
         settings,
         windows,
         activeUntil,
+        timeZone,
+        dayKey,
         permission,
         calendarSupported,
         calendarSyncing,

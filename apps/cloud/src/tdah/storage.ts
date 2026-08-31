@@ -2295,11 +2295,40 @@ export const mutateDeleteDndWindow = (database: TdahDatabase, id: string): TdahD
 };
 
 /**
+ * The local days of slack `mutateReplaceCalendarWindows` adds to EACH side of
+ * the phone's observed range (DW-100). The phone's calendar query returns every
+ * event that OVERLAPS its range without clipping it, and
+ * `materializeCalendarWindows` (dnd.ts) then splits each event at local
+ * midnight — so a meeting straddling either edge instant contributes a segment
+ * dated one local day outside the range, which the old strict guard dropped.
+ * That segment is the tail of a real meeting the user is in, so dropping it
+ * left exactly those meetings loud.
+ *
+ * One day, not more: it covers every event that crosses an edge by less than a
+ * full day (the shape of an actual meeting), while a genuinely multi-day event
+ * can still reach up to `MAX_CALENDAR_EVENT_LOCAL_DAYS` past `rangeEndDate` and
+ * keeps having its far tail dropped. That residue is deliberate and bounded —
+ * those days are re-observed, and re-materialized in full, by every later sync
+ * long before they arrive.
+ */
+const DND_CALENDAR_RANGE_SLACK_DAYS = 1;
+
+/**
  * Replaces, in block, every `source: 'calendar'` window whose local date falls
- * inside `[rangeStartDate, rangeEndDate]` — and touches no `'manual'` row at
- * all. Delete-then-insert rather than a merge because the phone's payload is
+ * inside `[rangeStartDate, rangeEndDate]` widened by
+ * `DND_CALENDAR_RANGE_SLACK_DAYS` on each side — and touches no `'manual'` row
+ * at all. Delete-then-insert rather than a merge because the phone's payload is
  * the complete truth for that range: a meeting the user cancelled is expressed
  * by its absence, which no merge could ever detect.
+ *
+ * DW-100: the delete and the accept guard are widened by the SAME amount, on
+ * purpose. Dropping the spilled segment instead (the previous behaviour) kept
+ * every stored row deletable, but silently broke the feature's central promise
+ * for exactly the meetings most worth silencing — the ones straddling the edge
+ * of the window the phone happened to look at. Keeping the segment while
+ * widening only the insert would make it immortal (nothing would ever delete
+ * it again); widening both keeps the block-replace contract intact, since the
+ * next sync's delete covers everything this one could have written.
  */
 export const mutateReplaceCalendarWindows = (
     database: TdahDatabase,
@@ -2309,13 +2338,15 @@ export const mutateReplaceCalendarWindows = (
     nowIso: string,
     mintId: () => string,
 ): number => {
-    database.prepare(DELETE_DND_CALENDAR_WINDOWS_IN_RANGE_SQL).run(rangeStartDate, rangeEndDate);
+    const replaceStartDate = shiftDateString(rangeStartDate, -DND_CALENDAR_RANGE_SLACK_DAYS);
+    const replaceEndDate = shiftDateString(rangeEndDate, DND_CALENDAR_RANGE_SLACK_DAYS);
+    database.prepare(DELETE_DND_CALENDAR_WINDOWS_IN_RANGE_SQL).run(replaceStartDate, replaceEndDate);
     let inserted = 0;
     for (const draft of windows) {
-        // A materialized window outside the range the phone actually looked at
-        // would survive the next sync's delete and become immortal, so it is
-        // dropped instead of stored.
-        if (draft.date === null || draft.date < rangeStartDate || draft.date > rangeEndDate) continue;
+        // Still bounded: a window beyond even the widened range could not have
+        // come from an event overlapping the observed range at all, and would
+        // survive the next sync's delete and become immortal.
+        if (draft.date === null || draft.date < replaceStartDate || draft.date > replaceEndDate) continue;
         insertDndWindow(database, mintId(), { ...draft, source: 'calendar' }, nowIso);
         inserted += 1;
     }
@@ -2345,6 +2376,7 @@ const buildDndResponse = (database: TdahDatabase, timeZone: string, now: Date): 
         settings: state.settings,
         windows: state.windows,
         activeUntil: resolution.active ? resolution.until : null,
+        timeZone,
     };
 };
 
@@ -2371,6 +2403,7 @@ export async function readDndState(
             settings: { calendarEnabled: false, workStart: TDAH_DND_DEFAULT_WORK_START, workEnd: TDAH_DND_DEFAULT_WORK_END },
             windows: [],
             activeUntil: null,
+            timeZone,
         };
     }
     return await withReadDatabase(databasePath, (database) => buildDndResponse(database, timeZone, now));

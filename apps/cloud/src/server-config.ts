@@ -55,7 +55,14 @@ export type CloudFailureContext = {
         // Story 4.1: `runWorkOriginPullTick` itself threw despite its own
         // never-throws contract — the backstop, mirroring
         // 'tdah_activity_trigger_tick_crashed'.
-        | 'tdah_origin_pull_tick_crashed';
+        | 'tdah_origin_pull_tick_crashed'
+        // DW-51: ONE socket's `ws.send` threw while fanning an already-decided
+        // event out to a namespace. Its own code rather than any of the
+        // '*_onfire_failed' ones above: those mean the whole push callback
+        // failed, while this one means the sweep survived and every OTHER
+        // socket of that namespace still got its copy. Carries no namespace
+        // key and no event payload — `.code`-only, like every field here.
+        | 'tdah_ws_push_failed';
     // S10: ONLY ever assign a bare fs/sqlite error code here (e.g. 'ENOENT', 'EACCES',
     // 'SQLITE_BUSY') — never error.message or a path. Privacy ratchet 9e1cd93b7 covers
     // this field too: logError does not sanitize it, the caller must.
@@ -90,6 +97,7 @@ export const CLOUD_LOG_MESSAGES = [
     'tdah origin pull crashed',
     'tdah origin pull fired',
     'tdah origin pull namespace failed',
+    'tdah ws push failed',
     'token auth allowlist enabled',
     'token namespace mode enabled by explicit opt-in',
     'trusting proxy IP headers for auth failure rate limiting',
