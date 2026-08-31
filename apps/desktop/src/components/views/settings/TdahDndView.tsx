@@ -369,11 +369,24 @@ export function TdahDndView() {
 
     const reloadRef = useRef(reload);
     reloadRef.current = reload;
+    // DW-112 — the previous value of `activeUntilExpired`, so the effect below
+    // can fire on its RISING EDGE alone. Without it the effect also re-ran
+    // whenever `isOffline` changed (it is a dependency, and it must be: the
+    // reload has to stay suppressed while offline), which meant a reconnect
+    // with an already-expired claim fired this reload AND `handleOnline`'s own
+    // — two concurrent `GET /v1/tdah/dnd` with no request-id guard on this
+    // view's `load`, free to resolve out of order and let the older answer
+    // overwrite the newer.
+    const wasExpiredRef = useRef(false);
     useEffect(() => {
+        const wasExpired = wasExpiredRef.current;
+        wasExpiredRef.current = activeUntilExpired;
         // Edge-triggered, never a poll — and never while offline, where the
         // reload could only fail and the banner already tells the user the
-        // state on screen is the last one known.
-        if (!activeUntilExpired || isOffline) return;
+        // state on screen is the last one known. Reconnecting is `handleOnline`'s
+        // job alone (it reloads unconditionally), so an expiry that was already
+        // true before the reconnect must NOT fire a second one here.
+        if (!activeUntilExpired || wasExpired || isOffline) return;
         void reloadRef.current();
     }, [activeUntilExpired, isOffline]);
 

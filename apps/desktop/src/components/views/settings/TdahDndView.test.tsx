@@ -280,6 +280,45 @@ describe('TdahDndView', () => {
             expect(cloudGetJson).toHaveBeenCalledTimes(2);
         });
 
+        // DW-112 — the expiry effect depends on `isOffline` (it must: the
+        // reload stays suppressed while offline), so a reconnect with an
+        // already-expired claim used to re-run it AND `handleOnline`'s own
+        // unconditional reload. Two concurrent reads, no request-id guard on
+        // this view's `load`, free to resolve out of order.
+        it('fires exactly one read on reconnect when the claim expired while offline', async () => {
+            configureCloudSync();
+            vi.setSystemTime(new Date('2026-08-26T15:00:00Z'));
+            mockDndSequence(
+                { ...baseState, activeUntil: '12:00', timeZone: 'America/Mexico_City' },
+                { ...baseState, activeUntil: null, timeZone: 'America/Mexico_City' },
+            );
+            render(<TdahDndView />);
+
+            const status = await screen.findByTestId('tdah-dnd-status');
+            expect(status.textContent).toBe('Quiet until 12:00');
+
+            fireEvent(window, new Event('offline'));
+            await screen.findByText('Offline — showing the last loaded state.');
+
+            // The claim expires while offline: the label must drop, but nothing
+            // may hit the network — the banner already says this is the last
+            // state known.
+            cloudGetJson.mockClear();
+            await act(async () => { await vi.advanceTimersByTimeAsync((3 * 60 + 10) * 60 * 1000); });
+            await waitFor(() => {
+                expect(screen.getByTestId('tdah-dnd-status').textContent)
+                    .toBe('Not quiet right now — reminders are coming through.');
+            });
+            expect(cloudGetJson).not.toHaveBeenCalled();
+
+            // Reconnect: `handleOnline` owns the refetch, and the expiry effect
+            // must not add a second concurrent one.
+            fireEvent(window, new Event('online'));
+            await waitFor(() => expect(cloudGetJson).toHaveBeenCalled());
+            await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+            expect(cloudGetJson).toHaveBeenCalledTimes(1);
+        });
+
         // The midnight edge a bare "HH:mm" compare cannot see: "00:20" is
         // lexically SMALLER than "23:59", so the time term alone would keep an
         // end-of-day claim standing for most of the following day.
