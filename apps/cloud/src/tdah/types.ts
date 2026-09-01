@@ -771,6 +771,30 @@ export type TdahDndResponse = {
     settings: TdahDndSettings;
     windows: TdahDndWindow[];
     activeUntil: string | null;
+    /**
+     * The profile's own IANA zone, the same field `TdahDayResponse` already
+     * carries and for the same reason (DW-102): `activeUntil` is an "HH:mm"
+     * with no zone of its own, so T-12 cannot tell whether it has passed
+     * without knowing which clock it was written against — and AD-6 makes the
+     * profile zone editable and therefore free to disagree with the device's.
+     * The client still decides nothing about ACTIVENESS with it; it only
+     * learns when to ask the server again.
+     */
+    timeZone: string;
+    /**
+     * The profile-local day `activeUntil` was resolved ON — the same
+     * `YYYY-MM-DD` shape and the same meaning `TdahDayResponse.date` carries
+     * (DW-114).
+     *
+     * `activeUntil` is a bare "HH:mm" that only orders monotonically WITHIN one
+     * calendar day, so a client comparing it against "now" needs to know which
+     * day it belongs to. Reconstructing that day from the client's own clock at
+     * receipt looks equivalent and is not: a response computed at 23:58 and
+     * applied after local midnight would be stamped with the WRONG day, and the
+     * mismatch would then never resolve itself. Sending the day the server
+     * actually used removes the race instead of narrowing it.
+     */
+    date: string;
 };
 
 /**

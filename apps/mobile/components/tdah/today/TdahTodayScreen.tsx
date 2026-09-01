@@ -36,7 +36,7 @@ import {
     TDAH_TIMELINE_PIXELS_PER_MINUTE,
 } from './tdah-today.styles';
 import type { TdahActivity } from './tdah-today-types';
-import { formatDayKeyInTimeZone, getMinutesSinceMidnightInTimeZone } from './tdah-time';
+import { formatDayKeyInTimeZone, formatWallClockInTimeZone, getMinutesSinceMidnightInTimeZone } from './tdah-time';
 import { computeActivityLaneOffsets } from './tdah-timeline-layout';
 import { useTdahLimbo } from './use-tdah-limbo';
 import { useTdahNow, TDAH_NOW_TICK_INTERVAL_MS } from './use-tdah-now';
@@ -168,6 +168,37 @@ export function TdahTodayScreen() {
     const reloadRef = useRef(reload);
     reloadRef.current = reload;
 
+    // DW-102 — the DND chip must never outlive the silence it announces.
+    // `dndActiveUntil` is the server's own "HH:mm" (AD-8) and nothing on this
+    // screen re-read it: the rollover effect above only fires on a day-key
+    // change, so a chip rendered at 10:30 still claimed "DND · hasta 11:00"
+    // at 14:00 — a false statement about the one question the whole feature
+    // answers ("is this going to vibrate?"), and one the user acts on.
+    //
+    // The comparison here is lexical on the SAME "HH:mm" shape the server
+    // emits, in the profile's own zone (AD-6) — it decides only that the
+    // announced instant has passed, never whether a window is active, which
+    // stays the server's call: the reload is what produces the next truth
+    // (a contiguous window that follows keeps the chip up, with its own
+    // later `until`).
+    //
+    // The day-key term is load-bearing, not belt-and-braces: "HH:mm" orders
+    // monotonically only WITHIN one calendar day, so past local midnight
+    // "00:05" is lexically SMALLER than a stale "23:59" and the time term
+    // alone would conclude the silence is still running. The rollover effect
+    // above reloads on that same tick, but it is a SEPARATE effect racing the
+    // same interval — the chip must not depend on which of the two lands
+    // first, and a `date` that has already rolled means the announced instant
+    // belongs to a finished day either way.
+    const dndExpired = dndActiveUntil !== null
+        && (date === null
+            || formatDayKeyInTimeZone(now, timeZone) !== date
+            || formatWallClockInTimeZone(now, timeZone) >= dndActiveUntil);
+    useEffect(() => {
+        if (!dndExpired) return;
+        void reloadRef.current();
+    }, [dndExpired]);
+
     const refreshBatteryLimited = useCallback(() => {
         if (!connectionSupported) return;
         setBatteryLimited(!isIgnoringBatteryOptimizations());
@@ -261,10 +292,14 @@ export function TdahTodayScreen() {
     // `dndActiveUntil` is the server's own computation (AD-8): the chip
     // renders whatever `GET /v1/tdah/day` returned and never decides for
     // itself whether a window is active or when its block ends.
-    const dndChipLabel = dndActiveUntil !== null
+    // DW-102: hidden the moment the announced instant passes, without waiting
+    // for the reload above to come back — a stale-but-honest "no chip" beats
+    // a rendered claim the clock has already falsified.
+    const dndChipVisible = dndActiveUntil !== null && !dndExpired;
+    const dndChipLabel = dndChipVisible
         ? formatI18nTemplate(tFallback(t, 'tdahToday.dndChip', 'DND \u00b7 until {time}'), { time: dndActiveUntil })
         : null;
-    const dndChipA11yLabel = dndActiveUntil !== null
+    const dndChipA11yLabel = dndChipVisible
         ? formatI18nTemplate(
             tFallback(t, 'tdahToday.dndChipA11y', 'Do not disturb is on until {time}. Opens do-not-disturb settings.'),
             { time: dndActiveUntil },

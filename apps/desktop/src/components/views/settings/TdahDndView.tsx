@@ -89,6 +89,21 @@ export type TdahDndResponse = {
     settings: TdahDndSettings;
     windows: TdahDndWindow[];
     activeUntil: string | null;
+    /**
+     * The profile's own IANA zone (AD-6). `activeUntil` is a bare `HH:mm` with
+     * no zone of its own, so without this the view cannot tell whether the
+     * announced instant has already passed — and the browser's zone is free to
+     * disagree with the profile's. Optional on the wire: a server predating
+     * this field simply leaves the view on its previous, focus-only refresh.
+     */
+    timeZone?: string;
+    /**
+     * The profile-local day (`YYYY-MM-DD`) the server resolved `activeUntil`
+     * ON (DW-114). Optional on the wire only to tolerate a server predating the
+     * field; the fallback stamps it from the browser clock, which carries the
+     * midnight-straddle race this field exists to remove.
+     */
+    date?: string;
 };
 
 type TdahDndPhase = 'loading' | 'no-sync' | 'inactive' | 'ready' | 'error';
@@ -160,6 +175,37 @@ const isDndResponse = (value: unknown): value is TdahDndResponse =>
     && (value as TdahDndResponse).settings !== null;
 
 /**
+ * DW-111 — the two wall-clock readings zone 1's staleness check needs, both in
+ * the PROFILE's zone (AD-6), never the browser's. Hand-written here rather than
+ * imported from `apps/mobile`'s `tdah-time.ts`: the two apps share no client
+ * code, and this file already mirrors the server's own constants and validators
+ * by hand for the same reason every other TDAH view documents (ADR 0026).
+ */
+const DEVICE_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+const formatWallClockInTimeZone = (date: Date, timeZone: string): string => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(date);
+    const hour = parts.find((part) => part.type === 'hour')?.value ?? '00';
+    const minute = parts.find((part) => part.type === 'minute')?.value ?? '00';
+    return `${hour}:${minute}`;
+};
+
+const formatDayKeyInTimeZone = (date: Date, timeZone: string): string => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(date);
+    const year = parts.find((part) => part.type === 'year')?.value ?? '1970';
+    const month = parts.find((part) => part.type === 'month')?.value ?? '01';
+    const day = parts.find((part) => part.type === 'day')?.value ?? '01';
+    return `${year}-${month}-${day}`;
+};
+
+/** Same 30s cadence the phone's own `useTdahNow` uses, for the same job: nothing here polls the server, the tick only re-evaluates a claim already on screen. */
+const TDAH_DND_STATUS_TICK_INTERVAL_MS = 30_000;
+
+/**
  * `Date.UTC` over the already-resolved `YYYY-MM-DD` plus a UTC formatter: a
  * one-off window's date is a wall-clock date in the profile's zone, and
  * `new Date('2026-09-01')` rendered in a negative-offset browser would print
@@ -211,6 +257,14 @@ export function TdahDndView() {
     const [state, setState] = useState<TdahDndResponse | null>(null);
     const [cloud, setCloud] = useState<CloudConnection | null>(null);
     const [isOffline, setIsOffline] = useState(false);
+    // DW-111 — zone 1's own clock. `now` re-samples the real clock every tick
+    // (never a fixed increment), so it crosses a day boundary correctly after
+    // the window was left open or the machine slept.
+    const [now, setNow] = useState(() => new Date());
+    // The profile-zone day the server resolved the CURRENT `activeUntil` on,
+    // read off the response itself (DW-114) rather than stamped from this
+    // machine's clock.
+    const [dayKey, setDayKey] = useState<string | null>(null);
 
     const [workStart, setWorkStart] = useState(TDAH_DND_DEFAULT_WORK_START);
     const [workEnd, setWorkEnd] = useState(TDAH_DND_DEFAULT_WORK_END);
@@ -243,6 +297,16 @@ export function TdahDndView() {
         setState(next);
         setWorkStart(next.settings.workStart || TDAH_DND_DEFAULT_WORK_START);
         setWorkEnd(next.settings.workEnd || TDAH_DND_DEFAULT_WORK_END);
+        // DW-114 — the server's own resolution day, verbatim. The client stamp
+        // below is the degraded path for a server predating the field: it can
+        // record the wrong day when a response computed at 23:58 lands after
+        // local midnight, and that mismatch never recovers on its own.
+        setDayKey(typeof next.date === 'string' && next.date.length > 0
+            ? next.date
+            : formatDayKeyInTimeZone(
+                new Date(),
+                typeof next.timeZone === 'string' && next.timeZone.length > 0 ? next.timeZone : DEVICE_TIME_ZONE,
+            ));
     }, []);
 
     const load = useCallback(async (config: CloudConnection): Promise<void> => {
@@ -284,6 +348,61 @@ export function TdahDndView() {
     useEffect(() => {
         void reload();
     }, [reload]);
+
+    // DW-111 — zone 1 must never outlive the silence it announces, the same
+    // defect and the same fix the two mobile surfaces carry (DW-102; see
+    // TdahTodayScreen.tsx for the full rationale). `activeUntil` is a
+    // server-computed "HH:mm" that nothing here re-read, so "Quiet until 12:00"
+    // stayed on screen at 14:00 — on the very view the user opens to check
+    // whether they are quiet.
+    useEffect(() => {
+        const interval = setInterval(() => setNow(new Date()), TDAH_DND_STATUS_TICK_INTERVAL_MS);
+        return () => clearInterval(interval);
+    }, []);
+
+    const activeUntil = state?.activeUntil ?? null;
+    const activeZone = (typeof state?.timeZone === 'string' && state.timeZone.length > 0)
+        ? state.timeZone
+        : DEVICE_TIME_ZONE;
+    // Two terms, both load-bearing. The time term alone would be wrong past
+    // local midnight: "HH:mm" orders monotonically only WITHIN one calendar
+    // day, so "00:05" is lexically SMALLER than a stale "23:59" and an
+    // end-of-day window would keep claiming a silence for most of the next
+    // day. A rolled-over day key means the announced instant belongs to a day
+    // that is already over, which expires it outright.
+    //
+    // Neither term decides whether a window is ACTIVE — that stays the
+    // server's call (AD-8). They decide only that the announced instant is
+    // behind us, and the reload is what produces the next truth: a contiguous
+    // window that follows comes back with its own later `until`.
+    const activeUntilExpired = activeUntil !== null
+        && (dayKey === null
+            || formatDayKeyInTimeZone(now, activeZone) !== dayKey
+            || formatWallClockInTimeZone(now, activeZone) >= activeUntil);
+    const activeUntilLabel = activeUntilExpired ? null : activeUntil;
+
+    const reloadRef = useRef(reload);
+    reloadRef.current = reload;
+    // DW-112 — the previous value of `activeUntilExpired`, so the effect below
+    // can fire on its RISING EDGE alone. Without it the effect also re-ran
+    // whenever `isOffline` changed (it is a dependency, and it must be: the
+    // reload has to stay suppressed while offline), which meant a reconnect
+    // with an already-expired claim fired this reload AND `handleOnline`'s own
+    // — two concurrent `GET /v1/tdah/dnd` with no request-id guard on this
+    // view's `load`, free to resolve out of order and let the older answer
+    // overwrite the newer.
+    const wasExpiredRef = useRef(false);
+    useEffect(() => {
+        const wasExpired = wasExpiredRef.current;
+        wasExpiredRef.current = activeUntilExpired;
+        // Edge-triggered, never a poll — and never while offline, where the
+        // reload could only fail and the banner already tells the user the
+        // state on screen is the last one known. Reconnecting is `handleOnline`'s
+        // job alone (it reloads unconditionally), so an expiry that was already
+        // true before the reconnect must NOT fire a second one here.
+        if (!activeUntilExpired || wasExpired || isOffline) return;
+        void reloadRef.current();
+    }, [activeUntilExpired, isOffline]);
 
     // Offline: pause automatic reloads and keep the last loaded state on screen
     // behind a banner — same pattern as the other TDAH views.
@@ -561,8 +680,8 @@ export function TdahDndView() {
                         <div className="p-4 space-y-1.5 border-b border-border">
                             <div className="text-sm font-medium">{t('tdahDnd.status.title')}</div>
                             <div className="text-[13px]" data-testid="tdah-dnd-status">
-                                {state?.activeUntil
-                                    ? formatI18nTemplate(t('tdahDnd.status.active'), { time: state.activeUntil })
+                                {activeUntilLabel
+                                    ? formatI18nTemplate(t('tdahDnd.status.active'), { time: activeUntilLabel })
                                     : t('tdahDnd.status.idle')}
                             </div>
                             <p className="text-xs text-muted-foreground pt-1">{t('tdahDnd.promise')}</p>

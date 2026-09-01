@@ -985,6 +985,40 @@ export function resolveServerMergeTimestamp(..._dataSets: AppData[]): string {
  * real client actually receives the message — the same end-to-end proof
  * `openTdahWs` already gives the `'connected'` event.
  */
+/**
+ * DW-51 — one namespace's fan-out, with per-socket failure isolation.
+ *
+ * Both push sinks below (N-03's ritual invitation, and N-01/N-02/N-04's
+ * activity-trigger tick) reach here. A `ws.send` that throws — a socket that
+ * closed between `connectionsFor` and the send, or a zombie left behind by an
+ * earlier session — must never cost the REMAINING sockets of that namespace
+ * their copy of the event: by the time a sink is called the caller's dedupe
+ * mark is already committed, so a socket skipped by an aborted loop is a
+ * permanently lost notification, never a retried one.
+ *
+ * The throw is swallowed per socket and the sweep continues. Logged with no
+ * namespace key and no event payload (AGENTS.md's `.code`-only rule); the
+ * calling layers' own wrappers (`activity-trigger.ts`, `scheduler.ts`) stay
+ * exactly as they are — they guard the sink as a whole, this guards inside it.
+ */
+export const fanOutTdahWsEvent = <TConnection extends { send: (data: string) => unknown }>(
+    registry: TdahWsConnectionRegistry<TConnection>,
+    key: string,
+    event: TdahWsRitualInvitationEvent | TdahWsActivityTriggerEvent | TdahWsWorkBandEvent,
+): void => {
+    const payload = JSON.stringify(event);
+    for (const ws of registry.connectionsFor(key)) {
+        try {
+            ws.send(payload);
+        } catch {
+            logFailureWarn('tdah ws push failed', {
+                failureClass: 'runtime',
+                failureCode: 'tdah_ws_push_failed',
+            });
+        }
+    }
+};
+
 export const buildTdahRitualInvitationWiring = (
     registry: TdahWsConnectionRegistry<BunServerWebSocket>,
 ): {
@@ -993,10 +1027,7 @@ export const buildTdahRitualInvitationWiring = (
 } => ({
     hasOpenConnection: (key) => registry.connectionCount(key) > 0,
     onRitualInvitationFire: (key, event) => {
-        const payload = JSON.stringify(event);
-        for (const ws of registry.connectionsFor(key)) {
-            ws.send(payload);
-        }
+        fanOutTdahWsEvent(registry, key, event);
     },
 });
 
@@ -1419,10 +1450,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
         // N-01/N-02; only the event `kind` differs. One helper serves both
         // sinks so the two pushes cannot drift apart.
         const pushToNamespace = (key: string, event: TdahWsActivityTriggerEvent | TdahWsWorkBandEvent) => {
-            const payload = JSON.stringify(event);
-            for (const ws of tdahWsRegistry.connectionsFor(key)) {
-                ws.send(payload);
-            }
+            fanOutTdahWsEvent(tdahWsRegistry, key, event);
         };
         void runTdahActivityTriggerIntervalTick(
             dataDir,

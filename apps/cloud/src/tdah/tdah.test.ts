@@ -7774,6 +7774,8 @@ describe('tdah module', () => {
             settings: { calendarEnabled: boolean; workStart: string; workEnd: string };
             windows: TdahTestDndWindow[];
             activeUntil: string | null;
+            timeZone?: string;
+            date?: string;
         };
 
         const dndRequest = async (
@@ -8308,6 +8310,54 @@ describe('tdah module', () => {
                 expect(resynced.windows.filter((entry) => entry.source === 'manual')).toHaveLength(1);
             });
 
+            // DW-100: `getEventsAsync` returns every event OVERLAPPING the
+            // phone's range without clipping it, and `materializeCalendarWindows`
+            // then splits it at local midnight — so a meeting crossing the edge
+            // of the observed range contributes a segment dated one local day
+            // outside it. The strict `[rangeStartDate, rangeEndDate]` guard
+            // dropped exactly that segment, and the tail of a real meeting the
+            // user is sitting in went unsilenced with nothing to signal it.
+            test('DW-100: el tramo de una junta que cruza el borde del rango se persiste, y sigue siendo reemplazable', async () => {
+                await activate({ timeZone: 'UTC' });
+                const date = today();
+                const nextDate = computeTomorrowDate('UTC');
+
+                const synced = await readDnd(await dndRequest('PUT', {
+                    path: '/v1/tdah/dnd/calendar',
+                    body: {
+                        rangeStart: `${date}T00:00:00.000Z`,
+                        // Deliberately BEFORE local midnight: the event below
+                        // outlives the range the phone actually looked at.
+                        rangeEnd: `${date}T23:00:00.000Z`,
+                        events: [
+                            // 22:00 today -> 10:00 tomorrow. Today's half falls
+                            // outside 09:00-18:00 and is discarded on its own
+                            // merits; tomorrow's 09:00-10:00 half is the tramo
+                            // that used to vanish.
+                            { startsAt: `${date}T22:00:00.000Z`, endsAt: `${nextDate}T10:00:00.000Z` },
+                        ],
+                    },
+                }));
+                const spilled = synced.windows.filter((entry) => entry.source === 'calendar');
+                expect(spilled).toHaveLength(1);
+                expect(spilled[0]?.date).toBe(nextDate);
+                expect(spilled[0]?.startTime).toBe('09:00');
+                expect(spilled[0]?.endTime).toBe('10:00');
+
+                // …and it is NOT immortal: the delete half of the next
+                // block-replace is widened by the same day, so an empty sync of
+                // the same range clears it.
+                const cleared = await readDnd(await dndRequest('PUT', {
+                    path: '/v1/tdah/dnd/calendar',
+                    body: {
+                        rangeStart: `${date}T00:00:00.000Z`,
+                        rangeEnd: `${date}T23:00:00.000Z`,
+                        events: [],
+                    },
+                }));
+                expect(cleared.windows.filter((entry) => entry.source === 'calendar')).toHaveLength(0);
+            });
+
             test('la ventana manual nº 51 es 409 TDAH_DND_LIMIT', async () => {
                 await activate({ timeZone: 'UTC' });
                 for (let index = 0; index < 50; index += 1) {
@@ -8383,6 +8433,27 @@ describe('tdah module', () => {
         });
 
         // --- (i) the chip: GET /v1/tdah/day carries the server's own verdict
+
+        // DW-114: `activeUntil` es un "HH:mm" pelado, asi que el cliente necesita
+        // saber SOBRE QUE DIA lo resolvio el servidor. Sin este campo las dos
+        // superficies DND lo sellaban del reloj propio al recibir, y una
+        // respuesta calculada a las 23:58 que aterriza pasada la medianoche
+        // quedaba sellada con el dia equivocado, sin forma de recuperarse.
+        test('DW-114: GET /v1/tdah/dnd trae el dia y la zona sobre los que el servidor resolvio activeUntil', async () => {
+            await activate({ timeZone: 'UTC' });
+            const body = await readDnd(await dndRequest('GET'));
+            expect(body.timeZone).toBe('UTC');
+            expect(body.date).toBe(today());
+
+            // Y viaja tambien en la respuesta de cada mutacion, no solo en el
+            // GET: toda mutacion DND devuelve el mismo envelope.
+            const created = await readDnd(await dndRequest('POST', {
+                path: '/v1/tdah/dnd/windows',
+                body: { kind: 'weekly', weekdays: [1], startTime: '10:00', endTime: '11:00' },
+            }));
+            expect(created.date).toBe(today());
+            expect(created.timeZone).toBe('UTC');
+        });
 
         test('(i) GET /v1/tdah/day trae dndActiveUntil, calculado por el servidor como fin del bloque contiguo', async () => {
             await activate({ timeZone: 'UTC' });

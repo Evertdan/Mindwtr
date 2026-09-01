@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -10,6 +10,8 @@ import { useFilledButtonColors } from '@/hooks/use-filled-button-colors';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { useThemeTokens } from '@/hooks/use-theme-tokens';
 
+import { formatDayKeyInTimeZone, formatWallClockInTimeZone } from '../today/tdah-time';
+import { useTdahNow } from '../today/use-tdah-now';
 import { styles } from './tdah-dnd.styles';
 import type { TdahDndWindow, TdahDndWindowInput, TdahDndWindowKind } from './tdah-dnd-types';
 import { useTdahDnd, type TdahDndMutationError } from './use-tdah-dnd';
@@ -127,6 +129,8 @@ export function TdahDndScreen() {
         settings,
         windows,
         activeUntil,
+        timeZone,
+        dayKey,
         permission,
         calendarSupported,
         calendarSyncing,
@@ -160,6 +164,38 @@ export function TdahDndScreen() {
         setWorkEndText(settings.workEnd);
         setWorkTouched(false);
     }, [settings.workStart, settings.workEnd]);
+
+    // DW-102 — zone 1 must never outlive the silence it announces, for the
+    // same reason T-01's chip must not (TdahTodayScreen.tsx carries the full
+    // rationale): `activeUntil` is a server-computed "HH:mm" that nothing
+    // re-read, so "Quiet until 11:00" stayed on screen at 14:00 — on the very
+    // screen the user opens to check whether they are quiet.
+    //
+    // The comparison is lexical, on the same "HH:mm" shape, in the profile's
+    // zone (AD-6). It decides only that the announced instant has passed; the
+    // reload is what produces the next truth, so a contiguous window that
+    // follows keeps zone 1 quiet with its own later `until`.
+    //
+    // The day key is half of that comparison, not decoration: "HH:mm" orders
+    // monotonically only WITHIN one calendar day, so past local midnight
+    // "00:05" is lexically SMALLER than a stale "23:59" — an end-of-day window
+    // (`LAST_MINUTE_OF_DAY`, dnd.ts) would keep claiming a silence for most of
+    // the following day. A rolled-over day key means the announced instant
+    // belongs to a day that is already over, which expires it outright. T-01
+    // gets the same guarantee from `GET /v1/tdah/day`'s own `date`; here the
+    // hook stamps it at receipt.
+    const now = useTdahNow();
+    const activeUntilExpired = activeUntil !== null
+        && (dayKey === null
+            || formatDayKeyInTimeZone(now, timeZone) !== dayKey
+            || formatWallClockInTimeZone(now, timeZone) >= activeUntil);
+    const reloadRef = useRef(reload);
+    reloadRef.current = reload;
+    useEffect(() => {
+        if (!activeUntilExpired) return;
+        void reloadRef.current();
+    }, [activeUntilExpired]);
+    const activeUntilLabel = activeUntilExpired ? null : activeUntil;
 
     // AC: the state is a datum of calm, in the `dnd` role when the active
     // theme resolves one (`tokens.roles`, null for a non-Material theme) —
@@ -305,13 +341,13 @@ export function TdahDndScreen() {
                         {tFallback(t, 'tdahDnd.status.title', 'Right now')}
                     </Text>
                     <Text
-                        style={[styles.statusValue, { color: activeUntil ? dndColor : tc.text }]}
+                        style={[styles.statusValue, { color: activeUntilLabel ? dndColor : tc.text }]}
                         testID="tdah-dnd-status-value"
                     >
-                        {activeUntil
+                        {activeUntilLabel
                             ? formatI18nTemplate(
                                 tFallback(t, 'tdahDnd.status.active', 'Quiet until {time}'),
-                                { time: activeUntil },
+                                { time: activeUntilLabel },
                             )
                             : tFallback(t, 'tdahDnd.status.idle', 'Not quiet right now — reminders are coming through.')}
                     </Text>

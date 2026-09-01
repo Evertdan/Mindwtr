@@ -34,6 +34,8 @@ const storeMocks = vi.hoisted(() => {
         setError: vi.fn(),
         setHighlightTask: vi.fn(),
         settings: {
+            // `dateFormat` pinned — see the beforeEach reset below for why.
+            dateFormat: 'mdy',
             diagnostics: {
                 loggingEnabled: false,
             },
@@ -203,6 +205,14 @@ describe('CalendarView', () => {
         storeMocks.taskStoreState.projects = [];
         storeMocks.taskStoreState.areas = [];
         storeMocks.taskStoreState.settings = {
+            // Pinned so the grid's date formatting is deterministic on any
+            // machine. With no `dateFormat`, `resolveDateLocaleTag` (core's
+            // date.ts) deliberately prefers the SYSTEM locale over the app
+            // language, so the English month abbreviations the aria-label
+            // assertions below match against only held on an English-locale
+            // host — on an es-* machine the same buttons read "4 abr 2026" and
+            // the queries found nothing. 'mdy' short-circuits to 'en-US'.
+            dateFormat: 'mdy',
             diagnostics: { loggingEnabled: false },
             undoNotificationsEnabled: true,
             weekStart: 'sunday',

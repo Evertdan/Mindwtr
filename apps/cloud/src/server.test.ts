@@ -73,6 +73,7 @@ import {
 } from './server-validation';
 import {
     canonicalCloudRoute,
+    fanOutTdahWsEvent,
     resolveServerMergeTimestamp,
     runTdahActivityTriggerIntervalTick,
     runTdahNightlyIntervalTick,
@@ -80,6 +81,7 @@ import {
     startCloudServer,
     type CloudRequestCompletion,
 } from './server';
+import { createTdahWsConnectionRegistry } from './tdah/ws-channel';
 import { pruneOrphanedCalendarFeeds, revokeCalendarFeed } from './server-calendar-feed';
 
 const expireFileForOrphanGc = (path: string): void => {
@@ -4906,5 +4908,61 @@ describe('cloud server calendar feed', () => {
         } finally {
             rmSync(dataDir, { recursive: true, force: true });
         }
+    });
+});
+
+// DW-51 — the WS fan-out's per-socket failure isolation. Both push sinks
+// (N-03's ritual invitation and the activity-trigger tick's N-01/N-02/N-04)
+// route through `fanOutTdahWsEvent`, so proving it here proves both.
+describe('tdah ws fan-out isolation', () => {
+    type FakeSocket = { send: (data: string) => number; received: string[] };
+
+    const okSocket = (): FakeSocket => {
+        const received: string[] = [];
+        return { received, send: (data) => { received.push(data); return data.length; } };
+    };
+
+    const throwingSocket = (): FakeSocket => ({
+        received: [],
+        send: () => { throw new Error('socket is closed'); },
+    });
+
+    const event = { kind: 'ritual-invitation', at: '2026-08-26T03:00:00.000Z' } as const;
+
+    test('a socket that throws mid-sweep never costs the later sockets of that namespace their event', () => {
+        const registry = createTdahWsConnectionRegistry<FakeSocket>();
+        const first = okSocket();
+        const broken = throwingSocket();
+        const last = okSocket();
+        // Registration order is the iteration order (Set): the broken socket
+        // sits BETWEEN two live ones, which is exactly the arrangement an
+        // unguarded loop would have truncated.
+        registry.register('ns', first);
+        registry.register('ns', broken);
+        registry.register('ns', last);
+
+        expect(() => fanOutTdahWsEvent(registry, 'ns', event)).not.toThrow();
+
+        const payload = JSON.stringify(event);
+        expect(first.received).toEqual([payload]);
+        expect(last.received).toEqual([payload]);
+    });
+
+    test('only the addressed namespace is swept', () => {
+        const registry = createTdahWsConnectionRegistry<FakeSocket>();
+        const mine = okSocket();
+        const other = okSocket();
+        registry.register('ns', mine);
+        registry.register('other-ns', other);
+
+        fanOutTdahWsEvent(registry, 'ns', event);
+
+        expect(mine.received).toHaveLength(1);
+        expect(other.received).toEqual([]);
+    });
+
+    test('an empty namespace is a silent no-op', () => {
+        const registry = createTdahWsConnectionRegistry<FakeSocket>();
+        expect(() => fanOutTdahWsEvent(registry, 'nobody', event)).not.toThrow();
     });
 });

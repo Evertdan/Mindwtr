@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { CloudHttpError } from '@mindwtr/core';
 
@@ -157,6 +157,20 @@ const mockDnd = (state: TdahDndResponse | null): void => {
     ));
 };
 
+/**
+ * `mockDnd`, but the SECOND and later reads answer with `next` — the shape a
+ * real server produces once the announced instant has passed and it recomputes
+ * `activeUntil` for the new "now".
+ */
+const mockDndSequence = (first: TdahDndResponse, next: TdahDndResponse): void => {
+    let seen = 0;
+    cloudGetJson.mockImplementation((url: string) => {
+        if (!url.includes('/tdah/dnd')) return Promise.resolve(null);
+        seen += 1;
+        return Promise.resolve(seen === 1 ? first : next);
+    });
+};
+
 const openEditorForNewWindow = async (): Promise<HTMLElement> => {
     fireEvent.click(screen.getByRole('button', { name: 'Add a window' }));
     const dialog = await screen.findByRole('dialog');
@@ -193,14 +207,177 @@ describe('TdahDndView', () => {
 
     it('renders the server-computed activeUntil verbatim and never decides it locally', async () => {
         configureCloudSync();
-        // The windows list here says nothing about *now*: the only source of
-        // "quiet until 11:00" is the server's own `activeUntil` (AD-8). A
-        // client that computed this itself would say "idle" for this payload.
-        mockDnd({ ...baseState, windows: [], activeUntil: '11:00' });
-        render(<TdahDndView />);
+        // DW-111: the claim is time-dependent now, so the clock is pinned
+        // inside the announced window (10:00 in the profile's zone) rather than
+        // left to whatever the wall clock says when the suite runs.
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        vi.setSystemTime(new Date('2026-08-26T16:00:00Z'));
+        try {
+            // The windows list here says nothing about *now*: the only source of
+            // "quiet until 11:00" is the server's own `activeUntil` (AD-8). A
+            // client that computed this itself would say "idle" for this payload.
+            mockDnd({ ...baseState, windows: [], activeUntil: '11:00', timeZone: 'America/Mexico_City' });
+            render(<TdahDndView />);
 
-        const status = await screen.findByTestId('tdah-dnd-status');
-        expect(status.textContent).toBe('Quiet until 11:00');
+            const status = await screen.findByTestId('tdah-dnd-status');
+            expect(status.textContent).toBe('Quiet until 11:00');
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    // DW-111 — zone 1's claim is time-dependent, and until this fix nothing on
+    // this view ever re-read it: "Quiet until 11:00" stayed on screen at 14:00,
+    // on the very view the user opens to check whether they are quiet. Same
+    // defect and same fix as the two mobile surfaces (DW-102).
+    describe('DW-111 — the status stops claiming a silence that has ended', () => {
+        beforeEach(() => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+        });
+
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        it('keeps the claim while the announced instant is still ahead', async () => {
+            configureCloudSync();
+            // 09:00 in the profile's zone (America/Mexico_City = UTC-6).
+            vi.setSystemTime(new Date('2026-08-26T15:00:00Z'));
+            mockDnd({ ...baseState, activeUntil: '12:00', timeZone: 'America/Mexico_City' });
+            render(<TdahDndView />);
+
+            const status = await screen.findByTestId('tdah-dnd-status');
+            expect(status.textContent).toBe('Quiet until 12:00');
+
+            // 09:00 → 11:00 local: still inside the window.
+            await act(async () => { await vi.advanceTimersByTimeAsync(2 * 60 * 60 * 1000); });
+            expect(screen.getByTestId('tdah-dnd-status').textContent).toBe('Quiet until 12:00');
+        });
+
+        it('drops the claim once the announced instant passes, and re-reads the server', async () => {
+            configureCloudSync();
+            vi.setSystemTime(new Date('2026-08-26T15:00:00Z'));
+            // The reload the expiry triggers gets the server's fresh verdict —
+            // which is `null`, because the window really has ended. The view
+            // never decides that itself (AD-8); it only decides when to ask.
+            mockDndSequence(
+                { ...baseState, activeUntil: '12:00', timeZone: 'America/Mexico_City' },
+                { ...baseState, activeUntil: null, timeZone: 'America/Mexico_City' },
+            );
+            render(<TdahDndView />);
+
+            const status = await screen.findByTestId('tdah-dnd-status');
+            expect(status.textContent).toBe('Quiet until 12:00');
+            expect(cloudGetJson).toHaveBeenCalledTimes(1);
+
+            // 09:00 → 12:10 local.
+            await act(async () => { await vi.advanceTimersByTimeAsync((3 * 60 + 10) * 60 * 1000); });
+            await waitFor(() => {
+                expect(screen.getByTestId('tdah-dnd-status').textContent)
+                    .toBe('Not quiet right now — reminders are coming through.');
+            });
+            // Edge-triggered: exactly one extra read, not one per tick.
+            expect(cloudGetJson).toHaveBeenCalledTimes(2);
+        });
+
+        // DW-112 — the expiry effect depends on `isOffline` (it must: the
+        // reload stays suppressed while offline), so a reconnect with an
+        // already-expired claim used to re-run it AND `handleOnline`'s own
+        // unconditional reload. Two concurrent reads, no request-id guard on
+        // this view's `load`, free to resolve out of order.
+        it('fires exactly one read on reconnect when the claim expired while offline', async () => {
+            configureCloudSync();
+            vi.setSystemTime(new Date('2026-08-26T15:00:00Z'));
+            mockDndSequence(
+                { ...baseState, activeUntil: '12:00', timeZone: 'America/Mexico_City' },
+                { ...baseState, activeUntil: null, timeZone: 'America/Mexico_City' },
+            );
+            render(<TdahDndView />);
+
+            const status = await screen.findByTestId('tdah-dnd-status');
+            expect(status.textContent).toBe('Quiet until 12:00');
+
+            fireEvent(window, new Event('offline'));
+            await screen.findByText('Offline — showing the last loaded state.');
+
+            // The claim expires while offline: the label must drop, but nothing
+            // may hit the network — the banner already says this is the last
+            // state known.
+            cloudGetJson.mockClear();
+            await act(async () => { await vi.advanceTimersByTimeAsync((3 * 60 + 10) * 60 * 1000); });
+            await waitFor(() => {
+                expect(screen.getByTestId('tdah-dnd-status').textContent)
+                    .toBe('Not quiet right now — reminders are coming through.');
+            });
+            expect(cloudGetJson).not.toHaveBeenCalled();
+
+            // Reconnect: `handleOnline` owns the refetch, and the expiry effect
+            // must not add a second concurrent one.
+            fireEvent(window, new Event('online'));
+            await waitFor(() => expect(cloudGetJson).toHaveBeenCalled());
+            await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+            expect(cloudGetJson).toHaveBeenCalledTimes(1);
+        });
+
+        // DW-114 — the day comes from the server's own resolution now. This is
+        // the race the client stamp could not survive: the response describes
+        // the 26th (activeUntil 23:59) but lands once the clock already reads
+        // the 27th. Stamping locally would have recorded the 27th, the day-key
+        // branch would never trip, and the stale claim would sit there ~24h.
+        it('drops a claim whose server day has already rolled, even on the very first render', async () => {
+            configureCloudSync();
+            vi.setSystemTime(new Date('2026-08-27T06:20:00Z')); // 00:20 on the 27th, UTC-6
+            mockDnd({
+                ...baseState,
+                activeUntil: '23:59',
+                timeZone: 'America/Mexico_City',
+                date: '2026-08-26',
+            });
+            render(<TdahDndView />);
+
+            const status = await screen.findByTestId('tdah-dnd-status');
+            expect(status.textContent).toBe('Not quiet right now — reminders are coming through.');
+            expect(status.textContent).not.toContain('23:59');
+        });
+
+        it('honours a server day that matches the clock', async () => {
+            configureCloudSync();
+            vi.setSystemTime(new Date('2026-08-26T15:00:00Z')); // 09:00 on the 26th
+            mockDnd({
+                ...baseState,
+                activeUntil: '12:00',
+                timeZone: 'America/Mexico_City',
+                date: '2026-08-26',
+            });
+            render(<TdahDndView />);
+
+            const status = await screen.findByTestId('tdah-dnd-status');
+            expect(status.textContent).toBe('Quiet until 12:00');
+        });
+
+        // The midnight edge a bare "HH:mm" compare cannot see: "00:20" is
+        // lexically SMALLER than "23:59", so the time term alone would keep an
+        // end-of-day claim standing for most of the following day.
+        it('drops an end-of-day claim once the profile zone rolls past midnight', async () => {
+            configureCloudSync();
+            // 23:50 local on 2026-08-26 (UTC-6).
+            vi.setSystemTime(new Date('2026-08-27T05:50:00Z'));
+            mockDndSequence(
+                { ...baseState, activeUntil: '23:59', timeZone: 'America/Mexico_City' },
+                { ...baseState, activeUntil: null, timeZone: 'America/Mexico_City' },
+            );
+            render(<TdahDndView />);
+
+            const status = await screen.findByTestId('tdah-dnd-status');
+            expect(status.textContent).toBe('Quiet until 23:59');
+
+            // 23:50 → 00:20 the next local day.
+            await act(async () => { await vi.advanceTimersByTimeAsync(30 * 60 * 1000); });
+            await waitFor(() => {
+                expect(screen.getByTestId('tdah-dnd-status').textContent)
+                    .toBe('Not quiet right now — reminders are coming through.');
+            });
+        });
     });
 
     it('stays idle when the server says so even while manual windows exist', async () => {

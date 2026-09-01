@@ -157,6 +157,61 @@ describe('useTdahDnd', () => {
             expect(latest.activeUntil).toBeNull();
         });
 
+        // DW-102: `activeUntil` is a bare "HH:mm", so T-12 needs the zone the
+        // server resolved it against to know when it has passed. AD-6 makes
+        // that zone editable and free to disagree with the device's.
+        it('exposes the profile zone the server resolved activeUntil against', async () => {
+            cloud.get.mockResolvedValue(state({ activeUntil: '12:00', timeZone: 'Asia/Tokyo' }));
+            await mountAndLoad();
+            expect(latest.timeZone).toBe('Asia/Tokyo');
+        });
+
+        // DW-114 — the day must come from the server's own resolution, not from
+        // the client clock at receipt. Stamping it locally looked equivalent and
+        // was not: a response computed at 23:58 and applied after local midnight
+        // got the wrong day, and the expiry predicate then never recovered.
+        it('takes the resolution day from the server response, not from the client clock', async () => {
+            cloud.get.mockResolvedValue(state({
+                activeUntil: '23:59',
+                timeZone: 'America/Mexico_City',
+                date: '2026-08-26',
+            }));
+            await mountAndLoad();
+            expect(latest.dayKey).toBe('2026-08-26');
+        });
+
+        it('keeps the server day even when the client clock has already rolled past it', async () => {
+            // The exact race: the response describes 2026-08-26, but it lands
+            // once the device clock already reads the 27th. The hook must record
+            // the day the server used, so the screen can see the claim is stale.
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2026-08-27T06:20:00Z')); // 00:20 on the 27th, UTC-6
+            try {
+                cloud.get.mockResolvedValue(state({
+                    activeUntil: '23:59',
+                    timeZone: 'America/Mexico_City',
+                    date: '2026-08-26',
+                }));
+                await mountAndLoad();
+                expect(latest.dayKey).toBe('2026-08-26');
+                expect(latest.dayKey).not.toBe('2026-08-27');
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
+        it('falls back to a client stamp only when the server sends no date', async () => {
+            cloud.get.mockResolvedValue({ ...state({ timeZone: 'UTC' }), date: undefined });
+            await mountAndLoad();
+            expect(latest.dayKey).toBe(new Intl.DateTimeFormat('en-CA', { timeZone: 'UTC' }).format(new Date()));
+        });
+
+        it('falls back to the device zone when the server sends none', async () => {
+            cloud.get.mockResolvedValue({ ...state(), timeZone: undefined });
+            await mountAndLoad();
+            expect(latest.timeZone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+        });
+
         it('is unconfigured when Self-Hosted sync is not set up', async () => {
             config.value = null;
             await mountAndLoad();
