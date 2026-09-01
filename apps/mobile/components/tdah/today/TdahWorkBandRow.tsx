@@ -106,7 +106,7 @@ export function TdahWorkBandRow({
     const timeRange = formatActivityTimeRange(activity.startTime, activity.durationMinutes);
     const originLabel = tdahActivityOriginLabel(t, activity.origin);
     const countLabel = formatI18nTemplate(
-        tFallback(t, 'tdahToday.workBandTasks', '{count} tasks'),
+        tFallback(t, 'tdahToday.workBandTasks', '{count} task(s)'),
         { count: String(items.length) },
     );
     const toggleLabel = expanded

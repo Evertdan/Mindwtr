@@ -164,7 +164,7 @@ function handleTdahRitualInvitationEvent(_event: TdahWsRitualInvitationEvent, re
  */
 function handleTdahWorkBandEvent(event: TdahWsWorkBandEvent, resolveText: ResolveText): void {
     const title = formatI18nTemplate(
-        resolveText('tdahToday.workBandNotificationTitle', 'Sprint: {count} pending assigned tasks'),
+        resolveText('tdahToday.workBandNotificationTitle', 'Sprint: {count} pending assigned task(s)'),
         { count: String(event.itemCount) },
     );
 

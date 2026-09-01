@@ -19,7 +19,7 @@ vi.mock('@/contexts/language-context', () => ({
         'common.notice': 'Notice',
         'common.offline': 'Offline',
         'settings.lastSyncError': 'Sync failed',
-        'settings.syncCompletedWithConflicts': 'Sync completed with {count} conflicts (resolved automatically).',
+        'settings.syncCompletedWithConflicts': 'Sync completed with {count} conflict(s) (resolved automatically).',
         'settings.syncMobile.pleaseSetAWebdavUrlFirst': 'Please set a WebDAV URL first',
         'settings.syncQueued': 'Sync queued',
         'settings.syncQueuedBody': 'Local changes arrived during sync. A retry was queued automatically.',
@@ -187,7 +187,7 @@ describe('useManualPullSync', () => {
 
     expect(latest?.indicatorState).toBe('success');
     expect(mocked.showToast).toHaveBeenCalledWith(expect.objectContaining({
-      message: 'Sync completed with 2 conflicts (resolved automatically).',
+      message: 'Sync completed with 2 conflict(s) (resolved automatically).',
       tone: 'warning',
     }));
   });

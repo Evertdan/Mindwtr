@@ -93,18 +93,18 @@ describe('TdahWorkBandRow', () => {
         const text = allText(renderBand());
         expect(text).toContain('9:30–14:00');
         expect(text).toContain('Sprint');
-        expect(text).toContain('3 tasks');
+        expect(text).toContain('3 task(s)');
     });
 
     it('counts the tasks it actually has, never a hard-coded figure', () => {
         const text = allText(renderBand({ ...band, workItems: [band.workItems![0]] }));
-        expect(text).toContain('1 tasks');
+        expect(text).toContain('1 task(s)');
     });
 
     it('reads a band with no workItems at all as zero tasks rather than crashing', () => {
         const { workItems: _omitted, ...withoutItems } = band;
         const text = allText(renderBand(withoutItems as TdahActivity));
-        expect(text).toContain('0 tasks');
+        expect(text).toContain('0 task(s)');
     });
 
     it('renders only the start when the band has no duration — never a fabricated end', () => {

@@ -442,7 +442,7 @@ export function TdahDndScreen() {
                                 <Text style={[styles.sectionHint, { color: tc.secondaryText }]} testID="tdah-dnd-calendar-detected">
                                     {calendarWindows.length > 0
                                         ? formatI18nTemplate(
-                                            tFallback(t, 'tdahDnd.calendar.detected', '{count} windows detected from your calendar'),
+                                            tFallback(t, 'tdahDnd.calendar.detected', '{count} window(s) detected from your calendar'),
                                             { count: String(calendarWindows.length) },
                                         )
                                         : tFallback(t, 'tdahDnd.calendar.detectedEmpty', 'No busy events in your working hours right now.')}

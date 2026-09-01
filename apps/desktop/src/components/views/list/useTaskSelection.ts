@@ -224,7 +224,7 @@ export function useTaskSelection(
                     if (undoNotificationsEnabled && showToast) {
                         const deletedMessage = deletedIds.length === 1
                             ? translate('list.taskDeleted', 'Task deleted')
-                            : translate('list.tasksDeleted', '{{count}} tasks deleted')
+                            : translate('list.tasksDeleted', '{{count}} task(s) deleted')
                                 .replace('{{count}}', String(deletedIds.length));
                         showToast(deletedMessage, 'info', 5000, {
                             label: translate('common.undo', 'Undo'),

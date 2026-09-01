@@ -22,7 +22,7 @@ const LABELS: Record<string, string> = {
     'tdahJira.status.lastSync': 'Last successful sync {when}',
     'tdahJira.status.neverSynced': 'No successful sync yet.',
     'tdahJira.status.syncing': 'Syncing…',
-    'tdahJira.status.taskCount': '{count} assigned tasks in the active sprint',
+    'tdahJira.status.taskCount': '{count} assigned task(s) in the active sprint',
     'tdahJira.status.noSprint': 'No active sprint — nothing to import.',
     'tdahJira.status.multiSprint': 'Several sprints are open at once; every assigned task from all of them is grouped into one band.',
     'tdahJira.error.credentials': 'The token no longer works — add a new one. Your personal activities keep running as usual.',
@@ -218,7 +218,7 @@ describe('TdahJiraView', () => {
 
         await screen.findByText('Connected to https://acme.atlassian.net');
         expect(screen.getByText('As me@acme.com')).toBeInTheDocument();
-        expect(screen.getByText('2 assigned tasks in the active sprint')).toBeInTheDocument();
+        expect(screen.getByText('2 assigned task(s) in the active sprint')).toBeInTheDocument();
         expect(screen.getByText(/^Last successful sync /)).toBeInTheDocument();
         // Only one sprint in the snapshot — the multi-sprint notice stays away.
         expect(screen.queryByText(/Several sprints are open/)).toBeNull();

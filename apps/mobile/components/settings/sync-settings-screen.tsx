@@ -171,7 +171,7 @@ function SyncSettingsView({
         const totalConflicts = summarizeMergeStats(lastSyncStats).conflicts;
         if (totalConflicts > samples.length) {
             lines.push(
-                translateWithFallback(t, 'settings.syncConflictMore', '+{{count}} more resolved conflicts')
+                translateWithFallback(t, 'settings.syncConflictMore', '+{{count}} more resolved conflict(s)')
                     .replace('{{count}}', String(totalConflicts - samples.length)),
             );
         }
