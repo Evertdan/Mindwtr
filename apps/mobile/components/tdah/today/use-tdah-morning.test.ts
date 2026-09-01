@@ -128,6 +128,34 @@ describe('useTdahMorning', () => {
         );
     });
 
+    // DW-117: the DEVICE_TIME_ZONE fallback (use-tdah-morning.ts:80,183) had no
+    // test at all on this surface. The literal is what the pinned test
+    // environment produces (TZ=UTC in the test script, enforced by
+    // tests/deterministic-environment.test.ts) — never a live `Intl` call,
+    // which is what made the sibling assertions in use-tdah-dnd/today/ritual
+    // tautological before DW-115.
+    it('falls back to the device zone when the server sends no timeZone', async () => {
+        cloudGetJson.mockResolvedValue({
+            date: '2026-08-28', timeZone: undefined, routineTitle: null,
+            activities: [], confirmedAt: null,
+        });
+        await mount();
+        await act(async () => { await latest?.reload(); });
+
+        expect(latest?.timeZone).toBe('UTC');
+    });
+
+    it('keeps the server timeZone when it sends one', async () => {
+        cloudGetJson.mockResolvedValue({
+            date: '2026-08-28', timeZone: 'Asia/Tokyo', routineTitle: null,
+            activities: [], confirmedAt: null,
+        });
+        await mount();
+        await act(async () => { await latest?.reload(); });
+
+        expect(latest?.timeZone).toBe('Asia/Tokyo');
+    });
+
     it('surfaces a non-null confirmedAt from the server (soft-lock banner data)', async () => {
         cloudGetJson.mockResolvedValue({
             date: '2026-08-28', timeZone: 'UTC', routineTitle: null, activities: [],

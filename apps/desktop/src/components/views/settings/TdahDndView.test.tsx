@@ -340,6 +340,36 @@ describe('TdahDndView', () => {
             expect(status.textContent).not.toContain('23:59');
         });
 
+        // DW-117: the DEVICE_TIME_ZONE fallback (TdahDndView.tsx:184,308,366)
+        // had no test at all. It is observable through the claim: the zone
+        // decides what "now" is when comparing against the server's "HH:mm".
+        // The pair below discriminates — same instant, same activeUntil, and
+        // the claim flips purely on which zone is in play.
+        it('falls back to the device zone when the server sends no timeZone', async () => {
+            configureCloudSync();
+            // 13:00 UTC. With the device zone (UTC under the pinned test
+            // environment) that is already past the announced 12:00.
+            vi.setSystemTime(new Date('2026-08-26T13:00:00Z'));
+            mockDnd({ ...baseState, activeUntil: '12:00', timeZone: undefined, date: '2026-08-26' });
+            render(<TdahDndView />);
+
+            const status = await screen.findByTestId('tdah-dnd-status');
+            expect(status.textContent).toBe('Not quiet right now — reminders are coming through.');
+        });
+
+        it('prefers the server timeZone over the device zone', async () => {
+            configureCloudSync();
+            // The very same instant, but Mexico City (UTC-6) reads 07:00, which
+            // is still before 12:00 — so the claim stands where the fallback
+            // above dropped it.
+            vi.setSystemTime(new Date('2026-08-26T13:00:00Z'));
+            mockDnd({ ...baseState, activeUntil: '12:00', timeZone: 'America/Mexico_City', date: '2026-08-26' });
+            render(<TdahDndView />);
+
+            const status = await screen.findByTestId('tdah-dnd-status');
+            expect(status.textContent).toBe('Quiet until 12:00');
+        });
+
         it('honours a server day that matches the clock', async () => {
             configureCloudSync();
             vi.setSystemTime(new Date('2026-08-26T15:00:00Z')); // 09:00 on the 26th
