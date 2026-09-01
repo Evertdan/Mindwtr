@@ -209,7 +209,12 @@ describe('useTdahDnd', () => {
         it('falls back to the device zone when the server sends none', async () => {
             cloud.get.mockResolvedValue({ ...state(), timeZone: undefined });
             await mountAndLoad();
-            expect(latest.timeZone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+            // DW-115: asserted against the literal the pinned test environment
+            // produces (TZ=UTC in the test script, enforced by
+            // tests/deterministic-environment.test.ts), NOT against a live
+            // `Intl` call. Comparing to the same call the code itself makes
+            // passed under any timezone and proved nothing.
+            expect(latest.timeZone).toBe('UTC');
         });
 
         it('is unconfigured when Self-Hosted sync is not set up', async () => {
