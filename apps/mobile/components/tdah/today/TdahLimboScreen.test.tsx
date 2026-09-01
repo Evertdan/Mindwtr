@@ -244,6 +244,57 @@ describe('TdahLimboScreen', () => {
             }
         });
 
+        // DW-117: the DEVICE_TIME_ZONE fallback (TdahLimboScreen.tsx:30,76) had
+        // no test at all. It is observable through the day count, because
+        // `daysInLimbo` resolves both ends in that zone. The pair below is what
+        // makes it a real assertion: the first proves the fallback is used when
+        // the profile carries no zone, the second proves the zone still shifts
+        // the count — without it, code that always returned 'UTC' would pass.
+        //
+        // Deliberately anchored so both sides land on a plural count (3 vs 2).
+        // A 2-vs-1 split discriminates just as well but would make the test
+        // assert "1 days in Limbo", codifying the missing plural form in
+        // `tdahToday.limboTimeInLimboDays` as expected output. See DW-118.
+        it('falls back to the device zone when the profile carries no timeZone', async () => {
+            vi.useFakeTimers();
+            try {
+                cloudConfig.value = { url: 'https://sync.example.com', token: 'tok', allowInsecureHttp: false };
+                cloudGetJson.mockResolvedValue({ profile: {} });
+                // 00:30 UTC on the 27th. In UTC the day key is the 27th, so an
+                // Activity moved on the 25th reads 2 days.
+                vi.setSystemTime(new Date('2026-08-27T00:30:00Z'));
+                hookState.activities = [limboActivity({ id: 1, dayPlanDate: '2026-08-01', movedAt: '2026-08-24T10:00:00Z' })];
+                let tree: ReturnType<typeof create> | undefined;
+                await act(async () => { tree = create(<TdahLimboScreen />); });
+
+                const row = tree!.root.findByProps({ testID: 'tdah-limbo-row-1' });
+                const texts = row.findAllByType(Text).map((node) => node.props.children).flat();
+                expect(texts).toContain('3 days in Limbo');
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
+        it('uses the profile timeZone over the device zone, shifting the count across a day boundary', async () => {
+            vi.useFakeTimers();
+            try {
+                cloudConfig.value = { url: 'https://sync.example.com', token: 'tok', allowInsecureHttp: false };
+                // Same instant as above, but Mexico City (UTC-6) is still on the
+                // 26th at 00:30 UTC, so the same Activity reads one day fewer.
+                cloudGetJson.mockResolvedValue({ profile: { timeZone: 'America/Mexico_City' } });
+                vi.setSystemTime(new Date('2026-08-27T00:30:00Z'));
+                hookState.activities = [limboActivity({ id: 1, dayPlanDate: '2026-08-01', movedAt: '2026-08-24T10:00:00Z' })];
+                let tree: ReturnType<typeof create> | undefined;
+                await act(async () => { tree = create(<TdahLimboScreen />); });
+
+                const row = tree!.root.findByProps({ testID: 'tdah-limbo-row-1' });
+                const texts = row.findAllByType(Text).map((node) => node.props.children).flat();
+                expect(texts).toContain('2 days in Limbo');
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
         it('sources the time-in-limbo count from movedAt, not the original dayPlanDate, once the Activity moved through T-05', async () => {
             vi.useFakeTimers();
             try {
