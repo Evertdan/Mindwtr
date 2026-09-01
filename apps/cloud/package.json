@@ -9,8 +9,8 @@
     "lint": "eslint -c ../../eslint.node.config.mjs . --max-warnings 0",
     "start": "bun run src/server.ts",
     "typecheck": "tsc --noEmit",
-    "test": "bun test",
-    "test:coverage": "bun test --coverage --coverage-reporter=lcov"
+    "test": "TZ=UTC LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 bun test",
+    "test:coverage": "TZ=UTC LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 bun test --coverage --coverage-reporter=lcov"
   },
   "dependencies": {
     "@mindwtr/core": "workspace:*"

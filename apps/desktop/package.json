@@ -21,8 +21,8 @@
     "build:vite": "tsc && vite build",
     "lint": "../../node_modules/.bin/eslint . --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "TZ=UTC LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 vitest run",
+    "test:watch": "TZ=UTC LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 vitest"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",
