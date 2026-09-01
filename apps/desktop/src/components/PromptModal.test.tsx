@@ -129,7 +129,14 @@ describe('PromptModal datetime-local field', () => {
         const calendar = screen.getByRole('dialog', { name: /nav\.calendar/ });
         // Day cells are labelled con la full localized date, matching how the
         // editor's calendar names them.
-        const dayLabel = new Intl.DateTimeFormat(undefined, {
+        //
+        // The locale is pinned to 'en-US' on purpose: `undefined` here means
+        // the HOST's locale, while the component formats with the locale the
+        // app resolved (English under this suite's mocks). On an English-locale
+        // machine the two coincided and the mismatch stayed invisible; on an
+        // es-* machine the expectation became "viernes, 17 de abril de 2026"
+        // while the button still read "Friday, April 17, 2026".
+        const dayLabel = new Intl.DateTimeFormat('en-US', {
             weekday: 'long',
             year: 'numeric',
             month: 'long',
