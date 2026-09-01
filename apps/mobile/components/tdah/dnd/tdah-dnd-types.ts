@@ -70,6 +70,14 @@ export type TdahDndResponse = {
      * itself is never recomputed here.
      */
     timeZone?: string;
+    /**
+     * The profile-local day (`YYYY-MM-DD`) the server resolved `activeUntil`
+     * ON, the same field `GET /v1/tdah/day` carries (DW-114). Needed because
+     * `activeUntil` is a bare "HH:mm" that only orders monotonically within one
+     * calendar day; taking the day from the server rather than stamping it from
+     * the client clock at receipt removes the midnight-straddle race entirely.
+     */
+    date?: string;
 };
 
 /** `POST /v1/tdah/dnd/windows` and `PUT /v1/tdah/dnd/windows/{id}` body. */

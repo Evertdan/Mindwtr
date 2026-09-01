@@ -319,6 +319,42 @@ describe('TdahDndView', () => {
             expect(cloudGetJson).toHaveBeenCalledTimes(1);
         });
 
+        // DW-114 — the day comes from the server's own resolution now. This is
+        // the race the client stamp could not survive: the response describes
+        // the 26th (activeUntil 23:59) but lands once the clock already reads
+        // the 27th. Stamping locally would have recorded the 27th, the day-key
+        // branch would never trip, and the stale claim would sit there ~24h.
+        it('drops a claim whose server day has already rolled, even on the very first render', async () => {
+            configureCloudSync();
+            vi.setSystemTime(new Date('2026-08-27T06:20:00Z')); // 00:20 on the 27th, UTC-6
+            mockDnd({
+                ...baseState,
+                activeUntil: '23:59',
+                timeZone: 'America/Mexico_City',
+                date: '2026-08-26',
+            });
+            render(<TdahDndView />);
+
+            const status = await screen.findByTestId('tdah-dnd-status');
+            expect(status.textContent).toBe('Not quiet right now — reminders are coming through.');
+            expect(status.textContent).not.toContain('23:59');
+        });
+
+        it('honours a server day that matches the clock', async () => {
+            configureCloudSync();
+            vi.setSystemTime(new Date('2026-08-26T15:00:00Z')); // 09:00 on the 26th
+            mockDnd({
+                ...baseState,
+                activeUntil: '12:00',
+                timeZone: 'America/Mexico_City',
+                date: '2026-08-26',
+            });
+            render(<TdahDndView />);
+
+            const status = await screen.findByTestId('tdah-dnd-status');
+            expect(status.textContent).toBe('Quiet until 12:00');
+        });
+
         // The midnight edge a bare "HH:mm" compare cannot see: "00:20" is
         // lexically SMALLER than "23:59", so the time term alone would keep an
         // end-of-day claim standing for most of the following day.

@@ -2377,6 +2377,9 @@ const buildDndResponse = (database: TdahDatabase, timeZone: string, now: Date): 
         windows: state.windows,
         activeUntil: resolution.active ? resolution.until : null,
         timeZone,
+        // DW-114 — the very `date` the resolution above ran against, so no
+        // client ever has to guess it from its own clock.
+        date,
     };
 };
 
@@ -2404,6 +2407,7 @@ export async function readDndState(
             windows: [],
             activeUntil: null,
             timeZone,
+            date: formatDateInTimeZone(now, timeZone),
         };
     }
     return await withReadDatabase(databasePath, (database) => buildDndResponse(database, timeZone, now));

@@ -97,6 +97,13 @@ export type TdahDndResponse = {
      * this field simply leaves the view on its previous, focus-only refresh.
      */
     timeZone?: string;
+    /**
+     * The profile-local day (`YYYY-MM-DD`) the server resolved `activeUntil`
+     * ON (DW-114). Optional on the wire only to tolerate a server predating the
+     * field; the fallback stamps it from the browser clock, which carries the
+     * midnight-straddle race this field exists to remove.
+     */
+    date?: string;
 };
 
 type TdahDndPhase = 'loading' | 'no-sync' | 'inactive' | 'ready' | 'error';
@@ -254,8 +261,9 @@ export function TdahDndView() {
     // (never a fixed increment), so it crosses a day boundary correctly after
     // the window was left open or the machine slept.
     const [now, setNow] = useState(() => new Date());
-    // The profile-zone day key the CURRENT `activeUntil` was resolved on,
-    // stamped at receipt because `GET /v1/tdah/dnd` carries no date of its own.
+    // The profile-zone day the server resolved the CURRENT `activeUntil` on,
+    // read off the response itself (DW-114) rather than stamped from this
+    // machine's clock.
     const [dayKey, setDayKey] = useState<string | null>(null);
 
     const [workStart, setWorkStart] = useState(TDAH_DND_DEFAULT_WORK_START);
@@ -289,10 +297,16 @@ export function TdahDndView() {
         setState(next);
         setWorkStart(next.settings.workStart || TDAH_DND_DEFAULT_WORK_START);
         setWorkEnd(next.settings.workEnd || TDAH_DND_DEFAULT_WORK_END);
-        setDayKey(formatDayKeyInTimeZone(
-            new Date(),
-            typeof next.timeZone === 'string' && next.timeZone.length > 0 ? next.timeZone : DEVICE_TIME_ZONE,
-        ));
+        // DW-114 — the server's own resolution day, verbatim. The client stamp
+        // below is the degraded path for a server predating the field: it can
+        // record the wrong day when a response computed at 23:58 lands after
+        // local midnight, and that mismatch never recovers on its own.
+        setDayKey(typeof next.date === 'string' && next.date.length > 0
+            ? next.date
+            : formatDayKeyInTimeZone(
+                new Date(),
+                typeof next.timeZone === 'string' && next.timeZone.length > 0 ? next.timeZone : DEVICE_TIME_ZONE,
+            ));
     }, []);
 
     const load = useCallback(async (config: CloudConnection): Promise<void> => {

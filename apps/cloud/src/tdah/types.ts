@@ -781,6 +781,20 @@ export type TdahDndResponse = {
      * learns when to ask the server again.
      */
     timeZone: string;
+    /**
+     * The profile-local day `activeUntil` was resolved ON — the same
+     * `YYYY-MM-DD` shape and the same meaning `TdahDayResponse.date` carries
+     * (DW-114).
+     *
+     * `activeUntil` is a bare "HH:mm" that only orders monotonically WITHIN one
+     * calendar day, so a client comparing it against "now" needs to know which
+     * day it belongs to. Reconstructing that day from the client's own clock at
+     * receipt looks equivalent and is not: a response computed at 23:58 and
+     * applied after local midnight would be stamped with the WRONG day, and the
+     * mismatch would then never resolve itself. Sending the day the server
+     * actually used removes the race instead of narrowing it.
+     */
+    date: string;
 };
 
 /**

@@ -7774,6 +7774,8 @@ describe('tdah module', () => {
             settings: { calendarEnabled: boolean; workStart: string; workEnd: string };
             windows: TdahTestDndWindow[];
             activeUntil: string | null;
+            timeZone?: string;
+            date?: string;
         };
 
         const dndRequest = async (
@@ -8431,6 +8433,27 @@ describe('tdah module', () => {
         });
 
         // --- (i) the chip: GET /v1/tdah/day carries the server's own verdict
+
+        // DW-114: `activeUntil` es un "HH:mm" pelado, asi que el cliente necesita
+        // saber SOBRE QUE DIA lo resolvio el servidor. Sin este campo las dos
+        // superficies DND lo sellaban del reloj propio al recibir, y una
+        // respuesta calculada a las 23:58 que aterriza pasada la medianoche
+        // quedaba sellada con el dia equivocado, sin forma de recuperarse.
+        test('DW-114: GET /v1/tdah/dnd trae el dia y la zona sobre los que el servidor resolvio activeUntil', async () => {
+            await activate({ timeZone: 'UTC' });
+            const body = await readDnd(await dndRequest('GET'));
+            expect(body.timeZone).toBe('UTC');
+            expect(body.date).toBe(today());
+
+            // Y viaja tambien en la respuesta de cada mutacion, no solo en el
+            // GET: toda mutacion DND devuelve el mismo envelope.
+            const created = await readDnd(await dndRequest('POST', {
+                path: '/v1/tdah/dnd/windows',
+                body: { kind: 'weekly', weekdays: [1], startTime: '10:00', endTime: '11:00' },
+            }));
+            expect(created.date).toBe(today());
+            expect(created.timeZone).toBe('UTC');
+        });
 
         test('(i) GET /v1/tdah/day trae dndActiveUntil, calculado por el servidor como fin del bloque contiguo', async () => {
             await activate({ timeZone: 'UTC' });

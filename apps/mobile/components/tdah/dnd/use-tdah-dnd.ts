@@ -67,12 +67,17 @@ export type UseTdahDndResult = {
      */
     timeZone: string;
     /**
-     * The profile-zone day key (`YYYY-MM-DD`) the current `activeUntil` was
-     * resolved on, or `null` before the first response. `activeUntil` is a bare
-     * "HH:mm", and "HH:mm" only orders monotonically WITHIN one calendar day —
-     * past local midnight "00:05" is lexically smaller than a stale "23:59", so
-     * a comparison without this would silently conclude the silence is still
-     * running. T-01 reads the equivalent from `GET /v1/tdah/day`'s own `date`.
+     * The profile-zone day (`YYYY-MM-DD`) the server resolved the current
+     * `activeUntil` ON, or `null` before the first response. `activeUntil` is a
+     * bare "HH:mm", and "HH:mm" only orders monotonically WITHIN one calendar
+     * day — past local midnight "00:05" is lexically smaller than a stale
+     * "23:59", so a comparison without this would silently conclude the silence
+     * is still running.
+     *
+     * Comes from the response's own `date` (DW-114), never from the client
+     * clock: a response computed at 23:58 and applied after midnight would
+     * otherwise be stamped with the wrong day and never recover. T-01 reads the
+     * same field off `GET /v1/tdah/day`.
      */
     dayKey: string | null;
     permission: SystemCalendarPermissionStatus;
@@ -174,11 +179,13 @@ export function useTdahDnd(): UseTdahDndResult {
             ? response.timeZone
             : DEVICE_TIME_ZONE;
         setTimeZone(zone);
-        // Stamped at receipt rather than sent by the server: `GET /v1/tdah/dnd`
-        // has no `date` of its own, and the sub-second window in which this
-        // could disagree with the server's own "today" closes itself — the very
-        // next tick sees the new day key and reloads.
-        setDayKey(formatDayKeyInTimeZone(new Date(), zone));
+        // DW-114 — the server's own resolution day, verbatim. The fallback to a
+        // client stamp only covers a server predating the field; it carries the
+        // midnight-straddle race this change exists to remove, so it is the
+        // degraded path, never the normal one.
+        setDayKey(typeof response.date === 'string' && response.date.length > 0
+            ? response.date
+            : formatDayKeyInTimeZone(new Date(), zone));
     }, []);
 
     const fetchState = useCallback(async (cloud: TdahDndCloudConfig): Promise<TdahDndResponse | null> => {
