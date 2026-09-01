@@ -244,9 +244,9 @@ Estilo de confirmación:
 
 ## Contribuciones de documentación
 
-Las actualizaciones de documentación son bienvenidas en el repositorio del sitio de documentación, `README.md`, `README_zh.md` y documentación local del repositorio.
+Las actualizaciones de documentación son bienvenidas en `README.md`, `README_zh.md` y la documentación local del repositorio.
 
-La mayoría de la documentación orientada al usuario debe ir en la fuente de documentación web de Mindwtr, que construye el sitio de documentación pública en https://docs.mindwtr.app/. Utiliza el directorio `docs/` de este repositorio para documentación local como guías de contribución, resúmenes de arquitectura, ADRs y notas de lanzamiento. El directorio `wiki/` contiene solo la página de inicio de la wiki de GitHub retirada, que dirige a los lectores al sitio de documentación; no agregues páginas de contenido allí.
+Utiliza el directorio `docs/` de este repositorio para documentación local como guías de contribución, resúmenes de arquitectura, ADRs y notas de lanzamiento. El directorio `wiki/` contiene solo la página de inicio de la wiki de GitHub retirada, que dirige a los lectores al sitio de documentación; no agregues páginas de contenido allí.
 
 Al cambiar documentos:
 
@@ -255,12 +255,10 @@ Al cambiar documentos:
 - Valida enlaces
 - Actualiza tanto documentación en inglés como en chino cuando el contenido se refleja
 - Mantén la estructura de encabezado de `README.md` y `README_zh.md` alineada; CI ejecuta `bun run docs:check-readme`
-- Prefiere actualizar la [fuente de documentación web de Mindwtr](https://github.com/dongdongbh/mindwtr-web/tree/main/docs) cuando el contenido es documentación pública de usuario/desarrollador
 
 Referencias útiles:
 
 - [Documentación oficial](https://docs.mindwtr.app/)
-- [Fuente de documentación](https://github.com/dongdongbh/mindwtr-web/tree/main/docs)
 - [Guía del desarrollador](https://docs.mindwtr.app/developers/developer-guide)
 - [Arquitectura](https://docs.mindwtr.app/developers/architecture)
 
