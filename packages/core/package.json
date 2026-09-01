@@ -49,8 +49,8 @@
     "build": "tsc",
     "lint": "eslint -c ../../eslint.node.config.mjs \"src/**/*.ts\" --ignore-pattern \"src/**/*.test.ts\"",
     "bench": "vitest bench",
-    "test": "vitest run",
-    "test:perf": "MINDWTR_PERF_TEST=1 vitest run src/performance-large-store.test.ts"
+    "test": "TZ=UTC LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 vitest run",
+    "test:perf": "TZ=UTC LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 MINDWTR_PERF_TEST=1 vitest run src/performance-large-store.test.ts"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
