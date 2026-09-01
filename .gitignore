@@ -122,3 +122,5 @@ _bmad/render/
 
 # Graphify analysis output (generated, not contributor material)
 graphify-out/
+# Local AI runtime state
+.atl/
