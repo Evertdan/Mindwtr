@@ -20,13 +20,13 @@ Mindwtr es un monorepo de Bun con:
 
 ### 1) Sigue nuestros estándares comunitarios
 
-- Lee y sigue el [Código de conducta](https://github.com/dongdongbh/Mindwtr/blob/main/.github/CODE_OF_CONDUCT.md).
+- Lee y sigue el [Código de conducta](https://github.com/Evertdan/Mindwtr/blob/main/.github/CODE_OF_CONDUCT.md).
 - Sé respetuoso en problemas, discusiones, revisiones y confirmaciones.
 
 ### 2) Reporta problemas de seguridad en privado
 
 - No abras problemas públicos para vulnerabilidades de seguridad.
-- Utiliza [SECURITY.md](https://github.com/dongdongbh/Mindwtr/blob/main/SECURITY.md) para las instrucciones de divulgación responsable.
+- Utiliza [SECURITY.md](https://github.com/Evertdan/Mindwtr/blob/main/SECURITY.md) para las instrucciones de divulgación responsable.
 
 ### 3) Comienza con un problema para cambios no triviales
 
@@ -56,7 +56,7 @@ Mindwtr se enfoca en GTD y ejecución práctica, y está construido para ser **s
 2. Bifurca el repositorio y crea una rama en tu bifurcación.
 3. Implementa el cambio con alcance enfocado.
 4. Ejecuta verificaciones relevantes localmente.
-5. Abre una solicitud de extracción a `dongdongbh/Mindwtr:main`.
+5. Abre una solicitud de extracción a `Evertdan/Mindwtr:main`.
 6. Vincula el problema en el PR (ejemplo: `Fixes #123`).
 
 Ejemplos de nombres de rama:
@@ -242,24 +242,11 @@ Estilo de confirmación:
   - `feat(core): add date format normalization`
   - `docs: clarify sync troubleshooting`
 
-## Acuerdo de licencia de colaborador
-
-Antes de que podamos fusionar tu solicitud de extracción, necesitarás firmar nuestro
-[Acuerdo de licencia de colaborador (CLA)](https://gist.github.com/dongdongbh/0446c35e1d5c1a73c344b16cba4aeeaa).
-
-Este es un proceso único — el Asistente de CLA verificará automáticamente cuando abras un PR y te lo pedirá si es necesario. Firmar toma aproximadamente 30 segundos a través de tu cuenta de GitHub.
-
-### ¿Por qué un CLA?
-
-Mindwtr es gratuito, de código abierto y está bajo la licencia AGPL-3.0. El CLA asegura que el proyecto tenga la flexibilidad de explorar opciones de sostenibilidad (como licencias duales) en el futuro, para que podamos mantener vivo el proyecto a largo plazo. Retienes la propiedad total de tus contribuciones — el CLA simplemente otorga al proyecto una licencia para usarlas.
-
-El núcleo de Mindwtr siempre seguirá siendo disponible bajo una licencia de código abierto aprobada por OSI.
-
 ## Contribuciones de documentación
 
-Las actualizaciones de documentación son bienvenidas en el repositorio del sitio de documentación, `README.md`, `README_zh.md` y documentación local del repositorio.
+Las actualizaciones de documentación son bienvenidas en `README.md`, `README_zh.md` y la documentación local del repositorio.
 
-La mayoría de la documentación orientada al usuario debe ir en la fuente de documentación web de Mindwtr, que construye el sitio de documentación pública en https://docs.mindwtr.app/. Utiliza el directorio `docs/` de este repositorio para documentación local como guías de contribución, resúmenes de arquitectura, ADRs y notas de lanzamiento. El directorio `wiki/` contiene solo la página de inicio de la wiki de GitHub retirada, que dirige a los lectores al sitio de documentación; no agregues páginas de contenido allí.
+Utiliza el directorio `docs/` de este repositorio para documentación local como guías de contribución, resúmenes de arquitectura, ADRs y notas de lanzamiento. El directorio `wiki/` contiene solo la página de inicio de la wiki de GitHub retirada, que dirige a los lectores al sitio de documentación; no agregues páginas de contenido allí.
 
 Al cambiar documentos:
 
@@ -268,12 +255,10 @@ Al cambiar documentos:
 - Valida enlaces
 - Actualiza tanto documentación en inglés como en chino cuando el contenido se refleja
 - Mantén la estructura de encabezado de `README.md` y `README_zh.md` alineada; CI ejecuta `bun run docs:check-readme`
-- Prefiere actualizar la [fuente de documentación web de Mindwtr](https://github.com/dongdongbh/mindwtr-web/tree/main/docs) cuando el contenido es documentación pública de usuario/desarrollador
 
 Referencias útiles:
 
 - [Documentación oficial](https://docs.mindwtr.app/)
-- [Fuente de documentación](https://github.com/dongdongbh/mindwtr-web/tree/main/docs)
 - [Guía del desarrollador](https://docs.mindwtr.app/developers/developer-guide)
 - [Arquitectura](https://docs.mindwtr.app/developers/architecture)
 
@@ -281,7 +266,7 @@ Referencias útiles:
 
 La mayoría de las cadenas de traducción viven en:
 
-- [`packages/core/src/i18n/locales/`](https://github.com/dongdongbh/Mindwtr/tree/main/packages/core/src/i18n/locales/)
+- [`packages/core/src/i18n/locales/`](https://github.com/Evertdan/Mindwtr/tree/main/packages/core/src/i18n/locales/)
 
 Al actualizar traducciones:
 
