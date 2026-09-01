@@ -20,13 +20,13 @@ Mindwtr es un monorepo de Bun con:
 
 ### 1) Sigue nuestros estándares comunitarios
 
-- Lee y sigue el [Código de conducta](https://github.com/dongdongbh/Mindwtr/blob/main/.github/CODE_OF_CONDUCT.md).
+- Lee y sigue el [Código de conducta](https://github.com/Evertdan/Mindwtr/blob/main/.github/CODE_OF_CONDUCT.md).
 - Sé respetuoso en problemas, discusiones, revisiones y commits.
 
 ### 2) Reporta problemas de seguridad de forma privada
 
 - No abras problemas públicos para vulnerabilidades de seguridad.
-- Usa [SECURITY.md](https://github.com/dongdongbh/Mindwtr/blob/main/SECURITY.md) para instrucciones de divulgación responsable.
+- Usa [SECURITY.md](https://github.com/Evertdan/Mindwtr/blob/main/SECURITY.md) para instrucciones de divulgación responsable.
 
 ### 3) Comienza con un problema para cambios no triviales
 
@@ -56,7 +56,7 @@ Mindwtr se enfoca en GTD y ejecución práctica, y se construye para ser **simpl
 2. Bifurca el repositorio y crea una rama en tu bifurcación.
 3. Implementa el cambio con alcance enfocado.
 4. Ejecuta verificaciones relevantes localmente.
-5. Abre una solicitud de extracción a `dongdongbh/Mindwtr:main`.
+5. Abre una solicitud de extracción a `Evertdan/Mindwtr:main`.
 6. Vincula el problema en la PR (ejemplo: `Fixes #123`).
 
 Ejemplos de nombres de ramas:
@@ -278,7 +278,7 @@ Referencias útiles:
 
 La mayoría de las cadenas de traducción viven en:
 
-- [`packages/core/src/i18n/locales/`](https://github.com/dongdongbh/Mindwtr/tree/main/packages/core/src/i18n/locales/)
+- [`packages/core/src/i18n/locales/`](https://github.com/Evertdan/Mindwtr/tree/main/packages/core/src/i18n/locales/)
 
 Cuando actualices traducciones:
 
