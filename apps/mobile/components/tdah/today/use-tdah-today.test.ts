@@ -200,7 +200,9 @@ describe('useTdahToday', () => {
         await act(async () => { await latest?.reload(); });
 
         expect(latest?.phase).toBe('empty');
-        expect(latest?.timeZone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+        // DW-115: literal, not a live `Intl` call — see the note in
+        // use-tdah-dnd.test.ts. TZ=UTC is pinned by the test script.
+        expect(latest?.timeZone).toBe('UTC');
     });
 
     it('moves to a clear error phase (never offline) on a malformed response body, e.g. activities missing or not an array', async () => {
