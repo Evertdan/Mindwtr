@@ -311,7 +311,7 @@ export function TdahLimboScreen() {
                                 const originalDateLabel = safeFormatDate(activity.dayPlanDate, 'P', activity.dayPlanDate);
                                 const timeLabel = activity.startTime;
                                 const daysLabel = formatI18nTemplate(
-                                    tFallback(t, 'tdahToday.limboTimeInLimboDays', '{count} days in Limbo'),
+                                    tFallback(t, 'tdahToday.limboTimeInLimboDays', '{count} day(s) in Limbo'),
                                     { count: String(daysInLimbo(activity, timeZone)) },
                                 );
 

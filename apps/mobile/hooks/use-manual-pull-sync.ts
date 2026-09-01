@@ -131,7 +131,7 @@ export function useManualPullSync() {
             tFallback(
               t,
               'settings.syncCompletedWithConflicts',
-              'Sync completed with {count} conflicts (resolved automatically).'
+              'Sync completed with {count} conflict(s) (resolved automatically).'
             ),
             conflictCount
           ),

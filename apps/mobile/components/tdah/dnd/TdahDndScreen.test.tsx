@@ -327,7 +327,7 @@ describe('TdahDndScreen (T-12)', () => {
             hookState.settings = { calendarEnabled: true, workStart: '09:00', workEnd: '18:00' };
             hookState.windows = [manualWindow, calendarWindow];
             const tree = await render();
-            expect(allText(tree)).toContain('1 windows detected from your calendar');
+            expect(allText(tree)).toContain('1 window(s) detected from your calendar');
         });
 
         it('says the calendar had nothing busy rather than showing a bare zero', async () => {

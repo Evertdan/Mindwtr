@@ -17,7 +17,7 @@ describe('focus-utils', () => {
     });
 
     it('formats dynamic focus limit text from new and legacy labels', () => {
-        expect(formatFocusTaskLimitText('Max {{count}} focus items', 5)).toBe('Max 5 focus items');
-        expect(formatFocusTaskLimitText('Max 3 focus items', 10)).toBe('Max 10 focus items');
+        expect(formatFocusTaskLimitText('Max {{count}} focus item(s)', 5)).toBe('Max 5 focus item(s)');
+        expect(formatFocusTaskLimitText('Max 3 focus item(s)', 10)).toBe('Max 10 focus item(s)');
     });
 });

@@ -411,7 +411,7 @@ describe('useRootLayoutTdahConnection', () => {
             expect(showTdahWorkBandNotificationMock).toHaveBeenCalledTimes(1);
             const request = showTdahWorkBandNotificationMock.mock.calls[0][0];
             expect(request.key).toBe('tdah-work-band:91');
-            expect(request.title).toBe('Sprint: 3 pending assigned tasks');
+            expect(request.title).toBe('Sprint: 3 pending assigned task(s)');
             expect(request.message).toBe('Your work band starts now.');
             expect(request.vibrationPattern).toEqual([0, 90]);
             expect(request.data).toMatchObject({ kind: 'tdah-work-band', context: '91' });
@@ -426,7 +426,7 @@ describe('useRootLayoutTdahConnection', () => {
                 options.onMessage(JSON.stringify({ ...workBandEvent, itemCount: 11 }));
             });
 
-            expect(showTdahWorkBandNotificationMock.mock.calls[0][0].title).toBe('Sprint: 11 pending assigned tasks');
+            expect(showTdahWorkBandNotificationMock.mock.calls[0][0].title).toBe('Sprint: 11 pending assigned task(s)');
         });
 
         it('resolves the title and body through resolveText instead of raw keys', async () => {
@@ -438,7 +438,7 @@ describe('useRootLayoutTdahConnection', () => {
             await act(async () => { options.onMessage(JSON.stringify(workBandEvent)); });
 
             const request = showTdahWorkBandNotificationMock.mock.calls[0][0];
-            expect(request.title).toBe('translated:Sprint: 3 pending assigned tasks');
+            expect(request.title).toBe('translated:Sprint: 3 pending assigned task(s)');
             expect(request.message).toBe('translated:Your work band starts now.');
             expect(request.channelName).toBe('translated:Activity reminders');
         });

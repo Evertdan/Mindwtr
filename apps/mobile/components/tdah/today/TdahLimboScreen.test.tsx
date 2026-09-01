@@ -97,7 +97,7 @@ const TRANSLATIONS: Record<string, string> = {
     'tdahToday.limboTitle': 'Limbo',
     'tdahToday.limboBadgeLabel': '{count} in Limbo',
     'tdahToday.limboEmpty': 'Nothing pending a decision — clean',
-    'tdahToday.limboTimeInLimboDays': '{count} days in Limbo',
+    'tdahToday.limboTimeInLimboDays': '{count} day(s) in Limbo',
     'tdahToday.limboSelectionCount': '{count} selected',
     'tdahToday.limboBatchApply': 'Apply to selection',
 };
@@ -238,7 +238,7 @@ describe('TdahLimboScreen', () => {
 
                 const row = tree!.root.findByProps({ testID: 'tdah-limbo-row-1' });
                 const texts = row.findAllByType(Text).map((node) => node.props.children).flat();
-                expect(texts).toContain('7 days in Limbo');
+                expect(texts).toContain('7 day(s) in Limbo');
             } finally {
                 vi.useRealTimers();
             }
@@ -251,10 +251,11 @@ describe('TdahLimboScreen', () => {
         // the profile carries no zone, the second proves the zone still shifts
         // the count — without it, code that always returned 'UTC' would pass.
         //
-        // Deliberately anchored so both sides land on a plural count (3 vs 2).
-        // A 2-vs-1 split discriminates just as well but would make the test
-        // assert "1 days in Limbo", codifying the missing plural form in
-        // `tdahToday.limboTimeInLimboDays` as expected output. See DW-118.
+        // Anchored at 3-vs-2 rather than 2-vs-1. Both discriminate, but the
+        // 2-vs-1 split once forced this test to assert "1 days in Limbo",
+        // codifying a missing plural form as expected output. DW-118 fixed the
+        // string itself (`{count} day(s) in Limbo`), so the trap is gone — the
+        // anchor stays where it is because a plural count reads better here.
         it('falls back to the device zone when the profile carries no timeZone', async () => {
             vi.useFakeTimers();
             try {
@@ -269,7 +270,7 @@ describe('TdahLimboScreen', () => {
 
                 const row = tree!.root.findByProps({ testID: 'tdah-limbo-row-1' });
                 const texts = row.findAllByType(Text).map((node) => node.props.children).flat();
-                expect(texts).toContain('3 days in Limbo');
+                expect(texts).toContain('3 day(s) in Limbo');
             } finally {
                 vi.useRealTimers();
             }
@@ -289,7 +290,7 @@ describe('TdahLimboScreen', () => {
 
                 const row = tree!.root.findByProps({ testID: 'tdah-limbo-row-1' });
                 const texts = row.findAllByType(Text).map((node) => node.props.children).flat();
-                expect(texts).toContain('2 days in Limbo');
+                expect(texts).toContain('2 day(s) in Limbo');
             } finally {
                 vi.useRealTimers();
             }
@@ -312,7 +313,7 @@ describe('TdahLimboScreen', () => {
 
                 const row = tree!.root.findByProps({ testID: 'tdah-limbo-row-1' });
                 const texts = row.findAllByType(Text).map((node) => node.props.children).flat();
-                expect(texts).toContain('2 days in Limbo');
+                expect(texts).toContain('2 day(s) in Limbo');
                 expect(texts).not.toContain('26 days in Limbo');
             } finally {
                 vi.useRealTimers();

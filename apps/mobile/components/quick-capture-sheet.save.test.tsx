@@ -177,7 +177,7 @@ vi.mock('../contexts/language-context', () => ({
     t: (key: string) => ({
       'common.notice': 'Notice',
       'agenda.addToFocus': "Add to today's focus",
-      'agenda.maxFocusItems': 'Max {{count}} focus items',
+      'agenda.maxFocusItems': 'Max {{count}} focus item(s)',
       'agenda.removeFromFocus': 'Remove from focus',
       'quickAdd.invalidDateCommand': 'Invalid date',
       'taskEdit.contextsLabel': 'Contexts',

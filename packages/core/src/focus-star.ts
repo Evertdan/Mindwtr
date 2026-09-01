@@ -92,7 +92,7 @@ export function getFocusStarBlockedText(
     switch (action.blockedReason) {
         case 'limit':
             return formatFocusTaskLimitText(
-                tFallback(t, 'agenda.maxFocusItems', 'Max {{count}} focus items.'),
+                tFallback(t, 'agenda.maxFocusItems', 'Max {{count}} focus item(s)'),
                 focusTaskLimit,
             );
         case 'deferred':

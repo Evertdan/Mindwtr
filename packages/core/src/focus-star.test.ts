@@ -76,11 +76,11 @@ describe('getFocusStarBlockedText', () => {
 
     it('interpolates the focus limit into the cap message', () => {
         const text = getFocusStarBlockedText(
-            () => 'Max {{count}} focus items.',
+            () => 'Max {{count}} focus item(s)',
             { blockedReason: 'limit' },
             5,
         );
-        expect(text).toBe('Max 5 focus items.');
+        expect(text).toBe('Max 5 focus item(s)');
     });
 
     it('falls back to English per reason and returns null when unblocked', () => {
