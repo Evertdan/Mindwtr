@@ -252,26 +252,6 @@ Estilo de commit:
   - `feat(core): add date format normalization`
   - `docs: clarify sync troubleshooting`
 
-## Acuerdo de licencia de contribuidor
-
-Antes de que podamos fusionar tu solicitud de extracción, necesitarás firmar nuestro
-[Acuerdo de licencia de contribuidor (CLA)](https://gist.github.com/dongdongbh/0446c35e1d5c1a73c344b16cba4aeeaa).
-
-Este es un proceso único — el Asistente de CLA verificará automáticamente
-cuando abras una PR y te indicará si es necesario. Firmar toma aproximadamente
-30 segundos a través de tu cuenta de GitHub.
-
-### ¿Por qué un CLA?
-
-Mindwtr es gratuito, de código abierto y con licencia AGPL-3.0. El CLA
-garantiza que el proyecto tiene la flexibilidad para explorar opciones de sostenibilidad
-(como licencias duales) en el futuro, para que podamos mantener el
-proyecto con vida a largo plazo. Tú retienes la propiedad total de tus
-contribuciones — el CLA simplemente otorga al proyecto una licencia para usarlas.
-
-El núcleo de Mindwtr siempre permanecerá disponible bajo una
-licencia de código abierto aprobada por OSI.
-
 ## Contribuciones de documentación
 
 Las actualizaciones de documentación son bienvenidas en el repositorio del sitio de documentación, `README.md`, `README_zh.md` y documentación local del repositorio.
